@@ -1,0 +1,3 @@
+<includeonly>{{#invoke:SV/Sections|managed}}</includeonly><noinclude>
+Notice placed on every page managed by the seminaverbi-templates repository.
+</noinclude>

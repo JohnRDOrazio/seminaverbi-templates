@@ -1,0 +1,3 @@
+<includeonly>{{#invoke:SV/Sections|discernment}}</includeonly><noinclude>
+Starts the closing section on how the work relates to the Gospel, with the same heading on every wiki. Put it on its own line.
+</noinclude>
