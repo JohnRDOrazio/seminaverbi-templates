@@ -1,0 +1,28 @@
+{
+  "versions": [
+    "NABRE",
+    "DRB",
+    "CEI2008",
+    "LUZZI",
+    "BLPD",
+    "NVBSE",
+    "VGCL"
+  ],
+  "version_lang": {
+    "NABRE": "en",
+    "DRB": "en",
+    "CEI2008": "it",
+    "LUZZI": "it",
+    "BLPD": "es",
+    "NVBSE": "la",
+    "VGCL": "la"
+  },
+  "defaults": {
+    "en": "NABRE",
+    "it": "CEI2008",
+    "es": "BLPD",
+    "fr": "NVBSE",
+    "de": "NVBSE",
+    "pt": "NVBSE"
+  }
+}

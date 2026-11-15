@@ -1,0 +1,295 @@
+{
+  "book": [
+    {
+      "key": "image",
+      "prop": "image",
+      "kind": "image"
+    },
+    {
+      "key": "title",
+      "prop": "title",
+      "kind": "monolingual"
+    },
+    {
+      "key": "author",
+      "prop": "author",
+      "kind": "item"
+    },
+    {
+      "key": "original_language_work",
+      "prop": "original_language_work",
+      "kind": "item"
+    },
+    {
+      "key": "publication_date",
+      "prop": "publication_date",
+      "kind": "time"
+    },
+    {
+      "key": "genre",
+      "prop": "genre",
+      "kind": "item"
+    },
+    {
+      "key": "country_of_origin",
+      "prop": "country_of_origin",
+      "kind": "item"
+    },
+    {
+      "key": "follows",
+      "prop": "follows",
+      "kind": "item"
+    },
+    {
+      "key": "followed_by",
+      "prop": "followed_by",
+      "kind": "item"
+    }
+  ],
+  "film": [
+    {
+      "key": "image",
+      "prop": "image",
+      "kind": "image"
+    },
+    {
+      "key": "title",
+      "prop": "title",
+      "kind": "monolingual"
+    },
+    {
+      "key": "director",
+      "prop": "director",
+      "kind": "item"
+    },
+    {
+      "key": "screenwriter",
+      "prop": "screenwriter",
+      "kind": "item"
+    },
+    {
+      "key": "cast",
+      "prop": "cast",
+      "kind": "item",
+      "max": 6
+    },
+    {
+      "key": "publication_date",
+      "prop": "publication_date",
+      "kind": "time"
+    },
+    {
+      "key": "original_language_film",
+      "prop": "original_language_film",
+      "kind": "item"
+    },
+    {
+      "key": "country_of_origin",
+      "prop": "country_of_origin",
+      "kind": "item"
+    },
+    {
+      "key": "genre",
+      "prop": "genre",
+      "kind": "item"
+    }
+  ],
+  "tv": [
+    {
+      "key": "image",
+      "prop": "image",
+      "kind": "image"
+    },
+    {
+      "key": "title",
+      "prop": "title",
+      "kind": "monolingual"
+    },
+    {
+      "key": "creator",
+      "prop": "creator",
+      "kind": "item"
+    },
+    {
+      "key": "cast",
+      "prop": "cast",
+      "kind": "item",
+      "max": 6
+    },
+    {
+      "key": "original_language_film",
+      "prop": "original_language_film",
+      "kind": "item"
+    },
+    {
+      "key": "country_of_origin",
+      "prop": "country_of_origin",
+      "kind": "item"
+    },
+    {
+      "key": "genre",
+      "prop": "genre",
+      "kind": "item"
+    },
+    {
+      "key": "publication_date",
+      "prop": "publication_date",
+      "kind": "time"
+    }
+  ],
+  "album": [
+    {
+      "key": "image",
+      "prop": "image",
+      "kind": "image"
+    },
+    {
+      "key": "title",
+      "prop": "title",
+      "kind": "monolingual"
+    },
+    {
+      "key": "performer",
+      "prop": "performer",
+      "kind": "item"
+    },
+    {
+      "key": "publication_date",
+      "prop": "publication_date",
+      "kind": "time"
+    },
+    {
+      "key": "genre",
+      "prop": "genre",
+      "kind": "item"
+    },
+    {
+      "key": "record_label",
+      "prop": "record_label",
+      "kind": "item"
+    }
+  ],
+  "song": [
+    {
+      "key": "image",
+      "prop": "image",
+      "kind": "image"
+    },
+    {
+      "key": "title",
+      "prop": "title",
+      "kind": "monolingual"
+    },
+    {
+      "key": "performer",
+      "prop": "performer",
+      "kind": "item"
+    },
+    {
+      "key": "composer",
+      "prop": "composer",
+      "kind": "item"
+    },
+    {
+      "key": "lyrics_by",
+      "prop": "lyrics_by",
+      "kind": "item"
+    },
+    {
+      "key": "publication_date",
+      "prop": "publication_date",
+      "kind": "time"
+    },
+    {
+      "key": "genre",
+      "prop": "genre",
+      "kind": "item"
+    }
+  ],
+  "play": [
+    {
+      "key": "image",
+      "prop": "image",
+      "kind": "image"
+    },
+    {
+      "key": "title",
+      "prop": "title",
+      "kind": "monolingual"
+    },
+    {
+      "key": "author",
+      "prop": "author",
+      "kind": "item"
+    },
+    {
+      "key": "original_language_work",
+      "prop": "original_language_work",
+      "kind": "item"
+    },
+    {
+      "key": "publication_date",
+      "prop": "publication_date",
+      "kind": "time"
+    },
+    {
+      "key": "genre",
+      "prop": "genre",
+      "kind": "item"
+    }
+  ],
+  "artwork": [
+    {
+      "key": "image",
+      "prop": "image",
+      "kind": "image"
+    },
+    {
+      "key": "title",
+      "prop": "title",
+      "kind": "monolingual"
+    },
+    {
+      "key": "creator",
+      "prop": "creator",
+      "kind": "item"
+    },
+    {
+      "key": "inception",
+      "prop": "inception",
+      "kind": "time"
+    }
+  ],
+  "person": [
+    {
+      "key": "image",
+      "prop": "image",
+      "kind": "image"
+    },
+    {
+      "key": "birth_date",
+      "prop": "birth_date",
+      "kind": "time"
+    },
+    {
+      "key": "birth_place",
+      "prop": "birth_place",
+      "kind": "item"
+    },
+    {
+      "key": "death_date",
+      "prop": "death_date",
+      "kind": "time"
+    },
+    {
+      "key": "death_place",
+      "prop": "death_place",
+      "kind": "item"
+    },
+    {
+      "key": "occupation",
+      "prop": "occupation",
+      "kind": "item"
+    }
+  ]
+}

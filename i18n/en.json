@@ -1,0 +1,19 @@
+{
+  "bible_missing_ref": "SV Bible quote: the ref parameter is missing.",
+  "bible_note": "text in $1; not yet available in English",
+  "bible_unsupported": "The Bible version '$1' is not supported by BibleGet.",
+  "cite_accessed": "Accessed",
+  "cite_archived": "Archived",
+  "cite_missing_title": "SV cite: the title parameter is missing.",
+  "cite_pages": "pp.",
+  "discernment_heading": "Seeds of the Word and points of caution",
+  "infobox_missing_category": "SV infobox missing data",
+  "langname_en": "English",
+  "langname_es": "Spanish",
+  "langname_it": "Italian",
+  "langname_la": "Latin",
+  "managed_notice": "This page is managed in git and overwritten by the sync: edit it at $1.",
+  "references_heading": "References",
+  "wip_category": "SV articles in progress",
+  "wip_notice": "This article is a work in progress ($1, $2)."
+}
