@@ -1,0 +1,34 @@
+.sv-infobox {
+	float: right;
+	clear: right;
+	width: 22em;
+	margin: 0 0 1em 1em;
+	border: 1px solid #a2a9b1;
+	background: #f8f9fa;
+	color: #202122;
+	font-size: 88%;
+	line-height: 1.5;
+	border-collapse: collapse;
+}
+.sv-infobox caption {
+	font-size: 125%;
+	font-weight: bold;
+	padding: 0.2em;
+}
+.sv-infobox th,
+.sv-infobox td {
+	padding: 0.2em 0.4em;
+	vertical-align: top;
+	text-align: left;
+}
+.sv-infobox-image,
+.sv-infobox-original {
+	text-align: center;
+}
+@media screen and (max-width: 640px) {
+	.sv-infobox {
+		float: none;
+		width: 100%;
+		margin: 0 0 1em 0;
+	}
+}

@@ -1,0 +1,115 @@
+from lua_env import LuaEnv
+
+
+def item(qid):
+    return {"mainsnak": {"snaktype": "value", "datavalue": {"type": "wikibase-entityid", "value": {"id": qid}}}}
+
+
+def time(iso, precision):
+    return {"mainsnak": {"snaktype": "value", "datavalue": {"type": "time", "value": {"time": iso, "precision": precision}}}}
+
+
+def text(value):
+    return {"mainsnak": {"snaktype": "value", "datavalue": {"type": "string", "value": value}}}
+
+
+def mono(t, lang):
+    return {"mainsnak": {"snaktype": "value", "datavalue": {"type": "monolingualtext", "value": {"text": t, "language": lang}}}}
+
+
+LOTR = {
+    "labels": {"en": "The Lord of the Rings", "it": "Il Signore degli Anelli"},
+    "sitelinks": {"it": "Il Signore degli Anelli", "itwiki": "Il Signore degli Anelli"},
+    "claims": {
+        "P725": [text("El Señor de los Anillos lectura.jpg")],
+        "P458": [mono("The Lord of the Rings", "en"), mono("Il Signore degli Anelli", "it")],
+        "P3990": [item("Q10")],
+        "P4788": [time("+1954-07-29T00:00:00Z", 11)],
+        "P501": [item("Q11")],
+    },
+}
+ENTITIES = {
+    "Q4178": LOTR,
+    "Q10": {"labels": {"en": "J. R. R. Tolkien", "it": "J. R. R. Tolkien"}, "sitelinks": {"itwiki": "J. R. R. Tolkien"}},
+    "Q11": {"labels": {"it": "Il Silmarillion"}, "sitelinks": {"it": "Il Silmarillion"}},
+    "P3990": {"labels": {"en": "author", "it": "autore"}},
+    "P4788": {"labels": {"en": "publication date", "it": "data di pubblicazione"}},
+    "P501": {"labels": {"en": "followed by", "it": "seguito da"}},
+}
+
+
+def render(kind="work", lang="it", page_entity="Q4178", entities=ENTITIES, **args):
+    env = LuaEnv(lang=lang, entities=entities, page_entity=page_entity, page_title="Pagina")
+    ctx = env.lua.table_from({"lang": lang, "entity_id": page_entity})
+    return env.call("Module:SV/Infobox", "_render", kind, env.lua.table_from(args), ctx)
+
+
+def row(label, value):
+    return f"<tr><th>{label}</th><td>{value}</td></tr>"
+
+
+def test_book_from_item():
+    out = render()
+    assert '<table class="sv-infobox sv-infobox-book">' in out
+    assert row("autore", "[[wikipedia:it:J. R. R. Tolkien|J. R. R. Tolkien]]") in out
+    assert "[[File:El Señor de los Anillos lectura.jpg|frameless|upright=1.15]]" in out
+    assert "''The Lord of the Rings''" in out
+    assert "Category:" not in out
+
+
+def test_local_sitelink_wins():
+    assert row("seguito da", "[[Il Silmarillion|Il Silmarillion]]") in render()
+
+
+def test_param_overrides_item():
+    out = render(author="[[Tolkien]]")
+    assert row("autore", "[[Tolkien]]") in out
+    assert "wikipedia:it:J. R. R. Tolkien" not in out
+
+
+def test_time_precision():
+    assert row("data di pubblicazione", "j F Y|1954-07-29") in render()
+    year = dict(ENTITIES, Q4178=dict(LOTR, claims={"P4788": [time("+1954-00-00T00:00:00Z", 9)]}))
+    assert row("data di pubblicazione", "1954") in render(entities=year)
+
+
+def test_no_item_still_renders():
+    out = render(page_entity=None, entities={}, name="X", genre="fantasy")
+    assert "X" in out and row("genre", "fantasy") in out
+    assert "[[Category:Infobox SV con dati mancanti]]" in out
+
+
+def test_empty_item_gets_category():
+    out = render(entities={"Q4178": {"labels": {"it": "Vuoto"}, "claims": {}}})
+    assert "Vuoto" in out
+    assert "[[Category:Infobox SV con dati mancanti]]" in out
+
+
+def test_label_fallback():
+    out = render(lang="pt")
+    assert row("author", "J. R. R. Tolkien") in out
+    assert "The Lord of the Rings" in out
+    bare = dict(ENTITIES, Q10={})
+    assert row("author", "Q10") in render(lang="pt", entities=bare)
+
+
+def test_cast_max():
+    film = {"Q1": {"labels": {"en": "Film"}, "claims": {"P552": [item(f"Q{n}") for n in range(100, 108)]}}}
+    out = render(lang="en", page_entity="Q1", entities=film, type="film")
+    assert out.count("Q10") == 6
+
+
+def test_person():
+    person = {"Q2": {"labels": {"en": "Bach"}, "claims": {
+        "P4712": [time("+1685-03-31T00:00:00Z", 11)], "P818": [item("Q3")]}},
+        "Q3": {"labels": {"en": "Eisenach"}, "sitelinks": {"enwiki": "Eisenach"}}}
+    out = render(kind="person", lang="en", page_entity="Q2", entities=person)
+    assert '<table class="sv-infobox sv-infobox-person">' in out
+    assert row("birth_date", "j F Y|1685-03-31") in out
+    assert row("birth_place", "[[wikipedia:en:Eisenach|Eisenach]]") in out
+
+
+def test_values_are_escaped():
+    evil = {"Q5": {"labels": {"en": 'A <b>"x"'}, "claims": {"P3990": [item("Q6")]}}, "Q6": {"labels": {"en": "<i>y"}}}
+    out = render(lang="en", page_entity="Q5", entities=evil)
+    assert "<b>" not in out and "<i>" not in out
