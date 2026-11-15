@@ -44,11 +44,13 @@ end
 
 
 class LuaEnv:
-    def __init__(self, lang="en", data=None, entities=None, page_entity=None, page_title="Test page"):
+    def __init__(self, lang="en", data=None, entities=None, page_entity=None, page_title="Test page",
+                 patch_data=None):
         self.lua = lupa.LuaRuntime(unpack_returned_tuples=True)
         self.lang = lang
         self.entities = entities or {}
         self._data = data
+        self._patch = patch_data
         table = self.lua.table_from
         bridge = {
             "lang": lang,
@@ -70,7 +72,10 @@ class LuaEnv:
             from sync.pages import compile_data
         except ImportError:
             return self.lua.table()
-        return self.lua.execute(compile_data(ROOT))
+        table = self.lua.execute(compile_data(ROOT))
+        if self._patch:
+            self._patch(table)
+        return table
 
     @staticmethod
     def _source(name):
