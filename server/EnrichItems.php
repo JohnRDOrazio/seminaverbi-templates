@@ -60,7 +60,8 @@ class EnrichItems extends Maintenance {
 		$file = $this->getOption( 'properties', __DIR__ . '/properties.txt' );
 		$wdProps = array_values( array_filter( array_map( 'trim', file( $file ) ) ) );
 
-		$failures = 0;
+		/** @var array<string, true> items left incomplete or unsaved, reported once all items have run */
+		$failed = [];
 		foreach ( $this->localItems() as $localSerialization ) {
 			$localId = new ItemId( $localSerialization );
 			$wdSerialization = $this->originalId( $localSerialization );
@@ -106,6 +107,7 @@ class EnrichItems extends Maintenance {
 						if ( $localRef === null && !$this->dryRun ) {
 							$this->output( "  ! $shown could not be created locally, $localPropSerialization ($wdProp) left for a later run\n" );
 							$complete = false;
+							$failed[$localSerialization] = true;
 							break;
 						}
 						if ( $localRef !== null ) {
@@ -138,13 +140,14 @@ class EnrichItems extends Maintenance {
 					$store->saveEntity( $item, "Enrich from Wikidata $wdSerialization", $this->user, EDIT_UPDATE,
 						$revision->getRevisionId() );
 				} catch ( Exception $e ) {
-					$failures++;
+					$failed[$localSerialization] = true;
 					$this->output( "  ! saving $localSerialization failed (rerun to retry): " . $e->getMessage() . "\n" );
 				}
 			}
 		}
-		if ( $failures ) {
-			$this->fatalError( "$failures item(s) could not be saved." );
+		if ( $failed ) {
+			$this->fatalError( count( $failed ) . ' item(s) incomplete or not saved (rerun to retry): '
+				. implode( ', ', array_keys( $failed ) ) );
 		}
 		$this->output( $this->dryRun ? "Dry run: nothing written.\n" : "Done.\n" );
 	}
