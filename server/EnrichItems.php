@@ -36,6 +36,7 @@ class EnrichItems extends Maintenance {
 	private const SOURCE = 'https://www.wikidata.org/w/api.php';
 
 	private bool $dryRun = false;
+	/** Null on a dry run, which must not create or take over the account. */
 	private ?User $user = null;
 	/** @var array<string, Item|null> */
 	private array $remoteCache = [];
@@ -51,12 +52,15 @@ class EnrichItems extends Maintenance {
 
 	public function execute() {
 		$this->dryRun = $this->hasOption( 'dry-run' );
-		$this->user = User::newSystemUser( 'SV enrichment', [ 'steal' => true ] );
+		if ( !$this->dryRun ) {
+			$this->user = User::newSystemUser( 'SV enrichment', [ 'steal' => true ] );
+		}
 		$lookup = WikibaseRepo::getEntityRevisionLookup();
 		$store = WikibaseRepo::getEntityStore();
 		$file = $this->getOption( 'properties', __DIR__ . '/properties.txt' );
 		$wdProps = array_values( array_filter( array_map( 'trim', file( $file ) ) ) );
 
+		$failures = 0;
 		foreach ( $this->localItems() as $localSerialization ) {
 			$localId = new ItemId( $localSerialization );
 			$wdSerialization = $this->originalId( $localSerialization );
@@ -83,6 +87,11 @@ class EnrichItems extends Maintenance {
 					continue;
 				}
 				$statements = $remoteItem->getStatements()->getByPropertyId( new NumericPropertyId( $wdProp ) );
+				// Stage the property's statements; add none if any referenced item cannot be created, so the
+				// property stays empty and a later run retries it (a partly filled property is skipped).
+				$staged = [];
+				$stagedShown = [];
+				$complete = true;
 				foreach ( $statements->toArray() as $statement ) {
 					$snak = $statement->getMainSnak();
 					if ( !$snak instanceof PropertyValueSnak || $statement->getRank() === Statement::RANK_DEPRECATED ) {
@@ -95,8 +104,9 @@ class EnrichItems extends Maintenance {
 					if ( $value instanceof EntityIdValue ) {
 						$localRef = $this->ensureLocal( $value->getEntityId() );
 						if ( $localRef === null && !$this->dryRun ) {
-							$this->output( "  ! $shown could not be created locally, value skipped\n" );
-							continue;
+							$this->output( "  ! $shown could not be created locally, $localPropSerialization ($wdProp) left for a later run\n" );
+							$complete = false;
+							break;
 						}
 						if ( $localRef !== null ) {
 							$value = new EntityIdValue( new ItemId( $localRef ) );
@@ -105,9 +115,16 @@ class EnrichItems extends Maintenance {
 					$copy = new Statement( new PropertyValueSnak( $localProp, $value ) );
 					$copy->setRank( $statement->getRank() );
 					$copy->setGuid( ( new \Wikibase\DataModel\Services\Statement\GuidGenerator() )->newGuid( $localId ) );
-					$item->getStatements()->addStatement( $copy );
-					$added[] = "$localPropSerialization ($wdProp) = $shown";
+					$staged[] = $copy;
+					$stagedShown[] = "$localPropSerialization ($wdProp) = $shown";
 				}
+				if ( !$complete ) {
+					continue;
+				}
+				foreach ( $staged as $copy ) {
+					$item->getStatements()->addStatement( $copy );
+				}
+				array_push( $added, ...$stagedShown );
 			}
 			if ( !$added ) {
 				$this->output( "$localSerialization (wd $wdSerialization): nothing to add\n" );
@@ -115,8 +132,19 @@ class EnrichItems extends Maintenance {
 			}
 			$this->output( "$localSerialization (wd $wdSerialization):\n  + " . implode( "\n  + ", $added ) . "\n" );
 			if ( !$this->dryRun ) {
-				$store->saveEntity( $item, "Enrich from Wikidata $wdSerialization", $this->user, EDIT_UPDATE );
+				try {
+					// The base revision makes Wikibase refuse the save if someone edited the item meanwhile,
+					// instead of overwriting their edit with this script's older copy.
+					$store->saveEntity( $item, "Enrich from Wikidata $wdSerialization", $this->user, EDIT_UPDATE,
+						$revision->getRevisionId() );
+				} catch ( Exception $e ) {
+					$failures++;
+					$this->output( "  ! saving $localSerialization failed (rerun to retry): " . $e->getMessage() . "\n" );
+				}
 			}
+		}
+		if ( $failures ) {
+			$this->fatalError( "$failures item(s) could not be saved." );
 		}
 		$this->output( $this->dryRun ? "Dry run: nothing written.\n" : "Done.\n" );
 	}

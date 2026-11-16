@@ -141,3 +141,42 @@ def test_only_first_image():
     out = render(entities=with_claims(P725=[text("One.jpg"), text("Two.jpg")]))
     assert "[[File:One.jpg|frameless|upright=1.15]]" in out
     assert "Two.jpg" not in out
+
+
+def ranked(statement, rank):
+    return dict(statement, rank=rank)
+
+
+def test_preferred_rank_wins():
+    # Wikibase shows the preferred statements when there are any
+    out = render(entities=with_claims(P725=[ranked(text("One.jpg"), "normal"), ranked(text("Two.jpg"), "preferred")]))
+    assert "[[File:Two.jpg|frameless|upright=1.15]]" in out
+    assert "One.jpg" not in out
+
+
+def test_julian_leap_day_kept():
+    # 29 February 1500 exists in the Julian calendar only; formatDate would roll it to 1 March
+    out = render(entities=with_claims(P4788=[time("+1500-02-29T00:00:00Z", 11)]))
+    assert row("data di pubblicazione", "29 F Y|1500-02-01") in out
+
+
+def date_row(iso, precision, lang="it"):
+    out = render(lang=lang, entities=with_claims(P4788=[time(iso, precision)]))
+    label = "data di pubblicazione" if lang == "it" else "publication date"
+    return out, label
+
+
+def test_decade_century_millennium():
+    out, label = date_row("+1950-00-00T00:00:00Z", 8)
+    assert row(label, "anni 1950") in out
+    out, label = date_row("+1400-00-00T00:00:00Z", 7)
+    assert row(label, "XIV secolo") in out
+    out, label = date_row("+1301-00-00T00:00:00Z", 7, lang="en")
+    assert row(label, "14th century") in out
+    out, label = date_row("+2000-00-00T00:00:00Z", 6)
+    assert row(label, "II millennio") in out
+
+
+def test_bc_century():
+    out, label = date_row("-0500-00-00T00:00:00Z", 7)
+    assert row(label, "V secolo a.C.") in out

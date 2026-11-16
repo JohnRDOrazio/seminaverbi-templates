@@ -52,3 +52,9 @@ def test_text_params_stay_wikitext():
 def test_missing_title_is_error():
     out = render(url="https://x.org")
     assert out.startswith('<strong class="error">')
+
+
+def test_impossible_iso_date_shown_as_written():
+    # formatDate raises on month 13; the citation must still render
+    out = render(url="https://x.org", title="T", **{"access-date": "2026-13-01"})
+    assert "2026-13-01" in out

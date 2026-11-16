@@ -31,12 +31,22 @@ class WikiClient:
             raise SyncError(f"{self.lang}: {data['error'].get('code')}: {data['error'].get('info')}")
         return data
 
+    def _dig(self, data, *keys):
+        """data[k1][k2]..., raising SyncError (not KeyError) when the API answered something unexpected."""
+        for key in keys:
+            try:
+                data = data[key]
+            except (KeyError, IndexError, TypeError):
+                raise SyncError(f"{self.lang}: unexpected API response: missing {key!r}") from None
+        return data
+
     def _token(self, kind: str) -> str:
-        return self._call("GET", action="query", meta="tokens", type=kind)["query"]["tokens"][f"{kind}token"]
+        return self._dig(self._call("GET", action="query", meta="tokens", type=kind),
+                         "query", "tokens", f"{kind}token")
 
     def login(self, user: str, password: str) -> None:
-        result = self._call("POST", action="login", lgname=user, lgpassword=password,
-                            lgtoken=self._token("login"))["login"]
+        result = self._dig(self._call("POST", action="login", lgname=user, lgpassword=password,
+                                      lgtoken=self._token("login")), "login")
         if result.get("result") != "Success":
             raise SyncError(f"{self.lang}: login failed: {result.get('reason', result.get('result'))}")
 
@@ -44,8 +54,8 @@ class WikiClient:
         out: dict[str, PageState | None] = {}
         for i in range(0, len(titles), 50):
             batch = titles[i:i + 50]
-            q = self._call("GET", action="query", prop="revisions", rvprop="content|user",
-                           rvslots="main", titles="|".join(batch))["query"]
+            q = self._dig(self._call("GET", action="query", prop="revisions", rvprop="content|user",
+                                     rvslots="main", titles="|".join(batch)), "query")
             back = {n["to"]: n["from"] for n in q.get("normalized", [])}
             for page in q.get("pages", []):
                 title = back.get(page["title"], page["title"])
@@ -53,13 +63,13 @@ class WikiClient:
                     out[title] = None
                 else:
                     rev = page["revisions"][0]
-                    out[title] = PageState(rev["slots"]["main"]["content"], rev.get("user", ""))
+                    out[title] = PageState(self._dig(rev, "slots", "main", "content"), rev.get("user", ""))
             for t in batch:
                 out.setdefault(t, None)
         return out
 
     def edit(self, title: str, text: str, summary: str) -> None:
-        result = self._call("POST", action="edit", title=title, text=text, summary=summary,
-                            bot="1", token=self._token("csrf"))["edit"]
+        result = self._dig(self._call("POST", action="edit", title=title, text=text, summary=summary,
+                                      bot="1", token=self._token("csrf")), "edit")
         if result.get("result") != "Success":
             raise SyncError(f"{self.lang}: edit of {title} failed: {result}")

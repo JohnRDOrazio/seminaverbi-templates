@@ -11,9 +11,9 @@ its own directory when `MW_INSTALL_PATH` is unset):
 ```
 sudo install -d -o <vhost-user> -g <group> <tools-dir>
 sudo install -m 644 -o <vhost-user> -g <group> server/EnrichItems.php server/properties.txt <tools-dir>/
-IP=<mw-root>
-$IP/maintenance/run --wiki en <tools-dir>/EnrichItems.php --item Q4178 --dry-run
-$IP/maintenance/run --wiki en <tools-dir>/EnrichItems.php --from-articles en,it --dry-run
+export MW_INSTALL_PATH=<mw-root>
+$MW_INSTALL_PATH/maintenance/run --wiki en <tools-dir>/EnrichItems.php --item Q4178 --dry-run
+$MW_INSTALL_PATH/maintenance/run --wiki en <tools-dir>/EnrichItems.php --from-articles en,it --dry-run
 ```
 
 Drop `--dry-run` to write. Check the size of the `seminaverbi_en` database before and after a full

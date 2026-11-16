@@ -1,3 +1,5 @@
+import shutil
+
 from conftest import ROOT
 from sync.pages import LANGS, desired_pages
 
@@ -27,3 +29,10 @@ def test_notices():
 
 def test_sha_not_in_content():
     assert desired_pages(ROOT, "it", "aaaaaaa") == desired_pages(ROOT, "it", "bbbbbbb")
+
+
+def test_other_files_in_templates_are_ignored(tmp_path):
+    for d in ("modules", "templates", "config", "i18n"):
+        shutil.copytree(ROOT / d, tmp_path / d)
+    (tmp_path / "templates" / ".DS_Store").write_bytes(b"\x00\x05\x16\x07\xff\xfe")
+    assert desired_pages(tmp_path, "it", "x") == desired_pages(ROOT, "it", "x")

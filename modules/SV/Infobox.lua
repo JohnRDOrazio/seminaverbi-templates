@@ -22,34 +22,94 @@ local function itemLink(id, lang)
 	return text
 end
 
+local GREGORIAN_DAYS = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 }
+
+local function gregorianDays(y, m)
+	if m == 2 and y % 4 == 0 and (y % 100 ~= 0 or y % 400 == 0) then
+		return 29
+	end
+	return GREGORIAN_DAYS[m] or 31
+end
+
+local ROMAN = { { 1000, 'M' }, { 900, 'CM' }, { 500, 'D' }, { 400, 'CD' }, { 100, 'C' }, { 90, 'XC' },
+	{ 50, 'L' }, { 40, 'XL' }, { 10, 'X' }, { 9, 'IX' }, { 5, 'V' }, { 4, 'IV' }, { 1, 'I' } }
+
+local function roman(n)
+	local out = {}
+	for _, pair in ipairs(ROMAN) do
+		while n >= pair[1] do
+			out[#out + 1] = pair[2]
+			n = n - pair[1]
+		end
+	end
+	return table.concat(out)
+end
+
+local function ordinalEn(n)
+	local t = n % 100
+	local suffix = (t < 11 or t > 13) and ({ 'st', 'nd', 'rd' })[n % 10] or 'th'
+	return n .. suffix
+end
+
+-- Decade (8), century (7) or millennium (6) of a positive year. Message parameters:
+-- $1 Roman numeral (decade: the decade's first year), $2 number, $3 English ordinal, $4 French ordinal.
+local function coarseDate(y, precision, code)
+	if precision == 8 then
+		return Util.msg('date_decade', code, tostring(y - y % 10))
+	end
+	local n = math.floor((y - 1) / (precision == 7 and 100 or 1000)) + 1
+	return Util.msg(precision == 7 and 'date_century' or 'date_millennium', code,
+		roman(n), tostring(n), ordinalEn(n), roman(n) .. (n == 1 and 'er' or 'e'))
+end
+
 local function formatTime(value)
 	local sign, year, month, day = value.time:match('^([+-])(%d+)-(%d%d)-(%d%d)')
 	if not year then
 		return Util.escape(value.time)
 	end
+	local y = tonumber(year)
+	local precision = tonumber(value.precision) or 9
 	local lang = mw.language.getContentLanguage()
+	local code = lang:getCode()
+	local coarse = precision >= 6 and precision <= 8 and y >= 1
 	if sign == '-' then
-		-- formatDate rejects years before 0000, so BC dates show the year only.
-		return Util.msg('bc_year', lang:getCode(), tostring(tonumber(year)))
+		-- formatDate rejects years before 0000, so BC dates show at most the year.
+		return Util.msg('bc_year', code, coarse and coarseDate(y, precision, code) or tostring(y))
+	end
+	if coarse then
+		return coarseDate(y, precision, code)
+	end
+	if precision <= 9 then
+		return tostring(y)
 	end
 	-- formatDate needs a four-digit year.
-	local padded = string.format('%04d', tonumber(year))
-	local precision = tonumber(value.precision) or 9
+	local padded = string.format('%04d', y)
 	if precision >= 11 then
+		local d = tonumber(day)
+		if d > gregorianDays(y, tonumber(month)) then
+			-- a Julian-only day such as 29 February 1500: formatDate would roll it over to 1 March
+			return d .. ' ' .. lang:formatDate('F Y', padded .. '-' .. month .. '-01')
+		end
 		return lang:formatDate('j F Y', padded .. '-' .. month .. '-' .. day)
-	elseif precision == 10 then
-		return lang:formatDate('F Y', padded .. '-' .. month .. '-01')
 	end
-	return tostring(tonumber(year))
+	return lang:formatDate('F Y', padded .. '-' .. month .. '-01')
 end
 
 local function values(entity, field, lang)
 	local statements = entity and entity.claims and entity.claims[field.propId]
+	-- Like Wikibase's "best statements": the preferred ones when there are any, else the normal ones.
+	local wanted = 'normal'
+	for _, statement in ipairs(statements or {}) do
+		if statement.rank == 'preferred' then
+			wanted = 'preferred'
+			break
+		end
+	end
 	local out = {}
 	for _, statement in ipairs(statements or {}) do
 		local snak = statement.mainsnak
 		local dv = snak and snak.snaktype == 'value' and snak.datavalue
-		if dv and statement.rank ~= 'deprecated' then
+		if dv and (statement.rank or 'normal') == wanted then
 			local v = dv.value
 			if field.kind == 'item' then
 				out[#out + 1] = itemLink(v.id, lang)

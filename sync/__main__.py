@@ -32,6 +32,10 @@ def main(argv=None, client_factory=WikiClient, sha=None) -> int:
         return 2
     bot_user = user.split("@", 1)[0]
     langs = LANGS if args.wiki == "all" else [w.strip() for w in args.wiki.split(",")]
+    unknown = [w for w in langs if w not in LANGS]
+    if unknown:
+        # checked before any login, so a typo never sends the bot password to another host
+        parser.error(f"unknown wiki {', '.join(unknown)}; choose from {', '.join(LANGS)} or all")
     sha = sha or _sha()
     summary = f"sync from seminaverbi-templates@{sha}"
     failed = False
@@ -43,6 +47,7 @@ def main(argv=None, client_factory=WikiClient, sha=None) -> int:
             desired = desired_pages(ROOT, lang, sha)
             actions = plan(desired, client.fetch(sorted(desired)), bot_user, set(args.force))
             counts = {"create": 0, "update": 0, "skip-unchanged": 0, "skip-foreign": 0}
+            edit_failures = 0
             for action in actions:
                 counts[action.kind] += 1
                 if action.kind == "skip-foreign":
@@ -53,9 +58,16 @@ def main(argv=None, client_factory=WikiClient, sha=None) -> int:
                     if args.dry_run:
                         print(f"[{lang}] would {action.kind} {action.title}\n{action.diff}")
                     else:
-                        client.edit(action.title, desired[action.title], summary)
+                        try:
+                            client.edit(action.title, desired[action.title], summary)
+                        except SyncError as exc:
+                            # one refused edit (protection, AbuseFilter, conflict) must not stop the rest
+                            failed = True
+                            edit_failures += 1
+                            print(f"[{lang}] ERROR: {exc}", file=sys.stderr)
             print(f"[{lang}] create {counts['create']}, update {counts['update']}, "
                   f"unchanged {counts['skip-unchanged']}, skipped(foreign) {counts['skip-foreign']}"
+                  + (f", failed {edit_failures}" if edit_failures else "")
                   + (" (dry run)" if args.dry_run else ""))
         except (SyncError, OSError) as exc:
             failed = True

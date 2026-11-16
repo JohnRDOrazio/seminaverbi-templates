@@ -38,6 +38,7 @@ def test_idempotent():
 class FakeClient:
     instances = {}
     fail = set()
+    fail_edit = set()
 
     def __init__(self, lang, session=None):
         self.lang, self.edits = lang, []
@@ -51,6 +52,8 @@ class FakeClient:
         return {t: None for t in titles}
 
     def edit(self, title, text, summary):
+        if title in self.fail_edit:
+            raise SyncError(f"{self.lang}: edit of {title} failed: protectedpage")
         self.edits.append((title, summary))
 
 
@@ -58,7 +61,7 @@ class FakeClient:
 def env(monkeypatch):
     monkeypatch.setenv("SV_SYNC_USER", "SV templates bot@sync")
     monkeypatch.setenv("SV_SYNC_PASSWORD", "secret")
-    FakeClient.instances, FakeClient.fail = {}, set()
+    FakeClient.instances, FakeClient.fail, FakeClient.fail_edit = {}, set(), set()
 
 
 def test_cli_continues_after_wiki_error(env, capsys):
@@ -83,3 +86,22 @@ def test_cli_summary_has_sha(env):
 def test_cli_requires_credentials(monkeypatch):
     monkeypatch.delenv("SV_SYNC_USER", raising=False)
     assert cli.main(["--wiki", "en"], client_factory=FakeClient, sha="x") == 2
+
+
+def test_cli_rejects_unknown_wiki_before_login(env):
+    # a typo must not send the bot password to some other subdomain
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["--wiki", "en,xx"], client_factory=FakeClient, sha="x")
+    assert exc.value.code == 2
+    assert FakeClient.instances == {}
+
+
+def test_cli_continues_after_edit_error(env, capsys):
+    FakeClient.fail_edit = {"Module:SV/Cite"}
+    code = cli.main(["--wiki", "en"], client_factory=FakeClient, sha="x")
+    out, err = capsys.readouterr()
+    assert code == 1
+    titles = [t for t, _ in FakeClient.instances["en"].edits]
+    assert "Module:SV/Cite" not in titles and "Template:SV cite" in titles
+    assert "edit of Module:SV/Cite failed" in err
+    assert "[en] create 16" in out and "failed 1" in out

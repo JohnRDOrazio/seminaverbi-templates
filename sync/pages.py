@@ -62,12 +62,12 @@ def desired_pages(root: Path, lang: str, sha: str) -> dict[str, str]:
         if path.is_dir():
             continue
         rel = path.relative_to(root / "templates").as_posix()
-        text = path.read_text(encoding="utf-8")
+        # read only the files that become pages: anything else (.DS_Store, images) may not be UTF-8
         if path.suffix == ".wikitext":
             name = rel[: -len(".wikitext")]
-            pages["Template:" + name] = _template(name, text)
+            pages["Template:" + name] = _template(name, path.read_text(encoding="utf-8"))
         elif path.suffix == ".css":
-            pages["Template:" + rel] = f"/* {NOTICE} */\n" + text
+            pages["Template:" + rel] = f"/* {NOTICE} */\n" + path.read_text(encoding="utf-8")
     aliases = json.loads((root / "config" / "aliases.json").read_text(encoding="utf-8"))
     for alias, target in sorted(aliases.get(lang, {}).items()):
         pages[alias] = f"#REDIRECT [[{target}]]"

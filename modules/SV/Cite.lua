@@ -17,7 +17,13 @@ end
 
 local function date(value)
 	if value:match('^%d%d%d%d%-%d%d%-%d%d$') then
-		return mw.language.getContentLanguage():formatDate('j F Y', value)
+		-- formatDate raises on an impossible date (e.g. month 13); show it as written instead
+		local ok, formatted = pcall(function()
+			return mw.language.getContentLanguage():formatDate('j F Y', value)
+		end)
+		if ok then
+			return formatted
+		end
 	end
 	return value
 end

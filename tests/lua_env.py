@@ -32,6 +32,9 @@ function lang:getCode() return self.code end
 function lang:formatDate(fmt, iso)
     -- Scribunto hands the string to PHP DateTime and rejects years before 0000: mimic that.
     if not iso:match('^%d%d%d%d%-%d%d%-%d%d$') then error('bad date for formatDate: ' .. iso) end
+    -- PHP DateTime throws on an impossible month or day number (it rolls over e.g. 02-30 silently).
+    local m, d = tonumber(iso:sub(6, 7)), tonumber(iso:sub(9, 10))
+    if m < 1 or m > 12 or d > 31 then error('bad date for formatDate: ' .. iso) end
     return fmt .. '|' .. iso
 end
 function mw.language.getContentLanguage() return lang end
