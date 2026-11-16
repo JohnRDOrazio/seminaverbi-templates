@@ -9,7 +9,7 @@
  * needed (labels and descriptions in the SeminaVerbi languages, sitelinks to those Wikipedias),
  * and copies main values only, without qualifiers or references.
  *
- *   maintenance/run --wiki en /var/www/vhosts/bibleget.io/seminaverbi-tools/EnrichItems.php \
+ *   maintenance/run --wiki en <tools-dir>/EnrichItems.php \
  *       [--item Q4178]... [--from-articles en,it] [--properties FILE] [--dry-run]
  */
 
@@ -26,7 +26,7 @@ use Wikibase\DataModel\Statement\Statement;
 use Wikibase\Lib\Store\LookupConstants;
 use Wikibase\Repo\WikibaseRepo;
 
-$IP = getenv( 'MW_INSTALL_PATH' ) ?: '/var/www/vhosts/bibleget.io/seminaverbi_1_44/w';
+$IP = getenv( 'MW_INSTALL_PATH' ) ?: dirname( __DIR__ ) . '/seminaverbi_1_44/w';
 require_once "$IP/maintenance/Maintenance.php";
 
 class EnrichItems extends Maintenance {

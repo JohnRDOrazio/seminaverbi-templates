@@ -20,3 +20,11 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
 Lua runs under Lua 5.1 (Scribunto's dialect) through `lupa`, with stubs for `mw`,
 `mw.wikibase` and `mw.language` in `tests/lua_env.py`.
+
+## License
+
+Copyright (C) 2026 John R. D'Orazio and contributors.
+
+This program is free software; you can redistribute it and/or modify it under the terms of the GNU
+General Public License as published by the Free Software Foundation; either version 2 of the License,
+or (at your option) any later version. See [LICENSE](LICENSE).

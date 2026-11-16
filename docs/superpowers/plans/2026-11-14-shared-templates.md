@@ -215,12 +215,12 @@ server/properties.txt             Wikidata property IDs to copy
 - Create: `server/EnrichItems.php`, `server/properties.txt` (Wikidata IDs, one per line: P50 P57 P58 P161 P577 P571 P136 P175 P364 P495 P86 P676 P264 P170 P569 P570 P19 P20 P106 P1476 P18 P155 P156 P31), `server/README.md`
 
 **Interfaces:**
-- `php maintenance/run.php /var/www/vhosts/bibleget.io/seminaverbi-tools/EnrichItems.php --wiki=seminaverbi_en [--item Q4178]… [--from-articles en,it] [--properties FILE] [--dry-run]`.
+- `php maintenance/run.php <tools-dir>/EnrichItems.php --wiki=seminaverbi_en [--item Q4178]… [--from-articles en,it] [--properties FILE] [--dry-run]`.
 - Behaviour: for each local item (given, or the items connected to main-namespace non-redirect pages on the listed wikis, via `page_props.wikibase_item` in each wiki DB), get its Wikidata ID with `ImportedEntityMappingStore::getOriginalId`; skip with a warning if none. Fetch the Wikidata entity with the factory's `ApiEntityLookup`. For each allow-listed Wikidata property that maps to a local property and for which the local item has **no** statement yet: collect referenced items, import them with `EntityImporter::importEntities($refs, false)` (creates items with labels and sitelinks, no statements), copy statements with `StatementCopier`, and save the item once per item with summary `Enrich from Wikidata <QID>: <props>`. `--dry-run` prints `Q4178 (wd Q15228): + P3990 author = Q… J. R. R. Tolkien` lines and writes nothing.
 - Uses services the same way `extensions/WikibaseImport/maintenance/importEntities.php` builds them (`EntityImporterFactory`); read that file first.
 
 - [ ] **Step 1:** Write the script; `php -l` it locally if PHP is available, else on the server.
-- [ ] **Step 2:** Copy to `/var/www/vhosts/bibleget.io/seminaverbi-tools/` (outside the docroot; owner `bibleget.io_q71zp2mh9vh:psacln`), run `--item Q4178 --dry-run` as the vhost user with `/opt/plesk/php/8.4/bin/php -d memory_limit=512M`. Expected: an author line for Tolkien, publication date, genre; no writes.
+- [ ] **Step 2:** Copy to `<tools-dir>/` (outside the docroot; owner `<vhost-user>:<group>`), run `--item Q4178 --dry-run` as the vhost user with `/opt/plesk/php/8.4/bin/php -d memory_limit=512M`. Expected: an author line for Tolkien, publication date, genre; no writes.
 - [ ] **Step 3:** Record `seminaverbi_en` size (`information_schema.tables` sum) → run `--item Q4178` for real → check the item on `en` has P3990 and the referenced Tolkien item exists with an `itwiki` sitelink.
 - [ ] **Step 4:** Run `--from-articles en,it --dry-run`, review counts, then for real; record DB size after; abort/report if growth > 200 MB.
 - [ ] **Step 5:** Commit `feat: server script enriching local items from Wikidata`; add to the same PR.
