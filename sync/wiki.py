@@ -56,13 +56,13 @@ class WikiClient:
             batch = titles[i:i + 50]
             q = self._dig(self._call("GET", action="query", prop="revisions", rvprop="content|user",
                                      rvslots="main", titles="|".join(batch)), "query")
-            back = {n["to"]: n["from"] for n in q.get("normalized", [])}
+            back = {self._dig(n, "to"): self._dig(n, "from") for n in q.get("normalized", [])}
             for page in q.get("pages", []):
-                title = back.get(page["title"], page["title"])
+                title = back.get(self._dig(page, "title"), page["title"])
                 if page.get("missing") or "revisions" not in page:
                     out[title] = None
                 else:
-                    rev = page["revisions"][0]
+                    rev = self._dig(page, "revisions", 0)
                     out[title] = PageState(self._dig(rev, "slots", "main", "content"), rev.get("user", ""))
             for t in batch:
                 out.setdefault(t, None)

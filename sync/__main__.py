@@ -49,7 +49,8 @@ def main(argv=None, client_factory=WikiClient, sha=None) -> int:
             counts = {"create": 0, "update": 0, "skip-unchanged": 0, "skip-foreign": 0}
             edit_failures = 0
             for action in actions:
-                counts[action.kind] += 1
+                if action.kind not in ("create", "update") or args.dry_run:
+                    counts[action.kind] += 1
                 if action.kind == "skip-foreign":
                     failed = True
                     print(f"[{lang}] SKIPPED {action.title}: last edited by someone else "
@@ -60,8 +61,9 @@ def main(argv=None, client_factory=WikiClient, sha=None) -> int:
                     else:
                         try:
                             client.edit(action.title, desired[action.title], summary)
-                        except SyncError as exc:
-                            # one refused edit (protection, AbuseFilter, conflict) must not stop the rest
+                            counts[action.kind] += 1  # count edits that went through
+                        except (SyncError, OSError) as exc:
+                            # one refused or dropped edit (protection, AbuseFilter, conflict, network) must not stop the rest
                             failed = True
                             edit_failures += 1
                             print(f"[{lang}] ERROR: {exc}", file=sys.stderr)

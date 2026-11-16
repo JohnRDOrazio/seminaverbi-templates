@@ -39,6 +39,7 @@ class FakeClient:
     instances = {}
     fail = set()
     fail_edit = set()
+    drop_edit = set()
 
     def __init__(self, lang, session=None):
         self.lang, self.edits = lang, []
@@ -54,6 +55,8 @@ class FakeClient:
     def edit(self, title, text, summary):
         if title in self.fail_edit:
             raise SyncError(f"{self.lang}: edit of {title} failed: protectedpage")
+        if title in self.drop_edit:
+            raise ConnectionError(f"connection dropped while saving {title}")
         self.edits.append((title, summary))
 
 
@@ -61,7 +64,7 @@ class FakeClient:
 def env(monkeypatch):
     monkeypatch.setenv("SV_SYNC_USER", "SV templates bot@sync")
     monkeypatch.setenv("SV_SYNC_PASSWORD", "secret")
-    FakeClient.instances, FakeClient.fail, FakeClient.fail_edit = {}, set(), set()
+    FakeClient.instances, FakeClient.fail, FakeClient.fail_edit, FakeClient.drop_edit = {}, set(), set(), set()
 
 
 def test_cli_continues_after_wiki_error(env, capsys):
@@ -104,4 +107,17 @@ def test_cli_continues_after_edit_error(env, capsys):
     titles = [t for t, _ in FakeClient.instances["en"].edits]
     assert "Module:SV/Cite" not in titles and "Template:SV cite" in titles
     assert "edit of Module:SV/Cite failed" in err
-    assert "[en] create 16" in out and "failed 1" in out
+    # counts are edits that went through; the failure is counted separately
+    assert "[en] create 15, update 0, unchanged 0, skipped(foreign) 0, failed 1" in out
+
+
+def test_cli_continues_after_network_error_on_one_edit(env, capsys):
+    # a dropped connection (OSError) on one page must not end the wiki's loop or hide its counts
+    FakeClient.drop_edit = {"Module:SV/Cite"}
+    code = cli.main(["--wiki", "en,it"], client_factory=FakeClient, sha="x")
+    out, err = capsys.readouterr()
+    assert code == 1
+    assert "connection dropped while saving Module:SV/Cite" in err
+    assert "[en] create 15, update 0, unchanged 0, skipped(foreign) 0, failed 1" in out
+    assert "Template:SV cite" in [t for t, _ in FakeClient.instances["en"].edits]
+    assert len(FakeClient.instances["it"].edits) == 22
