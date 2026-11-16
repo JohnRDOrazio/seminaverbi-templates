@@ -38,7 +38,18 @@ function mw.wikibase.getLabelByLang(id, l) return py.label(id, l) end
 function mw.wikibase.getSitelink(id, site) return py.sitelink(id, site or py.lang) end
 function make_frame(args, pargs)
     local parent = { args = pargs }
-    return { args = args, getParent = function() return parent end }
+    local f = { args = args, getParent = function() return parent end }
+    -- Scribunto's frame:extensionTag returns a strip marker; the mock returns a visible one
+    -- (see tag() in lua_env.py) so tests can tell a real tag call from a literal tag string.
+    function f:extensionTag(name, content, attrs)
+        local keys = {}
+        for k in pairs(attrs or {}) do keys[#keys + 1] = k end
+        table.sort(keys)
+        local parts = {}
+        for _, k in ipairs(keys) do parts[#parts + 1] = k .. '=' .. attrs[k] end
+        return '\127TAG:' .. name .. '|' .. table.concat(parts, ',') .. '|' .. (content or '') .. '\127'
+    end
+    return f
 end
 """
 
@@ -94,3 +105,9 @@ class LuaEnv:
     def frame(self, args=None, parent_args=None):
         t = self.lua.table_from
         return self._make_frame(t(args or {}), t(parent_args or {}))
+
+
+def tag(name, content="", **attrs):
+    """What the mock frame:extensionTag returns for this call."""
+    a = ",".join(f"{k}={attrs[k]}" for k in sorted(attrs))
+    return f"\x7fTAG:{name}|{a}|{content}\x7f"

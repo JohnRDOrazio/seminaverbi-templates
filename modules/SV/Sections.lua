@@ -20,8 +20,9 @@ end
 
 function p.references(frame)
 	local args = Args.get(frame)
-	local group = args.group and (' group="' .. Util.escape(args.group) .. '"') or ''
-	return '== ' .. Util.msg('references_heading', Util.lang()) .. ' ==\n<references' .. group .. ' />'
+	-- A tag returned as a string is not expanded by MediaWiki; it has to go through extensionTag.
+	return '== ' .. Util.msg('references_heading', Util.lang()) .. ' ==\n'
+		.. frame:extensionTag('references', '', args.group and { group = args.group } or nil)
 end
 
 function p.managed(frame)

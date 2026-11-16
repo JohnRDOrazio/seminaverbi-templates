@@ -1,4 +1,4 @@
-from lua_env import LuaEnv
+from lua_env import LuaEnv, tag
 
 
 def item(qid):
@@ -40,7 +40,7 @@ ENTITIES = {
 
 def render(kind="work", lang="it", page_entity="Q4178", entities=ENTITIES, **args):
     env = LuaEnv(lang=lang, entities=entities, page_entity=page_entity, page_title="Pagina")
-    ctx = env.lua.table_from({"lang": lang, "entity_id": page_entity})
+    ctx = env.lua.table_from({"lang": lang, "entity_id": page_entity, "frame": env.frame()})
     return env.call("Module:SV/Infobox", "_render", kind, env.lua.table_from(args), ctx)
 
 
@@ -113,3 +113,10 @@ def test_values_are_escaped():
     evil = {"Q5": {"labels": {"en": 'A <b>"x"'}, "claims": {"P3990": [item("Q6")]}}, "Q6": {"labels": {"en": "<i>y"}}}
     out = render(lang="en", page_entity="Q5", entities=evil)
     assert "<b>" not in out and "<i>" not in out
+
+
+def test_styles_loaded_through_extension_tag():
+    # a literal "<templatestyles .../>" returned from Lua shows up as text on the page
+    out = render()
+    assert out.startswith(tag("templatestyles", src="SV infobox/styles.css"))
+    assert "<templatestyles" not in out

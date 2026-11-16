@@ -1,4 +1,4 @@
-from lua_env import LuaEnv
+from lua_env import LuaEnv, tag
 
 
 def call(fn, lang="en", **args):
@@ -26,8 +26,9 @@ def test_wip_escapes_user():
 
 
 def test_references_group():
-    assert call("references") == "== References ==\n<references />"
-    assert call("references", "fr", group="n") == '== Références ==\n<references group="n" />'
+    # a literal "<references />" returned from Lua is not expanded by MediaWiki
+    assert call("references") == "== References ==\n" + tag("references")
+    assert call("references", "fr", group="n") == "== Références ==\n" + tag("references", group="n")
 
 
 def test_managed_links_repo():

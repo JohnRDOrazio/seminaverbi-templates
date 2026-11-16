@@ -119,7 +119,8 @@ function p._render(kind, args, ctx)
 	end
 
 	local out = {
-		'<templatestyles src="SV infobox/styles.css"/>',
+		-- A tag returned as a string is shown as text; it has to go through extensionTag.
+		ctx.frame:extensionTag('templatestyles', '', { src = 'SV infobox/styles.css' }),
 		'<table class="sv-infobox sv-infobox-' .. infoboxType .. '">',
 		'<caption>' .. caption .. '</caption>',
 	}
@@ -139,6 +140,7 @@ end
 function p.work(frame)
 	return p._render('work', Args.get(frame), {
 		lang = Util.lang(),
+		frame = frame,
 		entity_id = mw.wikibase.getEntityIdForCurrentPage(),
 	})
 end
@@ -146,6 +148,7 @@ end
 function p.person(frame)
 	return p._render('person', Args.get(frame), {
 		lang = Util.lang(),
+		frame = frame,
 		entity_id = mw.wikibase.getEntityIdForCurrentPage(),
 	})
 end
