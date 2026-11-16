@@ -1,0 +1,23 @@
+{
+  "bc_year": "$1 a.C.",
+  "bible_missing_ref": "SV Bible quote: manca il parametro ref.",
+  "bible_note": "testo in $1; non ancora disponibile in italiano",
+  "bible_unsupported": "La versione biblica '$1' non è supportata da BibleGet.",
+  "cite_accessed": "Consultato il",
+  "cite_archived": "Archiviato",
+  "cite_missing_title": "SV cite: manca il parametro title.",
+  "cite_pages": "pp.",
+  "date_century": "$1 secolo",
+  "date_decade": "anni $1",
+  "date_millennium": "$1 millennio",
+  "discernment_heading": "Semi del Verbo e punti di attenzione",
+  "infobox_missing_category": "Infobox SV con dati mancanti",
+  "langname_en": "inglese",
+  "langname_es": "spagnolo",
+  "langname_it": "italiano",
+  "langname_la": "latino",
+  "managed_notice": "Questa pagina è gestita in git e sovrascritta dalla sincronizzazione: modificala su $1.",
+  "references_heading": "Note",
+  "wip_category": "Voci SV in lavorazione",
+  "wip_notice": "Questa voce è in lavorazione ($1, $2)."
+}

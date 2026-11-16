@@ -1,0 +1,8 @@
+<includeonly>{{#invoke:SV/Cite|main}}</includeonly><noinclude>
+A citation in the same style on every wiki. Use inside <code><nowiki><ref>…</ref></nowiki></code>.
+* <code>type</code>: <code>web</code> (default), <code>book</code>, <code>journal</code>, <code>video</code>, <code>liner</code>, <code>interview</code>.
+* <code>title</code> (required), <code>url</code>, <code>author</code>, <code>date</code>, <code>work</code> (site, newspaper or journal), <code>publisher</code>, <code>isbn</code>, <code>pages</code>, <code>language</code>, <code>archive-url</code>, <code>archive-date</code>, <code>access-date</code>, <code>quote</code>.
+* Dates written as <code>YYYY-MM-DD</code> are shown in the wiki's language.
+
+<code><nowiki>{{SV cite|type=book|author=Humphrey Carpenter|date=1991|title=La vita di J.R.R. Tolkien|publisher=Ares|isbn=8881550431}}</nowiki></code>
+</noinclude>

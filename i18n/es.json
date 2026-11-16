@@ -1,0 +1,23 @@
+{
+  "bc_year": "$1 a. C.",
+  "bible_missing_ref": "SV Bible quote: falta el parámetro ref.",
+  "bible_note": "texto en $1; aún no disponible en español",
+  "bible_unsupported": "La versión bíblica '$1' no es compatible con BibleGet.",
+  "cite_accessed": "Consultado el",
+  "cite_archived": "Archivado",
+  "cite_missing_title": "SV cite: falta el parámetro title.",
+  "cite_pages": "págs.",
+  "date_century": "siglo $1",
+  "date_decade": "años $1",
+  "date_millennium": "$1 milenio",
+  "discernment_heading": "Semillas del Verbo y puntos de atención",
+  "infobox_missing_category": "Infobox SV con datos faltantes",
+  "langname_en": "inglés",
+  "langname_es": "español",
+  "langname_it": "italiano",
+  "langname_la": "latín",
+  "managed_notice": "Esta página se gestiona en git y la sobrescribe la sincronización: edítala en $1.",
+  "references_heading": "Referencias",
+  "wip_category": "Artículos SV en desarrollo",
+  "wip_notice": "Este artículo está en desarrollo ($1, $2)."
+}

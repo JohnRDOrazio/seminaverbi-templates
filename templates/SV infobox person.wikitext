@@ -1,0 +1,3 @@
+<includeonly>{{#invoke:SV/Infobox|person}}</includeonly><noinclude>
+Infobox for a person, filled from the page's Wikibase item. Optional parameters: <code>item</code>, <code>name</code>, and any field (<code>image</code>, <code>birth_date</code>, <code>birth_place</code>, <code>death_date</code>, <code>death_place</code>, <code>occupation</code>) to override the item's value.
+</noinclude>

@@ -1,0 +1,3 @@
+<includeonly>{{#invoke:SV/Sections|references}}</includeonly><noinclude>
+The references section heading and list. Optional <code>group</code>. Put it on its own line.
+</noinclude>
