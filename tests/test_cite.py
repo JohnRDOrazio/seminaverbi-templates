@@ -34,11 +34,19 @@ def test_quote():
         '"T". «Not all those who wander are lost»</cite>')
 
 
-def test_title_escaped():
-    out = render(url="https://x.org/a]b c", title='A "B" <i>')
-    assert "&quot;B&quot; &lt;i&gt;" in out
-    assert "[https://x.org/a%5Db%20c " in out
-    assert "<i>" not in out
+def test_url_encoded_and_bracket_in_link_text():
+    out = render(url="https://x.org/a]b c", title="A [B] C")
+    assert "[https://x.org/a%5Db%20c A [B&#93; C]" in out
+
+
+def test_text_params_stay_wikitext():
+    # MediaWiki's Sanitizer makes text safe; escaping it again breaks entities and strip markers
+    marker = "\x7f'\"`UNIQ--nowiki-00000001-QINU`\"'\x7f"
+    out = render(title='A "B" <i>x</i>', pages="12&ndash;15", quote=marker, author="X&nbsp;Y")
+    assert 'A "B" <i>x</i>' in out
+    assert "12&ndash;15" in out
+    assert marker in out
+    assert "X&nbsp;Y" in out
 
 
 def test_missing_title_is_error():

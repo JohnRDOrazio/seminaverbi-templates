@@ -1,4 +1,5 @@
 {
+  "bc_year": "$1 a.C.",
   "bible_missing_ref": "SV Bible quote: falta o parâmetro ref.",
   "bible_note": "texto em $1; tradução portuguesa ainda não disponível",
   "bible_unsupported": "A versão bíblica '$1' não é suportada pelo BibleGet.",

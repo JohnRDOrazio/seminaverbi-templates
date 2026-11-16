@@ -27,18 +27,20 @@ local function formatTime(value)
 	if not year then
 		return Util.escape(value.time)
 	end
-	year = tostring(tonumber(year))
-	if sign == '-' then
-		year = '-' .. year
-	end
-	local precision = tonumber(value.precision) or 9
 	local lang = mw.language.getContentLanguage()
-	if precision >= 11 then
-		return lang:formatDate('j F Y', year .. '-' .. month .. '-' .. day)
-	elseif precision == 10 then
-		return lang:formatDate('F Y', year .. '-' .. month .. '-01')
+	if sign == '-' then
+		-- formatDate rejects years before 0000, so BC dates show the year only.
+		return Util.msg('bc_year', lang:getCode(), tostring(tonumber(year)))
 	end
-	return year
+	-- formatDate needs a four-digit year.
+	local padded = string.format('%04d', tonumber(year))
+	local precision = tonumber(value.precision) or 9
+	if precision >= 11 then
+		return lang:formatDate('j F Y', padded .. '-' .. month .. '-' .. day)
+	elseif precision == 10 then
+		return lang:formatDate('F Y', padded .. '-' .. month .. '-01')
+	end
+	return tostring(tonumber(year))
 end
 
 local function values(entity, field, lang)
@@ -61,7 +63,9 @@ local function values(entity, field, lang)
 				out[#out + 1] = Util.escape(v)
 			end
 		end
-		if field.max and #out >= field.max then
+		-- An image field holds one file: several values would join into one broken file link.
+		local max = field.kind == 'image' and 1 or field.max
+		if max and #out >= max then
 			break
 		end
 	end

@@ -8,7 +8,7 @@ LANGS = ["en", "it", "es", "fr", "de", "pt"]
 REQUIRED = [
     "infobox_missing_category", "bible_note", "bible_unsupported", "bible_missing_ref",
     "discernment_heading", "references_heading", "wip_notice", "wip_category", "managed_notice",
-    "cite_accessed", "cite_archived", "cite_pages", "cite_missing_title",
+    "cite_accessed", "cite_archived", "cite_pages", "cite_missing_title", "bc_year",
 ]
 
 

@@ -29,7 +29,11 @@ require = load
 mw.loadData = load
 local lang = { code = py.lang }
 function lang:getCode() return self.code end
-function lang:formatDate(fmt, iso) return fmt .. '|' .. iso end
+function lang:formatDate(fmt, iso)
+    -- Scribunto hands the string to PHP DateTime and rejects years before 0000: mimic that.
+    if not iso:match('^%d%d%d%d%-%d%d%-%d%d$') then error('bad date for formatDate: ' .. iso) end
+    return fmt .. '|' .. iso
+end
 function mw.language.getContentLanguage() return lang end
 function mw.title.getCurrentTitle() return { text = py.page_title } end
 function mw.wikibase.getEntityIdForCurrentPage() return py.page_entity end

@@ -120,3 +120,24 @@ def test_styles_loaded_through_extension_tag():
     out = render()
     assert out.startswith(tag("templatestyles", src="SV infobox/styles.css"))
     assert "<templatestyles" not in out
+
+
+def with_claims(**claims):
+    return dict(ENTITIES, Q4178=dict(LOTR, claims=claims))
+
+
+def test_bc_date_is_year_only():
+    # formatDate cannot take a negative year (e.g. Virgil, born 15 October 70 BC, day precision)
+    out = render(entities=with_claims(P4788=[time("-0070-10-15T00:00:00Z", 11)]))
+    assert row("data di pubblicazione", "70 a.C.") in out
+
+
+def test_early_year_zero_padded():
+    out = render(entities=with_claims(P4788=[time("+0354-11-13T00:00:00Z", 11)]))
+    assert row("data di pubblicazione", "j F Y|0354-11-13") in out
+
+
+def test_only_first_image():
+    out = render(entities=with_claims(P725=[text("One.jpg"), text("Two.jpg")]))
+    assert "[[File:One.jpg|frameless|upright=1.15]]" in out
+    assert "Two.jpg" not in out
