@@ -2,7 +2,7 @@
 
 # Category tree
 
-Only these categories may be used. An article gets exactly one field category and the Gospel themes it really explores. Write `[[Category:<name>]]` with the name for the page's wiki.
+Only these categories may be used. An article gets exactly one field category and the Gospel themes it really explores. Write `[[Category:<name>]]` with the name for the page's wiki. The maintenance and tracking categories that SV templates add themselves (e.g. `{{SV WIP}}`, `{{SV cathopedia}}`) are the exception: they are not listed here and are never written by hand.
 
 ## en
 

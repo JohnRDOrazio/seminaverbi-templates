@@ -70,3 +70,8 @@ def test_skill_mentions_jev_routine():
         assert needle in text, needle
     standard = (SKILL / "article-standard.md").read_text(encoding="utf-8")
     assert "own page" in standard and "one field" in standard
+
+
+def test_template_categories_are_allowed():
+    for text in ((SKILL / "SKILL.md").read_text(encoding="utf-8"), render_categories(ROOT)):
+        assert "maintenance and tracking categories" in text
