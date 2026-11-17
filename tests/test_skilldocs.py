@@ -57,6 +57,16 @@ def test_categories_md_has_every_name():
             yield item
             yield from walk(item.get("children", []))
 
-    for node in list(walk(data["fields"])) + data["themes"]:
+    for node in list(walk(data["fields"])) + list(walk(data["themes"])):
         for name in node["names"].values():
             assert name in text, name
+
+
+def test_skill_mentions_jev_routine():
+    from tools import jev
+    text = (SKILL / "SKILL.md").read_text(encoding="utf-8")
+    for needle in ("tools.jev classify", "tools.jev themes", "tools.jev place", "one field",
+                   f"{jev.CHOICE_PROBABILITY:.2f}", f"{jev.THEME_APPLY:.2f}", f"{jev.THEME_ASK:.2f}"):
+        assert needle in text, needle
+    standard = (SKILL / "article-standard.md").read_text(encoding="utf-8")
+    assert "own page" in standard and "one field" in standard

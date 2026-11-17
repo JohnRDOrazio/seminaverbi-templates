@@ -2,7 +2,7 @@
 
 # Category tree
 
-Only these categories may be used. An article gets at least one field category and the Gospel themes it really explores. Write `[[Category:<name>]]` with the name for the page's wiki.
+Only these categories may be used. An article gets exactly one field category and the Gospel themes it really explores. Write `[[Category:<name>]]` with the name for the page's wiki.
 
 ## en
 

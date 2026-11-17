@@ -28,12 +28,19 @@ work (book, film, TV series, album, song, play, artwork) or a person is **not a 
 - End the article with the section started by `{{SV discernment}}` (same heading on every wiki), then
   `{{SV references}}`.
 
+## One work, one page, one field
+
+Each work has its own page: a novel and its film adaptation are two articles that link to each other,
+each filed in its own field (one field category per page: the work's medium or form, or a person's main
+domain). The subject of a work is carried by the Gospel themes, the links and the infobox.
+
 ## Shape of an article
 
 1. Infobox, lead paragraph.
 2. Sections on the story / content as it bears on the Gospel, with Bible quotes where the work points to
    Scripture, and `{{SV quote}}` for other quotations (Fathers, Magisterium, the author of the work).
 3. `{{SV discernment}}` section.
-4. See also (with `{{SV cathopedia}}` outside it.wiki), `{{SV references}}`, categories: at least one
-   field category and the Gospel themes the text really explores (`categories.md`).
+4. See also (with `{{SV cathopedia}}` outside it.wiki), `{{SV references}}`, categories: exactly one
+   field category and the Gospel themes the text really explores (`categories.md`), chosen
+   with the Jev routine in `SKILL.md`.
 5. `{{SV WIP|user=…|date=…}}` at the top while the article is incomplete.

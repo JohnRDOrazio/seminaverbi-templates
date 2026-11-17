@@ -59,7 +59,7 @@ def render_templates(root: Path) -> str:
 def render_categories(root: Path) -> str:
     data = load(root)
     out = [HEADER, "# Category tree\n\n",
-           "Only these categories may be used. An article gets at least one field category and the Gospel "
+           "Only these categories may be used. An article gets exactly one field category and the Gospel "
            "themes it really explores. Write `[[Category:<name>]]` with the name for the page's wiki.\n"]
     for lang in LANGS:
         out.append(f"\n## {lang}\n\nRoot: {data['root']['names'][lang]}\n\n### Fields\n\n")
