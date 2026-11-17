@@ -94,3 +94,11 @@ def test_infobox_import_resolves():
     assert bio["template"] == "Bio"
     assert set(bio["facts"].values()) <= rows["person"] | {"given_name", "nationality"}
     assert set(bio["free"].values()) <= {"note", "rest", "ref"}
+
+
+def test_bio_property_ids_present():
+    w = json.loads((ROOT / "config" / "wikibase.json").read_text(encoding="utf-8"))
+    for k in ("sex_or_gender", "country_of_citizenship", "female_form", "demonym"):
+        assert w[k].startswith("P") and w[k][1:].isdigit(), k
+    for k in ("male", "female"):
+        assert w[k].startswith("Q") and w[k][1:].isdigit(), k

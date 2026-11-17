@@ -347,9 +347,10 @@
     "AttivitàAltre": "rest",
     "PostNazionalità": "rest",
     "PostCognomeVirgola": "note",
-    "PostNome": "note",
-    "PostNascita": "note",
-    "PostMorte": "note"
+    "PostCognome": "note",
+    "PostPseudonimo": "note",
+    "NoteNascita": "note",
+    "NoteMorte": "note"
    }
   }
  }
