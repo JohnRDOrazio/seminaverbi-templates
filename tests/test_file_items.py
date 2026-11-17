@@ -452,3 +452,27 @@ def test_page_changed_after_its_preview_is_not_saved():
     report = run(repo, clients)
     assert report.edited == 0 and report.failed[0][:2] == ("en", "Film page")
     assert "changed" in report.failed[0][2] and en.pages["Film page"][2].endswith("An edit.")
+
+
+def test_merge_with_an_edit_after_the_check_is_verified_and_reported():
+    repo, clients = setup({"en": FILM_EN})
+    en = clients["en"]
+
+    def merged_edit(title, text, summary, tags=None, createonly=False, baserevid=None):
+        # someone saved between the check and our save; MediaWiki merged and their edit dropped Faith
+        item, revid, _, tc = en.pages[title]
+        en.pages[title] = (item, revid + 2, text.replace("{{SV categories}}", "[[Category:Film]]"), tc)
+        return {"result": "Success", "oldrevid": revid + 1, "newrevid": revid + 2}
+    en.edit = merged_edit
+    report = run(repo, clients)
+    assert report.unsafe and report.unsafe[0][:2] == ("en", "Film page") and "Faith" in report.unsafe[0][2]
+
+
+def test_save_on_the_previewed_revision_needs_no_second_check():
+    repo, clients = setup({"en": FILM_EN})
+    en = clients["en"]
+    calls = []
+    real = en.page_categories
+    en.page_categories = lambda t: calls.append(t) or real(t)
+    run(repo, clients)
+    assert calls == ["Film page"]  # only the planning read

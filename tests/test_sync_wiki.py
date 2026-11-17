@@ -315,7 +315,8 @@ def test_revision_reads_latest():
 
 def test_edit_with_baserevid():
     s = Recorder(CSRF, {"edit": {"result": "Success"}})
-    WikiClient("en", session=s).edit("X", "t", "s", tags="seminaverbi-mcp", baserevid=123)
+    result = WikiClient("en", session=s).edit("X", "t", "s", tags="seminaverbi-mcp", baserevid=123)
+    assert result == {"result": "Success"}
     params = s.calls[-1][1]
     assert params["baserevid"] == 123 and params["nocreate"] == "1"
     s = Recorder(CSRF, {"error": {"code": "editconflict", "info": "Edit conflict."}})

@@ -295,8 +295,15 @@ def run(repo, clients: dict, data, types, props: dict, apply: bool, only_item: s
                 out(f"{item}: FAILED {lang}:{title}: changed since it was read; run again")
                 continue
             try:
-                clients[lang].edit(title, text, _summary(lang), tags=TAG, baserevid=revid)
+                result = clients[lang].edit(title, text, _summary(lang), tags=TAG, baserevid=revid) or {}
                 edited += 1
+                if result.get("oldrevid", revid) != revid:
+                    # someone saved after the check and MediaWiki merged: verify what was saved
+                    lost = sorted(keep - clients[lang].page_categories(title))
+                    if lost:
+                        unsafe.append((lang, title, lost))
+                        out(f"{item}: UNSAFE {lang}:{title} merged with a concurrent edit and lost "
+                            f"{', '.join(lost)}; check the page")
             except SyncError as exc:
                 failed.append((lang, title, str(exc)))
                 out(f"{item}: FAILED {lang}:{title}: {exc}")

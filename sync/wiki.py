@@ -116,7 +116,7 @@ class WikiClient:
         return out
 
     def edit(self, title: str, text: str, summary: str, tags: str | None = None,
-             createonly: bool = False, baserevid: int | None = None) -> None:
+             createonly: bool = False, baserevid: int | None = None) -> dict:
         params = dict(action="edit", title=title, text=text, summary=summary, bot="1")
         if tags:
             params["tags"] = tags
@@ -125,13 +125,14 @@ class WikiClient:
         if baserevid is not None:
             # guard against a change since the page was read, and never create it. MediaWiki first tries a
             # three-way merge: a change elsewhere on the page merges and is kept (no editconflict); only
-            # overlapping changes are refused. A caller that previewed the text re-reads the revision
-            # just before saving (tools.file_items does).
+            # overlapping changes are refused. A caller that previewed the text checks the result's
+            # oldrevid against baserevid to detect a merge (tools.file_items does).
             params["baserevid"] = baserevid
             params["nocreate"] = "1"
         result = self._dig(self._call("POST", token=self._token("csrf"), **params), "edit")
         if result.get("result") != "Success":
             raise SyncError(f"{self.lang}: edit of {title} failed: {result}")
+        return result  # oldrevid: the revision actually replaced (differs from baserevid after a merge)
 
     def page_info(self, titles: list[str]) -> dict[str, PageInfo | None]:
         """Existence, redirect flag, visible categories and Wikibase item of each title (None if missing)."""
