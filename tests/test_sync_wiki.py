@@ -379,3 +379,11 @@ def test_both_retry_layers_share_one_budget(monkeypatch):
     with pytest.raises(Exception):
         WikiClient("en", session=s)._token("login")
     assert s.calls == 6
+
+
+def test_page_categories_follows_continuation():
+    s = Recorder({"query": {"pages": [{"title": "X", "categories": [{"title": "Category:A"}]}]},
+                  "continue": {"clcontinue": "1|B", "continue": "||"}},
+                 {"query": {"pages": [{"title": "X", "categories": [{"title": "Category:B"}]}]}})
+    assert WikiClient("en", session=s).page_categories("X") == {"A", "B"}
+    assert s.calls[1][1]["clcontinue"] == "1|B"

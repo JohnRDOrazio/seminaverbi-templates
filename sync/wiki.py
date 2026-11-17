@@ -125,7 +125,8 @@ class WikiClient:
         if baserevid is not None:
             # guard against a change since the page was read, and never create it. MediaWiki first tries a
             # three-way merge: a change elsewhere on the page merges and is kept (no editconflict); only
-            # overlapping changes are refused. The caller's preview ran on the unmerged text.
+            # overlapping changes are refused. A caller that previewed the text re-reads the revision
+            # just before saving (tools.file_items does).
             params["baserevid"] = baserevid
             params["nocreate"] = "1"
         result = self._dig(self._call("POST", token=self._token("csrf"), **params), "edit")
@@ -323,8 +324,13 @@ class WikiClient:
 
     def page_categories(self, title: str) -> set[str]:
         """The page's categories now (template-added included), bare names."""
-        data = self._call("GET", action="query", prop="categories", titles=title, cllimit="max")
-        return {c["title"].split(":", 1)[1] for c in self._dig(data, "query", "pages", 0).get("categories", [])}
+        params, out = dict(action="query", prop="categories", titles=title, cllimit="max"), set()
+        while True:
+            data = self._call("GET", **params)
+            out |= {c["title"].split(":", 1)[1] for c in self._dig(data, "query", "pages", 0).get("categories", [])}
+            if "continue" not in data:
+                return out
+            params.update(data["continue"])
 
     def articles(self) -> list[str]:
         """Titles of every main-namespace page that is not a redirect."""

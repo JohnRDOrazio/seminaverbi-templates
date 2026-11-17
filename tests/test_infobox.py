@@ -278,8 +278,10 @@ def test_auto_type_param_wins():
 
 
 def test_auto_first_mapped_instance_wins():
-    out = auto(["Q776", "Q1025"])
-    assert '<table class="sv-infobox sv-infobox-work">' in out
+    assert '<table class="sv-infobox sv-infobox-person">' in auto(["Q13121", "Q13367"])
+    assert '<table class="sv-infobox sv-infobox-film">' in auto(["Q13367", "Q13121"])
+    out = auto(["Q999", "Q13121"])  # an unmapped value first is skipped
+    assert '<table class="sv-infobox sv-infobox-person">' in out
     assert msg("it", "infobox_unknown_type") not in out
 
 

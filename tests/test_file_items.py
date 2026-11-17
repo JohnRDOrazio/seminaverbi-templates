@@ -436,3 +436,19 @@ def test_namespaces_read_once_per_wiki():
     clients["en"].category_namespaces = lambda: count.append(1) or ["Category"]
     run(repo, clients)
     assert len(count) == 1
+
+
+def test_page_changed_after_its_preview_is_not_saved():
+    repo, clients = setup({"en": FILM_EN})
+    en = clients["en"]
+    real_preview = en.preview_categories
+
+    def preview_then_someone_edits(title, text):
+        cats = real_preview(title, text)
+        item, revid, old, tc = en.pages[title]
+        en.pages[title] = (item, revid + 1, old + "\nAn edit.", tc)
+        return cats
+    en.preview_categories = preview_then_someone_edits
+    report = run(repo, clients)
+    assert report.edited == 0 and report.failed[0][:2] == ("en", "Film page")
+    assert "changed" in report.failed[0][2] and en.pages["Film page"][2].endswith("An edit.")

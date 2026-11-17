@@ -288,6 +288,12 @@ def run(repo, clients: dict, data, types, props: dict, apply: bool, only_item: s
                 unsafe.append((lang, title, lost))
                 out(f"{item}: UNSAFE {lang}:{title} would lose {', '.join(lost)}; not saved")
                 continue
+            now = clients[lang].revision(title)
+            if now is None or now[0] != revid:
+                # MediaWiki would merge a change elsewhere on the page into text nobody previewed
+                failed.append((lang, title, "changed since it was read; run again"))
+                out(f"{item}: FAILED {lang}:{title}: changed since it was read; run again")
+                continue
             try:
                 clients[lang].edit(title, text, _summary(lang), tags=TAG, baserevid=revid)
                 edited += 1
