@@ -53,3 +53,14 @@ def test_data_loads_in_lua():
 def test_categories_compiled():
     data = LuaEnv().require("Module:SV/Data")
     assert data.categories.root.names.en == "Seeds of the Word"  # the existing en root category
+
+
+def test_infobox_types_resolve():
+    from sync.categories import nodes
+    types = json.loads((ROOT / "config" / "infobox_types.json").read_text(encoding="utf-8"))
+    layouts = json.loads((ROOT / "config" / "infobox.json").read_text(encoding="utf-8"))
+    keys = {n.key for n in nodes(json.loads((ROOT / "config" / "categories.json").read_text(encoding="utf-8")))}
+    assert set(types["types"].values()) <= set(layouts)
+    assert set(types["fit"]) <= set(layouts)
+    assert {k for ks in types["fit"].values() for k in ks} <= keys
+    assert {"work", "group"} <= set(layouts)

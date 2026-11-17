@@ -257,3 +257,45 @@ def test_sv_categories_without_item_is_empty():
 
 def test_item_param_names_the_item():
     assert "[[Category:Musica]]" in categories(page_entity=None, item="Q4178")
+
+
+# --- {{SV infobox}}: the layout follows the item's instance of (P2016) ---
+
+def auto(instance_of, lang="it", **args):
+    ents = dict(ENTITIES)
+    ents["Q4178"] = dict(LOTR, claims=dict(LOTR["claims"], P2016=[item(q) for q in instance_of]))
+    env = LuaEnv(lang=lang, entities=ents, page_entity="Q4178", page_title="Pagina")
+    ctx = env.lua.table_from({"lang": lang, "entity_id": "Q4178", "frame": env.frame()})
+    return env.call("Module:SV/Infobox", "_render", "auto", env.lua.table_from(args), ctx)
+
+
+def test_auto_picks_film_from_instance_of():
+    assert '<table class="sv-infobox sv-infobox-film">' in auto(["Q13367"])
+
+
+def test_auto_type_param_wins():
+    assert '<table class="sv-infobox sv-infobox-tv">' in auto(["Q13367"], type="tv")
+
+
+def test_auto_first_mapped_instance_wins():
+    out = auto(["Q776", "Q1025"])
+    assert '<table class="sv-infobox sv-infobox-work">' in out
+    assert msg("it", "infobox_unknown_type") not in out
+
+
+def test_auto_unknown_type_tracked():
+    out = auto(["Q999"])
+    assert '<table class="sv-infobox sv-infobox-work">' in out
+    assert f"[[Category:{msg('it', 'infobox_unknown_type')}]]" in out
+
+
+def test_auto_no_instance_of_tracked():
+    assert f"[[Category:{msg('it', 'infobox_unknown_type')}]]" in auto([])
+
+
+def test_auto_human_is_person():
+    assert '<table class="sv-infobox sv-infobox-person">' in auto(["Q13121"])
+
+
+def test_auto_group_layout():
+    assert '<table class="sv-infobox sv-infobox-group">' in auto(["Q2404"])

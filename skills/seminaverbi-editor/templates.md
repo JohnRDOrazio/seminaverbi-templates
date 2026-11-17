@@ -91,6 +91,17 @@ Starts the closing section on how the work relates to the Gospel, with the same 
 
 Aliases: it: `SV discernimento`, es: `SV discernimiento`, fr: `SV discernement`, de: `SV Unterscheidung`, pt: `SV discernimento`
 
+## SV infobox
+
+The SeminaVerbi infobox: layout from the item's instance of, rows from its statements, categories from its SV field / SV Gospel theme. Write just {{SV infobox}}; any row key overrides the item's value.
+
+| parameter | meaning |
+|---|---|
+| `type` | layout when the item's type is missing or ambiguous: book, film, tv, album, song, play, artwork, person, group, work |
+| `item` | a Wikibase item ID, when the page is not connected to one |
+| `name` | caption; defaults to the item's label |
+| `sortkey` | sort key for the item's categories |
+
 ## SV infobox person
 
 Infobox for a person, filled from the page's Wikibase item. Any field (see below) overrides the item's value.
@@ -127,6 +138,8 @@ Fields per `type`:
 - `song`: image, title, performer, composer, lyrics_by, publication_date, genre
 - `play`: image, title, author, original_language_work, publication_date, genre
 - `artwork`: image, title, creator, inception
+- `work`: image, title, creator, publication_date, genre, country_of_origin
+- `group`: image, inception, genre, record_label, country_of_origin
 
 ## SV quote
 

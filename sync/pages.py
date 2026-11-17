@@ -27,7 +27,7 @@ def compile_data(root: Path) -> str:
     """Lua source of Module:SV/Data, built from config/*.json and i18n/*.json."""
     root = Path(root)
     data = {name: json.loads((root / "config" / f"{name}.json").read_text(encoding="utf-8"))
-            for name in ("wikibase", "infobox", "bible", "categories")}
+            for name in ("wikibase", "infobox", "infobox_types", "bible", "categories")}
     data["i18n"] = {lang: json.loads((root / "i18n" / f"{lang}.json").read_text(encoding="utf-8"))
                     for lang in LANGS}
     return "-- Generated from config/ and i18n/ by the sync script. Do not edit on the wiki.\nreturn " + _lua(data) + "\n"

@@ -225,13 +225,33 @@ function p._categories(entity, lang, sortkey)
 	return table.concat(out, '\n')
 end
 
+-- The layout for an item: the first of its "instance of" values that config/infobox_types.json maps,
+-- else person for a human, else the generic work layout (second result true: the type is unknown).
+function p.layoutFor(entity, data)
+	local types = data.infobox_types.types
+	local values = itemIds(entity, data.wikibase.instance_of)
+	for _, id in ipairs(values) do
+		if types[id] then
+			return types[id], false
+		end
+	end
+	return 'work', true
+end
+
 function p._render(kind, args, ctx)
 	local data = mw.loadData('Module:SV/Data')
 	local lang = ctx.lang
-	local infoboxType = kind == 'person' and 'person' or (args.type or 'book')
-	local fields = data.infobox[infoboxType] or data.infobox.book
 	local id = args.item or ctx.entity_id
 	local entity = id and mw.wikibase.getEntity(id)
+	local infoboxType, unknownType
+	if kind == 'person' then
+		infoboxType = 'person'
+	elseif kind == 'auto' and not args.type then
+		infoboxType, unknownType = p.layoutFor(entity, data)
+	else
+		infoboxType = args.type or 'book'
+	end
+	local fields = data.infobox[infoboxType] or data.infobox.book
 
 	local caption = args.name
 		or (entity and id and Util.escape(label(id, lang) or ''))
@@ -280,6 +300,9 @@ function p._render(kind, args, ctx)
 	if not entity or fromItem == 0 then
 		out[#out + 1] = '[[Category:' .. Util.msg('infobox_missing_category', lang) .. ']]'
 	end
+	if unknownType then
+		out[#out + 1] = '[[Category:' .. Util.msg('infobox_unknown_type', lang) .. ']]'
+	end
 	local cats = p._categories(entity, lang, args.sortkey)
 	if cats ~= '' then
 		out[#out + 1] = cats
@@ -289,6 +312,14 @@ end
 
 function p.work(frame)
 	return p._render('work', Args.get(frame), {
+		lang = Util.lang(),
+		frame = frame,
+		entity_id = mw.wikibase.getEntityIdForCurrentPage(),
+	})
+end
+
+function p.auto(frame)
+	return p._render('auto', Args.get(frame), {
 		lang = Util.lang(),
 		frame = frame,
 		entity_id = mw.wikibase.getEntityIdForCurrentPage(),

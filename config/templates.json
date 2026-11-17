@@ -55,6 +55,15 @@
     "summary": "Starts the closing section on how the work relates to the Gospel, with the same heading on every wiki. On its own line.",
     "params": {}
   },
+  "SV infobox": {
+    "summary": "The SeminaVerbi infobox: layout from the item's instance of, rows from its statements, categories from its SV field / SV Gospel theme. Write just {{SV infobox}}; any row key overrides the item's value.",
+    "params": {
+      "type": "layout when the item's type is missing or ambiguous: book, film, tv, album, song, play, artwork, person, group, work",
+      "item": "a Wikibase item ID, when the page is not connected to one",
+      "name": "caption; defaults to the item's label",
+      "sortkey": "sort key for the item's categories"
+    }
+  },
   "SV infobox person": {
     "summary": "Infobox for a person, filled from the page's Wikibase item. Any field (see below) overrides the item's value.",
     "params": {
