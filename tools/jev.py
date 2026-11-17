@@ -137,16 +137,26 @@ def themes(client, text: str, data) -> dict:
 
 
 def record(decision: Decision, path: Path = LOG) -> dict:
+    return record_all([decision], path)[0]
+
+
+def record_all(decisions: list, path: Path = LOG) -> list[dict]:
+    """Append the decisions to the log in one read and one write."""
+    if not decisions:
+        return []
     entries = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
     today = date.today().isoformat()
-    prefix = f"{today}-{decision.node or 'article'}"
-    n = sum(1 for e in entries if e["id"].startswith(prefix + "-")) + 1
-    entry = {"id": f"{prefix}-{n}", "date": today, "model": MODEL, **decision._asdict(),
-             "thresholds": {"choice_probability": CHOICE_PROBABILITY, "choice_confidence": CHOICE_CONFIDENCE,
-                            "theme_apply": THEME_APPLY, "theme_ask": THEME_ASK, "beam_tie": BEAM_TIE}}
-    entries.append(entry)
+    added = []
+    for decision in decisions:
+        prefix = f"{today}-{decision.node or 'article'}"
+        n = sum(1 for e in entries if e["id"].startswith(prefix + "-")) + 1
+        entry = {"id": f"{prefix}-{n}", "date": today, "model": MODEL, **decision._asdict(),
+                 "thresholds": {"choice_probability": CHOICE_PROBABILITY, "choice_confidence": CHOICE_CONFIDENCE,
+                                "theme_apply": THEME_APPLY, "theme_ask": THEME_ASK, "beam_tie": BEAM_TIE}}
+        entries.append(entry)
+        added.append(entry)
     path.write_text(json.dumps(entries, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
-    return entry
+    return added
 
 
 def _print_decision(d: Decision) -> None:

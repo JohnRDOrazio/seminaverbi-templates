@@ -83,8 +83,11 @@ class FakeJev:
 
 
 def run(fake, mapping, jev=None, dry_run=False, record=None):
-    steps = mig.plan(fake.lang, DATA, mapping, fake, jev or FakeJev(), record=record)
+    steps = mig.plan(fake.lang, DATA, mapping, fake, jev or FakeJev())
     report = mig.execute(fake, steps, dry_run=dry_run, lang=fake.lang)
+    if record and not dry_run:
+        for decision in mig.applied_decisions(steps, report):
+            record(decision)
     return steps, report
 
 
@@ -298,3 +301,32 @@ def test_execute_keeps_going_after_an_unexpected_error():
     _, report = run(fake, {"Film": "film", "Literary arts": "literature"})
     assert report.failed and report.failed[0][0] == "Category:Film"
     assert fake.pages["Category:Literature"].startswith("Literature def.")
+
+
+def test_failed_member_edit_is_not_recorded():
+    fake = Fake(pages={"Category:Fiction": "", "Book": "[[Category:Fiction]]", "Tale": "[[Category:Fiction]]"},
+                members={"Category:Fiction": [("Book", 0), ("Tale", 0)]})
+    fake.fail_edit = {"Book"}
+    recorded = []
+    run(fake, {"Fiction": "split:literature"}, FakeJev("novels"), record=recorded.append)
+    assert [d.node for d in recorded] == ["Tale"]
+
+
+def test_planning_writes_no_decision():
+    fake = Fake(pages={"Category:Fiction": "", "Book": "[[Category:Fiction]]"}, members={"Category:Fiction": [("Book", 0)]})
+    p = mig.plan("en", DATA, {"Fiction": "split:literature"}, fake, FakeJev("novels"))
+    assert [(m, d.choice) for m, d in p.decisions] == [("Book", "novels")]
+
+
+def test_redirected_split_category_finishes_its_leftover_members():
+    fake = Fake(pages={"Category:Fiction": "#REDIRECT [[:Category:Literature]]", "Book": "[[Category:Fiction]]"},
+                members={"Category:Fiction": [("Book", 0)]}, redirects={"Category:Fiction"})
+    _, report = run(fake, {"Fiction": "split:literature"}, FakeJev("novels"))
+    assert fake.pages["Book"] == "[[Category:Novels]]" and "Category:Fiction" not in report.skipped
+
+
+def test_redirected_split_category_reports_an_unsure_leftover():
+    fake = Fake(pages={"Category:Fiction": "#REDIRECT [[:Category:Literature]]", "Book": "[[Category:Fiction]]"},
+                members={"Category:Fiction": [("Book", 0)]}, redirects={"Category:Fiction"})
+    _, report = run(fake, {"Fiction": "split:literature"}, FakeJev("poetry", "author"))
+    assert report.author and report.author[0][0] == "Book"

@@ -10,7 +10,8 @@ Moves the old category pages of a wiki onto the category tree, following config/
   others are left for the author; when none is left, the old page redirects to <key>.
 
 Everything is planned (reading only, Jev included) before the first edit, so a failure while planning
-changes nothing. Only category pages and the category lines of member pages are edited.
+changes nothing. Jev's answers are logged after the run, only for members whose edit was saved. Only
+category pages and the category lines of member pages are edited.
 """
 from __future__ import annotations
 
@@ -44,6 +45,7 @@ class Plan(NamedTuple):
     unmatched: list    # (member title, category title): category line not found in the member's text
     redirected: list   # old category titles turned into redirects (the author may delete them)
     via_template: list  # (member title, category title): filed by a template whose category line was re-filed
+    decisions: list = []  # (member title, Decision): Jev's applied split answers, recorded after their edit
 
 
 class Report(NamedTuple):
@@ -89,12 +91,12 @@ def _bare(title: str) -> str:
     return title.split(":", 1)[1] if ":" in title else title
 
 
-def plan(lang: str, data: dict, mapping: dict, client, jev, record=None) -> Plan:
-    """record: called with each Jev decision applied to an article (split members)."""
+def plan(lang: str, data: dict, mapping: dict, client, jev) -> Plan:
+    """Reads only. Jev's applied answers for split members are returned in `decisions`, not recorded."""
     by_key = {n.key: n for n in nodes(data)}
     namespaces = client.category_namespaces()
     mapped = set(mapping)
-    steps, author, skipped, unmatched, redirected, via_template = [], [], [], [], [], []
+    steps, author, skipped, unmatched, redirected, via_template, decisions = [], [], [], [], [], [], []
     texts: dict[str, str | None] = {}  # pages as they will be after the planned edits
 
     def current(title):
@@ -134,6 +136,25 @@ def plan(lang: str, data: dict, mapping: dict, client, jev, record=None) -> Plan
                 missed.append(member)
         return missed
 
+    def split(members, old_name, old_title):
+        """File each non-category member with Jev; returns how many are left in the old category."""
+        pending = 0
+        for member, ns in members:
+            if ns == 14:
+                continue
+            decision = jev.classify(current(member) or "", data)
+            if decision.outcome != "applied":
+                author.append((member, old_title, decision))
+                pending += 1
+                continue
+            # a member filed by a template keeps the old category: do not redirect it away
+            missed = refile([(member, ns)], old_name, by_key[decision.choice].names[lang])
+            if missed:
+                pending += len(missed)
+            else:
+                decisions.append((member, decision._replace(node=member)))
+        return pending
+
     def node_text(node):
         parent = by_key[node.parent_key] if node.parent_key else None
         return page_text(node, parent, lang)
@@ -150,26 +171,15 @@ def plan(lang: str, data: dict, mapping: dict, client, jev, record=None) -> Plan
         members = client.members(old_title)
         if client.is_redirect(old_title):
             # already migrated; finish any member whose re-file failed in an earlier run
-            if members and kind != "split":
+            if members and kind == "split":
+                split(members, old_name, old_title)
+            elif members:
                 refile(members, old_name, new_name, refile_templates(old_name, new_name))
             else:
                 skipped.append(old_title)
             continue
         if kind == "split":
-            pending = 0
-            for member, ns in members:
-                if ns == 14:
-                    continue
-                decision = jev.classify(current(member) or "", data)
-                if decision.outcome != "applied":
-                    author.append((member, old_title, decision))
-                    pending += 1
-                    continue
-                if record:
-                    record(decision._replace(node=member))
-                # a member filed by a template keeps the old category: do not redirect it away
-                pending += len(refile([(member, ns)], old_name, by_key[decision.choice].names[lang]))
-            if not pending:
+            if not split(members, old_name, old_title):
                 set_text(old_title, f"#REDIRECT [[:{new_title}]]")
                 redirected.append(old_title)
         elif kind == "redirect" or (old_name != new_name and client.exists(new_title)):
@@ -185,7 +195,7 @@ def plan(lang: str, data: dict, mapping: dict, client, jev, record=None) -> Plan
             texts[new_title] = current(old_title)
             refile(members, old_name, new_name, refile_templates(old_name, new_name))
             set_text(new_title, node_text(node))
-    return Plan(steps, author, skipped, unmatched, redirected, via_template)
+    return Plan(steps, author, skipped, unmatched, redirected, via_template, decisions)
 
 
 def execute(client, p: Plan, dry_run: bool = False, lang: str = "en") -> Report:
@@ -201,6 +211,13 @@ def execute(client, p: Plan, dry_run: bool = False, lang: str = "en") -> Report:
             except Exception as exc:  # one failed step must not abort the rest of the run
                 failed.append((step[1], f"{type(exc).__name__}: {exc}"))
     return Report(p.author, p.skipped, p.unmatched, p.redirected, failed, p.via_template)
+
+
+def applied_decisions(p: Plan, report: Report) -> list:
+    """Jev's split answers whose member edit was saved: the ones to record."""
+    failed = {title for title, _ in report.failed}
+    edited = {step[1] for step in p.steps if step[0] == "edit"}
+    return [d for member, d in p.decisions if member in edited and member not in failed]
 
 
 class JevAdapter:
@@ -253,13 +270,14 @@ def main(argv=None, client_factory=WikiClient, jev=None, data=None, mapping=None
         if jev is None:
             from tools.jev import make_client
             jev = JevAdapter(make_client())
-        from tools.jev import record as record_decision
-        p = plan(args.wiki, data, mapping.get(args.wiki, {}), client, jev,
-                 record=None if args.dry_run else record_decision)
+        p = plan(args.wiki, data, mapping.get(args.wiki, {}), client, jev)
     except Exception as exc:  # planning reads only: nothing has been changed
         print(f"[{args.wiki}] ERROR while planning (nothing changed): {type(exc).__name__}: {exc}", file=sys.stderr)
         return 1
     report = execute(client, p, args.dry_run, args.wiki)
+    if not args.dry_run:
+        from tools.jev import record_all
+        record_all(applied_decisions(p, report))
     _print(p, report, args.wiki, args.dry_run)
     return 1 if report.failed or report.unmatched or report.author else 0
 
