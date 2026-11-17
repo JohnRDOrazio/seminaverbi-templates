@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import json
+import time
 from typing import NamedTuple
 
 import requests
 
 from sync.plan import PageState
 
+RETRIES = 5  # extra attempts after an HTTP 429
 USER_AGENT = "seminaverbi-templates-sync/1.0 (https://github.com/JohnRDOrazio/seminaverbi-templates)"
 
 
@@ -36,10 +38,16 @@ class WikiClient:
 
     def _call(self, method: str, **params) -> dict:
         params.update(format="json", formatversion="2")
-        if method == "GET":
-            r = self.session.get(self.api, params=params, timeout=60)
-        else:
-            r = self.session.post(self.api, data=params, timeout=60)
+        for attempt in range(RETRIES + 1):
+            if method == "GET":
+                r = self.session.get(self.api, params=params, timeout=60)
+            else:
+                r = self.session.post(self.api, data=params, timeout=60)
+            if getattr(r, "status_code", 200) != 429 or attempt == RETRIES:
+                break
+            # rate limited (nginx limit_req): wait as told, or back off, then retry the same request
+            retry_after = r.headers.get("Retry-After")
+            time.sleep(float(retry_after) if retry_after else min(2.0 ** attempt, 30.0))
         r.raise_for_status()
         data = r.json()
         if "error" in data:

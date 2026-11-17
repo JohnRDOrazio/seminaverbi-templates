@@ -161,3 +161,47 @@ def test_category_namespaces_include_local_and_aliases():
     s = Recorder({"query": {"namespaces": {"14": {"name": "Categoria", "canonical": "Category"}},
                             "namespacealiases": [{"id": 14, "alias": "Cat"}, {"id": 2, "alias": "U"}]}})
     assert WikiClient("it", session=s).category_namespaces() == ["Cat", "Categoria", "Category"]
+
+
+class Limited:
+    """Answers 429 (with Retry-After) `times` times, then the JSON body."""
+
+    def __init__(self, times, body, retry_after="1"):
+        self.left, self.body, self.retry_after, self.headers, self.calls = times, body, retry_after, {}, 0
+
+    def get(self, url, params=None, timeout=None):
+        self.calls += 1
+        if self.left:
+            self.left -= 1
+            return LimitedResponse(self.retry_after)
+        return Response(self.body)
+
+    post = get
+
+
+class LimitedResponse:
+    status_code = 429
+
+    def __init__(self, retry_after):
+        self.headers = {"Retry-After": retry_after} if retry_after else {}
+
+    def raise_for_status(self):
+        import requests
+        raise requests.HTTPError("429 Client Error: Too Many Requests")
+
+
+def test_rate_limited_requests_are_retried(monkeypatch):
+    waits = []
+    monkeypatch.setattr("sync.wiki.time.sleep", waits.append)
+    s = Limited(2, {"query": {"tokens": {"logintoken": "t"}}}, retry_after="3")
+    assert WikiClient("en", session=s)._token("login") == "t"
+    assert s.calls == 3 and waits == [3.0, 3.0]
+
+
+def test_rate_limit_gives_up_after_retries(monkeypatch):
+    import requests
+    monkeypatch.setattr("sync.wiki.time.sleep", lambda s: None)
+    s = Limited(99, {}, retry_after=None)
+    with pytest.raises(requests.HTTPError):
+        WikiClient("en", session=s)._token("login")
+    assert s.calls == 6
