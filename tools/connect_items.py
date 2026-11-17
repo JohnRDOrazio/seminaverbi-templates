@@ -127,6 +127,7 @@ def describe(entity: dict, qid: str, lang: str) -> str:
 
 
 def _search_text(title: str) -> str:
+    """The title without a trailing "(…)" disambiguator: search text and new items' labels."""
     return re.sub(r"\s*\([^)]*\)\s*$", "", title) or title
 
 
@@ -369,7 +370,7 @@ def run(rows: list, repo, apply: bool, import_log: str | None = None, create=(),
                     fail(r, f"import {r.wd}: not in the import log")
                     continue
             elif r.action == "create" and (r.lang, r.title) in create:
-                local = repo.new_item({r.lang: r.title}, {}, {r.lang: r.title}, tags=TAG)
+                local = repo.new_item({r.lang: _search_text(r.title)}, {}, {r.lang: r.title}, tags=TAG)
                 out(f"{r.lang}:{r.title}: created {local}")
                 linked += 1
                 if file_item:

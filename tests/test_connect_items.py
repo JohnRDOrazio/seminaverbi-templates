@@ -318,3 +318,11 @@ def test_main_wires_the_cli(tmp_path, capsys):
     assert code == 0 and repo.links["Q48100"] == {"en": "Christmas tree"} and filed == ["Q48100", "Q48001"]
     with pytest.raises(SystemExit):
         ci.main(["--wd", "Nobody=Q1"], repo=repo, clients=clients, wikidata=wd)
+
+
+def test_created_label_drops_the_disambiguator():
+    title = "Il Miglio Verde (film)"
+    repo = Repo()
+    rows = [Connect("it", title, "create", None, None, "")]
+    assert ci.run(rows, repo, apply=True, create={("it", title)}) == 0
+    assert repo.calls == [("new", "Q48001", {"it": "Il Miglio Verde"}, {}, {"it": title})]
