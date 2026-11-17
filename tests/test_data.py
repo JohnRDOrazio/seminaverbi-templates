@@ -118,7 +118,8 @@ def test_bio_params_all_accounted_for():
     assert not set(BIO_PARAMS) - known
     assert bio["facts"]["Sesso"] == "sex_or_gender"
     assert all(isinstance(v, str) and v for v in bio["ignored"].values())
-    assert not set(bio["facts"]) & set(bio["free"]) & set(bio["ignored"])
+    f, fr, ig = set(bio["facts"]), set(bio["free"]), set(bio["ignored"])
+    assert not f & fr and not f & ig and not fr & ig
 
 
 def test_import_helpers_and_kinds():
@@ -127,3 +128,9 @@ def test_import_helpers_and_kinds():
             "Film date"} <= set(imp["helpers"])
     assert {"Q207628", "Q105543609"} <= set(imp["kinds"]["song"])
     assert {"Q7397", "Q235557"} <= set(imp["kinds"]["work"])
+
+
+def test_import_kinds_easter_and_matrix():
+    kinds = json.loads((ROOT / "config" / "infobox_import.json").read_text(encoding="utf-8"))["kinds"]
+    assert {"Q163886", "Q267726"} <= set(kinds["work"])
+    assert {"Q196600", "Q13014087"} <= set(kinds["film"])
