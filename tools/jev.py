@@ -39,7 +39,7 @@ class Decision(NamedTuple):
     probabilities: dict
     confidence: float
     choice: str
-    outcome: str  # "applied" | "author"
+    outcome: str  # "applied" | "author" ("no" for a themes entry with no theme at all)
 
 
 def make_client():
@@ -92,29 +92,28 @@ def _ask_level(client, text, data, parent_key):
 def classify(client, text: str, data) -> Decision:
     """Exactly one field node for an article: descend the tree while each step is confident."""
     results = []  # (score, key, all_steps_confident, criteria, answer)
-    last = {}  # the most recent level's question, so a leaf reached by descending keeps its evidence
 
-    def descend(parent_key, score, ok):
+    def descend(parent_key, score, ok, picked=(None, None)):
+        """`picked`: the (criteria, answer) of the level that chose `parent_key`, its evidence."""
         if parent_key is not None and not field_children(data, parent_key):
-            results.append((score, parent_key, ok, last.get("criteria"), last.get("answer")))
+            results.append((score, parent_key, ok, *picked))
             return
         criteria, a = _ask_level(client, text, data, parent_key)
-        last["criteria"], last["answer"] = criteria, a
         ranked = sorted(a.probabilities.items(), key=lambda kv: kv[1], reverse=True)
         best, best_p = ranked[0]
         if confident(best_p, a.confidence):
-            descend(best, score * best_p, ok)
+            descend(best, score * best_p, ok, (criteria, a))
             return
         # explore both branches only when it can add evidence: both tied options have children to ask about
         tie = (len(ranked) > 1 and best_p - ranked[1][1] <= BEAM_TIE
                and all(field_children(data, k) for k, _ in ranked[:2]))
         if tie:
             for key, p in ranked[:2]:
-                descend(key, score * p, False)
+                descend(key, score * p, False, (criteria, a))
         elif parent_key is None:
             results.append((score * best_p, best, False, criteria, a))
         else:
-            results.append((score * best_p, parent_key, ok, criteria, a))  # file at the confident parent
+            results.append((score * best_p, parent_key, ok, *picked))  # file at the confident parent
 
     descend(None, 1.0, True)
     score, key, ok, criteria, a = max(results, key=lambda r: r[0])
@@ -138,15 +137,26 @@ def themes(client, text: str, data) -> dict:
 
 
 def record(decision: Decision, path: Path = LOG) -> dict:
+    return record_all([decision], path)[0]
+
+
+def record_all(decisions: list, path: Path = LOG) -> list[dict]:
+    """Append the decisions to the log in one read and one write."""
+    if not decisions:
+        return []
     entries = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
     today = date.today().isoformat()
-    prefix = f"{today}-{decision.node or 'article'}"
-    n = sum(1 for e in entries if e["id"].startswith(prefix + "-")) + 1
-    entry = {"id": f"{prefix}-{n}", "date": today, "model": MODEL, **decision._asdict(),
-             "thresholds": {"choice_probability": CHOICE_PROBABILITY, "choice_confidence": CHOICE_CONFIDENCE}}
-    entries.append(entry)
+    added = []
+    for decision in decisions:
+        prefix = f"{today}-{decision.node or 'article'}"
+        n = sum(1 for e in entries if e["id"].startswith(prefix + "-")) + 1
+        entry = {"id": f"{prefix}-{n}", "date": today, "model": MODEL, **decision._asdict(),
+                 "thresholds": {"choice_probability": CHOICE_PROBABILITY, "choice_confidence": CHOICE_CONFIDENCE,
+                                "theme_apply": THEME_APPLY, "theme_ask": THEME_ASK, "beam_tie": BEAM_TIE}}
+        entries.append(entry)
+        added.append(entry)
     path.write_text(json.dumps(entries, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
-    return entry
+    return added
 
 
 def _print_decision(d: Decision) -> None:
@@ -188,8 +198,10 @@ def main(argv=None, client=None, data=None) -> int:
             for key, (prob, outcome) in sorted(result.items(), key=lambda kv: -kv[1][0]):
                 print(f"{key}: {prob:.2f} {outcome}")
             if args.record:
-                d = Decision("themes", Path(args.file).stem, {}, {k: p for k, (p, _) in result.items()}, 1.0,
-                             ",".join(sorted(k for k, (_, o) in result.items() if o == "applied")), "applied")
+                outcomes = {o for _, o in result.values()}
+                outcome = "applied" if "applied" in outcomes else "author" if "author" in outcomes else "no"
+                d = Decision("themes", Path(args.file).stem, {}, {k: p for k, (p, _) in result.items()}, None,
+                             ",".join(sorted(k for k, (_, o) in result.items() if o == "applied")), outcome)
                 print(f"recorded {record(d, LOG)['id']}")
     except Exception as exc:  # TypeSafe, network, file or anything unexpected: no traceback, nothing recorded
         print(f"Jev request failed: {type(exc).__name__}: {exc}", file=sys.stderr)

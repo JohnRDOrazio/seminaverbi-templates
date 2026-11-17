@@ -31,12 +31,16 @@ CATEGORY_NS = {"en": "Category", "it": "Categoria", "es": "Categoría", "fr": "C
 class Plan(NamedTuple):
     sitelinks: dict   # wbeditentity 'sitelinks' payload; empty = nothing to do
     conflicts: list   # (lang, the SeminaVerbi link the item has, the tree title): left alone
+    kept: list = []   # (<lang>wiki, its link now, what the bot wrote): changed since the bot, left alone
 
 
-def plan_item(current: dict[str, str], before: dict[str, str] | None, titles: dict[str, str]) -> Plan:
+def plan_item(current: dict[str, str], before: dict[str, str] | None, titles: dict[str, str],
+              written: dict[str, str] | None = None) -> Plan:
     """`current`/`before`: site -> title of the item now and before the bot's first edit (None: the bot
-    created it). `titles`: lang -> the tree category's title on that wiki."""
-    out, conflicts = {}, []
+    created it). `titles`: lang -> the tree category's title on that wiki. `written`: the item's links
+    as the bot's last edit left them; a Wikipedia link that differs from it now was changed by someone
+    else since, and is kept."""
+    out, conflicts, kept = {}, [], []
     for lang in LANGS:
         wiki = f"{lang}wiki"
         have = current.get(lang)
@@ -44,13 +48,17 @@ def plan_item(current: dict[str, str], before: dict[str, str] | None, titles: di
             out[lang] = {"site": lang, "title": titles[lang]}
         elif have != titles[lang]:
             conflicts.append((lang, have, titles[lang]))
+        if written is not None and current.get(wiki) != written.get(wiki):
+            if wiki in current:
+                kept.append((wiki, current[wiki], written.get(wiki)))
+            continue
         if before is None:
             if wiki in current:
                 out[wiki] = {"site": wiki, "title": "", "remove": ""}
         elif current.get(wiki) != before.get(wiki):
             out[wiki] = ({"site": wiki, "title": before[wiki]} if wiki in before
                          else {"site": wiki, "title": "", "remove": ""})
-    return Plan(out, conflicts)
+    return Plan(out, conflicts, kept)
 
 
 def tree_titles(data: dict) -> dict[str, dict[str, str]]:
@@ -74,8 +82,9 @@ def bot_items(repo: WikiClient) -> dict[str, dict]:
                           uclimit="500", ucprop="title|ids|flags", **cont)
         for c in repo._dig(data, "query", "usercontribs"):
             q = c["title"].split(":")[-1]
-            entry = items.setdefault(q, {"created": False, "first": None, "first_parent": None})
-            entry["created"] |= bool(c.get("new"))
+            entry = items.setdefault(q, {"created": False, "first": None, "first_parent": None, "last": None})
+            entry["created"] |= "new" in c and c["new"] is not False
+            entry["last"] = max(entry["last"] or 0, c["revid"])
             if entry["first"] is None or c["revid"] < entry["first"]:
                 entry["first"], entry["first_parent"] = c["revid"], c["parentid"]
         if "continue" not in data:
@@ -83,15 +92,53 @@ def bot_items(repo: WikiClient) -> dict[str, dict]:
         cont = data["continue"]
 
 
-def sitelinks_of(repo: WikiClient, item: str) -> dict[str, str]:
-    entities = repo._dig(repo._call("GET", action="wbgetentities", ids=item, props="sitelinks"), "entities")
-    return {s: v["title"] for s, v in repo._dig(entities, item).get("sitelinks", {}).items()}
+def sitelinks_of(repo: WikiClient, item: str) -> tuple[dict[str, str], int]:
+    """The item's links now, and the revision they were read from."""
+    entities = repo._dig(repo._call("GET", action="wbgetentities", ids=item, props="sitelinks|info"), "entities")
+    entity = repo._dig(entities, item)
+    return {s: v["title"] for s, v in entity.get("sitelinks", {}).items()}, entity["lastrevid"]
 
 
 def sitelinks_at(repo: WikiClient, revid: int) -> dict[str, str]:
     data = repo._call("GET", action="query", prop="revisions", revids=str(revid), rvprop="content", rvslots="main")
     content = json.loads(repo._dig(data, "query", "pages", 0, "revisions", 0, "slots", "main", "content"))
     return {s: v["title"] for s, v in content.get("sitelinks", {}).items()}
+
+
+def _repair(repo, item, before, written, titles, clients, apply: bool) -> str:
+    """Plan and (with apply) save one item against the revision it was read from: "ok", "failed", or
+    "conflict" when someone edited the item in between (read it again)."""
+    current, revid = sitelinks_of(repo, item)
+    key = node_of(current, titles) or (node_of(before, titles) if before else None)
+    if key is None:
+        print(f"{item}: SKIP no single tree category in {current}")
+        return "failed"
+    plan = plan_item(current, before, titles[key], written)
+    status = "ok"
+    for lang, have, want in plan.conflicts:
+        client = clients.setdefault(lang, WikiClient(lang))
+        if not client.exists(have) or client.is_redirect(have):
+            # a stale link to a page since renamed (the clients could not follow the move)
+            plan.sitelinks[lang] = {"site": lang, "title": want}
+            continue
+        print(f"{item} ({key}): CONFLICT {lang} is {have}, tree says {want}; left alone")
+        status = "failed"
+    for site, have, bot in plan.kept:
+        print(f"{item} ({key}): KEPT {site} is {have}, changed since the bot wrote {bot or 'nothing'}")
+    if not plan.sitelinks:
+        return status
+    print(f"{item} ({key}): " + ", ".join(
+        f"-{s}" if "remove" in v else f"{s}={v['title']}" for s, v in plan.sitelinks.items()))
+    if apply:
+        try:
+            repo._call("POST", action="wbeditentity", id=item, bot="1", tags=TAG, summary=SUMMARY,
+                       baserevid=str(revid), data=json.dumps({"sitelinks": plan.sitelinks}, ensure_ascii=False),
+                       token=repo._token("csrf"))
+        except SyncError as e:
+            if "editconflict" in str(e):
+                return "conflict"
+            raise
+    return status
 
 
 def main(argv=None, repo: WikiClient | None = None, data: dict | None = None) -> int:
@@ -106,30 +153,14 @@ def main(argv=None, repo: WikiClient | None = None, data: dict | None = None) ->
     failed, clients = 0, {}
     for item, info in sorted(bot_items(repo).items(), key=lambda kv: int(kv[0][1:])):
         try:
-            current = sitelinks_of(repo, item)
             before = None if info["created"] else sitelinks_at(repo, info["first_parent"])
-            key = node_of(current, titles) or (node_of(before, titles) if before else None)
-            if key is None:
-                print(f"{item}: SKIP no single tree category in {current}")
-                failed += 1
-                continue
-            plan = plan_item(current, before, titles[key])
-            for lang, have, want in plan.conflicts:
-                client = clients.setdefault(lang, WikiClient(lang))
-                if not client.exists(have) or client.is_redirect(have):
-                    # a stale link to a page since renamed (the clients could not follow the move)
-                    plan.sitelinks[lang] = {"site": lang, "title": want}
-                    continue
-                print(f"{item} ({key}): CONFLICT {lang} is {have}, tree says {want}; left alone")
-                failed += 1
-            if not plan.sitelinks:
-                continue
-            print(f"{item} ({key}): " + ", ".join(
-                f"-{s}" if "remove" in v else f"{s}={v['title']}" for s, v in plan.sitelinks.items()))
-            if args.apply:
-                repo._call("POST", action="wbeditentity", id=item, bot="1", tags=TAG, summary=SUMMARY,
-                           data=json.dumps({"sitelinks": plan.sitelinks}, ensure_ascii=False),
-                           token=repo._token("csrf"))
+            written = sitelinks_at(repo, info["last"]) if info.get("last") else None
+            for attempt in range(3):
+                outcome = _repair(repo, item, before, written, titles, clients, args.apply)
+                if outcome != "conflict":
+                    break
+                print(f"{item}: edited since it was read; reading it again")
+            failed += outcome in ("failed", "conflict")
         except (SyncError, KeyError, ValueError) as e:
             print(f"{item}: FAILED {e}")
             failed += 1

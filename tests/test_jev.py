@@ -96,6 +96,8 @@ def test_classify_stops_at_parent_when_unsure():
     )
     d = jev.classify(fake, "A film.", DATA)
     assert d.choice == "film" and d.outcome == "applied"
+    # the evidence is the answer that chose film, not the unsure level below it
+    assert d.choice in d.probabilities and d.confidence == 0.85 and "film" in d.options
 
 
 def test_classify_top_level_unsure_goes_to_author():
@@ -194,3 +196,27 @@ def test_cli_classify_record_and_unexpected_errors(monkeypatch, tmp_path, capsys
 
     assert jev.main(["classify", str(text)], client=Weird(), data=DATA) == 1
     assert "unexpected" in capsys.readouterr().err
+
+
+def test_record_keeps_every_policy_constant(tmp_path):
+    log = tmp_path / "decisions.json"
+    log.write_text("[]")
+    d = jev.Decision("classify", "x", {}, {"film": 0.9}, 0.9, "film", "applied")
+    t = jev.record(d, log)["thresholds"]
+    assert t == {"choice_probability": jev.CHOICE_PROBABILITY, "choice_confidence": jev.CHOICE_CONFIDENCE,
+                 "theme_apply": jev.THEME_APPLY, "theme_ask": jev.THEME_ASK, "beam_tie": jev.BEAM_TIE}
+
+
+def test_cli_themes_record_outcome_from_the_answers(monkeypatch, tmp_path):
+    log = tmp_path / "log.json"
+    log.write_text("[]")
+    monkeypatch.setattr(jev, "LOG", log)
+    text = tmp_path / "a.txt"
+    text.write_text("A film.")
+    assert jev.main(["themes", str(text), "--record"], client=FakeJev({"faith": 0.5, "hope": 0.1, "family": 0.1}),
+                    data=DATA) == 0
+    assert jev.main(["themes", str(text), "--record"], client=FakeJev({"faith": 0.1, "hope": 0.1, "family": 0.1}),
+                    data=DATA) == 0
+    first, second = json.loads(log.read_text())
+    assert first["outcome"] == "author" and first["choice"] == "" and first["confidence"] is None
+    assert second["outcome"] == "no"

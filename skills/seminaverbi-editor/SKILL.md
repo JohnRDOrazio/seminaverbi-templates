@@ -18,7 +18,7 @@ templates or `Module:SV/…` on a wiki: they are overwritten by the sync. Change
 - `article-standard.md`: what a SeminaVerbi article is, and must contain. Read before writing article prose.
 - `links.md`: internal, Wikipedia, Cathopedia and cross-wiki links. Read before writing any link.
 - `templates.md` (generated): every SV template, its parameters, aliases and per-wiki defaults.
-- `categories.md` (generated): the only categories you may use, per language.
+- `categories.md` (generated): the only categories you may write, per language.
 
 ## Edit routine (every save)
 
@@ -30,7 +30,9 @@ templates or `Module:SV/…` on a wiki: they are overwritten by the sync. Change
      that wiki (check with `get-page` on `Template:<name>` if unsure); never introduce Wikipedia templates;
    - no link to `w:`/`wikipedia:` without a language on a non-English wiki (see `links.md`);
    - the article calls `{{SV infobox}}` or `{{SV categories}}`, and has no `[[Category:…]]` line for a
-     tree category (field and themes come from the item, below); any other category is in `categories.md`;
+     tree category (field and themes come from the item, below); any other category you write is in
+     `categories.md`; the SV templates' own maintenance and tracking categories (`{{SV WIP}}`,
+     `{{SV cathopedia}}`, the infobox's tracking categories…) are fine;
    - every Gospel theme on the item is argued in the text (see Categories);
    - every Bible verse named or alluded to is quoted with `{{SV Bible quote|ref=…}}`;
    - red links only for articles that are planned; say which ones you left.
