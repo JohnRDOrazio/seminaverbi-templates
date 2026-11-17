@@ -39,6 +39,7 @@ class CreateResult(NamedTuple):
     linked: list         # (title, item) sitelinks set or items created
     conflicts: list      # (node key, the distinct items its pages are attached to)
     failed: list         # (title, error)
+    taken: list          # (node key, item, page it already links on this wiki): left alone
 
 
 def _site(lang: str) -> str:
@@ -79,7 +80,7 @@ def create(lang: str, data: dict, client, repo, dry_run: bool) -> CreateResult:
     report = check(lang, data, client)
     tree = nodes(data)
     by_key = {n.key: n for n in tree}
-    created, linked, conflicts, failed = [], [], [], []
+    created, linked, conflicts, failed, taken = [], [], [], [], []
     missing = set(report.missing)
     for n in tree:
         if n.key not in missing:
@@ -107,6 +108,9 @@ def create(lang: str, data: dict, client, repo, dry_run: bool) -> CreateResult:
                 conflicts.append((n.key, distinct))
             elif own:
                 continue
+            elif distinct and (current := repo.sitelink(distinct[0], _site(lang))) not in (None, title):
+                # wbsetsitelink would silently move the item's existing link for this wiki
+                taken.append((n.key, distinct[0], current))
             elif dry_run:
                 linked.append((title, distinct[0] if distinct else "(new item)"))
             elif distinct:
@@ -117,7 +121,7 @@ def create(lang: str, data: dict, client, repo, dry_run: bool) -> CreateResult:
                 linked.append((title, item))
         except (SyncError, OSError) as exc:
             failed.append((title, str(exc)))
-    return CreateResult(report, created, linked, conflicts, failed)
+    return CreateResult(report, created, linked, conflicts, failed, taken)
 
 
 def _print_report(lang: str, data: dict, report: Report) -> None:
@@ -136,7 +140,7 @@ def _print_report(lang: str, data: dict, report: Report) -> None:
         print(f"[{lang}] used by articles, not in the tree: {', '.join(report.untracked)}")
 
 
-def main(argv=None, client_factory=WikiClient) -> int:
+def main(argv=None, client_factory=WikiClient, data=None) -> int:
     parser = argparse.ArgumentParser(prog="python -m tools.categories")
     parser.add_argument("command", choices=["check"])
     parser.add_argument("--wiki", required=True)
@@ -150,7 +154,7 @@ def main(argv=None, client_factory=WikiClient) -> int:
     if not user or not password:
         print("Set SV_EDITOR_USER and SV_EDITOR_PASSWORD (a bot password).", file=sys.stderr)
         return 2
-    data = load(ROOT)
+    data = data or load(ROOT)
     try:
         client = client_factory(args.wiki)
         client.login(user, password)
@@ -176,9 +180,12 @@ def main(argv=None, client_factory=WikiClient) -> int:
         print(f"[{args.wiki}] {'would link' if args.dry_run else 'linked'}: {title} -> {item}")
     for key, items in result.conflicts:
         print(f"[{args.wiki}] CONFLICT: {key} is on different items {', '.join(items)}; nothing linked")
+    for key, item, current in result.taken:
+        print(f"[{args.wiki}] CONFLICT: {key}: {item} already links {_site(args.wiki)} to {current}; nothing changed")
     for title, error in result.failed:
         print(f"[{args.wiki}] ERROR: {title}: {error}", file=sys.stderr)
-    problems = result.conflicts or result.failed or result.report.redirect or result.report.wrong_parent
+    problems = (result.conflicts or result.taken or result.failed or result.report.redirect
+                or result.report.wrong_parent)
     return 1 if problems else 0
 
 

@@ -26,9 +26,9 @@
     }
   },
   "SV cite": {
-    "summary": "A citation (web, book, periodical, video) with fixed parameter names and localized labels.",
+    "summary": "A citation (web page, book, journal, video, album liner notes, interview) with fixed parameter names and localized labels.",
     "params": {
-      "type": "web (default), book, periodical, video",
+      "type": "web (default), book, journal, video, liner, interview",
       "title": "(required)",
       "url": "",
       "author": "",

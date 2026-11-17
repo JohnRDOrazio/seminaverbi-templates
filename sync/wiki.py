@@ -137,6 +137,11 @@ class WikiClient:
                 return key
         return None
 
+    def sitelink(self, item: str, site: str) -> str | None:
+        """The title `item` links on `site`, or None."""
+        entities = self._dig(self._call("GET", action="wbgetentities", ids=item, props="sitelinks"), "entities")
+        return self._dig(entities, item).get("sitelinks", {}).get(site, {}).get("title")
+
     def set_sitelink(self, item: str, site: str, title: str, tags: str | None = None) -> None:
         params = dict(action="wbsetsitelink", id=item, linksite=site, linktitle=title, bot="1")
         if tags:

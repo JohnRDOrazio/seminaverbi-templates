@@ -47,6 +47,9 @@ class Fake:
                 return item
         return None
 
+    def sitelink(self, item, site):
+        return self.items.get(item, {}).get(site)
+
     def set_sitelink(self, item, site, title, tags=None):
         self.sitelinks.append((item, site, title, tags))
         self.items[item][site] = title
@@ -138,6 +141,25 @@ def test_create_conflict():
     result = cat.create("fr", DATA, fr, repo, dry_run=False)
     assert result.conflicts == [("music", ["Q10", "Q11"])]
     assert not [s for s in repo.sitelinks if s[2] == "Category:Music-fr"]
+
+
+def test_create_never_moves_an_existing_sitelink():
+    # Q10 already links frwiki to another page: re-pointing it would silently drop that link
+    items = {"Q10": {"enwiki": "Category:Music", "frwiki": "Category:Old music"}}
+    fr = Fake("fr", ALL_FR, items)
+    repo = Fake("en", items=items)
+    result = cat.create("fr", DATA, fr, repo, dry_run=False)
+    assert result.taken == [("music", "Q10", "Category:Old music")]
+    assert repo.sitelinks == [] and items["Q10"]["frwiki"] == "Category:Old music"
+
+
+def test_cli_reports_taken_sitelink(env, capsys):
+    items = {"Q10": {"enwiki": "Category:Music", "frwiki": "Category:Old music"}}
+    clients = {"fr": Fake("fr", ALL_FR, items), "en": Fake("en", items=items)}
+    for c in clients.values():
+        c.login = lambda user, password: None
+    assert cat.main(["check", "--wiki", "fr", "--create"], client_factory=clients.__getitem__, data=DATA) == 1
+    assert "Q10 already links frwiki to Category:Old music" in capsys.readouterr().out
 
 
 def test_dry_run_writes_nothing():

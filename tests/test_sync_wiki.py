@@ -127,3 +127,10 @@ def test_set_sitelink_params():
     params = s.calls[-1][1]
     assert (params["action"], params["id"], params["linksite"], params["linktitle"]) == (
         "wbsetsitelink", "Q42", "frwiki", "Category:Musique")
+
+
+def test_sitelink_reads_item():
+    s = Recorder({"entities": {"Q9": {"id": "Q9", "sitelinks": {"enwiki": {"site": "enwiki", "title": "Category:Video games"}}}}})
+    assert WikiClient("en", session=s).sitelink("Q9", "enwiki") == "Category:Video games"
+    s = Recorder({"entities": {"Q9": {"id": "Q9", "sitelinks": {}}}})
+    assert WikiClient("en", session=s).sitelink("Q9", "frwiki") is None

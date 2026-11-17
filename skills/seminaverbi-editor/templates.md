@@ -55,13 +55,13 @@ A link to an Italian Cathopedia page; on non-Italian wikis adds '(in Italian)'. 
 
 ## SV cite
 
-A citation (web, book, periodical, video) with fixed parameter names and localized labels.
+A citation (web page, book, journal, video, album liner notes, interview) with fixed parameter names and localized labels.
 
 Aliases: it: `SV cita`, es: `SV cita`, fr: `SV lien`, de: `SV Literatur`, pt: `SV citar`
 
 | parameter | meaning |
 |---|---|
-| `type` | web (default), book, periodical, video |
+| `type` | web (default), book, journal, video, liner, interview |
 | `title` | (required) |
 | `url` |  |
 | `author` |  |
