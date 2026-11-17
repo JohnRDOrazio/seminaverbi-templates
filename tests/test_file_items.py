@@ -157,6 +157,10 @@ class Repo:
         self.calls.append(("claim", item, prop, value))
         self.statements.setdefault(item, {}).setdefault(prop, []).append(value)
 
+    def items_for(self, site, titles):
+        pages = self.clients[site].pages
+        return {t: pages[t][0] for t in titles if pages[t][0]}
+
     def label(self, item, lang="en"):
         return {"Q_tv": "television series"}.get(item)
 
@@ -181,7 +185,7 @@ class Client:
         return list(self.pages)
 
     def items_for(self, site, titles):
-        return {t: self.pages[t][0] for t in titles if self.pages[t][0]}
+        raise AssertionError("client wikis have no wbgetentities: ask the repository")
 
     def revision(self, title):
         _, revid, text, _ = self.pages[title]
@@ -228,6 +232,7 @@ def setup(pages_by_lang, statements=None, instance_of=None):
     repo = Repo(statements, instance_of)
     log = repo.calls
     clients = {lang: Client(lang, repo, dict(pages), log) for lang, pages in pages_by_lang.items()}
+    repo.clients = clients
     return repo, clients
 
 

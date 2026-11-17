@@ -188,7 +188,7 @@ def run(repo, clients: dict, data, types, props: dict, apply: bool, only_item: s
     groups, unconnected = {}, []
     for lang, client in clients.items():
         titles = client.articles()
-        linked = client.items_for(lang, titles)
+        linked = repo.items_for(lang, titles)  # only the repository answers wbgetentities
         for title in titles:
             item = linked.get(title)
             if not item:
