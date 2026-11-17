@@ -363,3 +363,10 @@ def test_main_parses_field_decisions():
     finally:
         fi.run = original
     assert seen["fields"] == {"Q1": "novels", "Q2": "music"}
+
+
+def test_author_field_holds_after_an_earlier_item_was_edited():
+    en = dict(FILM_EN, **{"Z page": ("Q9", 5, "[[Category:Film]]\n[[Category:Novels]]", set())})
+    repo, clients = setup({"en": en})
+    report = run(repo, clients, fields={"Q9": "novels"})
+    assert report.stopped == [] and repo.statements["Q9"]["P10768"] == ["Q_novels"]

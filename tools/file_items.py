@@ -194,7 +194,7 @@ def _summary(lang: str) -> str:
 def run(repo, clients: dict, data, types, props: dict, apply: bool, only_item: str | None = None,
         classify=None, record=None, out=print, fields: dict | None = None) -> Report:
     """`fields`: item -> field key the author decided; it replaces the pages' field and skips Jev."""
-    fields = fields or {}
+    author_fields = fields or {}
     node_item = {n.key: None for n in nodes(data)}
     node_item.update(_node_items(data))
     names_of = {n.key: n.names for n in nodes(data)}
@@ -221,7 +221,7 @@ def run(repo, clients: dict, data, types, props: dict, apply: bool, only_item: s
         instance = repo.item_values(item, props["instance_of"])
         layout = layout_for(instance, types)
         plan = plan_item(item, pages, existing, layout, data, types, namespaces, node_item,
-                         field_override=fields.get(item))
+                         field_override=author_fields.get(item))
         if plan.recheck and plan.stop is None:
             if classify is None:
                 plan = plan._replace(stop=f"field {plan.field} does not fit {layout}; Jev not available")
