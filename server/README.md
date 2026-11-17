@@ -19,5 +19,20 @@ $MW_INSTALL_PATH/maintenance/run --wiki en <tools-dir>/EnrichItems.php --from-ar
 Drop `--dry-run` to write. Check the size of the `seminaverbi_en` database before and after a full
 run (the plan's guardrail: stop and report if it grows by more than 200 MB).
 
+To import Wikidata items or properties that have no local counterpart yet, use `--import`
+(repeatable; items are then enriched like `--item`), and `--follow` to enrich the items the selected
+items point to through given Wikidata properties (for example the occupations and countries):
+
+```
+$MW_INSTALL_PATH/maintenance/run --wiki en <tools-dir>/EnrichItems.php \
+    --import P21 --import P27 --import P2521 --import P1549 --import Q6581097 --import Q6581072 --dry-run
+$MW_INSTALL_PATH/maintenance/run --wiki en <tools-dir>/EnrichItems.php --from-articles en,it --follow P106,P27 --dry-run
+```
+
+Record the `seminaverbi_en` size first; drop `--dry-run` to write (expect six `IMPORT <wd> = <local>`
+lines and growth under 1 MB). Output lines: `IMPORT <wd> = <local> (mapped|created)`,
+`IMPORT <wd> = (would create)` on a dry run, `IMPORT <wd> FAILED <reason>`. With `--follow` on a dry
+run, targets that are not mapped yet are not listed.
+
 `properties.txt` lists Wikidata property IDs; each is mapped to the local property through
 WikibaseImport's mapping table.

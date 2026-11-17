@@ -11,6 +11,13 @@
  *
  *   maintenance/run --wiki en <tools-dir>/EnrichItems.php \
  *       [--item Q4178]... [--from-articles en,it] [--properties FILE] [--dry-run]
+ *       [--import Q123|P21]... [--follow P106,P27]
+ *
+ * --import creates a lean local copy of each given Wikidata item or property that is not mapped
+ * yet (properties: datatype, labels, descriptions) and then enriches the imported items like
+ * --item. --follow also enriches the items the selected items point to through the given Wikidata
+ * properties (creating them if needed). Each --import prints one parseable line:
+ *   IMPORT <wd> = <local> (mapped|created) | IMPORT <wd> = (would create) | IMPORT <wd> FAILED <reason>
  */
 
 use MediaWiki\MediaWikiServices;
@@ -20,6 +27,7 @@ use Wikibase\DataModel\Entity\EntityIdValue;
 use Wikibase\DataModel\Entity\Item;
 use Wikibase\DataModel\Entity\ItemId;
 use Wikibase\DataModel\Entity\NumericPropertyId;
+use Wikibase\DataModel\Entity\Property;
 use Wikibase\DataModel\SiteLink;
 use Wikibase\DataModel\Snak\PropertyValueSnak;
 use Wikibase\DataModel\Statement\Statement;
@@ -38,8 +46,10 @@ class EnrichItems extends Maintenance {
 	private bool $dryRun = false;
 	/** Null on a dry run, which must not create or take over the account. */
 	private ?User $user = null;
-	/** @var array<string, Item|null> */
+	/** @var array<string, Item|Property|null> */
 	private array $remoteCache = [];
+	/** Reason the last importEntity() call returned null. */
+	private string $lastError = '';
 
 	public function __construct() {
 		parent::__construct();
@@ -47,6 +57,8 @@ class EnrichItems extends Maintenance {
 		$this->addOption( 'item', 'Local item ID (repeatable)', false, true, false, true );
 		$this->addOption( 'from-articles', 'Comma-separated wiki IDs whose main-namespace articles give the items', false, true );
 		$this->addOption( 'properties', 'File of Wikidata property IDs to copy', false, true );
+		$this->addOption( 'import', 'Wikidata item or property ID to import if not mapped yet (repeatable)', false, true, false, true );
+		$this->addOption( 'follow', 'Comma-separated Wikidata property IDs whose item targets are enriched too', false, true );
 		$this->addOption( 'dry-run', 'Print what would be added; write nothing' );
 	}
 
@@ -62,7 +74,8 @@ class EnrichItems extends Maintenance {
 
 		/** @var array<string, true> items left incomplete or unsaved, reported once all items have run */
 		$failed = [];
-		foreach ( $this->localItems() as $localSerialization ) {
+		$imported = $this->runImports( $failed );
+		foreach ( $this->localItems( $imported ) as $localSerialization ) {
 			$localId = new ItemId( $localSerialization );
 			$wdSerialization = $this->originalId( $localSerialization );
 			if ( !$wdSerialization ) {
@@ -71,7 +84,7 @@ class EnrichItems extends Maintenance {
 			}
 			$revision = $lookup->getEntityRevision( $localId, 0, LookupConstants::LATEST_FROM_MASTER );
 			$remoteItem = $this->remote( $wdSerialization );
-			if ( !$revision || !$remoteItem ) {
+			if ( !$revision || !$remoteItem instanceof Item ) {
 				$this->output( "$localSerialization: could not load local or Wikidata item, skipped\n" );
 				continue;
 			}
@@ -159,29 +172,63 @@ class EnrichItems extends Maintenance {
 		if ( $local || $this->dryRun || !$wdId instanceof ItemId ) {
 			return $local;
 		}
-		$remote = $this->remote( $wd );
-		if ( !$remote ) {
+		$local = $this->importEntity( $wdId );
+		if ( $local === null ) {
+			$this->output( "  ! creating $wd failed: {$this->lastError}\n" );
 			return null;
 		}
-		$item = new Item();
+		$this->output( "  created $local for $wd\n" );
+		return $local;
+	}
+
+	/**
+	 * Creates a lean local copy of a Wikidata item or property and maps it; returns the existing
+	 * local ID if already mapped. Null on failure (reason in $lastError) and on a dry run.
+	 */
+	private function importEntity( EntityId $wdId ): ?string {
+		$wd = $wdId->getSerialization();
+		$local = $this->localId( $wd );
+		if ( $local ) {
+			return $local;
+		}
+		if ( $this->dryRun ) {
+			$this->lastError = 'dry run';
+			return null;
+		}
+		if ( !$wdId instanceof ItemId && !$wdId instanceof NumericPropertyId ) {
+			$this->lastError = 'unsupported entity type';
+			return null;
+		}
+		$remote = $this->remote( $wd );
+		if ( !$remote ) {
+			$this->lastError = 'not found on Wikidata';
+			return null;
+		}
+		if ( $remote instanceof Property ) {
+			$entity = Property::newFromType( $remote->getDataTypeId() );
+		} else {
+			$entity = new Item();
+		}
 		foreach ( self::LANGS as $lang ) {
 			if ( $remote->getLabels()->hasTermForLanguage( $lang ) ) {
-				$item->setLabel( $lang, $remote->getLabels()->getByLanguage( $lang )->getText() );
+				$entity->setLabel( $lang, $remote->getLabels()->getByLanguage( $lang )->getText() );
 			}
 			if ( $remote->getDescriptions()->hasTermForLanguage( $lang ) ) {
-				$item->setDescription( $lang, $remote->getDescriptions()->getByLanguage( $lang )->getText() );
+				$entity->setDescription( $lang, $remote->getDescriptions()->getByLanguage( $lang )->getText() );
 			}
 		}
-		foreach ( self::WIKIS as $site ) {
-			if ( $remote->getSiteLinkList()->hasLinkWithSiteId( $site ) ) {
-				$title = $remote->getSiteLinkList()->getBySiteId( $site )->getPageName();
-				$item->getSiteLinkList()->addSiteLink( new SiteLink( $site, $title ) );
+		if ( $remote instanceof Item ) {
+			foreach ( self::WIKIS as $site ) {
+				if ( $remote->getSiteLinkList()->hasLinkWithSiteId( $site ) ) {
+					$title = $remote->getSiteLinkList()->getBySiteId( $site )->getPageName();
+					$entity->getSiteLinkList()->addSiteLink( new SiteLink( $site, $title ) );
+				}
 			}
 		}
 		try {
-			$saved = WikibaseRepo::getEntityStore()->saveEntity( $item, "Import $wd from Wikidata", $this->user, EDIT_NEW );
+			$saved = WikibaseRepo::getEntityStore()->saveEntity( $entity, "Import $wd from Wikidata", $this->user, EDIT_NEW );
 		} catch ( Exception $e ) {
-			$this->output( "  ! creating $wd failed: " . $e->getMessage() . "\n" );
+			$this->lastError = str_replace( [ "\r", "\n" ], ' ', $e->getMessage() );
 			return null;
 		}
 		$local = $saved->getEntity()->getId()->getSerialization();
@@ -190,15 +237,54 @@ class EnrichItems extends Maintenance {
 			->row( [ 'wbs_local_id' => $local, 'wbs_original_id' => $wd ] )
 			->caller( __METHOD__ )
 			->execute();
-		$this->output( "  created $local for $wd\n" );
 		return $local;
 	}
 
-	private function remote( string $wd ): ?Item {
+	/**
+	 * Handles --import; prints one IMPORT line per ID.
+	 * @param array<string, true> &$failed receives IDs that failed
+	 * @return string[] local item IDs (mapped or created), to be enriched
+	 */
+	private function runImports( array &$failed ): array {
+		$items = [];
+		foreach ( array_unique( (array)$this->getOption( 'import', [] ) ) as $wd ) {
+			$wd = strtoupper( trim( $wd ) );
+			if ( preg_match( '/^Q[1-9]\d*$/', $wd ) ) {
+				$wdId = new ItemId( $wd );
+			} elseif ( preg_match( '/^P[1-9]\d*$/', $wd ) ) {
+				$wdId = new NumericPropertyId( $wd );
+			} else {
+				$this->output( "IMPORT $wd FAILED invalid ID\n" );
+				$failed[$wd] = true;
+				continue;
+			}
+			$local = $this->localId( $wd );
+			if ( $local ) {
+				$this->output( "IMPORT $wd = $local (mapped)\n" );
+			} elseif ( $this->dryRun ) {
+				$this->output( "IMPORT $wd = (would create)\n" );
+				continue;
+			} else {
+				$local = $this->importEntity( $wdId );
+				if ( $local === null ) {
+					$this->output( "IMPORT $wd FAILED {$this->lastError}\n" );
+					$failed[$wd] = true;
+					continue;
+				}
+				$this->output( "IMPORT $wd = $local (created)\n" );
+			}
+			if ( $wdId instanceof ItemId ) {
+				$items[] = $local;
+			}
+		}
+		return $items;
+	}
+
+	private function remote( string $wd ): Item|Property|null {
 		if ( !array_key_exists( $wd, $this->remoteCache ) ) {
 			$url = wfAppendQuery( self::SOURCE, [
 				'action' => 'wbgetentities', 'ids' => $wd, 'format' => 'json',
-				'props' => 'labels|descriptions|claims|sitelinks',
+				'props' => 'labels|descriptions|claims|sitelinks|datatype',
 			] );
 			$json = MediaWikiServices::getInstance()->getHttpRequestFactory()->get( $url, [], __METHOD__ );
 			$data = $json ? json_decode( $json, true ) : null;
@@ -207,7 +293,7 @@ class EnrichItems extends Maintenance {
 			if ( $serialization && !isset( $serialization['missing'] ) ) {
 				$entity = WikibaseRepo::getBaseDataModelDeserializerFactory()
 					->newEntityDeserializer()->deserialize( $serialization );
-				$this->remoteCache[$wd] = $entity instanceof Item ? $entity : null;
+				$this->remoteCache[$wd] = $entity instanceof Item || $entity instanceof Property ? $entity : null;
 			}
 		}
 		return $this->remoteCache[$wd];
@@ -229,9 +315,12 @@ class EnrichItems extends Maintenance {
 		return MediaWikiServices::getInstance()->getConnectionProvider()->getPrimaryDatabase();
 	}
 
-	/** @return string[] local item IDs */
-	private function localItems(): array {
-		$items = (array)$this->getOption( 'item', [] );
+	/**
+	 * @param string[] $imported local item IDs from --import
+	 * @return string[] local item IDs
+	 */
+	private function localItems( array $imported = [] ): array {
+		$items = array_merge( (array)$this->getOption( 'item', [] ), $imported );
 		$wikis = $this->getOption( 'from-articles' );
 		if ( $wikis ) {
 			$provider = MediaWikiServices::getInstance()->getConnectionProvider();
@@ -247,7 +336,43 @@ class EnrichItems extends Maintenance {
 				$items = array_merge( $items, $rows );
 			}
 		}
-		return array_values( array_unique( $items ) );
+		$items = array_values( array_unique( $items ) );
+		$follow = $this->getOption( 'follow' );
+		if ( $follow ) {
+			$props = array_filter( array_map( 'trim', explode( ',', $follow ) ) );
+			foreach ( $props as $prop ) {
+				if ( !preg_match( '/^P[1-9]\d*$/', $prop ) ) {
+					$this->fatalError( "--follow: invalid property ID $prop" );
+				}
+			}
+			foreach ( $items as $localSerialization ) {
+				$wd = $this->originalId( $localSerialization );
+				$remote = $wd ? $this->remote( $wd ) : null;
+				if ( !$remote instanceof Item ) {
+					continue;
+				}
+				foreach ( $props as $prop ) {
+					$statements = $remote->getStatements()->getByPropertyId( new NumericPropertyId( $prop ) );
+					foreach ( $statements->toArray() as $statement ) {
+						$snak = $statement->getMainSnak();
+						if ( !$snak instanceof PropertyValueSnak || $statement->getRank() === Statement::RANK_DEPRECATED ) {
+							continue;
+						}
+						$value = $snak->getDataValue();
+						if ( !$value instanceof EntityIdValue || !$value->getEntityId() instanceof ItemId ) {
+							continue;
+						}
+						// Unmapped targets are created here; on a dry run they are left out (nothing is written).
+						$target = $this->ensureLocal( $value->getEntityId() );
+						if ( $target !== null ) {
+							$items[] = $target;
+						}
+					}
+				}
+			}
+			$items = array_values( array_unique( $items ) );
+		}
+		return $items;
 	}
 }
 
