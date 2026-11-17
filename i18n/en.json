@@ -18,6 +18,7 @@
   "langname_it": "Italian",
   "langname_la": "Latin",
   "managed_notice": "This page is managed in git and overwritten by the sync: edit it at $1.",
+  "quote_missing_text": "SV quote: the text parameter is missing.",
   "references_heading": "References",
   "wip_category": "SV articles in progress",
   "wip_notice": "This article is a work in progress ($1, $2)."

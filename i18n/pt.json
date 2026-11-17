@@ -18,6 +18,7 @@
   "langname_it": "italiano",
   "langname_la": "latim",
   "managed_notice": "Esta página é gerida no git e substituída pela sincronização: edite-a em $1.",
+  "quote_missing_text": "SV citação: falta o parâmetro text.",
   "references_heading": "Referências",
   "wip_category": "Artigos SV em construção",
   "wip_notice": "Este artigo está em construção ($1, $2)."

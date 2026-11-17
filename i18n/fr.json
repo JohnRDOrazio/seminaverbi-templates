@@ -18,6 +18,7 @@
   "langname_it": "italien",
   "langname_la": "latin",
   "managed_notice": "Cette page est gérée dans git et écrasée par la synchronisation : modifiez-la sur $1.",
+  "quote_missing_text": "SV citation : le paramètre text est manquant.",
   "references_heading": "Références",
   "wip_category": "Articles SV en cours de rédaction",
   "wip_notice": "Cet article est en cours de rédaction ($1, $2)."

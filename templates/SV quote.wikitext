@@ -1,0 +1,8 @@
+<includeonly>{{#invoke:SV/Quote|quote}}</includeonly><noinclude>
+A quotation that is not from the Bible (for Bible passages use [[Template:SV Bible quote|SV Bible quote]]). Parameters:
+* <code>text</code> (required): the quotation, in this wiki's language; wikitext is allowed.
+* <code>author</code>: who said or wrote it; may be a link.
+* <code>source</code>: the work, page or document; may be a link.
+* <code>original</code>: the quotation in its original language, shown above the translation.
+* <code>original_lang</code>: the language code of <code>original</code> (e.g. <code>it</code>, <code>la</code>, <code>grc</code>).
+</noinclude>
