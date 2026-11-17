@@ -134,3 +134,30 @@ def test_sitelink_reads_item():
     assert WikiClient("en", session=s).sitelink("Q9", "enwiki") == "Category:Video games"
     s = Recorder({"entities": {"Q9": {"id": "Q9", "sitelinks": {}}}})
     assert WikiClient("en", session=s).sitelink("Q9", "frwiki") is None
+
+
+def test_move_params():
+    s = Recorder(CSRF, {"move": {"from": "Category:A", "to": "Category:B"}})
+    WikiClient("en", session=s).move("Category:A", "Category:B", "why", tags="seminaverbi-mcp")
+    params = s.calls[-1][1]
+    assert (params["action"], params["from"], params["to"], params["tags"]) == ("move", "Category:A", "Category:B",
+                                                                                "seminaverbi-mcp")
+
+
+def test_move_failure_is_sync_error():
+    s = Recorder(CSRF, {"warnings": {}})
+    with pytest.raises(SyncError, match="moving Category:A to Category:B failed"):
+        WikiClient("en", session=s).move("Category:A", "Category:B", "why")
+
+
+def test_members_follows_continue():
+    s = Recorder({"continue": {"cmcontinue": "x", "continue": "-||"},
+                  "query": {"categorymembers": [{"title": "A", "ns": 0}]}},
+                 {"query": {"categorymembers": [{"title": "Categoria:B", "ns": 14}]}})
+    assert WikiClient("it", session=s).members("Categoria:X") == [("A", 0), ("Categoria:B", 14)]
+
+
+def test_category_namespaces_include_local_and_aliases():
+    s = Recorder({"query": {"namespaces": {"14": {"name": "Categoria", "canonical": "Category"}},
+                            "namespacealiases": [{"id": 14, "alias": "Cat"}, {"id": 2, "alias": "U"}]}})
+    assert WikiClient("it", session=s).category_namespaces() == ["Cat", "Categoria", "Category"]

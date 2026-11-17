@@ -115,6 +115,47 @@ class WikiClient:
                 out.setdefault(t, None)
         return out
 
+    def wikitext(self, title: str) -> str | None:
+        state = self.fetch([title]).get(title)
+        return state.content if state else None
+
+    def exists(self, title: str) -> bool:
+        return self.page_info([title]).get(title) is not None
+
+    def is_redirect(self, title: str) -> bool:
+        info = self.page_info([title]).get(title)
+        return bool(info and info.redirect)
+
+    def members(self, category_title: str) -> list[tuple[str, int]]:
+        """(title, namespace) of every page and subcategory in a category."""
+        params = dict(action="query", list="categorymembers", cmtitle=category_title, cmprop="title",
+                      cmlimit="max")
+        out: list[tuple[str, int]] = []
+        while True:
+            data = self._call("GET", **params)
+            out.extend((self._dig(m, "title"), m.get("ns", 0))
+                       for m in data.get("query", {}).get("categorymembers", []))
+            if "continue" not in data:
+                return out
+            params.update(data["continue"])
+
+    def category_namespaces(self) -> list[str]:
+        """Every name of namespace 14 on this wiki: canonical, localized and aliases."""
+        q = self._dig(self._call("GET", action="query", meta="siteinfo", siprop="namespaces|namespacealiases"),
+                      "query")
+        ns = q.get("namespaces", {}).get("14", {})
+        names = {"Category", ns.get("name", "Category"), ns.get("canonical", "Category")}
+        names.update(a["alias"] for a in q.get("namespacealiases", []) if a.get("id") == 14)
+        return sorted(names)
+
+    def move(self, old: str, new: str, reason: str, tags: str | None = None) -> None:
+        params = dict(action="move", **{"from": old}, to=new, reason=reason, movetalk="1")
+        if tags:
+            params["tags"] = tags
+        data = self._call("POST", token=self._token("csrf"), **params)
+        if "move" not in data:
+            raise SyncError(f"{self.lang}: moving {old} to {new} failed: {data}")
+
     def article_categories(self) -> set[str]:
         """Visible categories used by main-namespace articles (redirects excluded)."""
         params = dict(action="query", generator="allpages", gapnamespace="0", gapfilterredir="nonredirects",
