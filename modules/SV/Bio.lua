@@ -13,10 +13,12 @@ local function firstValue(entity, propId)
 	return Util.best(entity, propId)[1]
 end
 
--- True when the item has any (non-deprecated) statement for propId, known value or not.
+-- True when the item has a (non-deprecated) statement for propId with a known or unknown value;
+-- "no value" does not count.
 local function hasStatement(entity, propId)
 	for _, statement in ipairs(entity and entity.claims and entity.claims[propId] or {}) do
-		if statement.rank ~= 'deprecated' then
+		local snaktype = statement.mainsnak and statement.mainsnak.snaktype
+		if statement.rank ~= 'deprecated' and (snaktype == 'value' or snaktype == 'somevalue') then
 			return true
 		end
 	end
@@ -27,7 +29,8 @@ end
 local function lifeEnd(entity, placeProp, dateProp, lang)
 	local place = firstValue(entity, placeProp)
 	local date = firstValue(entity, dateProp)
-	place = place and place.id and Util.itemLink(place.id, lang)
+	-- a place with no label to show (in lang or English) is left out rather than shown as its ID
+	place = place and place.id and Util.label(place.id, lang) and Util.itemLink(place.id, lang)
 	date = date and date.time and Util.formatTime(date)
 	if place and date then
 		return Util.msg('bio_place_date', lang, place, date)
@@ -126,9 +129,10 @@ function p._demonym(lang, forms, female)
 		return nil
 	end
 	local masc = candidates[1]
-	-- a lone form that may itself be the feminine (it/es/pt italiana, fr italienne)
-	if ((lang == 'it' or lang == 'es' or lang == 'pt') and endsWith(masc, 'a'))
-		or (lang == 'fr' and endsWith(masc, 'enne')) then
+	-- a form that may itself be the feminine: it/es/pt italiana, pt alemã, fr française (or belge,
+	-- which cannot be told apart from it). endsWith compares bytes, so the UTF-8 'ã' is listed apart.
+	if ((lang == 'it' or lang == 'es' or lang == 'pt') and (endsWith(masc, 'a') or endsWith(masc, 'ã')))
+		or (lang == 'fr' and endsWith(masc, 'e')) then
 		return nil
 	end
 	if female then
@@ -146,10 +150,15 @@ function p._article(lang, phrase, female)
 	local lower = phrase:lower()
 	if lang == 'en' then
 		-- by sound: a /juː/ or /w/ start takes "a", a silent h takes "an"
-		for _, start in ipairs({ 'eu', 'uni', 'use', 'usu', 'uti', 'one', 'once' }) do
+		for _, start in ipairs({ 'eu', 'uni', 'uk', 'ug', 'uru', 'usa', 'use', 'usu', 'uti', 'ura', 'uro', 'ute',
+			'once' }) do
 			if lower:sub(1, #start) == start then
 				return 'a ' .. phrase
 			end
+		end
+		-- "one" as a word ("one", "one-man"), not "onerous"
+		if lower:match('^one$') or lower:match('^one[%s%-]') then
+			return 'a ' .. phrase
 		end
 		for _, start in ipairs({ 'hour', 'honest', 'honour', 'honor', 'heir' }) do
 			if lower:sub(1, #start) == start then

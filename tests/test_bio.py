@@ -258,7 +258,9 @@ def test_demonym_it_es_pt():
 def test_demonym_fr():
     assert nationality("fr", ["français"]) == "français"
     assert nationality("fr", ["français"], True) == "française"
-    assert nationality("fr", ["belge"], True) == "belge"
+    # a lone -e form may be invariant (belge, russe) or the feminine itself (française): undecidable
+    assert nationality("fr", ["belge"], True) is None
+    assert nationality("fr", ["française"]) is None
     assert nationality("fr", ["française", "français"]) == "français"
     # -ien / -éen double the n
     assert nationality("fr", ["italienne", "italien"]) == "italien"
@@ -349,3 +351,39 @@ def test_demonym_fr_more():
                       ("américain", "américaine"), ("allemand", "allemande"), ("espagnol", "espagnole")):
         assert nationality("fr", [masc], True) == fem
         assert nationality("fr", [fem, masc]) == masc
+
+
+def test_en_article_by_sound():
+    e = env("en")
+    for word, art in (("Ukrainian", "a"), ("Ugandan", "a"), ("Uruguayan", "a"), ("Italian", "an"),
+                      ("unusual", "an"), ("European", "a"), ("hour", "an"), ("onerous", "an"),
+                      ("one-man band", "a"), ("one", "a"), ("once-famous", "a"), ("Uzbek", "an")):
+        assert e.call("Module:SV/Bio", "_article", "en", word, False) == art + " " + word
+
+
+def test_demonym_lone_feminine_pt():
+    assert nationality("pt", ["alemã"]) is None
+    assert nationality("pt", ["alemã"], True) is None
+
+
+def novalue():
+    return {"mainsnak": {"snaktype": "novalue"}}
+
+
+def somevalue():
+    return {"mainsnak": {"snaktype": "somevalue"}}
+
+
+def test_novalue_death_means_living():
+    assert bio(entities=with_nek(P4723=[novalue()])) == "Nek (Sassuolo, 6 gennaio 1972) è un cantautore italiano"
+    assert bio("en", entities=with_nek(P915=[novalue()])) == \
+        "Nek (born 6 January 1972 in Sassuolo) is an Italian singer-songwriter"
+    # unknown value: dead, with an unknown death
+    assert bio(entities=with_nek(P4723=[somevalue()])) == \
+        "Nek (Sassuolo, 6 gennaio 1972 – ?) è stato un cantautore italiano"
+
+
+def test_unlabelled_place_left_out():
+    ents = dict(BASE, **{SASSUOLO: {"labels": {"fr": "Sassuolo"}}})
+    assert bio(entities=ents) == "Nek (6 gennaio 1972) è un cantautore italiano"
+    assert bio("en", entities=with_nek(P4712=None) | {SASSUOLO: {}}) == "Nek is an Italian singer-songwriter"
