@@ -243,16 +243,19 @@ class WikiClient:
         entities = self._dig(self._call("GET", action="wbgetentities", ids=item, props="sitelinks"), "entities")
         return self._dig(entities, item).get("sitelinks", {}).get(site, {}).get("title")
 
-    def set_sitelink(self, item: str, site: str, title: str, tags: str | None = None) -> None:
+    def set_sitelink(self, item: str, site: str, title: str, tags: str | None = None,
+                     summary: str | None = None) -> None:
         params = dict(action="wbsetsitelink", id=item, linksite=site, linktitle=title, bot="1")
         if tags:
             params["tags"] = tags
+        if summary:
+            params["summary"] = summary
         data = self._call("POST", token=self._token("csrf"), **params)
         if not data.get("success"):
             raise SyncError(f"{self.lang}: linking {site}:{title} to {item} failed: {data}")
 
     def new_item(self, labels: dict[str, str], descriptions: dict[str, str], sitelinks: dict[str, str],
-                 tags: str | None = None) -> str:
+                 tags: str | None = None, summary: str | None = None) -> str:
         entity = {
             "labels": {lang: {"language": lang, "value": v} for lang, v in labels.items()},
             "descriptions": {lang: {"language": lang, "value": v} for lang, v in descriptions.items()},
@@ -261,6 +264,8 @@ class WikiClient:
         params = dict(action="wbeditentity", new="item", data=json.dumps(entity, ensure_ascii=False), bot="1")
         if tags:
             params["tags"] = tags
+        if summary:
+            params["summary"] = summary
         return self._dig(self._call("POST", token=self._token("csrf"), **params), "entity", "id")
 
     def new_property(self, labels: dict[str, str], descriptions: dict[str, str], datatype: str,
@@ -329,6 +334,13 @@ class WikiClient:
             return None
         rev = self._dig(page, "revisions", 0)
         return rev["revid"], self._dig(rev, "slots", "main", "content")
+
+    def first_comment(self, title: str) -> str:
+        """Edit summary of the page's first revision ("" when the page is missing)."""
+        data = self._call("GET", action="query", prop="revisions", titles=title, rvdir="newer", rvlimit="1",
+                          rvprop="comment")
+        page = self._dig(data, "query", "pages", 0)
+        return (page.get("revisions") or [{}])[0].get("comment", "")
 
     def preview_categories(self, title: str, text: str) -> set[str]:
         """Categories `text` would give page `title` (bare names), without saving."""

@@ -424,3 +424,24 @@ def test_main_page_from_siteinfo():
     s = Recorder({"query": {"general": {"mainpage": "Página principal"}}})
     assert WikiClient("es", session=s).main_page() == "Página principal"
     assert s.calls[0][1]["meta"] == "siteinfo"
+
+
+def test_sitelink_and_new_item_carry_a_summary():
+    s = Recorder(CSRF, {"success": 1})
+    WikiClient("en", session=s).set_sitelink("Q42", "it", "X", tags="seminaverbi-mcp", summary="Connect")
+    assert s.calls[-1][1]["summary"] == "Connect"
+    s = Recorder(CSRF, {"entity": {"id": "Q43"}})
+    assert WikiClient("en", session=s).new_item({"it": "X"}, {"it": "d"}, {"it": "X"}, summary="Connect") == "Q43"
+    assert s.calls[-1][1]["summary"] == "Connect"
+    s = Recorder(CSRF, {"success": 1})
+    WikiClient("en", session=s).set_sitelink("Q42", "it", "X")
+    assert "summary" not in s.calls[-1][1]
+
+
+def test_first_revision_comment():
+    s = Recorder({"query": {"pages": [{"title": "X", "revisions": [{"comment": "Imported"}]}]}})
+    assert WikiClient("it", session=s).first_comment("X") == "Imported"
+    p = s.calls[0][1]
+    assert (p["rvdir"], p["rvlimit"], p["rvprop"]) == ("newer", "1", "comment")
+    s = Recorder({"query": {"pages": [{"title": "X", "missing": True}]}})
+    assert WikiClient("it", session=s).first_comment("X") == ""

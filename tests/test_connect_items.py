@@ -35,7 +35,7 @@ class Wikidata:
 class Repo:
     def __init__(self, links=None):
         self.links = {item: dict(s) for item, s in (links or {}).items()}  # item -> {site: title}
-        self.calls, self.next_id = [], 48000
+        self.calls, self.next_id, self.summaries = [], 48000, []
 
     def items_for(self, site, titles):
         out = {}
@@ -47,11 +47,13 @@ class Repo:
     def sitelinks(self, items):
         return {i: dict(self.links[i]) for i in items if self.links.get(i)}
 
-    def set_sitelink(self, item, site, title, tags=None):
+    def set_sitelink(self, item, site, title, tags=None, summary=None):
+        self.summaries.append(summary)
         self.calls.append(("sitelink", item, site, title))
         self.links.setdefault(item, {})[site] = title
 
-    def new_item(self, labels, descriptions, sitelinks, tags=None):
+    def new_item(self, labels, descriptions, sitelinks, tags=None, summary=None):
+        self.summaries.append(summary)
         self.next_id += 1
         item = f"Q{self.next_id}"
         self.calls.append(("new", item, labels, descriptions, sitelinks))
@@ -71,6 +73,9 @@ class Client:
 
     def main_page(self):
         return self.main
+
+    def first_comment(self, title):
+        return ""
 
 
 def plan(articles, repo, wikidata, existing=None, **kw):
@@ -206,8 +211,10 @@ def test_no_wikidata_item_means_create():
     ci.run([row], repo, apply=True)  # proposed only: the author confirms with --create
     assert repo.calls == []
     filed = []
-    assert ci.run([row], repo, apply=True, create={("it", title)}, file_item=filed.append) == 0
-    assert repo.calls == [("new", "Q48001", {"it": title}, {}, {"it": title})] and filed == ["Q48001"]
+    assert ci.run([row], repo, apply=True, create={("it", title): "polittico di Jan van Eyck"},
+                  file_item=filed.append) == 0
+    assert repo.calls == [("new", "Q48001", {"it": title}, {"it": "polittico di Jan van Eyck"}, {"it": title})]
+    assert filed == ["Q48001"]
 
 
 def test_dry_run_writes_nothing():
@@ -215,7 +222,7 @@ def test_dry_run_writes_nothing():
                   entities={"Q47128": ent("Q47128", sitelinks={"enwiki": "Christmas tree"})})
     repo = Repo({"Q47700": {"enwiki": "Christmas tree"}})
     rows = plan([Article("en", "Christmas tree", "Text.")], repo, wd)
-    assert ci.run(rows, repo, apply=False, create={("en", "Christmas tree")}) == 0
+    assert ci.run(rows, repo, apply=False, create={("en", "Christmas tree"): "tree"}) == 0
     assert repo.calls == []
 
 
@@ -294,35 +301,113 @@ def test_two_part_episode_is_a_tv_kind():
 
 def test_cli_decisions_resolve_titles():
     articles = [Article("en", "Hear Me Lord", ""), Article("it", "Hear Me Lord", ""), Article("it", "Nek", "")]
-    assert ci.decisions(["Nek=Q45036", "en:Hear Me Lord=Q7339"], articles, value=True) == {
+    assert ci.decisions(["Nek=Q45036", "en:Hear Me Lord=Q7339"], articles, "qid") == {
         ("it", "Nek"): "Q45036", ("en", "Hear Me Lord"): "Q7339"}
     with pytest.raises(ValueError, match="both"):
-        ci.decisions(["Hear Me Lord=Q7339"], articles, value=True)
+        ci.decisions(["Hear Me Lord=Q7339"], articles, "qid")
     with pytest.raises(ValueError, match="not an unconnected"):
-        ci.decisions(["Nobody=Q1"], articles, value=True)
-    assert ci.decisions(["it:Nek"], articles, value=False) == {("it", "Nek"): True}
+        ci.decisions(["Nobody=Q1"], articles, "qid")
+    assert ci.decisions(["it:Nek=cantautore italiano"], articles, "description") == {
+        ("it", "Nek"): "cantautore italiano"}
+    with pytest.raises(ValueError, match="description"):
+        ci.decisions(["it:Nek"], articles, "description")
 
 
 def test_main_wires_the_cli(tmp_path, capsys):
     repo = Repo({"Q4": {"en": "Main Page"}})
     wd = Wikidata(links={("enwiki", "Christmas tree"): "Q47128"}, entities={"Q47128": ent("Q47128")})
     clients = {"en": Client("en", repo, {"Main Page": "", "Christmas tree": "Text.", "Nek": "x"})}
-    assert ci.main(["--apply", "--tools-dir", "/t", "--create", "Nek"], repo=repo, clients=clients,
+    assert ci.main(["--apply", "--tools-dir", "/t", "--create", "Nek=singer"], repo=repo, clients=clients,
                    wikidata=wd) == 3
     assert "/t/EnrichItems.php --wiki=en --import Q47128" in capsys.readouterr().out
     log = tmp_path / "import.log"
     log.write_text("IMPORT Q47128 = Q48100 (created)\n", encoding="utf-8")
     filed = []
-    code = ci.main(["--apply", "--import-log", str(log), "--create", "Nek"], repo=repo, clients=clients,
+    code = ci.main(["--apply", "--import-log", str(log), "--create", "Nek=singer"], repo=repo, clients=clients,
                    wikidata=wd, file_item=filed.append)
     assert code == 0 and repo.links["Q48100"] == {"en": "Christmas tree"} and filed == ["Q48100", "Q48001"]
     with pytest.raises(SystemExit):
         ci.main(["--wd", "Nobody=Q1"], repo=repo, clients=clients, wikidata=wd)
+    with pytest.raises(SystemExit):  # a created item needs a description
+        ci.main(["--create", "Nek"], repo=repo, clients=clients, wikidata=wd)
 
 
 def test_created_label_drops_the_disambiguator():
     title = "Il Miglio Verde (film)"
     repo = Repo()
     rows = [Connect("it", title, "create", None, None, "")]
-    assert ci.run(rows, repo, apply=True, create={("it", title)}) == 0
-    assert repo.calls == [("new", "Q48001", {"it": "Il Miglio Verde"}, {}, {"it": title})]
+    assert ci.run(rows, repo, apply=True, create={("it", title): "film del 1999"}) == 0
+    assert repo.calls == [("new", "Q48001", {"it": "Il Miglio Verde"}, {"it": "film del 1999"}, {"it": title})]
+
+
+def test_writes_carry_the_connect_summary():
+    repo = Repo({"Q47700": {"enwiki": "Christmas tree"}})
+    rows = [Connect("en", "Christmas tree", "local", "Q47128", "Q47700", ""),
+            Connect("it", "Nek", "create", None, None, "")]
+    ci.run(rows, repo, apply=True, create={("it", "Nek"): "cantautore"})
+    assert repo.summaries == ["Connect the article to its item"] * 2
+
+
+FILM = "{{Film\n|titolo italiano = Il miglio verde\n}}"
+GREEN_MILE = {"Q208263": ent("Q208263", p31=["Q11424"]), "Q1": ent("Q1", p31=["Q482994"])}
+
+
+def test_interlanguage_link_gives_the_item():
+    wd = Wikidata(links={("enwiki", "The Green Mile (film)"): "Q208263"}, entities=GREEN_MILE)
+    (row,) = plan([Article("it", "Il Miglio Verde (film)", FILM + "\n[[en:The Green Mile (film)]]")], Repo(), wd)
+    assert (row.action, row.wd) == ("import", "Q208263") and "enwiki:The Green Mile (film)" in row.reason
+
+
+def test_interlanguage_link_goes_through_the_kind_filter():
+    wd = Wikidata(links={("enwiki", "The Green Mile (soundtrack)"): "Q1"}, entities=GREEN_MILE)
+    (row,) = plan([Article("it", "Il Miglio Verde (film)", FILM + "\n[[en:The Green Mile (soundtrack)]]")],
+                  Repo(), wd)
+    assert row.action == "author" and row.wd is None
+
+
+def test_import_summary_naming_a_wikipedia_page_gives_the_item():
+    wd = Wikidata(links={("itwiki", "Il miglio verde (film)"): "Q208263"}, entities=GREEN_MILE)
+    art = Article("it", "Il Miglio Verde (film)", FILM, comment="Imported from wikipedia:it:Il miglio verde (film)")
+    (row,) = plan([art], Repo(), wd)
+    assert (row.action, row.wd) == ("import", "Q208263") and "import summary" in row.reason
+    assert ci.summary_page("[[w:it:Il miglio verde (film)]]") == ("itwiki", "Il miglio verde (film)")
+    assert ci.summary_page("Importata da [[wikipedia:Pulp Fiction]]") == ("enwiki", "Pulp Fiction")
+    for vague in ("1 revision imported", "/* Plot */ fix", "[[wikipedia:A]] and [[wikipedia:B]]", ""):
+        assert ci.summary_page(vague) is None
+
+
+def test_body_wikidata_link_is_not_the_pages_item():
+    wd = Wikidata(entities=GREEN_MILE)
+    (row,) = plan([Article("it", "Il Miglio Verde (film)", FILM + "\nVedi [[d:Q208263]].")], Repo(), wd)
+    assert row.action == "create"
+    (row,) = plan([Article("it", "Il Miglio Verde (film)", FILM + "\n{{Interprogetto|wikidata=Q208263}}")],
+                  Repo(), wd)
+    assert (row.action, row.wd) == ("import", "Q208263")
+    (row,) = plan([Article("it", "Il Miglio Verde (film)", FILM + "\n{{Collegamenti esterni|wikidata = Q208263}}")],
+                  Repo(), wd)
+    assert (row.action, row.wd) == ("import", "Q208263")
+
+
+def test_redirect_hit_without_a_kind_goes_to_the_author():
+    wd = Wikidata(links={("itwiki", "Matrix (trilogia)"): "Q13014087"},
+                  entities={"Q13014087": ent("Q13014087", p31=["Q196600"], labels={"it": "Matrix"})})
+    wd.resolved = {("itwiki", "Matrix (trilogia)"): "Matrix (franchise)"}
+    (row,) = plan([Article("it", "Matrix (trilogia)", "Testo.")], Repo(), wd)
+    assert row.action == "author" and "Q13014087" in row.reason and "Matrix (franchise)" in row.reason
+    (row,) = plan([Article("it", "Matrix (trilogia)", FILM)], Repo(), wd)
+    assert (row.action, row.wd) == ("import", "Q13014087")
+
+
+def test_filing_failure_is_reported_and_the_run_continues(capsys):
+    repo = Repo({"Q1": {"enwiki": "A"}, "Q2": {"enwiki": "B"}})
+    rows = [Connect("en", "A", "local", "Q10", "Q1", ""), Connect("en", "B", "local", "Q20", "Q2", "")]
+    filed = []
+
+    def file_item(item):
+        if item == "Q1":
+            raise RuntimeError("Jev unavailable")
+        filed.append(item)
+    assert ci.run(rows, repo, apply=True, file_item=file_item) == 1
+    assert [c[1] for c in repo.calls] == ["Q1", "Q2"] and filed == ["Q2"]
+    out = capsys.readouterr().out
+    assert "en:A: FILE-FAILED Q1: Jev unavailable" in out and "linked 2; file-failed 1; failed 0" in out

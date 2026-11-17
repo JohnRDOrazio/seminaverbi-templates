@@ -1,9 +1,13 @@
-"""python -m tools.connect_items [--wiki en,it] [--apply] [--import-log FILE] [--wd TITLE=QID]… [--create TITLE]…
+"""python -m tools.connect_items [--wiki en,it] [--apply] [--import-log FILE] [--wd TITLE=QID]…
+       [--create TITLE=DESCRIPTION]…
 
-Connects the articles that have no Wikibase item. For each one it finds the Wikidata item (the article's
-title on the Wikipedia of the same language, else a Wikidata ID the page itself carries, else a Wikidata
-label search, whose hits always go to the author), keeps only candidates of the page's kind (the layout of
-its old Wikipedia infobox, config/infobox_import.json "kinds"), and plans one action per page:
+Connects the articles that have no Wikibase item. For each one it finds the Wikidata item, from the first
+of: the article's title on the Wikipedia of the same language; the page's interlanguage links [[xx:Title]];
+the Wikipedia page its first revision's (import) summary names; the |wikidata= of its {{Interprogetto}} /
+{{Collegamenti esterni}}; else a Wikidata label search, whose hits always go to the author. Each source keeps
+only candidates of the page's kind (the layout of its old Wikipedia infobox, config/infobox_import.json
+"kinds"); a hit reached through a Wikipedia redirect on a page with no infobox goes to the author. It plans
+one action per page:
 
   skip-excluded  listed in config/connect_exclude.json (or a leftover default "Main Page"): never
                  connected, printed in the deletion list
@@ -17,8 +21,10 @@ its old Wikipedia infobox, config/infobox_import.json "kinds"), and plans one ac
 Without --apply nothing is written. With --apply, import rows need the server's import output: without
 --import-log the tool prints the EnrichItems command to run and stops (exit 3); with it, the local IDs come
 from its `IMPORT <wd> = <local> (mapped|created)` lines. Every newly linked item is then filed
-(tools.file_items for that item). Author decisions: --wd "TITLE=QID" forces the Wikidata item, --create TITLE
-makes a new local item; write "it:TITLE" when the title is unconnected on more than one wiki.
+(tools.file_items for that item; a filing failure is reported as file-failed and the run goes on). Author
+decisions: --wd "TITLE=QID" forces the Wikidata item, --create "TITLE=description" makes a new local item
+(label: the title without its "(…)"; description in the wiki's language); write "it:TITLE…" when the title
+is unconnected on more than one wiki.
 Credentials (with --apply): SV_EDITOR_USER / SV_EDITOR_PASSWORD (a bot password).
 """
 from __future__ import annotations
@@ -39,6 +45,8 @@ from sync.wikidata import WikidataClient
 
 ROOT = Path(__file__).resolve().parent.parent
 TAG = "seminaverbi-mcp"
+# the repository is en: its edit summaries are in English
+SUMMARY = json.loads((ROOT / "i18n" / "en.json").read_text(encoding="utf-8"))["connect_summary"]
 MAIN_PAGE_ITEM = "Q4"
 DEFAULT_MAIN_PAGE = "Main Page"  # MediaWiki's default, left over on wikis whose main page is localized
 WIKIPEDIA = [f"{lang}wiki" for lang in LANGS]
@@ -46,7 +54,12 @@ WIKIPEDIA = [f"{lang}wiki" for lang in LANGS]
 COMMENT = re.compile(r"<!--.*?(?:-->|\Z)", re.S)
 # itwiki's {{Album}} also boxes singles: |tipo = Singolo makes the page a song
 SUBKINDS = {("it", "Album"): ("tipo", {"singolo": "song"})}
-PAGE_QID = re.compile(r"\|\s*wikidata\s*=\s*(Q\d+)|\[\[\s*(?:d|wikidata)\s*:\s*(Q\d+)", re.I)
+# templates whose |wikidata= names the page's own item (a [[d:Q…]] in the body may name anything)
+WIKIDATA_TEMPLATES = {"Interprogetto", "Collegamenti esterni"}
+INTERLANGUAGE = re.compile(r"^(%s)\s*:\s*(.+)$" % "|".join(LANGS))
+# a Wikipedia page named in an edit summary: [[wikipedia:it:Title]], w:Title, …; no prefix means en.wikipedia
+SUMMARY_REF = re.compile(r"(?<![\w:])(?:\[\[\s*:?\s*)?(?:wikipedia|w)\s*:\s*(?:(%s)\s*:\s*)?"
+                         r"([^\[\]|#\n]+?)\s*(?:\|[^\]]*)?(?:\]\]|$)" % "|".join(LANGS), re.I)
 QID = re.compile(r"^Q\d+$")
 IMPORTED = re.compile(r"^IMPORT (Q\d+) = (Q\d+) \((?:mapped|created)\)\s*$", re.M)
 IMPORT_FAILED = re.compile(r"^IMPORT (Q\d+) FAILED (.*?)\s*$", re.M)
@@ -57,6 +70,7 @@ class Article(NamedTuple):
     title: str
     text: str
     main: bool = False
+    comment: str = ""  # edit summary of the first revision (an import may name its Wikipedia source)
 
 
 class Connect(NamedTuple):
@@ -126,6 +140,39 @@ def describe(entity: dict, qid: str, lang: str) -> str:
     return f"{qid} ({words})" if words else qid
 
 
+def summary_page(comment: str) -> tuple[str, str] | None:
+    """(site, title) of the one Wikipedia page an import summary names, else None: the summary must name
+    exactly one page, and say nothing but that it was imported."""
+    refs = list(SUMMARY_REF.finditer(comment or ""))
+    if len(refs) != 1:
+        return None
+    m = refs[0]
+    rest = (comment[:m.start()] + comment[m.end():]).strip()
+    if rest and ("[[" in rest or not re.search(r"import", rest, re.I)):
+        return None
+    title = m.group(2).strip().replace("_", " ")
+    return (f"{(m.group(1) or 'en').lower()}wiki", title[:1].upper() + title[1:]) if title else None
+
+
+def _interlanguage(text: str) -> list[tuple[str, str]]:
+    out = []
+    for link in mwparserfromhell.parse(text).filter_wikilinks():
+        m = INTERLANGUAGE.match(str(link.title).strip())
+        if m:
+            out.append((f"{m.group(1)}wiki", m.group(2).strip()))
+    return list(dict.fromkeys(out))
+
+
+def _template_qids(text: str) -> list[str]:
+    out = []
+    for template in mwparserfromhell.parse(text).filter_templates():
+        if _template_name(str(template.name)) in WIKIDATA_TEMPLATES and template.has("wikidata"):
+            value = template.get("wikidata").value.strip_code().strip()
+            if QID.match(value):
+                out.append(value)
+    return list(dict.fromkeys(out))
+
+
 def _search_text(title: str) -> str:
     """The title without a trailing "(…)" disambiguator: search text and new items' labels."""
     return re.sub(r"\s*\([^)]*\)\s*$", "", title) or title
@@ -143,7 +190,7 @@ def gather(clients: dict, repo) -> tuple[list, list]:
                 connected.append(linked[title])
                 continue
             rev = client.revision(title)
-            articles.append(Article(lang, title, rev[1] if rev else "", title == main))
+            articles.append(Article(lang, title, rev[1] if rev else "", title == main, client.first_comment(title)))
     return articles, sorted(set(connected) - {MAIN_PAGE_ITEM})
 
 
@@ -221,23 +268,40 @@ def _plan_one(a: Article, repo, wikidata, existing, conf, forced, hits) -> Conne
         return Connect(a.lang, a.title, action, wd, local, reason)
 
     wd, source, dropped = forced.get((a.lang, a.title)), "author", []
-    if not wd:
-        hit = hits.get(site, {}).get(a.title)
-        if hit and passes(wikidata.entity(hit), hit, allowed):
-            target = getattr(wikidata, "resolved", {}).get((site, a.title))
-            wd, source = hit, f"{site}:{a.title}" + (f" -> {target} (redirect)" if target else "")
-        elif hit:
-            dropped.append(hit)
-    if not wd:
-        carried = list(dict.fromkeys(m.group(1) or m.group(2) for m in PAGE_QID.finditer(COMMENT.sub("", a.text))))
-        wikidata.prefetch(carried)
-        fit = [q for q in carried if passes(wikidata.entity(q), q, allowed)]
-        dropped += [q for q in carried if q not in fit]
-        if len(fit) == 1:
-            wd, source = fit[0], "the page's Wikidata link"
-        elif fit:
-            return row("author", reason="the page links several items; candidates: " + ", ".join(
-                describe(wikidata.entity(q), q, a.lang) for q in fit))
+    resolved = getattr(wikidata, "resolved", {})
+
+    def by_link(pairs, known=None):
+        """{QID: source} for Wikipedia pages (site, title); `known`: lookups already made in one batch."""
+        found = {}
+        for link_site, link_title in pairs:
+            answers = known if known is not None else wikidata.by_sitelink(link_site, [link_title])
+            q = answers.get(link_title)
+            if q:
+                target = resolved.get((link_site, link_title))
+                found.setdefault(q, f"{link_site}:{link_title}" + (f" -> {target} (redirect)" if target else ""))
+        return found
+
+    sources = [
+        lambda: by_link([(site, a.title)], hits.get(site, {})),
+        lambda: {q: f"interlanguage link {src}" for q, src in by_link(_interlanguage(a.text)).items()},
+        lambda: {q: f"import summary {src}" for q, src in by_link([p for p in [summary_page(a.comment)] if p]).items()},
+        lambda: {q: "the page's {{Interprogetto}}/{{Collegamenti esterni}}" for q in _template_qids(a.text)},
+    ]
+    for source_of in ([] if wd else sources):
+        found = source_of()
+        wikidata.prefetch(list(found))
+        fit = {q: src for q, src in found.items() if passes(wikidata.entity(q), q, allowed)}
+        dropped += [q for q in found if q not in fit and q not in dropped]
+        if len(fit) > 1:
+            return row("author", reason="the page points to several items; candidates: " + ", ".join(
+                f"{describe(wikidata.entity(q), q, a.lang)} from {src}" for q, src in fit.items()))
+        if fit:
+            (wd, source), = fit.items()
+            if allowed is None and "(redirect)" in source:
+                # a redirect may lead to a broader article; with no infobox to check the kind, ask
+                return row("author", reason=f"{source} gives {describe(wikidata.entity(wd), wd, a.lang)}, "
+                                            f"no infobox to check its kind; confirm with --wd")
+            break
     if not wd:
         found = wikidata.search(_search_text(a.title), a.lang)
         wikidata.prefetch(found)
@@ -250,7 +314,7 @@ def _plan_one(a: Article, repo, wikidata, existing, conf, forced, hits) -> Conne
         if found or dropped:
             return row("author", reason=f"{prefix}no {kind or 'matching'} item among the search results "
                                         f"({', '.join(found) or '-'}); --wd or --create")
-        return row("create", reason=f"no Wikidata item; confirm with --create {a.lang}:{a.title}")
+        return row("create", reason=f"no Wikidata item; confirm with --create \"{a.lang}:{a.title}=DESCRIPTION\"")
     entity = wikidata.entity(wd)
     if wd in existing:
         local, sv = existing[wd]
@@ -313,13 +377,13 @@ def _link(repo, item: str, lang: str, title: str) -> bool:
     current = repo.sitelinks([item]).get(item, {}).get(lang)
     if current and current != title:
         raise SyncError(f"{item} is now linked to {lang}:{current}")
-    repo.set_sitelink(item, lang, title, tags=TAG)
+    repo.set_sitelink(item, lang, title, tags=TAG, summary=SUMMARY)
     return True
 
 
 def run(rows: list, repo, apply: bool, import_log: str | None = None, create=(), file_item=None, out=print,
         tools_dir: str = "<tools-dir>") -> int:
-    create = set(create)
+    create = dict(create or {})  # (lang, title) -> the author's description for a new item
     for r in rows:
         out(_line(r))
     imports = list(dict.fromkeys(r.wd for r in rows if r.action == "import"))
@@ -348,11 +412,20 @@ def run(rows: list, repo, apply: bool, import_log: str | None = None, create=(),
         deletion_list()
         return 3
     mapped, import_failed = parse_import_log(import_log or "")
-    linked, failed = 0, []
+    linked, failed, file_failed = 0, [], []
 
     def fail(r, why):
         failed.append((r.lang, r.title, why))
         out(f"{r.lang}:{r.title}: FAILED {why}")
+
+    def file(r, local):
+        if not file_item:
+            return
+        try:
+            file_item(local)
+        except Exception as exc:  # the sitelink stands; filing is reported and rerun on its own
+            file_failed.append((r.lang, r.title, local, str(exc)))
+            out(f"{r.lang}:{r.title}: FILE-FAILED {local}: {exc}")
 
     for r in rows:
         try:
@@ -370,35 +443,39 @@ def run(rows: list, repo, apply: bool, import_log: str | None = None, create=(),
                     fail(r, f"import {r.wd}: not in the import log")
                     continue
             elif r.action == "create" and (r.lang, r.title) in create:
-                local = repo.new_item({r.lang: _search_text(r.title)}, {}, {r.lang: r.title}, tags=TAG)
+                local = repo.new_item({r.lang: _search_text(r.title)}, {r.lang: create[r.lang, r.title]},
+                                      {r.lang: r.title}, tags=TAG, summary=SUMMARY)
                 out(f"{r.lang}:{r.title}: created {local}")
                 linked += 1
-                if file_item:
-                    file_item(local)
+                file(r, local)
                 continue
             else:
                 continue
             linked += _link(repo, local, r.lang, r.title)
             out(f"{r.lang}:{r.title}: linked to {local}")
-            if file_item:
-                file_item(local)
+            file(r, local)
         except SyncError as exc:
             fail(r, str(exc))
-    out(f"linked {linked}; failed {len(failed)}")
+    out(f"linked {linked}; file-failed {len(file_failed)}; failed {len(failed)}")
     deletion_list()
-    return 1 if failed else 0
+    return 1 if failed or file_failed else 0
 
 
-def decisions(specs: list, articles: list, value: bool) -> dict:
-    """CLI author decisions -> {(lang, title): QID} (value) or {(lang, title): True}."""
+def decisions(specs: list, articles: list, kind: str) -> dict:
+    """CLI author decisions -> {(lang, title): QID} (kind "qid", TITLE=QID) or {(lang, title): description}
+    (kind "description", TITLE=description)."""
     unconnected = {(a.lang, a.title) for a in articles}
     out = {}
     for spec in specs:
-        key, qid = spec, True
-        if value:
+        if kind == "qid":
             key, sep, qid = spec.rpartition("=")
             if not sep or not key or not QID.match(qid):
                 raise ValueError(f"expected TITLE=QID, got {spec!r}")
+        else:
+            key, sep, qid = spec.partition("=")
+            qid = qid.strip()
+            if not sep or not key or not qid:
+                raise ValueError(f"expected TITLE=description (the new item's description), got {spec!r}")
         lang, sep, title = key.partition(":")
         if sep and lang in LANGS:
             if (lang, title) not in unconnected:
@@ -421,8 +498,9 @@ def main(argv=None, repo=None, clients=None, wikidata=None, classify=None, out=p
     parser.add_argument("--import-log", metavar="FILE", help="output of the EnrichItems --import command")
     parser.add_argument("--wd", action="append", default=[], metavar="TITLE=QID",
                         help="the author's Wikidata item for an article (repeatable; LANG:TITLE=QID)")
-    parser.add_argument("--create", action="append", default=[], metavar="TITLE",
-                        help="create a new local item for an article (repeatable; LANG:TITLE)")
+    parser.add_argument("--create", action="append", default=[], metavar="TITLE=DESCRIPTION",
+                        help="create a new local item for an article, with its description in the wiki's "
+                             "language (repeatable; LANG:TITLE=DESCRIPTION)")
     parser.add_argument("--tools-dir", default=os.environ.get("SV_TOOLS_DIR", "<tools-dir>"),
                         help="server directory holding EnrichItems.php (for the printed command)")
     args = parser.parse_args(argv)
@@ -448,8 +526,8 @@ def main(argv=None, repo=None, clients=None, wikidata=None, classify=None, out=p
         articles, connected = gather(clients, repo)  # every wiki: a translation joins across all of them
         articles = [a for a in articles if a.lang in langs]
         try:
-            forced = decisions(args.wd, articles, value=True)
-            create = set(decisions(args.create, articles, value=False))
+            forced = decisions(args.wd, articles, "qid")
+            create = decisions(args.create, articles, "description")
         except ValueError as exc:
             parser.error(str(exc))
         rows = plan(articles, repo, wikidata, known(repo, wikidata, connected), forced=forced, create=create)
