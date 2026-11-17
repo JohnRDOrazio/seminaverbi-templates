@@ -109,12 +109,16 @@ class WikiClient:
         return out
 
     def edit(self, title: str, text: str, summary: str, tags: str | None = None,
-             createonly: bool = False) -> None:
+             createonly: bool = False, baserevid: int | None = None) -> None:
         params = dict(action="edit", title=title, text=text, summary=summary, bot="1")
         if tags:
             params["tags"] = tags
         if createonly:
             params["createonly"] = "1"
+        if baserevid is not None:
+            # refuse the save if the page changed since it was read (editconflict), never create it
+            params["baserevid"] = baserevid
+            params["nocreate"] = "1"
         result = self._dig(self._call("POST", token=self._token("csrf"), **params), "edit")
         if result.get("result") != "Success":
             raise SyncError(f"{self.lang}: edit of {title} failed: {result}")
@@ -247,3 +251,68 @@ class WikiClient:
         if tags:
             params["tags"] = tags
         return self._dig(self._call("POST", token=self._token("csrf"), **params), "entity", "id")
+
+    def new_property(self, labels: dict[str, str], descriptions: dict[str, str], datatype: str,
+                     tags: str | None = None) -> str:
+        entity = {
+            "datatype": datatype,
+            "labels": {lang: {"language": lang, "value": v} for lang, v in labels.items()},
+            "descriptions": {lang: {"language": lang, "value": v} for lang, v in descriptions.items()},
+        }
+        params = dict(action="wbeditentity", new="property", data=json.dumps(entity, ensure_ascii=False), bot="1")
+        if tags:
+            params["tags"] = tags
+        return self._dig(self._call("POST", token=self._token("csrf"), **params), "entity", "id")
+
+    def find_property(self, label_en: str) -> str | None:
+        """The property whose English label is exactly `label_en`, or None."""
+        data = self._call("GET", action="wbsearchentities", search=label_en, type="property", language="en",
+                          limit="50")
+        for hit in data.get("search", []):
+            if hit.get("label") == label_en:
+                return hit["id"]
+        return None
+
+    def item_values(self, item: str, prop: str) -> list[str]:
+        """Q-IDs of `item`'s item-valued `prop` statements, deprecated and no/some-value ones excluded."""
+        entities = self._dig(self._call("GET", action="wbgetentities", ids=item, props="claims"), "entities")
+        out = []
+        for claim in self._dig(entities, item).get("claims", {}).get(prop, []):
+            snak = claim.get("mainsnak", {})
+            if claim.get("rank") == "deprecated" or snak.get("snaktype") != "value":
+                continue
+            out.append(snak["datavalue"]["value"]["id"])
+        return out
+
+    def add_item_claim(self, item: str, prop: str, value: str, tags: str | None = None,
+                       summary: str | None = None) -> None:
+        params = dict(action="wbcreateclaim", entity=item, property=prop, snaktype="value", bot="1",
+                      value=json.dumps({"entity-type": "item", "numeric-id": int(value.lstrip("Q"))}))
+        if tags:
+            params["tags"] = tags
+        if summary:
+            params["summary"] = summary
+        data = self._call("POST", token=self._token("csrf"), **params)
+        if not data.get("success"):
+            raise SyncError(f"{self.lang}: adding {prop}={value} to {item} failed: {data}")
+
+    def revision(self, title: str) -> tuple[int, str] | None:
+        """(latest revid, wikitext) of `title`, or None when the page does not exist."""
+        data = self._call("GET", action="query", prop="revisions", titles=title, rvprop="ids|content",
+                          rvslots="main")
+        page = self._dig(data, "query", "pages", 0)
+        if page.get("missing"):
+            return None
+        rev = self._dig(page, "revisions", 0)
+        return rev["revid"], self._dig(rev, "slots", "main", "content")
+
+    def preview_categories(self, title: str, text: str) -> set[str]:
+        """Categories `text` would give page `title` (bare names), without saving."""
+        data = self._call("POST", action="parse", title=title, text=text, prop="categories", pst="1",
+                          contentmodel="wikitext")
+        return {c["category"].replace("_", " ") for c in self._dig(data, "parse", "categories")}
+
+    def page_categories(self, title: str) -> set[str]:
+        """The page's categories now (template-added included), bare names."""
+        data = self._call("GET", action="query", prop="categories", titles=title, cllimit="max")
+        return {c["title"].split(":", 1)[1] for c in self._dig(data, "query", "pages", 0).get("categories", [])}

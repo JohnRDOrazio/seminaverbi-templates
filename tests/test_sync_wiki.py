@@ -258,3 +258,79 @@ def test_article_categories_replaces_continuation():
         {"query": {"pages": [{"title": "C", "categories": [{"title": "Category:O"}]}]}})
     assert WikiClient("en", session=s).article_categories() == {"M", "N", "O"}
     assert "clcontinue" not in s.calls[2][1] and s.calls[2][1]["gapcontinue"] == "C"
+
+
+# --- Task 1 (SV infobox plan): properties, item statements, guarded edits, parse preview ---
+
+def test_new_property_posts_entity():
+    import json
+    s = Recorder(CSRF, {"entity": {"id": "P9001"}, "success": 1})
+    pid = WikiClient("en", session=s).new_property({"en": "SV field"}, {"en": "d"}, "wikibase-item",
+                                                   tags="seminaverbi-mcp")
+    assert pid == "P9001"
+    params = s.calls[-1][1]
+    assert params["action"] == "wbeditentity" and params["new"] == "property" and params["bot"] == "1"
+    data = json.loads(params["data"])
+    assert data["datatype"] == "wikibase-item" and data["labels"]["en"]["value"] == "SV field"
+
+
+def test_find_property_exact_label():
+    body = {"search": [{"id": "P1", "label": "SV field x"}, {"id": "P2", "label": "SV field"}]}
+    s = Recorder(body)
+    assert WikiClient("en", session=s).find_property("SV field") == "P2"
+    assert s.calls[0][1]["type"] == "property"
+    assert WikiClient("en", session=Recorder({"search": [{"id": "P1", "label": "SV fields"}]})).find_property("SV field") is None
+
+
+def _claim(qid, rank="normal", snaktype="value"):
+    snak = {"snaktype": snaktype}
+    if snaktype == "value":
+        snak["datavalue"] = {"type": "wikibase-entityid", "value": {"id": qid}}
+    return {"rank": rank, "mainsnak": snak}
+
+
+def test_item_values_skips_deprecated_and_novalue():
+    claims = [_claim("Q1"), _claim("Q2", "preferred"), _claim("Q3", "deprecated"), _claim(None, snaktype="novalue")]
+    s = Recorder({"entities": {"Q5": {"id": "Q5", "claims": {"P9001": claims}}}})
+    assert WikiClient("en", session=s).item_values("Q5", "P9001") == ["Q1", "Q2"]
+    s = Recorder({"entities": {"Q5": {"id": "Q5", "claims": {}}}})
+    assert WikiClient("en", session=s).item_values("Q5", "P9001") == []
+
+
+def test_add_item_claim_params():
+    s = Recorder(CSRF, {"success": 1, "claim": {"id": "Q5$x"}})
+    WikiClient("en", session=s).add_item_claim("Q5", "P9001", "Q47743", tags="seminaverbi-mcp", summary="s")
+    params = s.calls[-1][1]
+    assert (params["action"], params["entity"], params["property"], params["snaktype"]) == (
+        "wbcreateclaim", "Q5", "P9001", "value")
+    assert params["value"] == '{"entity-type": "item", "numeric-id": 47743}'
+    assert params["bot"] == "1" and params["tags"] == "seminaverbi-mcp" and params["summary"] == "s"
+
+
+def test_revision_reads_latest():
+    body = {"query": {"pages": [{"title": "X", "revisions": [{"revid": 7, "slots": {"main": {"content": "t"}}}]}]}}
+    assert WikiClient("en", session=Recorder(body)).revision("X") == (7, "t")
+    assert WikiClient("en", session=Recorder({"query": {"pages": [{"title": "X", "missing": True}]}})).revision("X") is None
+
+
+def test_edit_with_baserevid():
+    s = Recorder(CSRF, {"edit": {"result": "Success"}})
+    WikiClient("en", session=s).edit("X", "t", "s", tags="seminaverbi-mcp", baserevid=123)
+    params = s.calls[-1][1]
+    assert params["baserevid"] == 123 and params["nocreate"] == "1"
+    s = Recorder(CSRF, {"error": {"code": "editconflict", "info": "Edit conflict."}})
+    with pytest.raises(SyncError, match="editconflict"):
+        WikiClient("en", session=s).edit("X", "t", "s", baserevid=123)
+
+
+def test_preview_categories():
+    s = Recorder({"parse": {"categories": [{"category": "Musica"}, {"category": "Arti_dello_spettacolo"}]}})
+    assert WikiClient("it", session=s).preview_categories("X", "t") == {"Musica", "Arti dello spettacolo"}
+    params = s.calls[0][1]
+    assert params["action"] == "parse" and params["title"] == "X" and params["text"] == "t" and params["pst"] == "1"
+
+
+def test_page_categories_bare_names():
+    s = Recorder({"query": {"pages": [{"title": "X", "categories": [{"title": "Categoria:Musica"},
+                                                                       {"title": "Categoria:Arti dello spettacolo"}]}]}})
+    assert WikiClient("it", session=s).page_categories("X") == {"Musica", "Arti dello spettacolo"}
