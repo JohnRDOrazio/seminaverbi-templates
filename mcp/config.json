@@ -28,7 +28,8 @@
             "import os\nfor line in open(os.path.expanduser('~/.config/seminaverbi/editor.env'), encoding='utf-8'):\n    k, _, v = line.strip().partition('=')\n    if k == 'SV_EDITOR_PASSWORD':\n        print(v.strip().strip('\"').strip(\"'\"), end='')\n"
           ]
         }
-      }
+      },
+      "bot": true
     },
     "it": {
       "sitename": "Semina Verbi (italiano)",
@@ -56,7 +57,8 @@
             "import os\nfor line in open(os.path.expanduser('~/.config/seminaverbi/editor.env'), encoding='utf-8'):\n    k, _, v = line.strip().partition('=')\n    if k == 'SV_EDITOR_PASSWORD':\n        print(v.strip().strip('\"').strip(\"'\"), end='')\n"
           ]
         }
-      }
+      },
+      "bot": true
     },
     "es": {
       "sitename": "Semina Verbi (español)",
@@ -84,7 +86,8 @@
             "import os\nfor line in open(os.path.expanduser('~/.config/seminaverbi/editor.env'), encoding='utf-8'):\n    k, _, v = line.strip().partition('=')\n    if k == 'SV_EDITOR_PASSWORD':\n        print(v.strip().strip('\"').strip(\"'\"), end='')\n"
           ]
         }
-      }
+      },
+      "bot": true
     },
     "fr": {
       "sitename": "Semina Verbi (français)",
@@ -112,7 +115,8 @@
             "import os\nfor line in open(os.path.expanduser('~/.config/seminaverbi/editor.env'), encoding='utf-8'):\n    k, _, v = line.strip().partition('=')\n    if k == 'SV_EDITOR_PASSWORD':\n        print(v.strip().strip('\"').strip(\"'\"), end='')\n"
           ]
         }
-      }
+      },
+      "bot": true
     },
     "de": {
       "sitename": "Semina Verbi (Deutsch)",
@@ -140,7 +144,8 @@
             "import os\nfor line in open(os.path.expanduser('~/.config/seminaverbi/editor.env'), encoding='utf-8'):\n    k, _, v = line.strip().partition('=')\n    if k == 'SV_EDITOR_PASSWORD':\n        print(v.strip().strip('\"').strip(\"'\"), end='')\n"
           ]
         }
-      }
+      },
+      "bot": true
     },
     "pt": {
       "sitename": "Semina Verbi (português)",
@@ -168,7 +173,8 @@
             "import os\nfor line in open(os.path.expanduser('~/.config/seminaverbi/editor.env'), encoding='utf-8'):\n    k, _, v = line.strip().partition('=')\n    if k == 'SV_EDITOR_PASSWORD':\n        print(v.strip().strip('\"').strip(\"'\"), end='')\n"
           ]
         }
-      }
+      },
+      "bot": true
     }
   }
 }
