@@ -72,8 +72,8 @@ def page_text(node, parent, lang: str) -> str:
     if parent is None:
         return "{{SV category tree}}"
     link = f"[[Category:{parent.names[lang]}]]"
-    description = node.description.get(lang)
-    return f"{description}\n\n{link}" if description else link
+    definition = node.definition.get(lang) or node.definition.get("en")
+    return f"{definition}\n\n{link}" if definition else link
 
 
 def create(lang: str, data: dict, client, repo, dry_run: bool) -> CreateResult:

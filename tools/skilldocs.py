@@ -66,7 +66,9 @@ def render_categories(root: Path) -> str:
 
         def walk(items, depth):
             for item in items:
-                out.append(f"{'  ' * depth}- {item['names'][lang]} (`{item['key']}`)\n")
+                definition = item.get("definition", {}).get("en", "")
+                out.append(f"{'  ' * depth}- {item['names'][lang]} (`{item['key']}`)"
+                           + (f": {definition}" if lang == "en" and definition else "") + "\n")
                 walk(item.get("children", []), depth + 1)
 
         walk(data["fields"], 0)

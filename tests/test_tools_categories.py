@@ -13,9 +13,10 @@ def names(base):
 DATA = {
     "root": {"names": {lang: "Semina Verbi" for lang in LANGS}},
     "themes_root": {"names": names("Themes")},
-    "fields": [{"key": "arts", "names": names("Arts"), "description": {"fr": "Les arts."},
-                "children": [{"key": "music", "names": names("Music")}]}],
-    "themes": [{"key": "love", "names": names("Love")}],
+    "fields": [{"key": "arts", "names": names("Arts"), "definition": {"en": "The arts.", "fr": "Les arts."},
+                "children": [{"key": "music", "names": names("Music"), "definition": {"en": "Music."}}]}],
+    "themes": [{"key": "virtues", "names": names("Virtues"), "definition": {"en": "Virtues."},
+                "children": [{"key": "love", "names": names("Love"), "definition": {"en": "Love."}}]}],
 }
 
 
@@ -66,7 +67,8 @@ ALL_FR = {
     "Category:Arts-fr": page("Semina Verbi"),
     "Category:Music-fr": page("Arts-fr"),
     "Category:Themes-fr": page("Semina Verbi"),
-    "Category:Love-fr": page("Themes-fr"),
+    "Category:Virtues-fr": page("Themes-fr"),
+    "Category:Love-fr": page("Virtues-fr"),
 }
 
 
@@ -100,17 +102,18 @@ def test_create_never_edits_existing():
     result = cat.create("fr", DATA, fr, Fake("en", items=fr.items), dry_run=False)
     assert [e[0] for e in fr.edits] == ["Category:Music-fr"]
     title, text, tags, createonly = fr.edits[0]
-    assert text == "[[Category:Arts-fr]]" and tags == "seminaverbi-mcp" and createonly is True
+    # no French definition: the English one is used
+    assert text == "Music.\n\n[[Category:Arts-fr]]" and tags == "seminaverbi-mcp" and createonly is True
     assert result.created == ["Category:Music-fr"]
 
 
-def test_create_page_text_description_and_root():
+def test_create_page_text_definition_and_root():
     fr = Fake("fr", {})
     cat.create("fr", DATA, fr, Fake("en", items=fr.items), dry_run=False)
     texts = {t: text for t, text, _, _ in fr.edits}
     assert texts["Category:Semina Verbi"] == "{{SV category tree}}"
     assert texts["Category:Arts-fr"] == "Les arts.\n\n[[Category:Semina Verbi]]"
-    assert texts["Category:Love-fr"] == "[[Category:Themes-fr]]"
+    assert texts["Category:Love-fr"] == "Love.\n\n[[Category:Virtues-fr]]"
 
 
 def test_create_links_existing_item():

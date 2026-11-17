@@ -7,6 +7,9 @@
    "fr": "Semences du Verbe",
    "de": "Samen des Wortes",
    "pt": "Sementes do Verbo"
+  },
+  "definition": {
+   "en": "Everything Semina Verbi covers: the expressions of human culture, from the arts to the sciences, and the Gospel themes they carry."
   }
  },
  "themes_root": {
@@ -17,209 +20,122 @@
    "fr": "Thèmes évangéliques",
    "de": "Themen des Evangeliums",
    "pt": "Temas evangélicos"
+  },
+  "definition": {
+   "en": "Themes of the Gospel and of Christian life that a work explores, grouped after the Catechism of the Catholic Church."
   }
  },
  "fields": [
   {
-   "key": "literary-arts",
+   "key": "arts",
    "names": {
-    "en": "Literary arts",
-    "it": "Arti letterarie",
-    "es": "Artes literarias",
-    "fr": "Arts littéraires",
-    "de": "Literarische Künste",
-    "pt": "Artes literárias"
+    "en": "Arts",
+    "it": "Arti",
+    "es": "Artes",
+    "fr": "Arts",
+    "de": "Kunst",
+    "pt": "Artes"
+   },
+   "definition": {
+    "en": "Creative practices and their works, following UNESCO's cultural domains: literature, the performing, visual and audiovisual arts, architecture, crafts, cultural heritage and gastronomy."
    },
    "children": [
     {
-     "key": "drama",
+     "key": "literature",
      "names": {
-      "en": "Drama (Literature)",
-      "it": "Opera Drammatica (Letteratura)",
-      "es": "Drama (Literatura)",
-      "fr": "Drame (littérature)",
-      "de": "Drama (Literatur)",
-      "pt": "Drama (Literatura)"
-     }
-    },
-    {
-     "key": "fiction",
-     "names": {
-      "en": "Fiction (Literature)",
-      "it": "Narrativa (Letteratura)",
-      "es": "Narrativa (Literatura)",
-      "fr": "Fiction (littérature)",
-      "de": "Erzählende Literatur",
-      "pt": "Ficção (Literatura)"
-     }
-    },
-    {
-     "key": "poetry",
-     "names": {
-      "en": "Poetry (Literature)",
-      "it": "Poesia (Letteratura)",
-      "es": "Poesía (Literatura)",
-      "fr": "Poésie (littérature)",
-      "de": "Lyrik",
-      "pt": "Poesia (Literatura)"
-     }
-    },
-    {
-     "key": "prose",
-     "names": {
-      "en": "Prose (Literature)",
-      "it": "Prosa (Letteratura)",
-      "es": "Prosa (Literatura)",
-      "fr": "Prose (littérature)",
-      "de": "Prosa (Literatur)",
-      "pt": "Prosa (Literatura)"
-     }
-    },
-    {
-     "key": "novel",
-     "names": {
-      "en": "Novel (Literature)",
-      "it": "Romanzo (Letteratura)",
-      "es": "Novela (Literatura)",
-      "fr": "Roman (littérature)",
-      "de": "Roman (Literatur)",
-      "pt": "Romance (Literatura)"
-     }
-    }
-   ]
-  },
-  {
-   "key": "performing-arts",
-   "names": {
-    "en": "Performing arts",
-    "it": "Arti dello spettacolo",
-    "es": "Artes escénicas",
-    "fr": "Arts du spectacle",
-    "de": "Darstellende Kunst",
-    "pt": "Artes cênicas"
-   },
-   "children": [
-    {
-     "key": "dance",
-     "names": {
-      "en": "Dance",
-      "it": "Danza",
-      "es": "Danza",
-      "fr": "Danse",
-      "de": "Tanz",
-      "pt": "Dança"
-     }
-    },
-    {
-     "key": "music",
-     "names": {
-      "en": "Music",
-      "it": "Musica",
-      "es": "Música",
-      "fr": "Musique",
-      "de": "Musik",
-      "pt": "Música"
-     }
-    },
-    {
-     "key": "theatre",
-     "names": {
-      "en": "Theatre",
-      "it": "Teatro",
-      "es": "Teatro",
-      "fr": "Théâtre",
-      "de": "Theater",
-      "pt": "Teatro"
-     }
-    }
-   ]
-  },
-  {
-   "key": "visual-arts",
-   "names": {
-    "en": "Visual arts",
-    "it": "Arti visive",
-    "es": "Artes visuales",
-    "fr": "Arts visuels",
-    "de": "Bildende Kunst",
-    "pt": "Artes visuais"
-   },
-   "children": [
-    {
-     "key": "architecture",
-     "names": {
-      "en": "Architecture",
-      "it": "Architettura",
-      "es": "Arquitectura",
-      "fr": "Architecture",
-      "de": "Architektur",
-      "pt": "Arquitetura"
-     }
-    },
-    {
-     "key": "animation",
-     "names": {
-      "en": "Animation",
-      "it": "Animazione",
-      "es": "Animación",
-      "fr": "Animation",
-      "de": "Animation",
-      "pt": "Animação"
-     }
-    },
-    {
-     "key": "ceramic-art",
-     "names": {
-      "en": "Ceramic art",
-      "it": "Arte ceramica",
-      "es": "Cerámica artística",
-      "fr": "Art céramique",
-      "de": "Keramische Kunst",
-      "pt": "Arte cerâmica"
-     }
-    },
-    {
-     "key": "cinematography",
-     "names": {
-      "en": "Cinematography",
-      "it": "Cinematografia",
-      "es": "Cinematografía",
-      "fr": "Cinéma",
-      "de": "Film",
-      "pt": "Cinema"
+      "en": "Literature",
+      "it": "Letteratura",
+      "es": "Literatura",
+      "fr": "Littérature",
+      "de": "Literatur",
+      "pt": "Literatura"
+     },
+     "definition": {
+      "en": "Written and oral works of imagination and of artful prose, in any language. Studies about literature belong under Literary studies."
      },
      "children": [
       {
-       "key": "sitcom",
+       "key": "poetry",
        "names": {
-        "en": "Sitcom",
-        "it": "Sitcom",
-        "es": "Comedia de situación",
-        "fr": "Sitcom",
-        "de": "Sitcom",
-        "pt": "Sitcom"
+        "en": "Poetry",
+        "it": "Poesia",
+        "es": "Poesía",
+        "fr": "Poésie",
+        "de": "Lyrik",
+        "pt": "Poesia"
+       },
+       "definition": {
+        "en": "Works in verse: lyric, epic, dramatic and sacred poetry, hymns and song lyrics read as poems."
        }
       },
       {
-       "key": "feature-film",
+       "key": "novels",
        "names": {
-        "en": "Feature film",
-        "it": "Lungometraggio",
-        "es": "Largometraje",
-        "fr": "Long métrage",
-        "de": "Spielfilm",
-        "pt": "Longa-metragem"
+        "en": "Novels",
+        "it": "Romanzi",
+        "es": "Novelas",
+        "fr": "Romans",
+        "de": "Romane",
+        "pt": "Romances"
+       },
+       "definition": {
+        "en": "Book-length works of narrative prose fiction."
        }
       },
       {
-       "key": "short-film",
+       "key": "short-fiction",
        "names": {
-        "en": "Short film",
-        "it": "Cortometraggio",
-        "es": "Cortometraje",
-        "fr": "Court métrage",
-        "de": "Kurzfilm",
-        "pt": "Curta-metragem"
+        "en": "Short stories",
+        "it": "Racconti",
+        "es": "Cuentos",
+        "fr": "Nouvelles",
+        "de": "Kurzgeschichten",
+        "pt": "Contos"
+       },
+       "definition": {
+        "en": "Short narrative prose fiction: short stories, novellas, tales and fables."
+       }
+      },
+      {
+       "key": "drama",
+       "names": {
+        "en": "Drama",
+        "it": "Drammaturgia",
+        "es": "Dramaturgia",
+        "fr": "Œuvres dramatiques",
+        "de": "Dramatik",
+        "pt": "Dramaturgia"
+       },
+       "definition": {
+        "en": "Plays and other dramatic works as written texts. Their staging belongs under Theatre."
+       }
+      },
+      {
+       "key": "essays",
+       "names": {
+        "en": "Essays",
+        "it": "Saggistica",
+        "es": "Ensayos",
+        "fr": "Essais",
+        "de": "Essays",
+        "pt": "Ensaios"
+       },
+       "definition": {
+        "en": "Non-fiction prose of literary value: essays, letters, memoirs, autobiographies, spiritual writings published as literature."
+       }
+      },
+      {
+       "key": "childrens-literature",
+       "names": {
+        "en": "Children's literature",
+        "it": "Letteratura per ragazzi",
+        "es": "Literatura infantil",
+        "fr": "Littérature d'enfance et de jeunesse",
+        "de": "Kinder- und Jugendliteratur",
+        "pt": "Literatura infantojuvenil"
+       },
+       "definition": {
+        "en": "Literature written for children and young readers, in any form."
        }
       }
      ]
@@ -233,269 +149,907 @@
       "fr": "Bande dessinée",
       "de": "Comic",
       "pt": "Histórias em quadrinhos"
+     },
+     "definition": {
+      "en": "Sequential art telling a story in drawn panels: comic strips, comic books, graphic novels, manga."
      }
     },
     {
-     "key": "video-games",
+     "key": "performing-arts",
      "names": {
-      "en": "Video gaming",
-      "it": "Videogiochi",
-      "es": "Videojuegos",
-      "fr": "Jeux vidéo",
-      "de": "Videospiele",
-      "pt": "Jogos eletrônicos"
-     }
-    },
-    {
-     "key": "drawing",
-     "names": {
-      "en": "Drawing",
-      "it": "Disegno",
-      "es": "Dibujo",
-      "fr": "Dessin",
-      "de": "Zeichnung",
-      "pt": "Desenho"
+      "en": "Performing arts",
+      "it": "Arti dello spettacolo",
+      "es": "Artes escénicas",
+      "fr": "Arts du spectacle",
+      "de": "Darstellende Kunst",
+      "pt": "Artes cênicas"
+     },
+     "definition": {
+      "en": "Arts performed live before an audience: music, theatre, dance and their combined forms."
      },
      "children": [
       {
-       "key": "engraving",
+       "key": "music",
        "names": {
-        "en": "Engraving",
+        "en": "Music",
+        "it": "Musica",
+        "es": "Música",
+        "fr": "Musique",
+        "de": "Musik",
+        "pt": "Música"
+       },
+       "definition": {
+        "en": "Musical works, songs, albums and performers. Studies about music belong under Musicology."
+       },
+       "children": [
+        {
+         "key": "classical-music",
+         "names": {
+          "en": "Classical music",
+          "it": "Musica classica",
+          "es": "Música clásica",
+          "fr": "Musique classique",
+          "de": "Klassische Musik",
+          "pt": "Música clássica"
+         },
+         "definition": {
+          "en": "Art music of the Western tradition and its concert repertoire: symphonies, chamber music, concertos, art songs."
+         }
+        },
+        {
+         "key": "sacred-music",
+         "names": {
+          "en": "Sacred music",
+          "it": "Musica sacra",
+          "es": "Música sacra",
+          "fr": "Musique sacrée",
+          "de": "Geistliche Musik",
+          "pt": "Música sacra"
+         },
+         "definition": {
+          "en": "Music for worship or on religious texts: chant, masses, oratorios, hymns, gospel and contemporary Christian music."
+         }
+        },
+        {
+         "key": "popular-music",
+         "names": {
+          "en": "Popular music",
+          "it": "Musica leggera",
+          "es": "Música popular",
+          "fr": "Musique populaire",
+          "de": "Populäre Musik",
+          "pt": "Música popular"
+         },
+         "definition": {
+          "en": "Commercial music of mass audiences: pop, rock, folk-rock, country, singer-songwriters, soundtracks released as songs."
+         }
+        },
+        {
+         "key": "folk-music",
+         "names": {
+          "en": "Folk music",
+          "it": "Musica popolare tradizionale",
+          "es": "Música folclórica",
+          "fr": "Musique traditionnelle",
+          "de": "Volksmusik",
+          "pt": "Música folclórica"
+         },
+         "definition": {
+          "en": "Traditional music transmitted within a people or region."
+         }
+        },
+        {
+         "key": "opera",
+         "names": {
+          "en": "Opera",
+          "it": "Opera lirica",
+          "es": "Ópera",
+          "fr": "Opéra",
+          "de": "Oper",
+          "pt": "Ópera"
+         },
+         "definition": {
+          "en": "Staged works sung throughout with orchestra: opera, operetta, and their libretti as staged works."
+         }
+        },
+        {
+         "key": "musical-theatre",
+         "names": {
+          "en": "Musical theatre",
+          "it": "Teatro musicale",
+          "es": "Teatro musical",
+          "fr": "Comédie musicale",
+          "de": "Musical",
+          "pt": "Teatro musical"
+         },
+         "definition": {
+          "en": "Stage musicals combining songs, spoken dialogue and dance."
+         }
+        }
+       ]
+      },
+      {
+       "key": "theatre",
+       "names": {
+        "en": "Theatre",
+        "it": "Teatro",
+        "es": "Teatro",
+        "fr": "Théâtre",
+        "de": "Theater",
+        "pt": "Teatro"
+       },
+       "definition": {
+        "en": "The staging and performance of plays and theatrical shows. Plays as texts belong under Drama."
+       }
+      },
+      {
+       "key": "dance",
+       "names": {
+        "en": "Dance",
+        "it": "Danza",
+        "es": "Danza",
+        "fr": "Danse",
+        "de": "Tanz",
+        "pt": "Dança"
+       },
+       "definition": {
+        "en": "Dance works and forms: ballet, modern dance, folk and liturgical dance."
+       }
+      }
+     ]
+    },
+    {
+     "key": "visual-arts",
+     "names": {
+      "en": "Visual arts",
+      "it": "Arti visive",
+      "es": "Artes visuales",
+      "fr": "Arts visuels",
+      "de": "Bildende Kunst",
+      "pt": "Artes visuais"
+     },
+     "definition": {
+      "en": "Arts that produce works to be seen: painting, sculpture, drawing, printmaking, photography."
+     },
+     "children": [
+      {
+       "key": "painting",
+       "names": {
+        "en": "Painting",
+        "it": "Pittura",
+        "es": "Pintura",
+        "fr": "Peinture",
+        "de": "Malerei",
+        "pt": "Pintura"
+       },
+       "definition": {
+        "en": "Works of paint applied to a surface, by technique."
+       },
+       "children": [
+        {
+         "key": "fresco",
+         "names": {
+          "en": "Fresco",
+          "it": "Affresco",
+          "es": "Fresco",
+          "fr": "Fresque",
+          "de": "Fresko",
+          "pt": "Afresco"
+         },
+         "definition": {
+          "en": "Painting on fresh plaster, including church and palace cycles."
+         }
+        },
+        {
+         "key": "oil-painting",
+         "names": {
+          "en": "Oil painting",
+          "it": "Pittura ad olio",
+          "es": "Pintura al óleo",
+          "fr": "Peinture à l'huile",
+          "de": "Ölmalerei",
+          "pt": "Pintura a óleo"
+         },
+         "definition": {
+          "en": "Painting with oil-based paints, on canvas or panel."
+         }
+        },
+        {
+         "key": "watercolor",
+         "names": {
+          "en": "Watercolor",
+          "it": "Acquerello",
+          "es": "Acuarela",
+          "fr": "Aquarelle",
+          "de": "Aquarellmalerei",
+          "pt": "Aquarela"
+         },
+         "definition": {
+          "en": "Painting with water-soluble pigments on paper."
+         }
+        },
+        {
+         "key": "icon-painting",
+         "names": {
+          "en": "Icon painting",
+          "it": "Iconografia sacra",
+          "es": "Iconografía",
+          "fr": "Iconographie",
+          "de": "Ikonenmalerei",
+          "pt": "Iconografia"
+         },
+         "definition": {
+          "en": "Painted sacred images of the Eastern and Western Christian traditions, especially icons on panel."
+         }
+        },
+        {
+         "key": "cave-painting",
+         "names": {
+          "en": "Cave painting",
+          "it": "Pittura rupestre",
+          "es": "Pintura rupestre",
+          "fr": "Art pariétal",
+          "de": "Höhlenmalerei",
+          "pt": "Pintura rupestre"
+         },
+         "definition": {
+          "en": "Prehistoric painting and engraving on rock surfaces."
+         }
+        }
+       ]
+      },
+      {
+       "key": "sculpture",
+       "names": {
+        "en": "Sculpture",
+        "it": "Scultura",
+        "es": "Escultura",
+        "fr": "Sculpture",
+        "de": "Bildhauerei",
+        "pt": "Escultura"
+       },
+       "definition": {
+        "en": "Three-dimensional works carved, modelled or cast, in any material."
+       }
+      },
+      {
+       "key": "drawing",
+       "names": {
+        "en": "Drawing",
+        "it": "Disegno",
+        "es": "Dibujo",
+        "fr": "Dessin",
+        "de": "Zeichnung",
+        "pt": "Desenho"
+       },
+       "definition": {
+        "en": "Works made by drawing on a surface with dry or wet media."
+       },
+       "children": [
+        {
+         "key": "charcoal-drawing",
+         "names": {
+          "en": "Charcoal drawing",
+          "it": "Disegno a carboncino",
+          "es": "Dibujo al carbón",
+          "fr": "Dessin au fusain",
+          "de": "Kohlezeichnung",
+          "pt": "Desenho a carvão"
+         },
+         "definition": {
+          "en": "Drawings made with charcoal."
+         }
+        },
+        {
+         "key": "pencil-drawing",
+         "names": {
+          "en": "Pencil drawing",
+          "it": "Disegno a matita",
+          "es": "Dibujo a lápiz",
+          "fr": "Dessin au crayon",
+          "de": "Bleistiftzeichnung",
+          "pt": "Desenho a lápis"
+         },
+         "definition": {
+          "en": "Drawings made with graphite or coloured pencils."
+         }
+        }
+       ]
+      },
+      {
+       "key": "printmaking",
+       "names": {
+        "en": "Printmaking",
         "it": "Incisione",
         "es": "Grabado",
-        "fr": "Gravure",
+        "fr": "Estampe",
         "de": "Druckgrafik",
         "pt": "Gravura"
-       }
+       },
+       "definition": {
+        "en": "Works printed from a matrix: engraving, etching, woodcut, lithography."
+       },
+       "children": [
+        {
+         "key": "engraving",
+         "names": {
+          "en": "Engraving",
+          "it": "Incisione a bulino",
+          "es": "Grabado a buril",
+          "fr": "Gravure au burin",
+          "de": "Kupferstich",
+          "pt": "Gravura a buril"
+         },
+         "definition": {
+          "en": "Prints from lines cut into a plate or block."
+         }
+        },
+        {
+         "key": "etching",
+         "names": {
+          "en": "Etching",
+          "it": "Acquaforte",
+          "es": "Aguafuerte",
+          "fr": "Eau-forte",
+          "de": "Radierung",
+          "pt": "Água-forte"
+         },
+         "definition": {
+          "en": "Prints from lines bitten into a metal plate by acid."
+         }
+        }
+       ]
       },
       {
-       "key": "etching",
+       "key": "photography",
        "names": {
-        "en": "Etching",
-        "it": "Acquaforte",
-        "es": "Aguafuerte",
-        "fr": "Eau-forte",
-        "de": "Radierung",
-        "pt": "Água-forte"
-       }
-      },
-      {
-       "key": "cave-painting",
-       "names": {
-        "en": "Cave painting",
-        "it": "Pittura rupestre",
-        "es": "Pintura rupestre",
-        "fr": "Art pariétal",
-        "de": "Höhlenmalerei",
-        "pt": "Pintura rupestre"
-       }
-      },
-      {
-       "key": "charcoal-drawing",
-       "names": {
-        "en": "Charcoal drawing",
-        "it": "Disegno a carboncino",
-        "es": "Dibujo al carbón",
-        "fr": "Dessin au fusain",
-        "de": "Kohlezeichnung",
-        "pt": "Desenho a carvão"
-       }
-      },
-      {
-       "key": "pencil-drawing",
-       "names": {
-        "en": "Pencil drawing",
-        "it": "Disegno a matita",
-        "es": "Dibujo a lápiz",
-        "fr": "Dessin au crayon",
-        "de": "Bleistiftzeichnung",
-        "pt": "Desenho a lápis"
-       }
+        "en": "Photography",
+        "it": "Fotografia",
+        "es": "Fotografía",
+        "fr": "Photographie",
+        "de": "Fotografie",
+        "pt": "Fotografia"
+       },
+       "definition": {
+        "en": "Photographic works and photographers, by genre or technique."
+       },
+       "children": [
+        {
+         "key": "bw-photography",
+         "names": {
+          "en": "Black-and-white photography",
+          "it": "Fotografia in bianco e nero",
+          "es": "Fotografía en blanco y negro",
+          "fr": "Photographie en noir et blanc",
+          "de": "Schwarzweißfotografie",
+          "pt": "Fotografia em preto e branco"
+         },
+         "definition": {
+          "en": "Photographs in monochrome."
+         }
+        },
+        {
+         "key": "hdr-photography",
+         "names": {
+          "en": "HDR photography",
+          "it": "Fotografia HDR",
+          "es": "Fotografía HDR",
+          "fr": "Photographie HDR",
+          "de": "HDR-Fotografie",
+          "pt": "Fotografia HDR"
+         },
+         "definition": {
+          "en": "Photographs made with high-dynamic-range technique."
+         }
+        },
+        {
+         "key": "landscape-photography",
+         "names": {
+          "en": "Landscape photography",
+          "it": "Fotografia di paesaggio",
+          "es": "Fotografía de paisaje",
+          "fr": "Photographie de paysage",
+          "de": "Landschaftsfotografie",
+          "pt": "Fotografia de paisagem"
+         },
+         "definition": {
+          "en": "Photographs whose subject is natural or built landscape."
+         }
+        },
+        {
+         "key": "portrait-photography",
+         "names": {
+          "en": "Portrait photography",
+          "it": "Fotografia di ritratto",
+          "es": "Fotografía de retrato",
+          "fr": "Portrait photographique",
+          "de": "Porträtfotografie",
+          "pt": "Fotografia de retrato"
+         },
+         "definition": {
+          "en": "Photographs whose subject is a person or group."
+         }
+        }
+       ]
       }
      ]
     },
     {
-     "key": "glass-art",
+     "key": "crafts",
      "names": {
-      "en": "Glass art",
-      "it": "Arti vitree",
-      "es": "Arte en vidrio",
-      "fr": "Art du verre",
-      "de": "Glaskunst",
-      "pt": "Arte em vidro"
+      "en": "Crafts and decorative arts",
+      "it": "Arti decorative",
+      "es": "Artes decorativas",
+      "fr": "Arts décoratifs",
+      "de": "Kunsthandwerk",
+      "pt": "Artes decorativas"
+     },
+     "definition": {
+      "en": "Applied and decorative arts producing crafted objects: ceramics, glass, mosaic, textiles, metalwork, calligraphy."
      },
      "children": [
       {
-       "key": "glassblowing",
+       "key": "ceramics",
        "names": {
-        "en": "Glassblowing",
-        "it": "Vetro soffiato",
-        "es": "Vidrio soplado",
-        "fr": "Verre soufflé",
-        "de": "Glasbläserei",
-        "pt": "Vidro soprado"
+        "en": "Ceramic art",
+        "it": "Arte ceramica",
+        "es": "Cerámica artística",
+        "fr": "Céramique",
+        "de": "Keramik",
+        "pt": "Arte cerâmica"
+       },
+       "definition": {
+        "en": "Pottery, porcelain and other fired-clay works."
        }
       },
       {
-       "key": "stained-glass",
+       "key": "glass-art",
        "names": {
-        "en": "Stained glass",
-        "it": "Vetro colorato",
-        "es": "Vitral",
-        "fr": "Vitrail",
-        "de": "Glasmalerei",
-        "pt": "Vitral"
+        "en": "Glass art",
+        "it": "Arte vetraria",
+        "es": "Arte en vidrio",
+        "fr": "Art du verre",
+        "de": "Glaskunst",
+        "pt": "Arte em vidro"
+       },
+       "definition": {
+        "en": "Works made of or in glass."
+       },
+       "children": [
+        {
+         "key": "glassblowing",
+         "names": {
+          "en": "Glassblowing",
+          "it": "Vetro soffiato",
+          "es": "Vidrio soplado",
+          "fr": "Verre soufflé",
+          "de": "Glasbläserei",
+          "pt": "Vidro soprado"
+         },
+         "definition": {
+          "en": "Objects formed by blowing molten glass."
+         }
+        },
+        {
+         "key": "stained-glass",
+         "names": {
+          "en": "Stained glass",
+          "it": "Vetro colorato",
+          "es": "Vitral",
+          "fr": "Vitrail",
+          "de": "Glasmalerei",
+          "pt": "Vitral"
+         },
+         "definition": {
+          "en": "Coloured glass windows and panels, in churches and elsewhere."
+         }
+        }
+       ]
+      },
+      {
+       "key": "mosaic",
+       "names": {
+        "en": "Mosaic",
+        "it": "Mosaico",
+        "es": "Mosaico",
+        "fr": "Mosaïque",
+        "de": "Mosaik",
+        "pt": "Mosaico"
+       },
+       "definition": {
+        "en": "Images made of small pieces of stone, glass or ceramic set in a surface."
+       }
+      },
+      {
+       "key": "tapestry",
+       "names": {
+        "en": "Tapestry",
+        "it": "Arazzo",
+        "es": "Tapiz",
+        "fr": "Tapisserie",
+        "de": "Bildwirkerei",
+        "pt": "Tapeçaria"
+       },
+       "definition": {
+        "en": "Woven textile images and other textile arts such as embroidery."
+       }
+      },
+      {
+       "key": "goldsmithing",
+       "names": {
+        "en": "Goldsmithing",
+        "it": "Oreficeria",
+        "es": "Orfebrería",
+        "fr": "Orfèvrerie",
+        "de": "Goldschmiedekunst",
+        "pt": "Ourivesaria"
+       },
+       "definition": {
+        "en": "Works in gold, silver and precious metals, including liturgical vessels and reliquaries."
+       }
+      },
+      {
+       "key": "calligraphy",
+       "names": {
+        "en": "Calligraphy and illumination",
+        "it": "Calligrafia e miniatura",
+        "es": "Caligrafía e iluminación",
+        "fr": "Calligraphie et enluminure",
+        "de": "Kalligrafie und Buchmalerei",
+        "pt": "Caligrafia e iluminura"
+       },
+       "definition": {
+        "en": "Artistic lettering and the decoration of manuscripts."
        }
       }
      ]
     },
     {
-     "key": "mosaic",
+     "key": "architecture",
      "names": {
-      "en": "Mosaic art",
-      "it": "Arte del mosaico",
-      "es": "Mosaico",
-      "fr": "Mosaïque",
-      "de": "Mosaik",
-      "pt": "Mosaico"
-     }
-    },
-    {
-     "key": "painting",
-     "names": {
-      "en": "Painting",
-      "it": "Pittura",
-      "es": "Pintura",
-      "fr": "Peinture",
-      "de": "Malerei",
-      "pt": "Pintura"
+      "en": "Architecture",
+      "it": "Architettura",
+      "es": "Arquitectura",
+      "fr": "Architecture",
+      "de": "Architektur",
+      "pt": "Arquitetura"
+     },
+     "definition": {
+      "en": "Buildings and the art of designing them, by type and style. The engineering of structures belongs under Civil engineering."
      },
      "children": [
       {
-       "key": "fresco",
+       "key": "sacred-architecture",
        "names": {
-        "en": "Fresco painting",
-        "it": "Affresco",
-        "es": "Fresco",
-        "fr": "Fresque",
-        "de": "Freskomalerei",
-        "pt": "Afresco"
+        "en": "Sacred architecture",
+        "it": "Architettura sacra",
+        "es": "Arquitectura sacra",
+        "fr": "Architecture religieuse",
+        "de": "Sakralarchitektur",
+        "pt": "Arquitetura sacra"
+       },
+       "definition": {
+        "en": "Churches, cathedrals, monasteries, shrines and other places of worship."
        }
       },
       {
-       "key": "oil-painting",
+       "key": "landscape-architecture",
        "names": {
-        "en": "Oil painting",
-        "it": "Pittura ad olio",
-        "es": "Pintura al óleo",
-        "fr": "Peinture à l'huile",
-        "de": "Ölmalerei",
-        "pt": "Pintura a óleo"
-       }
-      },
-      {
-       "key": "watercolor",
-       "names": {
-        "en": "Watercolor painting",
-        "it": "Acquerello",
-        "es": "Acuarela",
-        "fr": "Aquarelle",
-        "de": "Aquarellmalerei",
-        "pt": "Aquarela"
+        "en": "Landscape architecture",
+        "it": "Architettura del paesaggio",
+        "es": "Arquitectura del paisaje",
+        "fr": "Architecture du paysage",
+        "de": "Landschaftsarchitektur",
+        "pt": "Arquitetura paisagística"
+       },
+       "definition": {
+        "en": "Gardens, parks and designed landscapes."
        }
       }
      ]
     },
     {
-     "key": "photography",
+     "key": "design",
      "names": {
-      "en": "Photography",
-      "it": "Fotografia",
-      "es": "Fotografía",
-      "fr": "Photographie",
-      "de": "Fotografie",
-      "pt": "Fotografia"
+      "en": "Design",
+      "it": "Design",
+      "es": "Diseño",
+      "fr": "Design",
+      "de": "Design",
+      "pt": "Design"
+     },
+     "definition": {
+      "en": "The design of objects and visual communication."
      },
      "children": [
       {
-       "key": "bw-photography",
+       "key": "graphic-design",
        "names": {
-        "en": "Black and White photography",
-        "it": "Fotografia in bianco e nero",
-        "es": "Fotografía en blanco y negro",
-        "fr": "Photographie en noir et blanc",
-        "de": "Schwarzweißfotografie",
-        "pt": "Fotografia em preto e branco"
+        "en": "Graphic design",
+        "it": "Grafica",
+        "es": "Diseño gráfico",
+        "fr": "Graphisme",
+        "de": "Grafikdesign",
+        "pt": "Design gráfico"
+       },
+       "definition": {
+        "en": "Visual communication by typography, images and layout."
        }
       },
       {
-       "key": "hdr-photography",
+       "key": "industrial-design",
        "names": {
-        "en": "HDR photography",
-        "it": "Fotografia HDR",
-        "es": "Fotografía HDR",
-        "fr": "Photographie HDR",
-        "de": "HDR-Fotografie",
-        "pt": "Fotografia HDR"
-       }
-      },
-      {
-       "key": "landscape-photography",
-       "names": {
-        "en": "Landscape photography",
-        "it": "Fotografia di paesaggio",
-        "es": "Fotografía de paisaje",
-        "fr": "Photographie de paysage",
-        "de": "Landschaftsfotografie",
-        "pt": "Fotografia de paisagem"
-       }
-      },
-      {
-       "key": "portrait-photography",
-       "names": {
-        "en": "Portrait photography",
-        "it": "Fotografia di ritratto",
-        "es": "Fotografía de retrato",
-        "fr": "Portrait photographique",
-        "de": "Porträtfotografie",
-        "pt": "Fotografia de retrato"
+        "en": "Industrial design",
+        "it": "Disegno industriale",
+        "es": "Diseño industrial",
+        "fr": "Design industriel",
+        "de": "Industriedesign",
+        "pt": "Design industrial"
+       },
+       "definition": {
+        "en": "The design of mass-produced objects."
        }
       }
      ]
     },
     {
-     "key": "sculpture",
+     "key": "audiovisual-media",
      "names": {
-      "en": "Sculpting",
-      "it": "Scultura",
-      "es": "Escultura",
-      "fr": "Sculpture",
-      "de": "Bildhauerei",
-      "pt": "Escultura"
-     }
+      "en": "Audiovisual and interactive media",
+      "it": "Media audiovisivi e interattivi",
+      "es": "Medios audiovisuales e interactivos",
+      "fr": "Médias audiovisuels et interactifs",
+      "de": "Audiovisuelle und interaktive Medien",
+      "pt": "Mídias audiovisuais e interativas"
+     },
+     "definition": {
+      "en": "Works made to be watched, heard or played on a screen or broadcast: film, television, radio, animation, video games."
+     },
+     "children": [
+      {
+       "key": "film",
+       "names": {
+        "en": "Film",
+        "it": "Cinematografia",
+        "es": "Cine",
+        "fr": "Cinéma",
+        "de": "Film",
+        "pt": "Cinema"
+       },
+       "definition": {
+        "en": "Motion pictures released as films, and filmmakers. Genres are not categories; they go in the infobox."
+       },
+       "children": [
+        {
+         "key": "feature-films",
+         "names": {
+          "en": "Feature films",
+          "it": "Lungometraggi",
+          "es": "Largometrajes",
+          "fr": "Longs métrages",
+          "de": "Spielfilme",
+          "pt": "Longas-metragens"
+         },
+         "definition": {
+          "en": "Fiction films of full length."
+         }
+        },
+        {
+         "key": "short-films",
+         "names": {
+          "en": "Short films",
+          "it": "Cortometraggi",
+          "es": "Cortometrajes",
+          "fr": "Courts métrages",
+          "de": "Kurzfilme",
+          "pt": "Curtas-metragens"
+         },
+         "definition": {
+          "en": "Films of short length."
+         }
+        },
+        {
+         "key": "documentary-films",
+         "names": {
+          "en": "Documentary films",
+          "it": "Film documentari",
+          "es": "Documentales",
+          "fr": "Films documentaires",
+          "de": "Dokumentarfilme",
+          "pt": "Documentários"
+         },
+         "definition": {
+          "en": "Non-fiction films."
+         }
+        }
+       ]
+      },
+      {
+       "key": "television",
+       "names": {
+        "en": "Television",
+        "it": "Televisione",
+        "es": "Televisión",
+        "fr": "Télévision",
+        "de": "Fernsehen",
+        "pt": "Televisão"
+       },
+       "definition": {
+        "en": "Television series, miniseries, sitcoms and programmes. Genres are not categories."
+       }
+      },
+      {
+       "key": "radio",
+       "names": {
+        "en": "Radio",
+        "it": "Radio",
+        "es": "Radio",
+        "fr": "Radio",
+        "de": "Hörfunk",
+        "pt": "Rádio"
+       },
+       "definition": {
+        "en": "Radio programmes and dramas."
+       }
+      },
+      {
+       "key": "animation",
+       "names": {
+        "en": "Animation",
+        "it": "Animazione",
+        "es": "Animación",
+        "fr": "Animation",
+        "de": "Animation",
+        "pt": "Animação"
+       },
+       "definition": {
+        "en": "Animated films and series, by any technique."
+       }
+      },
+      {
+       "key": "video-games",
+       "names": {
+        "en": "Video games",
+        "it": "Videogiochi",
+        "es": "Videojuegos",
+        "fr": "Jeux vidéo",
+        "de": "Videospiele",
+        "pt": "Jogos eletrônicos"
+       },
+       "definition": {
+        "en": "Interactive games played on a screen, and their makers."
+       }
+      }
+     ]
     },
     {
-     "key": "tapestry",
+     "key": "heritage",
      "names": {
-      "en": "Tapestry",
-      "it": "Arazzo",
-      "es": "Tapiz",
-      "fr": "Tapisserie",
-      "de": "Tapisserie",
-      "pt": "Tapeçaria"
+      "en": "Cultural heritage",
+      "it": "Patrimonio culturale",
+      "es": "Patrimonio cultural",
+      "fr": "Patrimoine culturel",
+      "de": "Kulturerbe",
+      "pt": "Patrimônio cultural"
+     },
+     "definition": {
+      "en": "Inherited tangible and intangible culture: monuments, traditions, festivals, folklore and symbols of peoples."
+     },
+     "children": [
+      {
+       "key": "monuments",
+       "names": {
+        "en": "Monuments and historic sites",
+        "it": "Monumenti e siti storici",
+        "es": "Monumentos y sitios históricos",
+        "fr": "Monuments et sites historiques",
+        "de": "Denkmäler und historische Stätten",
+        "pt": "Monumentos e sítios históricos"
+       },
+       "definition": {
+        "en": "Historic buildings, sites and memorials as heritage."
+       }
+      },
+      {
+       "key": "cultural-traditions",
+       "names": {
+        "en": "Cultural traditions",
+        "it": "Tradizioni culturali",
+        "es": "Tradiciones culturales",
+        "fr": "Traditions culturelles",
+        "de": "Kulturelle Traditionen",
+        "pt": "Tradições culturais"
+       },
+       "definition": {
+        "en": "Customs, rites and practices handed down within a culture."
+       }
+      },
+      {
+       "key": "festivals",
+       "names": {
+        "en": "Festivals",
+        "it": "Feste e festival",
+        "es": "Fiestas y festivales",
+        "fr": "Fêtes et festivals",
+        "de": "Feste und Festivals",
+        "pt": "Festas e festivais"
+       },
+       "definition": {
+        "en": "Recurring celebrations, popular feasts and festivals."
+       }
+      },
+      {
+       "key": "folklore",
+       "names": {
+        "en": "Folklore and mythology",
+        "it": "Folclore e mitologia",
+        "es": "Folclore y mitología",
+        "fr": "Folklore et mythologie",
+        "de": "Folklore und Mythologie",
+        "pt": "Folclore e mitologia"
+       },
+       "definition": {
+        "en": "Myths, legends, fairy tales and popular beliefs of peoples."
+       }
+      },
+      {
+       "key": "christian-roots",
+       "names": {
+        "en": "Christian roots of Europe",
+        "it": "Radici cristiane dell'Europa",
+        "es": "Raíces cristianas de Europa",
+        "fr": "Racines chrétiennes de l'Europe",
+        "de": "Christliche Wurzeln Europas",
+        "pt": "Raízes cristãs da Europa"
+       },
+       "definition": {
+        "en": "How Christianity shaped the culture, institutions and identity of Europe."
+       }
+      },
+      {
+       "key": "flags",
+       "names": {
+        "en": "Flags and symbols",
+        "it": "Bandiere e simboli",
+        "es": "Banderas y símbolos",
+        "fr": "Drapeaux et symboles",
+        "de": "Flaggen und Symbole",
+        "pt": "Bandeiras e símbolos"
+       },
+       "definition": {
+        "en": "Flags, coats of arms and other symbols of peoples, states and institutions."
+       }
+      }
+     ]
+    },
+    {
+     "key": "culinary-arts",
+     "names": {
+      "en": "Culinary arts",
+      "it": "Arti culinarie",
+      "es": "Artes culinarias",
+      "fr": "Arts culinaires",
+      "de": "Kochkunst",
+      "pt": "Artes culinárias"
+     },
+     "definition": {
+      "en": "Food, cooking, wine and the culture of the table."
      }
     }
    ]
   },
   {
-   "key": "formal-sciences",
+   "key": "humanities",
    "names": {
-    "en": "Formal sciences",
-    "it": "Scienze formali",
-    "es": "Ciencias formales",
-    "fr": "Sciences formelles",
-    "de": "Formalwissenschaften",
-    "pt": "Ciências formais"
+    "en": "Humanities",
+    "it": "Discipline umanistiche",
+    "es": "Humanidades",
+    "fr": "Sciences humaines",
+    "de": "Geisteswissenschaften",
+    "pt": "Humanidades"
+   },
+   "definition": {
+    "en": "The study of human culture and thought, following OECD Fields of Science group 6: history, languages and literature, philosophy, theology, the study of the arts."
    },
    "children": [
     {
@@ -507,6 +1061,123 @@
       "fr": "Histoire",
       "de": "Geschichte",
       "pt": "História"
+     },
+     "definition": {
+      "en": "The study of the human past and historical works, by period."
+     },
+     "children": [
+      {
+       "key": "ancient-history",
+       "names": {
+        "en": "Ancient history",
+        "it": "Storia antica",
+        "es": "Historia antigua",
+        "fr": "Histoire antique",
+        "de": "Alte Geschichte",
+        "pt": "História antiga"
+       },
+       "definition": {
+        "en": "From the beginnings of writing to the end of Antiquity."
+       }
+      },
+      {
+       "key": "medieval-history",
+       "names": {
+        "en": "Medieval history",
+        "it": "Storia medievale",
+        "es": "Historia medieval",
+        "fr": "Histoire médiévale",
+        "de": "Geschichte des Mittelalters",
+        "pt": "História medieval"
+       },
+       "definition": {
+        "en": "The Middle Ages, about 500 to 1500."
+       }
+      },
+      {
+       "key": "modern-history",
+       "names": {
+        "en": "Modern history",
+        "it": "Storia moderna",
+        "es": "Historia moderna",
+        "fr": "Histoire moderne",
+        "de": "Geschichte der Neuzeit",
+        "pt": "História moderna"
+       },
+       "definition": {
+        "en": "About 1500 to the end of the eighteenth century."
+       }
+      },
+      {
+       "key": "contemporary-history",
+       "names": {
+        "en": "Contemporary history",
+        "it": "Storia contemporanea",
+        "es": "Historia contemporánea",
+        "fr": "Histoire contemporaine",
+        "de": "Zeitgeschichte",
+        "pt": "História contemporânea"
+       },
+       "definition": {
+        "en": "From the end of the eighteenth century to the present."
+       }
+      },
+      {
+       "key": "church-history",
+       "names": {
+        "en": "Church history",
+        "it": "Storia della Chiesa",
+        "es": "Historia de la Iglesia",
+        "fr": "Histoire de l'Église",
+        "de": "Kirchengeschichte",
+        "pt": "História da Igreja"
+       },
+       "definition": {
+        "en": "The history of the Church and of Christianity."
+       }
+      }
+     ]
+    },
+    {
+     "key": "archaeology",
+     "names": {
+      "en": "Archaeology",
+      "it": "Archeologia",
+      "es": "Arqueología",
+      "fr": "Archéologie",
+      "de": "Archäologie",
+      "pt": "Arqueologia"
+     },
+     "definition": {
+      "en": "The study of the human past through material remains."
+     }
+    },
+    {
+     "key": "linguistics",
+     "names": {
+      "en": "Linguistics",
+      "it": "Linguistica",
+      "es": "Lingüística",
+      "fr": "Linguistique",
+      "de": "Sprachwissenschaft",
+      "pt": "Linguística"
+     },
+     "definition": {
+      "en": "The scientific study of language and of particular languages."
+     }
+    },
+    {
+     "key": "literary-studies",
+     "names": {
+      "en": "Literary studies",
+      "it": "Critica letteraria",
+      "es": "Estudios literarios",
+      "fr": "Études littéraires",
+      "de": "Literaturwissenschaft",
+      "pt": "Estudos literários"
+     },
+     "definition": {
+      "en": "Literary theory, criticism and the history of literature. Literary works themselves belong under Literature."
      }
     },
     {
@@ -518,107 +1189,223 @@
       "fr": "Philosophie",
       "de": "Philosophie",
       "pt": "Filosofia"
+     },
+     "definition": {
+      "en": "Philosophical works, thinkers and disciplines."
+     },
+     "children": [
+      {
+       "key": "metaphysics",
+       "names": {
+        "en": "Metaphysics",
+        "it": "Metafisica",
+        "es": "Metafísica",
+        "fr": "Métaphysique",
+        "de": "Metaphysik",
+        "pt": "Metafísica"
+       },
+       "definition": {
+        "en": "Being, causes, God as known by reason, the nature of reality."
+       }
+      },
+      {
+       "key": "epistemology",
+       "names": {
+        "en": "Epistemology",
+        "it": "Epistemologia",
+        "es": "Epistemología",
+        "fr": "Épistémologie",
+        "de": "Erkenntnistheorie",
+        "pt": "Epistemologia"
+       },
+       "definition": {
+        "en": "Knowledge, truth and certainty."
+       }
+      },
+      {
+       "key": "ethics",
+       "names": {
+        "en": "Ethics",
+        "it": "Etica",
+        "es": "Ética",
+        "fr": "Éthique",
+        "de": "Ethik",
+        "pt": "Ética"
+       },
+       "definition": {
+        "en": "Philosophical moral reflection: the good, virtue, duty, natural law."
+       }
+      },
+      {
+       "key": "logic",
+       "names": {
+        "en": "Logic",
+        "it": "Logica",
+        "es": "Lógica",
+        "fr": "Logique",
+        "de": "Logik",
+        "pt": "Lógica"
+       },
+       "definition": {
+        "en": "The study of valid reasoning and argument."
+       }
+      },
+      {
+       "key": "aesthetics",
+       "names": {
+        "en": "Aesthetics",
+        "it": "Estetica",
+        "es": "Estética",
+        "fr": "Esthétique",
+        "de": "Ästhetik",
+        "pt": "Estética"
+       },
+       "definition": {
+        "en": "Beauty, art and taste as philosophical questions."
+       }
+      },
+      {
+       "key": "political-philosophy",
+       "names": {
+        "en": "Political philosophy",
+        "it": "Filosofia politica",
+        "es": "Filosofía política",
+        "fr": "Philosophie politique",
+        "de": "Politische Philosophie",
+        "pt": "Filosofia política"
+       },
+       "definition": {
+        "en": "The common good, justice, authority and the state as philosophical questions."
+       }
+      }
+     ]
+    },
+    {
+     "key": "theology",
+     "names": {
+      "en": "Theology",
+      "it": "Teologia",
+      "es": "Teología",
+      "fr": "Théologie",
+      "de": "Theologie",
+      "pt": "Teologia"
+     },
+     "definition": {
+      "en": "The study of God and of revelation in the light of faith, as an academic discipline. Religious life and practice belong under Religion."
+     },
+     "children": [
+      {
+       "key": "biblical-studies",
+       "names": {
+        "en": "Biblical studies",
+        "it": "Studi biblici",
+        "es": "Estudios bíblicos",
+        "fr": "Études bibliques",
+        "de": "Bibelwissenschaft",
+        "pt": "Estudos bíblicos"
+       },
+       "definition": {
+        "en": "Exegesis, interpretation and the history of the books of the Bible."
+       }
+      },
+      {
+       "key": "dogmatic-theology",
+       "names": {
+        "en": "Dogmatic theology",
+        "it": "Teologia dogmatica",
+        "es": "Teología dogmática",
+        "fr": "Théologie dogmatique",
+        "de": "Dogmatik",
+        "pt": "Teologia dogmática"
+       },
+       "definition": {
+        "en": "The doctrines of faith: Trinity, Christ, Church, sacraments, last things."
+       }
+      },
+      {
+       "key": "moral-theology",
+       "names": {
+        "en": "Moral theology",
+        "it": "Teologia morale",
+        "es": "Teología moral",
+        "fr": "Théologie morale",
+        "de": "Moraltheologie",
+        "pt": "Teologia moral"
+       },
+       "definition": {
+        "en": "Christian moral life in the light of faith, including Catholic social teaching."
+       }
+      },
+      {
+       "key": "patristics",
+       "names": {
+        "en": "Patristics",
+        "it": "Patristica",
+        "es": "Patrística",
+        "fr": "Patristique",
+        "de": "Patristik",
+        "pt": "Patrística"
+       },
+       "definition": {
+        "en": "The Fathers of the Church and their writings."
+       }
+      },
+      {
+       "key": "spiritual-theology",
+       "names": {
+        "en": "Spiritual theology",
+        "it": "Teologia spirituale",
+        "es": "Teología espiritual",
+        "fr": "Théologie spirituelle",
+        "de": "Spirituelle Theologie",
+        "pt": "Teologia espiritual"
+       },
+       "definition": {
+        "en": "Prayer, mysticism and the spiritual life."
+       }
+      }
+     ]
+    },
+    {
+     "key": "art-history",
+     "names": {
+      "en": "Art history",
+      "it": "Storia dell'arte",
+      "es": "Historia del arte",
+      "fr": "Histoire de l'art",
+      "de": "Kunstgeschichte",
+      "pt": "História da arte"
+     },
+     "definition": {
+      "en": "The study of the visual arts and architecture through history."
      }
     },
     {
-     "key": "logic",
+     "key": "musicology",
      "names": {
-      "en": "Logic",
-      "it": "Logica",
-      "es": "Lógica",
-      "fr": "Logique",
-      "de": "Logik",
-      "pt": "Lógica"
+      "en": "Musicology",
+      "it": "Musicologia",
+      "es": "Musicología",
+      "fr": "Musicologie",
+      "de": "Musikwissenschaft",
+      "pt": "Musicologia"
+     },
+     "definition": {
+      "en": "The study of music, its history and theory."
      }
     },
     {
-     "key": "mathematics",
+     "key": "film-studies",
      "names": {
-      "en": "Mathematics",
-      "it": "Matematica",
-      "es": "Matemáticas",
-      "fr": "Mathématiques",
-      "de": "Mathematik",
-      "pt": "Matemática"
-     }
-    },
-    {
-     "key": "computer-science",
-     "names": {
-      "en": "Computer science",
-      "it": "Informatica",
-      "es": "Informática",
-      "fr": "Informatique",
-      "de": "Informatik",
-      "pt": "Ciência da computação"
-     }
-    }
-   ]
-  },
-  {
-   "key": "natural-sciences",
-   "names": {
-    "en": "Natural sciences",
-    "it": "Scienze naturali",
-    "es": "Ciencias naturales",
-    "fr": "Sciences naturelles",
-    "de": "Naturwissenschaften",
-    "pt": "Ciências naturais"
-   },
-   "children": [
-    {
-     "key": "physics",
-     "names": {
-      "en": "Physics",
-      "it": "Fisica",
-      "es": "Física",
-      "fr": "Physique",
-      "de": "Physik",
-      "pt": "Física"
-     }
-    },
-    {
-     "key": "chemistry",
-     "names": {
-      "en": "Chemistry",
-      "it": "Chimica",
-      "es": "Química",
-      "fr": "Chimie",
-      "de": "Chemie",
-      "pt": "Química"
-     }
-    },
-    {
-     "key": "astronomy",
-     "names": {
-      "en": "Astronomy",
-      "it": "Astronomia",
-      "es": "Astronomía",
-      "fr": "Astronomie",
-      "de": "Astronomie",
-      "pt": "Astronomia"
-     }
-    },
-    {
-     "key": "biology",
-     "names": {
-      "en": "Biology",
-      "it": "Biologia",
-      "es": "Biología",
-      "fr": "Biologie",
-      "de": "Biologie",
-      "pt": "Biologia"
-     }
-    },
-    {
-     "key": "geology",
-     "names": {
-      "en": "Geology",
-      "it": "Geologia",
-      "es": "Geología",
-      "fr": "Géologie",
-      "de": "Geologie",
-      "pt": "Geologia"
+      "en": "Film studies",
+      "it": "Studi cinematografici",
+      "es": "Estudios cinematográficos",
+      "fr": "Études cinématographiques",
+      "de": "Filmwissenschaft",
+      "pt": "Estudos de cinema"
+     },
+     "definition": {
+      "en": "The study and criticism of film and other audiovisual media."
      }
     }
    ]
@@ -633,7 +1420,66 @@
     "de": "Sozialwissenschaften",
     "pt": "Ciências sociais"
    },
+   "definition": {
+    "en": "The study of human behaviour and society, following OECD Fields of Science group 5."
+   },
    "children": [
+    {
+     "key": "psychology",
+     "names": {
+      "en": "Psychology",
+      "it": "Psicologia",
+      "es": "Psicología",
+      "fr": "Psychologie",
+      "de": "Psychologie",
+      "pt": "Psicologia"
+     },
+     "definition": {
+      "en": "The study of the mind and behaviour."
+     }
+    },
+    {
+     "key": "economics",
+     "names": {
+      "en": "Economics",
+      "it": "Economia",
+      "es": "Economía",
+      "fr": "Économie",
+      "de": "Wirtschaftswissenschaft",
+      "pt": "Economia"
+     },
+     "definition": {
+      "en": "The study of production, exchange and use of goods, and of business."
+     }
+    },
+    {
+     "key": "education",
+     "names": {
+      "en": "Education",
+      "it": "Pedagogia",
+      "es": "Educación",
+      "fr": "Éducation",
+      "de": "Pädagogik",
+      "pt": "Educação"
+     },
+     "definition": {
+      "en": "Teaching, schooling and formation."
+     }
+    },
+    {
+     "key": "sociology",
+     "names": {
+      "en": "Sociology",
+      "it": "Sociologia",
+      "es": "Sociología",
+      "fr": "Sociologie",
+      "de": "Soziologie",
+      "pt": "Sociologia"
+     },
+     "definition": {
+      "en": "Society, social groups, family and social change."
+     }
+    },
     {
      "key": "anthropology",
      "names": {
@@ -643,28 +1489,37 @@
       "fr": "Anthropologie",
       "de": "Anthropologie",
       "pt": "Antropologia"
+     },
+     "definition": {
+      "en": "Cultural and social anthropology: the comparative study of peoples and cultures."
      }
     },
     {
-     "key": "archeology",
+     "key": "law",
      "names": {
-      "en": "Archeology",
-      "it": "Archeologia",
-      "es": "Arqueología",
-      "fr": "Archéologie",
-      "de": "Archäologie",
-      "pt": "Arqueologia"
+      "en": "Law",
+      "it": "Diritto",
+      "es": "Derecho",
+      "fr": "Droit",
+      "de": "Rechtswissenschaft",
+      "pt": "Direito"
+     },
+     "definition": {
+      "en": "Legal systems, laws and jurisprudence, including canon law."
      }
     },
     {
-     "key": "economics",
+     "key": "political-science",
      "names": {
-      "en": "Economics",
-      "it": "Economia (scienza)",
-      "es": "Economía",
-      "fr": "Économie",
-      "de": "Wirtschaftswissenschaft",
-      "pt": "Economia"
+      "en": "Political science",
+      "it": "Scienze politiche",
+      "es": "Ciencia política",
+      "fr": "Science politique",
+      "de": "Politikwissenschaft",
+      "pt": "Ciência política"
+     },
+     "definition": {
+      "en": "Government, politics, international relations and public policy."
      }
     },
     {
@@ -676,50 +1531,625 @@
       "fr": "Géographie",
       "de": "Geographie",
       "pt": "Geografia"
+     },
+     "definition": {
+      "en": "The study of places, peoples and their environments."
      }
     },
     {
-     "key": "linguistics",
+     "key": "media-communication",
      "names": {
-      "en": "Linguistics",
-      "it": "Linguistica",
-      "es": "Lingüística",
-      "fr": "Linguistique",
-      "de": "Linguistik",
-      "pt": "Linguística"
+      "en": "Media and communication",
+      "it": "Scienze della comunicazione",
+      "es": "Ciencias de la comunicación",
+      "fr": "Sciences de l'information et de la communication",
+      "de": "Kommunikationswissenschaft",
+      "pt": "Comunicação social"
+     },
+     "definition": {
+      "en": "Journalism, mass media and social communication."
+     }
+    }
+   ]
+  },
+  {
+   "key": "natural-sciences",
+   "names": {
+    "en": "Natural sciences",
+    "it": "Scienze naturali",
+    "es": "Ciencias naturales",
+    "fr": "Sciences naturelles",
+    "de": "Naturwissenschaften",
+    "pt": "Ciências naturais"
+   },
+   "definition": {
+    "en": "The sciences of nature and of formal systems, following OECD Fields of Science group 1: mathematics, computer science, physics, astronomy, chemistry, earth and life sciences."
+   },
+   "children": [
+    {
+     "key": "mathematics",
+     "names": {
+      "en": "Mathematics",
+      "it": "Matematica",
+      "es": "Matemáticas",
+      "fr": "Mathématiques",
+      "de": "Mathematik",
+      "pt": "Matemática"
+     },
+     "definition": {
+      "en": "Number, quantity, structure, space and change."
      }
     },
     {
-     "key": "political-science",
+     "key": "computer-science",
      "names": {
-      "en": "Political science",
-      "it": "Politica (Scienza)",
-      "es": "Ciencia política",
-      "fr": "Science politique",
-      "de": "Politikwissenschaft",
-      "pt": "Ciência política"
+      "en": "Computer science",
+      "it": "Informatica",
+      "es": "Informática",
+      "fr": "Informatique",
+      "de": "Informatik",
+      "pt": "Ciência da computação"
+     },
+     "definition": {
+      "en": "Computation, algorithms, software and information."
      }
     },
     {
-     "key": "psychology",
+     "key": "physics",
      "names": {
-      "en": "Psychology",
-      "it": "Psicologia",
-      "es": "Psicología",
-      "fr": "Psychologie",
-      "de": "Psychologie",
-      "pt": "Psicologia"
+      "en": "Physics",
+      "it": "Fisica",
+      "es": "Física",
+      "fr": "Physique",
+      "de": "Physik",
+      "pt": "Física"
+     },
+     "definition": {
+      "en": "Matter, energy, forces and their laws."
      }
     },
+    {
+     "key": "astronomy",
+     "names": {
+      "en": "Astronomy",
+      "it": "Astronomia",
+      "es": "Astronomía",
+      "fr": "Astronomie",
+      "de": "Astronomie",
+      "pt": "Astronomia"
+     },
+     "definition": {
+      "en": "Celestial bodies and the universe, including cosmology."
+     }
+    },
+    {
+     "key": "chemistry",
+     "names": {
+      "en": "Chemistry",
+      "it": "Chimica",
+      "es": "Química",
+      "fr": "Chimie",
+      "de": "Chemie",
+      "pt": "Química"
+     },
+     "definition": {
+      "en": "The composition, structure and reactions of substances."
+     }
+    },
+    {
+     "key": "earth-sciences",
+     "names": {
+      "en": "Earth sciences",
+      "it": "Scienze della Terra",
+      "es": "Ciencias de la Tierra",
+      "fr": "Sciences de la Terre",
+      "de": "Geowissenschaften",
+      "pt": "Ciências da Terra"
+     },
+     "definition": {
+      "en": "The planet Earth and its environment."
+     },
+     "children": [
+      {
+       "key": "geology",
+       "names": {
+        "en": "Geology",
+        "it": "Geologia",
+        "es": "Geología",
+        "fr": "Géologie",
+        "de": "Geologie",
+        "pt": "Geologia"
+       },
+       "definition": {
+        "en": "Rocks, minerals and the history of the Earth."
+       }
+      },
+      {
+       "key": "meteorology",
+       "names": {
+        "en": "Meteorology and climatology",
+        "it": "Meteorologia e climatologia",
+        "es": "Meteorología y climatología",
+        "fr": "Météorologie et climatologie",
+        "de": "Meteorologie und Klimatologie",
+        "pt": "Meteorologia e climatologia"
+       },
+       "definition": {
+        "en": "Weather and climate."
+       }
+      },
+      {
+       "key": "environmental-science",
+       "names": {
+        "en": "Environmental science",
+        "it": "Scienze ambientali",
+        "es": "Ciencias ambientales",
+        "fr": "Sciences de l'environnement",
+        "de": "Umweltwissenschaften",
+        "pt": "Ciências ambientais"
+       },
+       "definition": {
+        "en": "The natural environment and human impact on it."
+       }
+      }
+     ]
+    },
+    {
+     "key": "biology",
+     "names": {
+      "en": "Biology",
+      "it": "Biologia",
+      "es": "Biología",
+      "fr": "Biologie",
+      "de": "Biologie",
+      "pt": "Biologia"
+     },
+     "definition": {
+      "en": "Living organisms and life processes."
+     },
+     "children": [
+      {
+       "key": "botany",
+       "names": {
+        "en": "Botany",
+        "it": "Botanica",
+        "es": "Botánica",
+        "fr": "Botanique",
+        "de": "Botanik",
+        "pt": "Botânica"
+       },
+       "definition": {
+        "en": "Plants."
+       }
+      },
+      {
+       "key": "zoology",
+       "names": {
+        "en": "Zoology",
+        "it": "Zoologia",
+        "es": "Zoología",
+        "fr": "Zoologie",
+        "de": "Zoologie",
+        "pt": "Zoologia"
+       },
+       "definition": {
+        "en": "Animals."
+       }
+      },
+      {
+       "key": "genetics",
+       "names": {
+        "en": "Genetics",
+        "it": "Genetica",
+        "es": "Genética",
+        "fr": "Génétique",
+        "de": "Genetik",
+        "pt": "Genética"
+       },
+       "definition": {
+        "en": "Genes, heredity and variation."
+       }
+      },
+      {
+       "key": "ecology",
+       "names": {
+        "en": "Ecology",
+        "it": "Ecologia",
+        "es": "Ecología",
+        "fr": "Écologie",
+        "de": "Ökologie",
+        "pt": "Ecologia"
+       },
+       "definition": {
+        "en": "Relations of organisms with each other and their environment."
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "key": "engineering-technology",
+   "names": {
+    "en": "Engineering and technology",
+    "it": "Ingegneria e tecnologia",
+    "es": "Ingeniería y tecnología",
+    "fr": "Ingénierie et technologie",
+    "de": "Ingenieurwissenschaften und Technik",
+    "pt": "Engenharia e tecnologia"
+   },
+   "definition": {
+    "en": "The design and making of structures, machines, systems and materials, following OECD Fields of Science group 2."
+   },
+   "children": [
+    {
+     "key": "civil-engineering",
+     "names": {
+      "en": "Civil engineering",
+      "it": "Ingegneria civile",
+      "es": "Ingeniería civil",
+      "fr": "Génie civil",
+      "de": "Bauingenieurwesen",
+      "pt": "Engenharia civil"
+     },
+     "definition": {
+      "en": "Structures, construction, transport infrastructure."
+     }
+    },
+    {
+     "key": "mechanical-engineering",
+     "names": {
+      "en": "Mechanical engineering",
+      "it": "Ingegneria meccanica",
+      "es": "Ingeniería mecánica",
+      "fr": "Génie mécanique",
+      "de": "Maschinenbau",
+      "pt": "Engenharia mecânica"
+     },
+     "definition": {
+      "en": "Machines, engines and mechanical systems."
+     }
+    },
+    {
+     "key": "electrical-engineering",
+     "names": {
+      "en": "Electrical and electronic engineering",
+      "it": "Ingegneria elettrica ed elettronica",
+      "es": "Ingeniería eléctrica y electrónica",
+      "fr": "Génie électrique et électronique",
+      "de": "Elektrotechnik",
+      "pt": "Engenharia elétrica e eletrônica"
+     },
+     "definition": {
+      "en": "Electricity, electronics and telecommunications."
+     }
+    },
+    {
+     "key": "information-technology",
+     "names": {
+      "en": "Information technology",
+      "it": "Tecnologie dell'informazione",
+      "es": "Tecnologías de la información",
+      "fr": "Technologies de l'information",
+      "de": "Informationstechnik",
+      "pt": "Tecnologia da informação"
+     },
+     "definition": {
+      "en": "Computers, networks, the internet and software as technology in use."
+     }
+    },
+    {
+     "key": "aerospace-engineering",
+     "names": {
+      "en": "Aerospace engineering",
+      "it": "Ingegneria aerospaziale",
+      "es": "Ingeniería aeroespacial",
+      "fr": "Génie aérospatial",
+      "de": "Luft- und Raumfahrttechnik",
+      "pt": "Engenharia aeroespacial"
+     },
+     "definition": {
+      "en": "Aircraft and spacecraft."
+     }
+    },
+    {
+     "key": "biotechnology",
+     "names": {
+      "en": "Biotechnology",
+      "it": "Biotecnologie",
+      "es": "Biotecnología",
+      "fr": "Biotechnologie",
+      "de": "Biotechnologie",
+      "pt": "Biotecnologia"
+     },
+     "definition": {
+      "en": "Technology using living organisms, including genetic engineering."
+     }
+    }
+   ]
+  },
+  {
+   "key": "medical-health-sciences",
+   "names": {
+    "en": "Medical and health sciences",
+    "it": "Scienze mediche e della salute",
+    "es": "Ciencias médicas y de la salud",
+    "fr": "Sciences médicales et de la santé",
+    "de": "Medizin- und Gesundheitswissenschaften",
+    "pt": "Ciências médicas e da saúde"
+   },
+   "definition": {
+    "en": "Human health and its care, following OECD Fields of Science group 3."
+   },
+   "children": [
     {
      "key": "medicine",
      "names": {
-      "en": "Medicinal science",
+      "en": "Medicine",
       "it": "Medicina",
       "es": "Medicina",
       "fr": "Médecine",
       "de": "Medizin",
       "pt": "Medicina"
+     },
+     "definition": {
+      "en": "The diagnosis, treatment and prevention of disease."
+     }
+    },
+    {
+     "key": "nursing",
+     "names": {
+      "en": "Nursing",
+      "it": "Infermieristica",
+      "es": "Enfermería",
+      "fr": "Soins infirmiers",
+      "de": "Krankenpflege",
+      "pt": "Enfermagem"
+     },
+     "definition": {
+      "en": "The care of the sick."
+     }
+    },
+    {
+     "key": "public-health",
+     "names": {
+      "en": "Public health",
+      "it": "Sanità pubblica",
+      "es": "Salud pública",
+      "fr": "Santé publique",
+      "de": "Öffentliche Gesundheit",
+      "pt": "Saúde pública"
+     },
+     "definition": {
+      "en": "The health of populations: epidemics, prevention, health systems."
+     }
+    },
+    {
+     "key": "pharmacology",
+     "names": {
+      "en": "Pharmacology",
+      "it": "Farmacologia",
+      "es": "Farmacología",
+      "fr": "Pharmacologie",
+      "de": "Pharmakologie",
+      "pt": "Farmacologia"
+     },
+     "definition": {
+      "en": "Drugs and their effects."
+     }
+    },
+    {
+     "key": "bioethics",
+     "names": {
+      "en": "Bioethics",
+      "it": "Bioetica",
+      "es": "Bioética",
+      "fr": "Bioéthique",
+      "de": "Bioethik",
+      "pt": "Bioética"
+     },
+     "definition": {
+      "en": "Ethical questions of life, medicine and biotechnology."
+     }
+    }
+   ]
+  },
+  {
+   "key": "religion",
+   "names": {
+    "en": "Religion",
+    "it": "Religione",
+    "es": "Religión",
+    "fr": "Religion",
+    "de": "Religion",
+    "pt": "Religião"
+   },
+   "definition": {
+    "en": "Religious traditions and their life, worship, persons and art as expressions of culture. Theology as an academic discipline belongs under Humanities."
+   },
+   "children": [
+    {
+     "key": "christianity",
+     "names": {
+      "en": "Christianity",
+      "it": "Cristianesimo",
+      "es": "Cristianismo",
+      "fr": "Christianisme",
+      "de": "Christentum",
+      "pt": "Cristianismo"
+     },
+     "definition": {
+      "en": "The Christian faith as lived: churches, worship, saints, religious life."
+     },
+     "children": [
+      {
+       "key": "liturgy",
+       "names": {
+        "en": "Liturgy",
+        "it": "Liturgia",
+        "es": "Liturgia",
+        "fr": "Liturgie",
+        "de": "Liturgie",
+        "pt": "Liturgia"
+       },
+       "definition": {
+        "en": "The public worship of the Church: Mass, sacraments, the liturgical year, the Liturgy of the Hours."
+       }
+      },
+      {
+       "key": "saints",
+       "names": {
+        "en": "Saints",
+        "it": "Santi",
+        "es": "Santos",
+        "fr": "Saints",
+        "de": "Heilige",
+        "pt": "Santos"
+       },
+       "definition": {
+        "en": "Saints, blesseds and venerable servants of God, and their lives."
+       }
+      },
+      {
+       "key": "religious-orders",
+       "names": {
+        "en": "Religious orders",
+        "it": "Ordini religiosi",
+        "es": "Órdenes religiosas",
+        "fr": "Ordres religieux",
+        "de": "Orden",
+        "pt": "Ordens religiosas"
+       },
+       "definition": {
+        "en": "Monastic orders, congregations and other forms of consecrated life."
+       }
+      },
+      {
+       "key": "sacred-art",
+       "names": {
+        "en": "Sacred art",
+        "it": "Arte sacra",
+        "es": "Arte sacro",
+        "fr": "Art sacré",
+        "de": "Sakrale Kunst",
+        "pt": "Arte sacra"
+       },
+       "definition": {
+        "en": "Art made for worship and devotion, considered as religious expression."
+       }
+      },
+      {
+       "key": "popes",
+       "names": {
+        "en": "Popes",
+        "it": "Papi",
+        "es": "Papas",
+        "fr": "Papes",
+        "de": "Päpste",
+        "pt": "Papas"
+       },
+       "definition": {
+        "en": "The Popes and the papacy."
+       }
+      },
+      {
+       "key": "christian-denominations",
+       "names": {
+        "en": "Christian denominations",
+        "it": "Confessioni cristiane",
+        "es": "Confesiones cristianas",
+        "fr": "Confessions chrétiennes",
+        "de": "Christliche Konfessionen",
+        "pt": "Confissões cristãs"
+       },
+       "definition": {
+        "en": "Orthodox, Protestant and other Christian churches and communities."
+       }
+      }
+     ]
+    },
+    {
+     "key": "bible",
+     "names": {
+      "en": "The Bible",
+      "it": "Bibbia",
+      "es": "Biblia",
+      "fr": "Bible",
+      "de": "Bibel",
+      "pt": "Bíblia"
+     },
+     "definition": {
+      "en": "The books of Sacred Scripture, their persons and stories as such."
+     }
+    },
+    {
+     "key": "judaism",
+     "names": {
+      "en": "Judaism",
+      "it": "Ebraismo",
+      "es": "Judaísmo",
+      "fr": "Judaïsme",
+      "de": "Judentum",
+      "pt": "Judaísmo"
+     },
+     "definition": {
+      "en": "The Jewish religion and its traditions."
+     }
+    },
+    {
+     "key": "islam",
+     "names": {
+      "en": "Islam",
+      "it": "Islam",
+      "es": "Islam",
+      "fr": "Islam",
+      "de": "Islam",
+      "pt": "Islã"
+     },
+     "definition": {
+      "en": "The Islamic religion and its traditions."
+     }
+    },
+    {
+     "key": "eastern-religions",
+     "names": {
+      "en": "Eastern religions",
+      "it": "Religioni orientali",
+      "es": "Religiones orientales",
+      "fr": "Religions orientales",
+      "de": "Östliche Religionen",
+      "pt": "Religiões orientais"
+     },
+     "definition": {
+      "en": "Hinduism, Buddhism, Taoism, Confucianism, Shinto and other religions of Asia."
+     }
+    },
+    {
+     "key": "traditional-religions",
+     "names": {
+      "en": "Traditional religions",
+      "it": "Religioni tradizionali",
+      "es": "Religiones tradicionales",
+      "fr": "Religions traditionnelles",
+      "de": "Traditionelle Religionen",
+      "pt": "Religiões tradicionais"
+     },
+     "definition": {
+      "en": "Indigenous and ancient religions, including the religions of Greece and Rome."
+     }
+    },
+    {
+     "key": "new-religious-movements",
+     "names": {
+      "en": "New religious movements",
+      "it": "Nuovi movimenti religiosi",
+      "es": "Nuevos movimientos religiosos",
+      "fr": "Nouveaux mouvements religieux",
+      "de": "Neue religiöse Bewegungen",
+      "pt": "Novos movimentos religiosos"
+     },
+     "definition": {
+      "en": "Recent religious movements, esotericism and New Age."
      }
     }
    ]
@@ -734,49 +2164,78 @@
     "de": "Populärkultur",
     "pt": "Cultura popular"
    },
+   "definition": {
+    "en": "Everyday mass culture that is not itself an art form: sport, fashion, games and toys, fandom, internet culture."
+   },
    "children": [
     {
-     "key": "culinary-arts",
+     "key": "sport",
      "names": {
-      "en": "Culinary arts",
-      "it": "Arti culinarie",
-      "es": "Artes culinarias",
-      "fr": "Arts culinaires",
-      "de": "Kochkunst",
-      "pt": "Artes culinárias"
+      "en": "Sport",
+      "it": "Sport",
+      "es": "Deporte",
+      "fr": "Sport",
+      "de": "Sport",
+      "pt": "Esporte"
+     },
+     "definition": {
+      "en": "Sports, athletes and competitions."
      }
     },
     {
-     "key": "cultural-traditions",
+     "key": "fashion",
      "names": {
-      "en": "Cultural traditions",
-      "it": "Tradizioni culturali",
-      "es": "Tradiciones culturales",
-      "fr": "Traditions culturelles",
-      "de": "Kulturelle Traditionen",
-      "pt": "Tradições culturais"
+      "en": "Fashion",
+      "it": "Moda",
+      "es": "Moda",
+      "fr": "Mode",
+      "de": "Mode",
+      "pt": "Moda"
+     },
+     "definition": {
+      "en": "Clothing, style and the fashion industry."
      }
     },
     {
-     "key": "christian-roots",
+     "key": "toys-games",
      "names": {
-      "en": "Christian roots of Europe",
-      "it": "Radici cristiane dell'Europa",
-      "es": "Raíces cristianas de Europa",
-      "fr": "Racines chrétiennes de l'Europe",
-      "de": "Christliche Wurzeln Europas",
-      "pt": "Raízes cristãs da Europa"
+      "en": "Toys and games",
+      "it": "Giocattoli e giochi",
+      "es": "Juguetes y juegos",
+      "fr": "Jouets et jeux",
+      "de": "Spielzeug und Spiele",
+      "pt": "Brinquedos e jogos"
+     },
+     "definition": {
+      "en": "Toys, board and card games and other non-digital games."
      }
     },
     {
-     "key": "flags",
+     "key": "fandom",
      "names": {
-      "en": "Flags",
-      "it": "Bandiere",
-      "es": "Banderas",
-      "fr": "Drapeaux",
-      "de": "Flaggen",
-      "pt": "Bandeiras"
+      "en": "Fandom",
+      "it": "Fandom",
+      "es": "Fandom",
+      "fr": "Fandom",
+      "de": "Fankultur",
+      "pt": "Fandom"
+     },
+     "definition": {
+      "en": "Fan communities and their creative practices."
+     }
+    },
+    {
+     "key": "internet-culture",
+     "names": {
+      "en": "Internet culture",
+      "it": "Cultura di Internet",
+      "es": "Cultura de Internet",
+      "fr": "Culture Internet",
+      "de": "Internetkultur",
+      "pt": "Cultura da internet"
+     },
+     "definition": {
+      "en": "Memes, online communities, influencers and social media phenomena."
      }
     }
    ]
@@ -784,114 +2243,618 @@
  ],
  "themes": [
   {
-   "key": "love",
+   "key": "theological-virtues",
    "names": {
-    "en": "Love",
-    "it": "Amore",
-    "es": "Amor",
-    "fr": "Amour",
-    "de": "Liebe",
-    "pt": "Amor"
-   }
+    "en": "Theological virtues",
+    "it": "Virtù teologali",
+    "es": "Virtudes teologales",
+    "fr": "Vertus théologales",
+    "de": "Göttliche Tugenden",
+    "pt": "Virtudes teologais"
+   },
+   "definition": {
+    "en": "The virtues given by God that unite us to him: faith, hope and charity (CCC 1812–1829)."
+   },
+   "children": [
+    {
+     "key": "faith",
+     "names": {
+      "en": "Faith",
+      "it": "Fede",
+      "es": "Fe",
+      "fr": "Foi",
+      "de": "Glaube",
+      "pt": "Fé"
+     },
+     "definition": {
+      "en": "Believing God and all he has revealed; trust and fidelity in him, doubt and the search for faith."
+     }
+    },
+    {
+     "key": "hope",
+     "names": {
+      "en": "Hope",
+      "it": "Speranza",
+      "es": "Esperanza",
+      "fr": "Espérance",
+      "de": "Hoffnung",
+      "pt": "Esperança"
+     },
+     "definition": {
+      "en": "Desiring eternal life and trusting in God's promises against despair."
+     }
+    },
+    {
+     "key": "charity",
+     "names": {
+      "en": "Charity",
+      "it": "Carità",
+      "es": "Caridad",
+      "fr": "Charité",
+      "de": "Liebe",
+      "pt": "Caridade"
+     },
+     "definition": {
+      "en": "Love of God above all and of neighbour as oneself; self-giving love, love of enemies."
+     }
+    }
+   ]
   },
   {
-   "key": "forgiveness",
+   "key": "cardinal-virtues",
    "names": {
-    "en": "Forgiveness",
-    "it": "Perdono",
-    "es": "Perdón",
-    "fr": "Pardon",
-    "de": "Vergebung",
-    "pt": "Perdão"
-   }
+    "en": "Cardinal virtues",
+    "it": "Virtù cardinali",
+    "es": "Virtudes cardinales",
+    "fr": "Vertus cardinales",
+    "de": "Kardinaltugenden",
+    "pt": "Virtudes cardeais"
+   },
+   "definition": {
+    "en": "The human virtues on which moral life hinges: prudence, justice, fortitude, temperance (CCC 1805–1809)."
+   },
+   "children": [
+    {
+     "key": "prudence",
+     "names": {
+      "en": "Prudence",
+      "it": "Prudenza",
+      "es": "Prudencia",
+      "fr": "Prudence",
+      "de": "Klugheit",
+      "pt": "Prudência"
+     },
+     "definition": {
+      "en": "Practical wisdom: discerning the true good and the right means."
+     }
+    },
+    {
+     "key": "justice",
+     "names": {
+      "en": "Justice",
+      "it": "Giustizia",
+      "es": "Justicia",
+      "fr": "Justice",
+      "de": "Gerechtigkeit",
+      "pt": "Justiça"
+     },
+     "definition": {
+      "en": "Giving God and neighbour their due; fairness, rights, the struggle against injustice."
+     }
+    },
+    {
+     "key": "fortitude",
+     "names": {
+      "en": "Fortitude",
+      "it": "Fortezza",
+      "es": "Fortaleza",
+      "fr": "Force",
+      "de": "Tapferkeit",
+      "pt": "Fortaleza"
+     },
+     "definition": {
+      "en": "Courage and constancy in doing good, facing fear, trial and persecution."
+     }
+    },
+    {
+     "key": "temperance",
+     "names": {
+      "en": "Temperance",
+      "it": "Temperanza",
+      "es": "Templanza",
+      "fr": "Tempérance",
+      "de": "Mäßigung",
+      "pt": "Temperança"
+     },
+     "definition": {
+      "en": "Mastery of desires and appetites; chastity, sobriety, self-control."
+     }
+    }
+   ]
   },
   {
-   "key": "faith",
+   "key": "sin-grace-salvation",
    "names": {
-    "en": "Faith",
-    "it": "Fede",
-    "es": "Fe",
-    "fr": "Foi",
-    "de": "Glaube",
-    "pt": "Fé"
-   }
+    "en": "Sin, grace and salvation",
+    "it": "Peccato, grazia e salvezza",
+    "es": "Pecado, gracia y salvación",
+    "fr": "Péché, grâce et salut",
+    "de": "Sünde, Gnade und Erlösung",
+    "pt": "Pecado, graça e salvação"
+   },
+   "definition": {
+    "en": "The drama of sin and of God's saving grace: fall, temptation, conversion, forgiveness, redemption."
+   },
+   "children": [
+    {
+     "key": "sin",
+     "names": {
+      "en": "Sin",
+      "it": "Peccato",
+      "es": "Pecado",
+      "fr": "Péché",
+      "de": "Sünde",
+      "pt": "Pecado"
+     },
+     "definition": {
+      "en": "Evil chosen against God and neighbour, its roots and consequences."
+     }
+    },
+    {
+     "key": "temptation",
+     "names": {
+      "en": "Temptation",
+      "it": "Tentazione",
+      "es": "Tentación",
+      "fr": "Tentation",
+      "de": "Versuchung",
+      "pt": "Tentação"
+     },
+     "definition": {
+      "en": "Enticement to evil and the struggle to resist it."
+     }
+    },
+    {
+     "key": "repentance",
+     "names": {
+      "en": "Repentance",
+      "it": "Pentimento",
+      "es": "Arrepentimiento",
+      "fr": "Repentir",
+      "de": "Reue",
+      "pt": "Arrependimento"
+     },
+     "definition": {
+      "en": "Sorrow for sin and the resolve to amend one's life."
+     }
+    },
+    {
+     "key": "conversion",
+     "names": {
+      "en": "Conversion",
+      "it": "Conversione",
+      "es": "Conversión",
+      "fr": "Conversion",
+      "de": "Bekehrung",
+      "pt": "Conversão"
+     },
+     "definition": {
+      "en": "Turning one's whole life back to God; a change of heart."
+     }
+    },
+    {
+     "key": "forgiveness",
+     "names": {
+      "en": "Forgiveness",
+      "it": "Perdono",
+      "es": "Perdón",
+      "fr": "Pardon",
+      "de": "Vergebung",
+      "pt": "Perdão"
+     },
+     "definition": {
+      "en": "Pardoning others and being pardoned; reconciliation after offence."
+     }
+    },
+    {
+     "key": "mercy",
+     "names": {
+      "en": "Mercy",
+      "it": "Misericordia",
+      "es": "Misericordia",
+      "fr": "Miséricorde",
+      "de": "Barmherzigkeit",
+      "pt": "Misericórdia"
+     },
+     "definition": {
+      "en": "Compassion that goes beyond justice, God's and ours; works of mercy."
+     }
+    },
+    {
+     "key": "redemption",
+     "names": {
+      "en": "Redemption",
+      "it": "Redenzione",
+      "es": "Redención",
+      "fr": "Rédemption",
+      "de": "Erlösung",
+      "pt": "Redenção"
+     },
+     "definition": {
+      "en": "Being bought back from sin and death; a life redeemed."
+     }
+    },
+    {
+     "key": "grace",
+     "names": {
+      "en": "Grace",
+      "it": "Grazia",
+      "es": "Gracia",
+      "fr": "Grâce",
+      "de": "Gnade",
+      "pt": "Graça"
+     },
+     "definition": {
+      "en": "God's free and undeserved gift that heals and sanctifies."
+     }
+    },
+    {
+     "key": "sacrifice",
+     "names": {
+      "en": "Sacrifice",
+      "it": "Sacrificio",
+      "es": "Sacrificio",
+      "fr": "Sacrifice",
+      "de": "Opfer",
+      "pt": "Sacrifício"
+     },
+     "definition": {
+      "en": "Giving one's life or goods for others or for God; self-sacrificial love."
+     }
+    }
+   ]
   },
   {
-   "key": "hope",
+   "key": "human-person",
    "names": {
-    "en": "Hope",
-    "it": "Speranza",
-    "es": "Esperanza",
-    "fr": "Espérance",
-    "de": "Hoffnung",
-    "pt": "Esperança"
-   }
+    "en": "The human person",
+    "it": "La persona umana",
+    "es": "La persona humana",
+    "fr": "La personne humaine",
+    "de": "Die menschliche Person",
+    "pt": "A pessoa humana"
+   },
+   "definition": {
+    "en": "The dignity and destiny of the human being created in God's image (CCC 1700–1876)."
+   },
+   "children": [
+    {
+     "key": "conscience",
+     "names": {
+      "en": "Conscience",
+      "it": "Coscienza",
+      "es": "Conciencia",
+      "fr": "Conscience",
+      "de": "Gewissen",
+      "pt": "Consciência"
+     },
+     "definition": {
+      "en": "The inner voice judging good and evil; its formation and fidelity to it."
+     }
+    },
+    {
+     "key": "freedom",
+     "names": {
+      "en": "Freedom",
+      "it": "Libertà",
+      "es": "Libertad",
+      "fr": "Liberté",
+      "de": "Freiheit",
+      "pt": "Liberdade"
+     },
+     "definition": {
+      "en": "Free will, responsibility and true freedom for the good."
+     }
+    },
+    {
+     "key": "human-dignity",
+     "names": {
+      "en": "Human dignity",
+      "it": "Dignità umana",
+      "es": "Dignidad humana",
+      "fr": "Dignité humaine",
+      "de": "Menschenwürde",
+      "pt": "Dignidade humana"
+     },
+     "definition": {
+      "en": "The worth of every person from conception to natural death."
+     }
+    },
+    {
+     "key": "suffering",
+     "names": {
+      "en": "Suffering",
+      "it": "Sofferenza",
+      "es": "Sufrimiento",
+      "fr": "Souffrance",
+      "de": "Leiden",
+      "pt": "Sofrimento"
+     },
+     "definition": {
+      "en": "Pain, illness, loss and the meaning of suffering."
+     }
+    },
+    {
+     "key": "death",
+     "names": {
+      "en": "Death",
+      "it": "Morte",
+      "es": "Muerte",
+      "fr": "Mort",
+      "de": "Tod",
+      "pt": "Morte"
+     },
+     "definition": {
+      "en": "Mortality, dying and facing death."
+     }
+    },
+    {
+     "key": "eternal-life",
+     "names": {
+      "en": "Eternal life",
+      "it": "Vita eterna",
+      "es": "Vida eterna",
+      "fr": "Vie éternelle",
+      "de": "Ewiges Leben",
+      "pt": "Vida eterna"
+     },
+     "definition": {
+      "en": "The last things: judgment, heaven, hell, purgatory, the resurrection of the body."
+     }
+    },
+    {
+     "key": "vocation",
+     "names": {
+      "en": "Vocation",
+      "it": "Vocazione",
+      "es": "Vocación",
+      "fr": "Vocation",
+      "de": "Berufung",
+      "pt": "Vocação"
+     },
+     "definition": {
+      "en": "God's call to each person and its discernment."
+     }
+    }
+   ]
   },
   {
-   "key": "virtue",
+   "key": "communion-society",
    "names": {
-    "en": "Virtue",
-    "it": "Virtù",
-    "es": "Virtud",
-    "fr": "Vertu",
-    "de": "Tugend",
-    "pt": "Virtude"
-   }
+    "en": "Communion and society",
+    "it": "Comunione e società",
+    "es": "Comunión y sociedad",
+    "fr": "Communion et société",
+    "de": "Gemeinschaft und Gesellschaft",
+    "pt": "Comunhão e sociedade"
+   },
+   "definition": {
+    "en": "Life with others: family, marriage, friendship, community, work, peace and creation."
+   },
+   "children": [
+    {
+     "key": "family",
+     "names": {
+      "en": "Family",
+      "it": "Famiglia",
+      "es": "Familia",
+      "fr": "Famille",
+      "de": "Familie",
+      "pt": "Família"
+     },
+     "definition": {
+      "en": "Parents and children, family bonds and their trials."
+     }
+    },
+    {
+     "key": "marriage",
+     "names": {
+      "en": "Marriage",
+      "it": "Matrimonio",
+      "es": "Matrimonio",
+      "fr": "Mariage",
+      "de": "Ehe",
+      "pt": "Matrimônio"
+     },
+     "definition": {
+      "en": "The covenant of man and woman, fidelity and conjugal love."
+     }
+    },
+    {
+     "key": "friendship",
+     "names": {
+      "en": "Friendship",
+      "it": "Amicizia",
+      "es": "Amistad",
+      "fr": "Amitié",
+      "de": "Freundschaft",
+      "pt": "Amizade"
+     },
+     "definition": {
+      "en": "Bonds of friendship, loyalty and companionship."
+     }
+    },
+    {
+     "key": "community",
+     "names": {
+      "en": "Community",
+      "it": "Comunità",
+      "es": "Comunidad",
+      "fr": "Communauté",
+      "de": "Gemeinschaft",
+      "pt": "Comunidade"
+     },
+     "definition": {
+      "en": "Belonging, solidarity and the common good of a group or people."
+     }
+    },
+    {
+     "key": "work",
+     "names": {
+      "en": "Work",
+      "it": "Lavoro",
+      "es": "Trabajo",
+      "fr": "Travail",
+      "de": "Arbeit",
+      "pt": "Trabalho"
+     },
+     "definition": {
+      "en": "Human labour, its dignity and its meaning."
+     }
+    },
+    {
+     "key": "peace",
+     "names": {
+      "en": "Peace",
+      "it": "Pace",
+      "es": "Paz",
+      "fr": "Paix",
+      "de": "Frieden",
+      "pt": "Paz"
+     },
+     "definition": {
+      "en": "Peace and war, violence and nonviolence, reconciliation between peoples."
+     }
+    },
+    {
+     "key": "creation",
+     "names": {
+      "en": "Care for creation",
+      "it": "Custodia del creato",
+      "es": "Cuidado de la creación",
+      "fr": "Sauvegarde de la création",
+      "de": "Bewahrung der Schöpfung",
+      "pt": "Cuidado da criação"
+     },
+     "definition": {
+      "en": "Nature as God's gift and the human responsibility for it."
+     }
+    }
+   ]
   },
   {
-   "key": "redemption",
+   "key": "christ-church",
    "names": {
-    "en": "Redemption",
-    "it": "Redenzione",
-    "es": "Redención",
-    "fr": "Rédemption",
-    "de": "Erlösung",
-    "pt": "Redenção"
-   }
-  },
-  {
-   "key": "conversion",
-   "names": {
-    "en": "Conversion",
-    "it": "Conversione",
-    "es": "Conversión",
-    "fr": "Conversion",
-    "de": "Bekehrung",
-    "pt": "Conversão"
-   }
-  },
-  {
-   "key": "repentance",
-   "names": {
-    "en": "Repentance",
-    "it": "Pentimento",
-    "es": "Arrepentimiento",
-    "fr": "Repentir",
-    "de": "Reue",
-    "pt": "Arrependimento"
-   }
-  },
-  {
-   "key": "conscience",
-   "names": {
-    "en": "Conscience",
-    "it": "Coscienza",
-    "es": "Conciencia",
-    "fr": "Conscience",
-    "de": "Gewissen",
-    "pt": "Consciência"
-   }
-  },
-  {
-   "key": "family",
-   "names": {
-    "en": "Family",
-    "it": "Famiglia",
-    "es": "Familia",
-    "fr": "Famille",
-    "de": "Familie",
-    "pt": "Família"
-   }
+    "en": "Christ and the Church",
+    "it": "Cristo e la Chiesa",
+    "es": "Cristo y la Iglesia",
+    "fr": "Le Christ et l'Église",
+    "de": "Christus und die Kirche",
+    "pt": "Cristo e a Igreja"
+   },
+   "definition": {
+    "en": "The mysteries of Christ and the life of the Church as they appear in a work."
+   },
+   "children": [
+    {
+     "key": "incarnation",
+     "names": {
+      "en": "Incarnation",
+      "it": "Incarnazione",
+      "es": "Encarnación",
+      "fr": "Incarnation",
+      "de": "Menschwerdung",
+      "pt": "Encarnação"
+     },
+     "definition": {
+      "en": "God made man; Christmas and the hidden life of Jesus."
+     }
+    },
+    {
+     "key": "cross",
+     "names": {
+      "en": "The Cross",
+      "it": "La Croce",
+      "es": "La Cruz",
+      "fr": "La Croix",
+      "de": "Das Kreuz",
+      "pt": "A Cruz"
+     },
+     "definition": {
+      "en": "The Passion and death of Christ; carrying one's cross."
+     }
+    },
+    {
+     "key": "resurrection",
+     "names": {
+      "en": "Resurrection",
+      "it": "Risurrezione",
+      "es": "Resurrección",
+      "fr": "Résurrection",
+      "de": "Auferstehung",
+      "pt": "Ressurreição"
+     },
+     "definition": {
+      "en": "The Resurrection of Christ and new life over death."
+     }
+    },
+    {
+     "key": "eucharist",
+     "names": {
+      "en": "Eucharist",
+      "it": "Eucaristia",
+      "es": "Eucaristía",
+      "fr": "Eucharistie",
+      "de": "Eucharistie",
+      "pt": "Eucaristia"
+     },
+     "definition": {
+      "en": "The Mass, Holy Communion and Eucharistic devotion."
+     }
+    },
+    {
+     "key": "mary",
+     "names": {
+      "en": "Mary",
+      "it": "Maria",
+      "es": "María",
+      "fr": "Marie",
+      "de": "Maria",
+      "pt": "Maria"
+     },
+     "definition": {
+      "en": "The Virgin Mary, Mother of God, and Marian devotion."
+     }
+    },
+    {
+     "key": "holiness",
+     "names": {
+      "en": "Holiness",
+      "it": "Santità",
+      "es": "Santidad",
+      "fr": "Sainteté",
+      "de": "Heiligkeit",
+      "pt": "Santidade"
+     },
+     "definition": {
+      "en": "The call to be holy; the witness of saints and martyrs."
+     }
+    },
+    {
+     "key": "prayer",
+     "names": {
+      "en": "Prayer",
+      "it": "Preghiera",
+      "es": "Oración",
+      "fr": "Prière",
+      "de": "Gebet",
+      "pt": "Oração"
+     },
+     "definition": {
+      "en": "Speaking with God; prayer, contemplation and worship."
+     }
+    }
+   ]
   }
  ]
 }
