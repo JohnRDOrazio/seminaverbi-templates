@@ -92,12 +92,14 @@ def _ask_level(client, text, data, parent_key):
 def classify(client, text: str, data) -> Decision:
     """Exactly one field node for an article: descend the tree while each step is confident."""
     results = []  # (score, key, all_steps_confident, criteria, answer)
+    last = {}  # the most recent level's question, so a leaf reached by descending keeps its evidence
 
     def descend(parent_key, score, ok):
         if parent_key is not None and not field_children(data, parent_key):
-            results.append((score, parent_key, ok, None, None))
+            results.append((score, parent_key, ok, last.get("criteria"), last.get("answer")))
             return
         criteria, a = _ask_level(client, text, data, parent_key)
+        last["criteria"], last["answer"] = criteria, a
         ranked = sorted(a.probabilities.items(), key=lambda kv: kv[1], reverse=True)
         best, best_p = ranked[0]
         if confident(best_p, a.confidence):
@@ -160,7 +162,9 @@ def main(argv=None, client=None, data=None) -> int:
     p.add_argument("candidates", nargs="+")
     p.add_argument("--record", action="store_true")
     for name in ("classify", "themes"):
-        sub.add_parser(name).add_argument("file")
+        sp = sub.add_parser(name)
+        sp.add_argument("file")
+        sp.add_argument("--record", action="store_true")
     args = parser.parse_args(argv)
     data = data or load(ROOT)
     by_key = {n.key: n for n in nodes(data)}
@@ -175,12 +179,19 @@ def main(argv=None, client=None, data=None) -> int:
             if args.record:
                 print(f"recorded {record(d)['id']}")
         elif args.command == "classify":
-            _print_decision(classify(client, Path(args.file).read_text(encoding="utf-8"), data))
+            d = classify(client, Path(args.file).read_text(encoding="utf-8"), data)
+            _print_decision(d)
+            if args.record:
+                print(f"recorded {record(d._replace(node=Path(args.file).stem), LOG)['id']}")
         else:
-            for key, (prob, outcome) in sorted(themes(client, Path(args.file).read_text(encoding="utf-8"), data).items(),
-                                               key=lambda kv: -kv[1][0]):
+            result = themes(client, Path(args.file).read_text(encoding="utf-8"), data)
+            for key, (prob, outcome) in sorted(result.items(), key=lambda kv: -kv[1][0]):
                 print(f"{key}: {prob:.2f} {outcome}")
-    except (TypeSafeError, OSError) as exc:
+            if args.record:
+                d = Decision("themes", Path(args.file).stem, {}, {k: p for k, (p, _) in result.items()}, 1.0,
+                             ",".join(sorted(k for k, (_, o) in result.items() if o == "applied")), "applied")
+                print(f"recorded {record(d, LOG)['id']}")
+    except Exception as exc:  # TypeSafe, network, file or anything unexpected: no traceback, nothing recorded
         print(f"Jev request failed: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 1
     return 0

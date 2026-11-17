@@ -229,3 +229,13 @@ def test_mediawiki_ratelimited_gives_up(monkeypatch):
     s = Recorder(*([{"error": {"code": "ratelimited", "info": "slow down"}}] * 7))
     with pytest.raises(SyncError, match="ratelimited"):
         WikiClient("en", session=s)._token("login")
+
+
+def test_retry_after_http_date_and_huge_values_are_handled(monkeypatch):
+    waits = []
+    monkeypatch.setattr("sync.wiki.time.sleep", waits.append)
+    s = Limited(1, {"query": {"tokens": {"logintoken": "t"}}}, retry_after="Wed, 21 Oct 2015 07:28:00 GMT")
+    assert WikiClient("en", session=s)._token("login") == "t"
+    s = Limited(1, {"query": {"tokens": {"logintoken": "t"}}}, retry_after="86400")
+    assert WikiClient("en", session=s)._token("login") == "t"
+    assert waits[0] == 1.0 and waits[1] == 120.0

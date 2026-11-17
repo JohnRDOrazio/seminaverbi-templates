@@ -56,24 +56,28 @@ class Report(NamedTuple):
 
 
 def _name_pattern(name: str) -> str:
+    """MediaWiki titles: only the first letter is case-insensitive; spaces and underscores are the same."""
     first, rest = name[0], name[1:]
     head = f"[{re.escape(first.upper())}{re.escape(first.lower())}]" if first.isalpha() else re.escape(first)
     return head + r"[ _]+".join(re.escape(part) for part in rest.split(" ")) if rest else head
 
 
 def _line_regex(name: str, namespaces) -> re.Pattern:
+    # namespace names are case-insensitive; the title is not (except its first letter)
     ns = "|".join(re.escape(n) for n in sorted(namespaces, key=len, reverse=True))
-    return re.compile(r"\[\[\s*(" + ns + r")\s*:\s*" + _name_pattern(name) + r"\s*(\|[^\]]*)?\]\]", re.IGNORECASE)
+    return re.compile(r"\[\[\s*((?i:" + ns + r"))\s*:\s*" + _name_pattern(name) + r"\s*(\|[^\]]*)?\]\]")
 
 
 def refile_text(text: str, old_name: str, new_name: str, namespaces) -> tuple[str, bool]:
     """Replace the [[Category:old_name|sortkey]] line(s) by [[Category:new_name|sortkey]]."""
+    if old_name == new_name:
+        return text, False
     old_re = _line_regex(old_name, namespaces)
     if not old_re.search(text):
         return text, False
     if _line_regex(new_name, namespaces).search(text):
         # already in the new category: drop the old line instead of duplicating it
-        return re.sub(old_re.pattern + r"\n?", "", text, flags=re.IGNORECASE), True
+        return re.sub(old_re.pattern + r"\n?", "", text), True
     return old_re.sub(lambda m: f"[[{m.group(1)}:{new_name}{m.group(2) or ''}]]", text), True
 
 
@@ -85,7 +89,8 @@ def _bare(title: str) -> str:
     return title.split(":", 1)[1] if ":" in title else title
 
 
-def plan(lang: str, data: dict, mapping: dict, client, jev) -> Plan:
+def plan(lang: str, data: dict, mapping: dict, client, jev, record=None) -> Plan:
+    """record: called with each Jev decision applied to an article (split members)."""
     by_key = {n.key: n for n in nodes(data)}
     namespaces = client.category_namespaces()
     mapped = set(mapping)
@@ -114,6 +119,8 @@ def plan(lang: str, data: dict, mapping: dict, client, jev) -> Plan:
         return fixed
 
     def refile(members, old_name, new_name, templates_fixed=False):
+        """Returns the members whose category line could not be found (template-filed or unmatched)."""
+        missed = []
         for member, ns in members:
             if ns == 14 and _bare(member) in mapped:
                 continue  # that category's own entry rewrites its page
@@ -124,6 +131,8 @@ def plan(lang: str, data: dict, mapping: dict, client, jev) -> Plan:
                 via_template.append((member, _cat(old_name)))
             else:
                 unmatched.append((member, _cat(old_name)))
+                missed.append(member)
+        return missed
 
     def node_text(node):
         parent = by_key[node.parent_key] if node.parent_key else None
@@ -156,7 +165,10 @@ def plan(lang: str, data: dict, mapping: dict, client, jev) -> Plan:
                     author.append((member, old_title, decision))
                     pending += 1
                     continue
-                refile([(member, ns)], old_name, by_key[decision.choice].names[lang])
+                if record:
+                    record(decision._replace(node=member))
+                # a member filed by a template keeps the old category: do not redirect it away
+                pending += len(refile([(member, ns)], old_name, by_key[decision.choice].names[lang]))
             if not pending:
                 set_text(old_title, f"#REDIRECT [[:{new_title}]]")
                 redirected.append(old_title)
@@ -186,8 +198,8 @@ def execute(client, p: Plan, dry_run: bool = False, lang: str = "en") -> Report:
                     client.move(step[1], step[2], summary, tags=TAG)
                 else:
                     client.edit(step[1], step[2], summary, tags=TAG)
-            except (SyncError, OSError) as exc:
-                failed.append((step[1], str(exc)))
+            except Exception as exc:  # one failed step must not abort the rest of the run
+                failed.append((step[1], f"{type(exc).__name__}: {exc}"))
     return Report(p.author, p.skipped, p.unmatched, p.redirected, failed, p.via_template)
 
 
@@ -241,7 +253,9 @@ def main(argv=None, client_factory=WikiClient, jev=None, data=None, mapping=None
         if jev is None:
             from tools.jev import make_client
             jev = JevAdapter(make_client())
-        p = plan(args.wiki, data, mapping.get(args.wiki, {}), client, jev)
+        from tools.jev import record as record_decision
+        p = plan(args.wiki, data, mapping.get(args.wiki, {}), client, jev,
+                 record=None if args.dry_run else record_decision)
     except Exception as exc:  # planning reads only: nothing has been changed
         print(f"[{args.wiki}] ERROR while planning (nothing changed): {type(exc).__name__}: {exc}", file=sys.stderr)
         return 1

@@ -51,6 +51,14 @@ def _bare(title: str) -> str:
     return title.split(":", 1)[1] if ":" in title else title
 
 
+def _same_category(current: str, title: str, category_ns: set) -> bool:
+    """`current` is the category `title` under one of this wiki's category namespace names."""
+    if ":" not in current:
+        return False
+    ns, rest = current.split(":", 1)
+    return ns.strip().lower() in category_ns and rest == _bare(title)
+
+
 def _title(name: str) -> str:
     return "Category:" + name
 
@@ -103,6 +111,7 @@ def create(lang: str, data: dict, client, repo, dry_run: bool, replace_missing: 
         created.append(title)
 
     skip = set(report.redirect) | {t for t, _ in failed}
+    category_ns = {n.lower() for n in client.category_namespaces()}
     for n in tree:
         title = _title(n.names[lang])
         if n.key in skip or title in skip or (n.key in missing and title not in created):
@@ -115,7 +124,8 @@ def create(lang: str, data: dict, client, repo, dry_run: bool, replace_missing: 
                 conflicts.append((n.key, distinct))
             elif own:
                 continue
-            elif distinct and (current := repo.sitelink(distinct[0], _site(lang))) is not None and _bare(current) == _bare(title):
+            elif (distinct and (current := repo.sitelink(distinct[0], _site(lang))) is not None
+                  and _same_category(current, title, category_ns)):
                 continue  # already linked, stored under the localized namespace name ("Categoria:…")
             elif (distinct and current not in (None, title)
                   and not (replace_missing and client.page_info([current]).get(current) is None)):

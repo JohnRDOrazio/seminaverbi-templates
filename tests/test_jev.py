@@ -164,3 +164,33 @@ def test_cli_api_error_exit_1_no_key_in_output(monkeypatch, capsys):
     out, err = capsys.readouterr()
     assert code == 1 and "upstream failure" in err
     assert "ts-very-secret-key" not in out + err
+
+
+def test_beam_leaf_decision_carries_the_answer():
+    fake = FakeJev(
+        {"level": choice({"arts": 0.52, "religion": 0.48}, 0.05)},
+        {"level": choice({"film": 0.5, "music": 0.5}, 0.0)},
+        {"level": choice({"saints": 1.0}, 1.0)},
+    )
+    d = jev.classify(fake, "The life of a saint.", DATA)
+    assert d.choice == "saints" and d.probabilities == {"saints": 1.0}
+
+
+def test_cli_classify_record_and_unexpected_errors(monkeypatch, tmp_path, capsys):
+    log = tmp_path / "log.json"
+    log.write_text("[]")
+    monkeypatch.setattr(jev, "LOG", log)
+    text = tmp_path / "a.txt"
+    text.write_text("A film.")
+    fake = FakeJev({"level": choice({"arts": 0.95, "religion": 0.05}, 0.9)},
+                   {"level": choice({"film": 0.95, "music": 0.05}, 0.9)},
+                   {"level": choice({"feature-films": 0.95, "short-films": 0.05}, 0.9)})
+    assert jev.main(["classify", str(text), "--record"], client=fake, data=DATA) == 0
+    assert json.loads(log.read_text())[0]["choice"] == "feature-films"
+
+    class Weird:
+        def system_one(self, *a, **k):
+            raise RuntimeError("unexpected")
+
+    assert jev.main(["classify", str(text)], client=Weird(), data=DATA) == 1
+    assert "unexpected" in capsys.readouterr().err

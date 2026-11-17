@@ -82,8 +82,8 @@ class FakeJev:
         return self.result
 
 
-def run(fake, mapping, jev=None, dry_run=False):
-    steps = mig.plan(fake.lang, DATA, mapping, fake, jev or FakeJev())
+def run(fake, mapping, jev=None, dry_run=False, record=None):
+    steps = mig.plan(fake.lang, DATA, mapping, fake, jev or FakeJev(), record=record)
     report = mig.execute(fake, steps, dry_run=dry_run, lang=fake.lang)
     return steps, report
 
@@ -256,3 +256,45 @@ def test_redirected_old_category_with_leftover_members_is_finished():
     _, report = run(fake, {"Video gaming": "film"})
     assert fake.pages["Song"] == "[[Category:Film]]"
     assert [t for t, _, _ in fake.edits] == ["Song"]
+
+
+def test_refile_case_only_rename_replaces_the_line():
+    text, changed = mig.refile_text("[[Categoria:Arti dello Spettacolo|X]]\n", "Arti dello Spettacolo",
+                                    "Arti dello spettacolo", ["Category", "Categoria"])
+    assert changed and text == "[[Categoria:Arti dello spettacolo|X]]\n"
+
+
+def test_refile_matches_only_the_first_letter_case_insensitively():
+    src = "[[Category:FILM]] [[Category:film]]"
+    text, changed = mig.refile_text(src, "Film", "Movies", ["Category"])
+    assert text == "[[Category:FILM]] [[Category:Movies]]"
+
+
+def test_refile_same_name_is_a_no_op():
+    assert mig.refile_text("[[Category:Film]]", "Film", "Film", ["Category"]) == ("[[Category:Film]]", False)
+
+
+def test_split_records_each_applied_decision():
+    fake = Fake(pages={"Category:Fiction": "", "Book": "[[Category:Fiction]]"}, members={"Category:Fiction": [("Book", 0)]})
+    recorded = []
+    run(fake, {"Fiction": "split:literature"}, FakeJev("novels"), record=recorded.append)
+    assert len(recorded) == 1 and recorded[0].node == "Book" and recorded[0].choice == "novels"
+
+
+def test_split_with_template_filed_member_is_not_redirected():
+    fake = Fake(pages={"Category:Fiction": "", "Book": "{{Infobox book}}"}, members={"Category:Fiction": [("Book", 0)]})
+    _, report = run(fake, {"Fiction": "split:literature"}, FakeJev("novels"))
+    assert fake.pages["Category:Fiction"] == ""
+    assert report.unmatched == [("Book", "Category:Fiction")]
+
+
+def test_execute_keeps_going_after_an_unexpected_error():
+    fake = Fake(pages={"Category:Film": "", "Category:Literary arts": ""})
+
+    def boom(*a, **k):
+        raise ValueError("unparseable Retry-After")
+    original = fake.edit
+    fake.edit = lambda title, *a, **k: boom() if title == "Category:Film" else original(title, *a, **k)
+    _, report = run(fake, {"Film": "film", "Literary arts": "literature"})
+    assert report.failed and report.failed[0][0] == "Category:Film"
+    assert fake.pages["Category:Literature"].startswith("Literature def.")

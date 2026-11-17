@@ -11,6 +11,15 @@ from sync.plan import PageState
 
 RETRIES = 5  # extra attempts after an HTTP 429 or a MediaWiki "ratelimited" error
 RATELIMITED_WAIT = 65.0  # seconds; MediaWiki does not say how long to wait
+MAX_RETRY_WAIT = 120.0
+
+
+def _retry_wait(retry_after, attempt: int) -> float:
+    """Seconds to wait after an HTTP 429: Retry-After in seconds (capped), else exponential backoff."""
+    try:
+        return min(max(float(retry_after), 0.0), MAX_RETRY_WAIT)
+    except (TypeError, ValueError):  # missing, or the HTTP-date form
+        return min(2.0 ** attempt, 30.0)
 USER_AGENT = "seminaverbi-templates-sync/1.0 (https://github.com/JohnRDOrazio/seminaverbi-templates)"
 
 
@@ -58,8 +67,7 @@ class WikiClient:
             if getattr(r, "status_code", 200) != 429 or attempt == RETRIES:
                 break
             # rate limited (nginx limit_req): wait as told, or back off, then retry the same request
-            retry_after = r.headers.get("Retry-After")
-            time.sleep(float(retry_after) if retry_after else min(2.0 ** attempt, 30.0))
+            time.sleep(_retry_wait(r.headers.get("Retry-After"), attempt))
         r.raise_for_status()
         return r.json()
 

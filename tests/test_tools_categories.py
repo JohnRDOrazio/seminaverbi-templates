@@ -30,6 +30,9 @@ class Fake:
         self.items = items if items is not None else {}
         self.edits, self.sitelinks, self.new_items, self.fail_edit = [], [], [], set()
 
+    def category_namespaces(self):
+        return ["Category", "Catégorie"]
+
     def page_info(self, titles):
         return {t: self.pages.get(t) for t in titles}
 
@@ -186,6 +189,14 @@ def test_link_stored_under_the_localized_namespace_is_not_a_conflict():
     result = cat.create("fr", DATA, fr, repo, dry_run=False)
     assert result.taken == [] and result.conflicts == []
     assert repo.sitelinks == []
+
+
+def test_link_to_a_same_named_page_in_another_namespace_is_a_conflict():
+    items = {"Q10": {"enwiki": "Category:Music", "frwiki": "Music-fr"}}  # the article, not the category
+    fr = Fake("fr", dict(ALL_FR, **{"Music-fr": page()}), items)
+    repo = Fake("en", items=items)
+    result = cat.create("fr", DATA, fr, repo, dry_run=False)
+    assert result.taken == [("music", "Q10", "Music-fr")]
 
 
 def test_cli_reports_taken_sitelink(env, capsys):
