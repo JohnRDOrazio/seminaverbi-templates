@@ -1,0 +1,3 @@
+<includeonly>{{#invoke:SV/Bio|main}}</includeonly><noinclude>
+Opening sentence of a biography, written from the page's Wikibase item in the wiki's language: name, birth and death places and dates, occupation and nationality agreeing with the person's sex or gender. No categories. Optional parameters: <code>item</code>, <code>name</code> (replaces the item's label), <code>note</code> (free text after the name, e.g. a pseudonym), <code>rest</code> (free text continuing the sentence after the occupation), <code>ref</code> (references, appended verbatim).
+</noinclude>

@@ -38,6 +38,18 @@ Aliases: it: `SV lavori in corso`, es: `SV en desarrollo`, fr: `SV en travaux`, 
 | `user` | who is working on it |
 | `date` | since when |
 
+## SV bio
+
+The opening sentence of a biography, written from the page's Wikibase item in the wiki's language: name, birth and death places and dates, occupation and nationality agreeing with the person's sex or gender. Adds no categories; missing facts are left out.
+
+| parameter | meaning |
+|---|---|
+| `item` | a Wikibase item ID, when the page is not connected to one |
+| `name` | the name to show instead of the item's label (e.g. a fuller form) |
+| `note` | free text after the name, e.g. "pseudonimo di Filippo Neviani" |
+| `rest` | free text continuing the sentence after the occupation (starts with a comma or a word) |
+| `ref` | references, appended verbatim at the end |
+
 ## SV categories
 
 Files the page under its Wikibase item's SV field and SV Gospel theme categories, in the wiki's language. Use it on pages without an SV infobox; every SV infobox outputs the same categories.
