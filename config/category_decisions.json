@@ -1170,5 +1170,347 @@
    "choice_confidence": 0.6
   },
   "author_choice": "earth-sciences"
+ },
+ {
+  "id": "2026-11-17-article-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "classify",
+  "node": null,
+  "options": {
+   "poetry": {
+    "name": "Poetry",
+    "path": "Arts > Literature > Poetry",
+    "definition": "Works in verse: lyric, epic, dramatic and sacred poetry, hymns and song lyrics read as poems."
+   },
+   "novels": {
+    "name": "Novels",
+    "path": "Arts > Literature > Novels",
+    "definition": "Book-length works of narrative prose fiction."
+   },
+   "short-fiction": {
+    "name": "Short stories",
+    "path": "Arts > Literature > Short stories",
+    "definition": "Short narrative prose fiction: short stories, novellas, tales and fables."
+   },
+   "drama": {
+    "name": "Drama",
+    "path": "Arts > Literature > Drama",
+    "definition": "Plays and other dramatic works as written texts. Their staging belongs under Theatre."
+   },
+   "essays": {
+    "name": "Essays",
+    "path": "Arts > Literature > Essays",
+    "definition": "Non-fiction prose of literary value: essays, letters, memoirs, autobiographies, spiritual writings published as literature."
+   },
+   "childrens-literature": {
+    "name": "Children's literature",
+    "path": "Arts > Literature > Children's literature",
+    "definition": "Literature written for children and young readers, in any form."
+   }
+  },
+  "probabilities": {
+   "poetry": 0.0,
+   "novels": 0.82,
+   "short-fiction": 0.0,
+   "drama": 0.0,
+   "essays": 0.01,
+   "childrens-literature": 0.17
+  },
+  "confidence": 0.78,
+  "choice": "novels",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-article-2",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "classify",
+  "node": null,
+  "options": {
+   "film": {
+    "name": "Film",
+    "path": "Arts > Audiovisual and interactive media > Film",
+    "definition": "Motion pictures released as films, and filmmakers. Genres are not categories; they go in the infobox."
+   },
+   "television": {
+    "name": "Television",
+    "path": "Arts > Audiovisual and interactive media > Television",
+    "definition": "Television series, miniseries, sitcoms and programmes. Genres are not categories."
+   },
+   "radio": {
+    "name": "Radio",
+    "path": "Arts > Audiovisual and interactive media > Radio",
+    "definition": "Radio programmes and dramas."
+   },
+   "animation": {
+    "name": "Animation",
+    "path": "Arts > Audiovisual and interactive media > Animation",
+    "definition": "Animated films and series, by any technique."
+   },
+   "video-games": {
+    "name": "Video games",
+    "path": "Arts > Audiovisual and interactive media > Video games",
+    "definition": "Interactive games played on a screen, and their makers."
+   }
+  },
+  "probabilities": {
+   "film": 0.01,
+   "television": 0.99,
+   "radio": 0.0,
+   "animation": 0.0,
+   "video-games": 0.0
+  },
+  "confidence": 0.99,
+  "choice": "television",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-article-3",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "classify",
+  "node": null,
+  "options": {
+   "film": {
+    "name": "Film",
+    "path": "Arts > Audiovisual and interactive media > Film",
+    "definition": "Motion pictures released as films, and filmmakers. Genres are not categories; they go in the infobox."
+   },
+   "television": {
+    "name": "Television",
+    "path": "Arts > Audiovisual and interactive media > Television",
+    "definition": "Television series, miniseries, sitcoms and programmes. Genres are not categories."
+   },
+   "radio": {
+    "name": "Radio",
+    "path": "Arts > Audiovisual and interactive media > Radio",
+    "definition": "Radio programmes and dramas."
+   },
+   "animation": {
+    "name": "Animation",
+    "path": "Arts > Audiovisual and interactive media > Animation",
+    "definition": "Animated films and series, by any technique."
+   },
+   "video-games": {
+    "name": "Video games",
+    "path": "Arts > Audiovisual and interactive media > Video games",
+    "definition": "Interactive games played on a screen, and their makers."
+   }
+  },
+  "probabilities": {
+   "film": 0.0,
+   "television": 1.0,
+   "radio": 0.0,
+   "animation": 0.0,
+   "video-games": 0.0
+  },
+  "confidence": 1.0,
+  "choice": "television",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-article-4",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "classify",
+  "node": null,
+  "options": {
+   "film": {
+    "name": "Film",
+    "path": "Arts > Audiovisual and interactive media > Film",
+    "definition": "Motion pictures released as films, and filmmakers. Genres are not categories; they go in the infobox."
+   },
+   "television": {
+    "name": "Television",
+    "path": "Arts > Audiovisual and interactive media > Television",
+    "definition": "Television series, miniseries, sitcoms and programmes. Genres are not categories."
+   },
+   "radio": {
+    "name": "Radio",
+    "path": "Arts > Audiovisual and interactive media > Radio",
+    "definition": "Radio programmes and dramas."
+   },
+   "animation": {
+    "name": "Animation",
+    "path": "Arts > Audiovisual and interactive media > Animation",
+    "definition": "Animated films and series, by any technique."
+   },
+   "video-games": {
+    "name": "Video games",
+    "path": "Arts > Audiovisual and interactive media > Video games",
+    "definition": "Interactive games played on a screen, and their makers."
+   }
+  },
+  "probabilities": {
+   "film": 0.0,
+   "television": 1.0,
+   "radio": 0.0,
+   "animation": 0.0,
+   "video-games": 0.0
+  },
+  "confidence": 1.0,
+  "choice": "television",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-article-5",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "classify",
+  "node": null,
+  "options": {
+   "film": {
+    "name": "Film",
+    "path": "Arts > Audiovisual and interactive media > Film",
+    "definition": "Motion pictures released as films, and filmmakers. Genres are not categories; they go in the infobox."
+   },
+   "television": {
+    "name": "Television",
+    "path": "Arts > Audiovisual and interactive media > Television",
+    "definition": "Television series, miniseries, sitcoms and programmes. Genres are not categories."
+   },
+   "radio": {
+    "name": "Radio",
+    "path": "Arts > Audiovisual and interactive media > Radio",
+    "definition": "Radio programmes and dramas."
+   },
+   "animation": {
+    "name": "Animation",
+    "path": "Arts > Audiovisual and interactive media > Animation",
+    "definition": "Animated films and series, by any technique."
+   },
+   "video-games": {
+    "name": "Video games",
+    "path": "Arts > Audiovisual and interactive media > Video games",
+    "definition": "Interactive games played on a screen, and their makers."
+   }
+  },
+  "probabilities": {
+   "film": 0.0,
+   "television": 1.0,
+   "radio": 0.0,
+   "animation": 0.0,
+   "video-games": 0.0
+  },
+  "confidence": 1.0,
+  "choice": "television",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-article-6",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "classify",
+  "node": null,
+  "options": {
+   "film": {
+    "name": "Film",
+    "path": "Arts > Audiovisual and interactive media > Film",
+    "definition": "Motion pictures released as films, and filmmakers. Genres are not categories; they go in the infobox."
+   },
+   "television": {
+    "name": "Television",
+    "path": "Arts > Audiovisual and interactive media > Television",
+    "definition": "Television series, miniseries, sitcoms and programmes. Genres are not categories."
+   },
+   "radio": {
+    "name": "Radio",
+    "path": "Arts > Audiovisual and interactive media > Radio",
+    "definition": "Radio programmes and dramas."
+   },
+   "animation": {
+    "name": "Animation",
+    "path": "Arts > Audiovisual and interactive media > Animation",
+    "definition": "Animated films and series, by any technique."
+   },
+   "video-games": {
+    "name": "Video games",
+    "path": "Arts > Audiovisual and interactive media > Video games",
+    "definition": "Interactive games played on a screen, and their makers."
+   }
+  },
+  "probabilities": {
+   "film": 0.0,
+   "television": 1.0,
+   "radio": 0.0,
+   "animation": 0.0,
+   "video-games": 0.0
+  },
+  "confidence": 1.0,
+  "choice": "television",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-article-7",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "classify",
+  "node": null,
+  "options": {
+   "film": {
+    "name": "Film",
+    "path": "Arts > Audiovisual and interactive media > Film",
+    "definition": "Motion pictures released as films, and filmmakers. Genres are not categories; they go in the infobox."
+   },
+   "television": {
+    "name": "Television",
+    "path": "Arts > Audiovisual and interactive media > Television",
+    "definition": "Television series, miniseries, sitcoms and programmes. Genres are not categories."
+   },
+   "radio": {
+    "name": "Radio",
+    "path": "Arts > Audiovisual and interactive media > Radio",
+    "definition": "Radio programmes and dramas."
+   },
+   "animation": {
+    "name": "Animation",
+    "path": "Arts > Audiovisual and interactive media > Animation",
+    "definition": "Animated films and series, by any technique."
+   },
+   "video-games": {
+    "name": "Video games",
+    "path": "Arts > Audiovisual and interactive media > Video games",
+    "definition": "Interactive games played on a screen, and their makers."
+   }
+  },
+  "probabilities": {
+   "film": 0.0,
+   "television": 1.0,
+   "radio": 0.0,
+   "animation": 0.0,
+   "video-games": 0.0
+  },
+  "confidence": 1.0,
+  "choice": "television",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
  }
 ]
