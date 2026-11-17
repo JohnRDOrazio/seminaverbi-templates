@@ -27,6 +27,16 @@ from tools.migrate_categories import _line_regex
 MODULE_CALL = re.compile(r"\{\{\s*SV[ _](?:infobox(?:[ _](?:work|person))?|categories)\s*(\|(?:[^{}]|\{\{[^{}]*\}\})*)?\}\}")
 
 
+# wikitext MediaWiki shows instead of running: comments, nowiki, pre and code blocks
+INACTIVE = re.compile(r"<!--.*?(?:-->|\Z)|<(nowiki|pre|syntaxhighlight|source|math|code)\b[^>]*?(?:/>|>.*?(?:</\1\s*>|\Z))",
+                      re.S | re.I)
+
+
+def _mask(text: str) -> str:
+    """`text` with its inactive spans blanked (same length, newlines kept), so matches keep their positions."""
+    return INACTIVE.sub(lambda m: re.sub(r"[^\n]", "\x01", m.group(0)), text)
+
+
 class PageFacts(NamedTuple):
     lang: str
     title: str
@@ -73,14 +83,15 @@ def fits(field_key: str, layout: str, data, types) -> bool:
 
 
 def calls_module(text: str) -> bool:
-    return bool(MODULE_CALL.search(text))
+    return bool(MODULE_CALL.search(_mask(text)))
 
 
 def rewrite(text: str, remove: list, namespaces, has_module: bool) -> str:
     """`text` without the hand-written [[Category:…]] lines of `remove` (bare names). {{SV categories}}
     takes the first removed line's place unless the page already calls an SV infobox / SV categories;
     the first sort key found is kept as sortkey=."""
-    matches = sorted((m for name in remove for m in _line_regex(name, namespaces).finditer(text)),
+    masked = _mask(text)
+    matches = sorted((m for name in remove for m in _line_regex(name, namespaces).finditer(masked)),
                      key=lambda m: m.start())
     if not matches:
         return text
@@ -110,18 +121,18 @@ def rewrite(text: str, remove: list, namespaces, has_module: bool) -> str:
         call = "{{SV categories" + (f"|sortkey={sortkey}" if sortkey else "") + "}}"
         return result.replace(marker, call)
     if sortkey:
-        def add_sortkey(m):
-            if m.group(1) and re.search(r"\|\s*sortkey\s*=", m.group(1)):
-                return m.group(0)
-            return m.group(0)[:-2] + f"|sortkey={sortkey}}}}}"
-        result = MODULE_CALL.sub(add_sortkey, result, count=1)
+        call = MODULE_CALL.search(_mask(result))
+        if call and not (call.group(1) and re.search(r"\|\s*sortkey\s*=", call.group(1))):
+            # splice into the original text (the match was made on the masked copy)
+            end = call.end() - 2
+            result = result[:end] + f"|sortkey={sortkey}" + result[end:]
     return result
 
 
 def add_module_call(text: str, namespaces) -> str:
     """`text` with {{SV categories}} before its first category line, or at the end."""
     ns = "|".join(re.escape(n) for n in sorted(namespaces, key=len, reverse=True))
-    first = re.search(r"^\[\[\s*(?i:" + ns + r")\s*:", text, re.M)
+    first = re.search(r"^\[\[\s*(?i:" + ns + r")\s*:", _mask(text), re.M)
     if first:
         return text[:first.start()] + "{{SV categories}}\n" + text[first.start():]
     return text.rstrip("\n") + "\n\n{{SV categories}}"
@@ -295,15 +306,14 @@ def run(repo, clients: dict, data, types, props: dict, apply: bool, only_item: s
                 out(f"{item}: FAILED {lang}:{title}: changed since it was read; run again")
                 continue
             try:
-                result = clients[lang].edit(title, text, _summary(lang), tags=TAG, baserevid=revid) or {}
+                clients[lang].edit(title, text, _summary(lang), tags=TAG, baserevid=revid)
                 edited += 1
-                if result.get("oldrevid", revid) != revid:
-                    # someone saved after the check and MediaWiki merged: verify what was saved
-                    lost = sorted(keep - clients[lang].page_categories(title))
-                    if lost:
-                        unsafe.append((lang, title, lost))
-                        out(f"{item}: UNSAFE {lang}:{title} merged with a concurrent edit and lost "
-                            f"{', '.join(lost)}; check the page")
+                # MediaWiki may have merged a concurrent edit (its oldrevid does not tell): verify every save
+                lost = sorted(keep - clients[lang].page_categories(title))
+                if lost:
+                    unsafe.append((lang, title, lost))
+                    out(f"{item}: UNSAFE {lang}:{title} saved without {', '.join(lost)} (a concurrent edit "
+                        f"merged?); check the page")
             except SyncError as exc:
                 failed.append((lang, title, str(exc)))
                 out(f"{item}: FAILED {lang}:{title}: {exc}")

@@ -468,11 +468,40 @@ def test_merge_with_an_edit_after_the_check_is_verified_and_reported():
     assert report.unsafe and report.unsafe[0][:2] == ("en", "Film page") and "Faith" in report.unsafe[0][2]
 
 
-def test_save_on_the_previewed_revision_needs_no_second_check():
+@pytest.mark.parametrize("wrap", ["<nowiki>{}</nowiki>", "<!-- {} -->", "<pre>{}</pre>"])
+def test_inactive_module_call_does_not_count(wrap):
+    text = "Intro. " + wrap.format("{{SV categories}}") + "\n[[Category:Film]]"
+    assert not fi.calls_module(text)
+    out = rewrite(text, ["Film"], ["Category"], has_module=fi.calls_module(text))
+    assert out.startswith("Intro. " + wrap.format("{{SV categories}}")) and out.endswith("\n{{SV categories}}")
+
+
+def test_inactive_category_example_is_kept():
+    text = "{{SV infobox}}\nWrite <nowiki>[[Category:Film]]</nowiki> to file it.\n[[Category:Film]]"
+    out = rewrite(text, ["Film"], ["Category"], has_module=True)
+    assert out == "{{SV infobox}}\nWrite <nowiki>[[Category:Film]]</nowiki> to file it."
+
+
+def test_module_call_goes_before_the_first_active_category_line():
+    text = "Intro.\n<!--\n[[Category:Old]]\n-->\nMore.\n[[Category:Other]]"
+    assert fi.add_module_call(text, ["Category"]) == ("Intro.\n<!--\n[[Category:Old]]\n-->\nMore.\n"
+                                                     "{{SV categories}}\n[[Category:Other]]")
+
+
+def test_every_save_is_verified():
     repo, clients = setup({"en": FILM_EN})
     en = clients["en"]
-    calls = []
-    real = en.page_categories
-    en.page_categories = lambda t: calls.append(t) or real(t)
-    run(repo, clients)
-    assert calls == ["Film page"]  # only the planning read
+
+    def silently_merged(title, text, summary, tags=None, createonly=False, baserevid=None):
+        item, revid, _, tc = en.pages[title]
+        en.pages[title] = (item, revid + 1, text.replace("{{SV categories}}", "[[Category:Film]]"), tc)
+        return {"result": "Success", "oldrevid": baserevid, "newrevid": revid + 1}
+    en.edit = silently_merged
+    report = run(repo, clients)
+    assert report.unsafe and "Faith" in report.unsafe[0][2]
+
+
+def test_sortkey_added_to_a_call_containing_a_comment_keeps_the_comment():
+    text = "{{SV infobox|name=X<!-- the title -->}}\n[[Category:Film|Zed]]"
+    out = rewrite(text, ["Film"], ["Category"], has_module=True)
+    assert out == "{{SV infobox|name=X<!-- the title -->|sortkey=Zed}}"

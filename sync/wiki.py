@@ -125,14 +125,14 @@ class WikiClient:
         if baserevid is not None:
             # guard against a change since the page was read, and never create it. MediaWiki first tries a
             # three-way merge: a change elsewhere on the page merges and is kept (no editconflict); only
-            # overlapping changes are refused. A caller that previewed the text checks the result's
-            # oldrevid against baserevid to detect a merge (tools.file_items does).
+            # overlapping changes are refused. A caller that previewed the text must verify the saved
+            # page itself (tools.file_items does); oldrevid does not reveal a merge.
             params["baserevid"] = baserevid
             params["nocreate"] = "1"
         result = self._dig(self._call("POST", token=self._token("csrf"), **params), "edit")
         if result.get("result") != "Success":
             raise SyncError(f"{self.lang}: edit of {title} failed: {result}")
-        return result  # oldrevid: the revision actually replaced (differs from baserevid after a merge)
+        return result
 
     def page_info(self, titles: list[str]) -> dict[str, PageInfo | None]:
         """Existence, redirect flag, visible categories and Wikibase item of each title (None if missing)."""
