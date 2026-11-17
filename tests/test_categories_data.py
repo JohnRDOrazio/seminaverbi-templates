@@ -143,3 +143,19 @@ def test_theme_groups():
 def test_leaf_themes_excludes_groups():
     keys = {t.key for t in leaf_themes(load(ROOT))}
     assert not keys & set(THEME_GROUPS) and "themes-root" not in keys
+
+
+def test_every_node_has_an_item():
+    import re
+    data = load(ROOT)
+    dicts = [data["root"], data["themes_root"]]
+
+    def walk(items):
+        for item in items:
+            dicts.append(item)
+            walk(item.get("children", []))
+    walk(data["fields"])
+    walk(data["themes"])
+    ids = [d.get("item", "") for d in dicts]
+    assert all(re.fullmatch(r"Q\d+", i) for i in ids), [d.get("key") for d in dicts if "item" not in d][:5]
+    assert len(set(ids)) == len(ids)

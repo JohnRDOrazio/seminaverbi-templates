@@ -291,5 +291,64 @@
       "prop": "occupation",
       "kind": "item"
     }
+  ],
+  "work": [
+    {
+      "key": "image",
+      "prop": "image",
+      "kind": "image"
+    },
+    {
+      "key": "title",
+      "prop": "title",
+      "kind": "monolingual"
+    },
+    {
+      "key": "creator",
+      "prop": "creator",
+      "kind": "item"
+    },
+    {
+      "key": "publication_date",
+      "prop": "publication_date",
+      "kind": "time"
+    },
+    {
+      "key": "genre",
+      "prop": "genre",
+      "kind": "item"
+    },
+    {
+      "key": "country_of_origin",
+      "prop": "country_of_origin",
+      "kind": "item"
+    }
+  ],
+  "group": [
+    {
+      "key": "image",
+      "prop": "image",
+      "kind": "image"
+    },
+    {
+      "key": "inception",
+      "prop": "inception",
+      "kind": "time"
+    },
+    {
+      "key": "genre",
+      "prop": "genre",
+      "kind": "item"
+    },
+    {
+      "key": "record_label",
+      "prop": "record_label",
+      "kind": "item"
+    },
+    {
+      "key": "country_of_origin",
+      "prop": "country_of_origin",
+      "kind": "item"
+    }
   ]
 }

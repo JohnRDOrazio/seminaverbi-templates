@@ -180,3 +180,128 @@ def test_decade_century_millennium():
 def test_bc_century():
     out, label = date_row("-0500-00-00T00:00:00Z", 7)
     assert row(label, "V secolo a.C.") in out
+
+
+# --- categories from the item's SV field / SV Gospel theme statements (P10768 / P10769) ---
+
+MUSIC, FAITH, LOVE = "Q47743", "Q47888", None
+
+
+def cat_entities(field=(MUSIC,), themes=(FAITH,), extra=None):
+    claims = {"P10768": [item(q) for q in field], "P10769": [item(q) for q in themes]}
+    ents = dict(ENTITIES)
+    ents["Q4178"] = dict(LOTR, claims=dict(LOTR["claims"], **claims))
+    ents[MUSIC] = {"labels": {"it": "Musica"}, "sitelinks": {"it": "Categoria:Musica", "en": "Category:Music"}}
+    ents[FAITH] = {"labels": {"it": "Fede"}, "sitelinks": {"it": "Categoria:Fede"}}
+    ents.update(extra or {})
+    return ents
+
+
+def categories(lang="it", page_entity="Q4178", entities=None, **args):
+    env = LuaEnv(lang=lang, entities=entities if entities is not None else cat_entities(),
+                 page_entity=page_entity, page_title="Pagina")
+    return env.call("Module:SV/Infobox", "categories", env.frame(args))
+
+
+def msg(lang, key):
+    import json
+    from conftest import ROOT
+    return json.loads((ROOT / "i18n" / f"{lang}.json").read_text(encoding="utf-8"))[key]
+
+
+def test_field_and_theme_categories():
+    out = categories()
+    assert "[[Category:Musica]]" in out and "[[Category:Fede]]" in out
+    assert out.index("Musica") < out.index("Fede")
+
+
+def test_infobox_outputs_the_categories_too():
+    out = render(entities=cat_entities())
+    assert "[[Category:Musica]]" in out and "[[Category:Fede]]" in out
+
+
+def test_sortkey_param():
+    assert "[[Category:Musica|Buona novella]]" in categories(sortkey="Buona novella")
+
+
+def test_not_tree_value_tracked():
+    ents = cat_entities(themes=("Q999",), extra={"Q999": {"labels": {"it": "Altro"}, "sitelinks": {"it": "Categoria:Altro"}}})
+    out = categories(entities=ents)
+    assert f"[[Category:{msg('it', 'category_not_tree')}]]" in out
+    assert "Altro" not in out
+
+
+def test_theme_value_that_is_a_field_is_not_a_theme():
+    out = categories(entities=cat_entities(themes=(MUSIC,)))
+    assert f"[[Category:{msg('it', 'category_not_tree')}]]" in out
+
+
+def test_two_fields_first_used_and_tracked():
+    ents = cat_entities(field=(MUSIC, "Q47734"), extra={"Q47734": {"sitelinks": {"it": "Categoria:Arti"}}})
+    out = categories(entities=ents)
+    assert "[[Category:Musica]]" in out and "Categoria:Arti" not in out and "[[Category:Arti]]" not in out
+    assert f"[[Category:{msg('it', 'category_two_fields')}]]" in out
+
+
+def test_tree_item_without_local_category_tracked():
+    ents = cat_entities()
+    ents[FAITH] = {"labels": {"it": "Fede"}, "sitelinks": {}}
+    out = categories(entities=ents)
+    assert f"[[Category:{msg('it', 'category_not_on_wiki')}]]" in out
+    assert "Fede]]" not in out.replace(msg('it', 'category_not_on_wiki'), "")
+
+
+def test_sv_categories_without_item_is_empty():
+    assert categories(page_entity=None, entities={}) == ""
+
+
+def test_item_param_names_the_item():
+    assert "[[Category:Musica]]" in categories(page_entity=None, item="Q4178")
+
+
+# --- {{SV infobox}}: the layout follows the item's instance of (P2016) ---
+
+def auto(instance_of, lang="it", **args):
+    ents = dict(ENTITIES)
+    ents["Q4178"] = dict(LOTR, claims=dict(LOTR["claims"], P2016=[item(q) for q in instance_of]))
+    env = LuaEnv(lang=lang, entities=ents, page_entity="Q4178", page_title="Pagina")
+    ctx = env.lua.table_from({"lang": lang, "entity_id": "Q4178", "frame": env.frame()})
+    return env.call("Module:SV/Infobox", "_render", "auto", env.lua.table_from(args), ctx)
+
+
+def test_auto_picks_film_from_instance_of():
+    assert '<table class="sv-infobox sv-infobox-film">' in auto(["Q13367"])
+
+
+def test_auto_type_param_wins():
+    assert '<table class="sv-infobox sv-infobox-tv">' in auto(["Q13367"], type="tv")
+
+
+def test_auto_first_mapped_instance_wins():
+    assert '<table class="sv-infobox sv-infobox-person">' in auto(["Q13121", "Q13367"])
+    assert '<table class="sv-infobox sv-infobox-film">' in auto(["Q13367", "Q13121"])
+    out = auto(["Q999", "Q13121"])  # an unmapped value first is skipped
+    assert '<table class="sv-infobox sv-infobox-person">' in out
+    assert msg("it", "infobox_unknown_type") not in out
+
+
+def test_auto_unknown_type_tracked():
+    out = auto(["Q999"])
+    assert '<table class="sv-infobox sv-infobox-work">' in out
+    assert f"[[Category:{msg('it', 'infobox_unknown_type')}]]" in out
+
+
+def test_auto_no_instance_of_tracked():
+    assert f"[[Category:{msg('it', 'infobox_unknown_type')}]]" in auto([])
+
+
+def test_auto_human_is_person():
+    assert '<table class="sv-infobox sv-infobox-person">' in auto(["Q13121"])
+
+
+def test_auto_group_layout():
+    assert '<table class="sv-infobox sv-infobox-group">' in auto(["Q2404"])
+
+
+def test_sortkey_space_entity_becomes_a_space():
+    assert "[[Category:Musica| ]]" in categories(sortkey="&#32;")

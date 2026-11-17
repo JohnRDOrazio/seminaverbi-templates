@@ -1,5 +1,6 @@
 {
  "root": {
+  "item": "Q48362",
   "names": {
    "en": "Seeds of the Word",
    "it": "Semi del Verbo",
@@ -13,6 +14,7 @@
   }
  },
  "themes_root": {
+  "item": "Q48381",
   "names": {
    "en": "Gospel themes",
    "it": "Temi evangelici",
@@ -28,6 +30,7 @@
  "fields": [
   {
    "key": "arts",
+   "item": "Q47734",
    "names": {
     "en": "Arts",
     "it": "Arti",
@@ -42,6 +45,7 @@
    "children": [
     {
      "key": "literature",
+     "item": "Q47735",
      "names": {
       "en": "Literature",
       "it": "Letteratura",
@@ -56,6 +60,7 @@
      "children": [
       {
        "key": "poetry",
+       "item": "Q47736",
        "names": {
         "en": "Poetry",
         "it": "Poesia",
@@ -70,6 +75,7 @@
       },
       {
        "key": "novels",
+       "item": "Q47737",
        "names": {
         "en": "Novels",
         "it": "Romanzi",
@@ -84,6 +90,7 @@
       },
       {
        "key": "short-fiction",
+       "item": "Q47738",
        "names": {
         "en": "Short stories",
         "it": "Racconti",
@@ -98,6 +105,7 @@
       },
       {
        "key": "drama",
+       "item": "Q47739",
        "names": {
         "en": "Drama",
         "it": "Drammaturgia",
@@ -112,6 +120,7 @@
       },
       {
        "key": "essays",
+       "item": "Q47740",
        "names": {
         "en": "Essays",
         "it": "Saggistica",
@@ -126,6 +135,7 @@
       },
       {
        "key": "childrens-literature",
+       "item": "Q47741",
        "names": {
         "en": "Children's literature",
         "it": "Letteratura per ragazzi",
@@ -142,6 +152,7 @@
     },
     {
      "key": "performing-arts",
+     "item": "Q47742",
      "names": {
       "en": "Performing arts",
       "it": "Arti dello spettacolo",
@@ -156,6 +167,7 @@
      "children": [
       {
        "key": "music",
+       "item": "Q47743",
        "names": {
         "en": "Music",
         "it": "Musica",
@@ -170,6 +182,7 @@
        "children": [
         {
          "key": "classical-music",
+         "item": "Q47744",
          "names": {
           "en": "Classical music",
           "it": "Musica classica",
@@ -184,6 +197,7 @@
         },
         {
          "key": "sacred-music",
+         "item": "Q47931",
          "names": {
           "en": "Sacred music",
           "it": "Musica sacra",
@@ -198,6 +212,7 @@
         },
         {
          "key": "popular-music",
+         "item": "Q47746",
          "names": {
           "en": "Popular music",
           "it": "Musica leggera",
@@ -212,6 +227,7 @@
         },
         {
          "key": "folk-music",
+         "item": "Q47747",
          "names": {
           "en": "Folk music",
           "it": "Musica popolare tradizionale",
@@ -228,6 +244,7 @@
       },
       {
        "key": "theatre",
+       "item": "Q47932",
        "names": {
         "en": "Theatre",
         "it": "Teatro",
@@ -242,6 +259,7 @@
       },
       {
        "key": "dance",
+       "item": "Q47933",
        "names": {
         "en": "Dance",
         "it": "Danza",
@@ -256,6 +274,7 @@
       },
       {
        "key": "musical-theatre",
+       "item": "Q48004",
        "names": {
         "en": "Musical theatre",
         "it": "Teatro musicale",
@@ -270,6 +289,7 @@
       },
       {
        "key": "opera",
+       "item": "Q48005",
        "names": {
         "en": "Opera",
         "it": "Opera lirica",
@@ -286,6 +306,7 @@
     },
     {
      "key": "visual-arts",
+     "item": "Q47752",
      "names": {
       "en": "Visual arts",
       "it": "Arti visive",
@@ -300,6 +321,7 @@
      "children": [
       {
        "key": "painting",
+       "item": "Q47753",
        "names": {
         "en": "Painting",
         "it": "Pittura",
@@ -314,6 +336,7 @@
        "children": [
         {
          "key": "fresco",
+         "item": "Q48068",
          "names": {
           "en": "Fresco",
           "it": "Affresco",
@@ -328,6 +351,7 @@
         },
         {
          "key": "oil-painting",
+         "item": "Q48363",
          "names": {
           "en": "Oil painting",
           "it": "Pittura ad olio",
@@ -342,6 +366,7 @@
         },
         {
          "key": "watercolor",
+         "item": "Q48126",
          "names": {
           "en": "Watercolor",
           "it": "Acquerello",
@@ -356,6 +381,7 @@
         },
         {
          "key": "icon-painting",
+         "item": "Q48009",
          "names": {
           "en": "Icon painting",
           "it": "Iconografia sacra",
@@ -370,6 +396,7 @@
         },
         {
          "key": "cave-painting",
+         "item": "Q48071",
          "names": {
           "en": "Cave painting",
           "it": "Pittura rupestre",
@@ -386,6 +413,7 @@
       },
       {
        "key": "sculpture",
+       "item": "Q47759",
        "names": {
         "en": "Sculpture",
         "it": "Scultura",
@@ -400,6 +428,7 @@
       },
       {
        "key": "drawing",
+       "item": "Q47760",
        "names": {
         "en": "Drawing",
         "it": "Disegno",
@@ -414,6 +443,7 @@
        "children": [
         {
          "key": "charcoal-drawing",
+         "item": "Q48364",
          "names": {
           "en": "Charcoal drawing",
           "it": "Disegno a carboncino",
@@ -428,6 +458,7 @@
         },
         {
          "key": "pencil-drawing",
+         "item": "Q48365",
          "names": {
           "en": "Pencil drawing",
           "it": "Disegno a matita",
@@ -444,6 +475,7 @@
       },
       {
        "key": "printmaking",
+       "item": "Q47763",
        "names": {
         "en": "Printmaking",
         "it": "Incisione",
@@ -458,6 +490,7 @@
        "children": [
         {
          "key": "engraving",
+         "item": "Q47764",
          "names": {
           "en": "Engraving",
           "it": "Incisione a bulino",
@@ -472,6 +505,7 @@
         },
         {
          "key": "etching",
+         "item": "Q47765",
          "names": {
           "en": "Etching",
           "it": "Acquaforte",
@@ -488,6 +522,7 @@
       },
       {
        "key": "photography",
+       "item": "Q47766",
        "names": {
         "en": "Photography",
         "it": "Fotografia",
@@ -502,6 +537,7 @@
        "children": [
         {
          "key": "bw-photography",
+         "item": "Q48074",
          "names": {
           "en": "Black-and-white photography",
           "it": "Fotografia in bianco e nero",
@@ -516,6 +552,7 @@
         },
         {
          "key": "hdr-photography",
+         "item": "Q48366",
          "names": {
           "en": "HDR photography",
           "it": "Fotografia HDR",
@@ -530,6 +567,7 @@
         },
         {
          "key": "landscape-photography",
+         "item": "Q47769",
          "names": {
           "en": "Landscape photography",
           "it": "Fotografia di paesaggio",
@@ -544,6 +582,7 @@
         },
         {
          "key": "portrait-photography",
+         "item": "Q47770",
          "names": {
           "en": "Portrait photography",
           "it": "Fotografia di ritratto",
@@ -560,6 +599,7 @@
       },
       {
        "key": "comics",
+       "item": "Q47771",
        "names": {
         "en": "Comics",
         "it": "Fumetto",
@@ -576,6 +616,7 @@
     },
     {
      "key": "crafts",
+     "item": "Q47945",
      "names": {
       "en": "Crafts and decorative arts",
       "it": "Arti decorative",
@@ -590,6 +631,7 @@
      "children": [
       {
        "key": "ceramics",
+       "item": "Q47773",
        "names": {
         "en": "Ceramic art",
         "it": "Arte ceramica",
@@ -604,6 +646,7 @@
       },
       {
        "key": "glass-art",
+       "item": "Q47774",
        "names": {
         "en": "Glass art",
         "it": "Arte vetraria",
@@ -618,6 +661,7 @@
        "children": [
         {
          "key": "glassblowing",
+         "item": "Q48367",
          "names": {
           "en": "Glassblowing",
           "it": "Vetro soffiato",
@@ -632,6 +676,7 @@
         },
         {
          "key": "stained-glass",
+         "item": "Q47776",
          "names": {
           "en": "Stained glass",
           "it": "Vetro colorato",
@@ -648,6 +693,7 @@
       },
       {
        "key": "mosaic",
+       "item": "Q47777",
        "names": {
         "en": "Mosaic",
         "it": "Mosaico",
@@ -662,6 +708,7 @@
       },
       {
        "key": "tapestry",
+       "item": "Q47947",
        "names": {
         "en": "Tapestry",
         "it": "Arazzo",
@@ -676,6 +723,7 @@
       },
       {
        "key": "goldsmithing",
+       "item": "Q47948",
        "names": {
         "en": "Goldsmithing",
         "it": "Oreficeria",
@@ -690,6 +738,7 @@
       },
       {
        "key": "calligraphy",
+       "item": "Q48368",
        "names": {
         "en": "Calligraphy and illumination",
         "it": "Calligrafia e miniatura",
@@ -706,6 +755,7 @@
     },
     {
      "key": "architecture",
+     "item": "Q47781",
      "names": {
       "en": "Architecture",
       "it": "Architettura",
@@ -720,6 +770,7 @@
      "children": [
       {
        "key": "sacred-architecture",
+       "item": "Q48079",
        "names": {
         "en": "Sacred architecture",
         "it": "Architettura sacra",
@@ -734,6 +785,7 @@
       },
       {
        "key": "landscape-architecture",
+       "item": "Q47783",
        "names": {
         "en": "Landscape architecture",
         "it": "Architettura del paesaggio",
@@ -750,6 +802,7 @@
     },
     {
      "key": "design",
+     "item": "Q47784",
      "names": {
       "en": "Design",
       "it": "Design",
@@ -764,6 +817,7 @@
      "children": [
       {
        "key": "graphic-design",
+       "item": "Q47785",
        "names": {
         "en": "Graphic design",
         "it": "Grafica",
@@ -778,6 +832,7 @@
       },
       {
        "key": "industrial-design",
+       "item": "Q47786",
        "names": {
         "en": "Industrial design",
         "it": "Disegno industriale",
@@ -794,6 +849,7 @@
     },
     {
      "key": "audiovisual-media",
+     "item": "Q48369",
      "names": {
       "en": "Audiovisual and interactive media",
       "it": "Media audiovisivi e interattivi",
@@ -808,6 +864,7 @@
      "children": [
       {
        "key": "film",
+       "item": "Q47788",
        "names": {
         "en": "Film",
         "it": "Cinematografia",
@@ -822,6 +879,7 @@
        "children": [
         {
          "key": "feature-films",
+         "item": "Q48192",
          "names": {
           "en": "Feature films",
           "it": "Lungometraggi",
@@ -836,6 +894,7 @@
         },
         {
          "key": "short-films",
+         "item": "Q47790",
          "names": {
           "en": "Short films",
           "it": "Cortometraggi",
@@ -850,6 +909,7 @@
         },
         {
          "key": "documentary-films",
+         "item": "Q47791",
          "names": {
           "en": "Documentary films",
           "it": "Film documentari",
@@ -866,6 +926,7 @@
       },
       {
        "key": "television",
+       "item": "Q47792",
        "names": {
         "en": "Television",
         "it": "Televisione",
@@ -880,6 +941,7 @@
       },
       {
        "key": "radio",
+       "item": "Q47793",
        "names": {
         "en": "Radio",
         "it": "Radio",
@@ -894,6 +956,7 @@
       },
       {
        "key": "animation",
+       "item": "Q47794",
        "names": {
         "en": "Animation",
         "it": "Animazione",
@@ -908,6 +971,7 @@
       },
       {
        "key": "video-games",
+       "item": "Q47288",
        "names": {
         "en": "Video games",
         "it": "Videogiochi",
@@ -924,6 +988,7 @@
     },
     {
      "key": "heritage",
+     "item": "Q47795",
      "names": {
       "en": "Cultural heritage",
       "it": "Patrimonio culturale",
@@ -938,6 +1003,7 @@
      "children": [
       {
        "key": "monuments",
+       "item": "Q48370",
        "names": {
         "en": "Monuments and historic sites",
         "it": "Monumenti e siti storici",
@@ -952,6 +1018,7 @@
       },
       {
        "key": "cultural-traditions",
+       "item": "Q48371",
        "names": {
         "en": "Cultural traditions",
         "it": "Tradizioni culturali",
@@ -966,6 +1033,7 @@
       },
       {
        "key": "festivals",
+       "item": "Q47798",
        "names": {
         "en": "Festivals",
         "it": "Feste e festival",
@@ -980,6 +1048,7 @@
       },
       {
        "key": "folklore",
+       "item": "Q48372",
        "names": {
         "en": "Folklore and mythology",
         "it": "Folclore e mitologia",
@@ -994,6 +1063,7 @@
       },
       {
        "key": "christian-roots",
+       "item": "Q48373",
        "names": {
         "en": "Christian roots of Europe",
         "it": "Radici cristiane dell'Europa",
@@ -1008,6 +1078,7 @@
       },
       {
        "key": "flags",
+       "item": "Q48374",
        "names": {
         "en": "Flags and symbols",
         "it": "Bandiere e simboli",
@@ -1024,6 +1095,7 @@
     },
     {
      "key": "culinary-arts",
+     "item": "Q47533",
      "names": {
       "en": "Culinary arts",
       "it": "Arti culinarie",
@@ -1040,6 +1112,7 @@
   },
   {
    "key": "humanities",
+   "item": "Q47803",
    "names": {
     "en": "Humanities",
     "it": "Discipline umanistiche",
@@ -1054,6 +1127,7 @@
    "children": [
     {
      "key": "history",
+     "item": "Q47804",
      "names": {
       "en": "History",
       "it": "Storia",
@@ -1068,6 +1142,7 @@
      "children": [
       {
        "key": "ancient-history",
+       "item": "Q47805",
        "names": {
         "en": "Ancient history",
         "it": "Storia antica",
@@ -1082,6 +1157,7 @@
       },
       {
        "key": "medieval-history",
+       "item": "Q47958",
        "names": {
         "en": "Medieval history",
         "it": "Storia medievale",
@@ -1096,6 +1172,7 @@
       },
       {
        "key": "modern-history",
+       "item": "Q47807",
        "names": {
         "en": "Modern history",
         "it": "Storia moderna",
@@ -1110,6 +1187,7 @@
       },
       {
        "key": "contemporary-history",
+       "item": "Q47808",
        "names": {
         "en": "Contemporary history",
         "it": "Storia contemporanea",
@@ -1124,6 +1202,7 @@
       },
       {
        "key": "church-history",
+       "item": "Q48143",
        "names": {
         "en": "Church history",
         "it": "Storia della Chiesa",
@@ -1140,6 +1219,7 @@
     },
     {
      "key": "archaeology",
+     "item": "Q47810",
      "names": {
       "en": "Archaeology",
       "it": "Archeologia",
@@ -1154,6 +1234,7 @@
     },
     {
      "key": "linguistics",
+     "item": "Q47811",
      "names": {
       "en": "Linguistics",
       "it": "Linguistica",
@@ -1168,6 +1249,7 @@
     },
     {
      "key": "literary-studies",
+     "item": "Q47960",
      "names": {
       "en": "Literary studies",
       "it": "Critica letteraria",
@@ -1182,6 +1264,7 @@
     },
     {
      "key": "philosophy",
+     "item": "Q47813",
      "names": {
       "en": "Philosophy",
       "it": "Filosofia",
@@ -1196,6 +1279,7 @@
      "children": [
       {
        "key": "metaphysics",
+       "item": "Q47814",
        "names": {
         "en": "Metaphysics",
         "it": "Metafisica",
@@ -1210,6 +1294,7 @@
       },
       {
        "key": "epistemology",
+       "item": "Q47815",
        "names": {
         "en": "Epistemology",
         "it": "Epistemologia",
@@ -1224,6 +1309,7 @@
       },
       {
        "key": "ethics",
+       "item": "Q47816",
        "names": {
         "en": "Ethics",
         "it": "Etica",
@@ -1238,6 +1324,7 @@
        "children": [
         {
          "key": "bioethics",
+         "item": "Q47817",
          "names": {
           "en": "Bioethics",
           "it": "Bioetica",
@@ -1254,6 +1341,7 @@
       },
       {
        "key": "logic",
+       "item": "Q47818",
        "names": {
         "en": "Logic",
         "it": "Logica",
@@ -1268,6 +1356,7 @@
       },
       {
        "key": "aesthetics",
+       "item": "Q47819",
        "names": {
         "en": "Aesthetics",
         "it": "Estetica",
@@ -1282,6 +1371,7 @@
       },
       {
        "key": "political-philosophy",
+       "item": "Q47820",
        "names": {
         "en": "Political philosophy",
         "it": "Filosofia politica",
@@ -1298,6 +1388,7 @@
     },
     {
      "key": "theology",
+     "item": "Q47821",
      "names": {
       "en": "Theology",
       "it": "Teologia",
@@ -1312,6 +1403,7 @@
      "children": [
       {
        "key": "biblical-studies",
+       "item": "Q47822",
        "names": {
         "en": "Biblical studies",
         "it": "Studi biblici",
@@ -1326,6 +1418,7 @@
       },
       {
        "key": "dogmatic-theology",
+       "item": "Q48144",
        "names": {
         "en": "Dogmatic theology",
         "it": "Teologia dogmatica",
@@ -1340,6 +1433,7 @@
       },
       {
        "key": "moral-theology",
+       "item": "Q47962",
        "names": {
         "en": "Moral theology",
         "it": "Teologia morale",
@@ -1354,6 +1448,7 @@
       },
       {
        "key": "patristics",
+       "item": "Q47825",
        "names": {
         "en": "Patristics",
         "it": "Patristica",
@@ -1368,6 +1463,7 @@
       },
       {
        "key": "spiritual-theology",
+       "item": "Q48031",
        "names": {
         "en": "Spiritual theology",
         "it": "Teologia spirituale",
@@ -1384,6 +1480,7 @@
     },
     {
      "key": "art-history",
+     "item": "Q47827",
      "names": {
       "en": "Art history",
       "it": "Storia dell'arte",
@@ -1398,6 +1495,7 @@
     },
     {
      "key": "musicology",
+     "item": "Q47828",
      "names": {
       "en": "Musicology",
       "it": "Musicologia",
@@ -1412,6 +1510,7 @@
     },
     {
      "key": "film-studies",
+     "item": "Q47964",
      "names": {
       "en": "Film studies",
       "it": "Studi cinematografici",
@@ -1428,6 +1527,7 @@
   },
   {
    "key": "social-sciences",
+   "item": "Q47830",
    "names": {
     "en": "Social sciences",
     "it": "Scienze sociali",
@@ -1442,6 +1542,7 @@
    "children": [
     {
      "key": "psychology",
+     "item": "Q47831",
      "names": {
       "en": "Psychology",
       "it": "Psicologia",
@@ -1456,6 +1557,7 @@
     },
     {
      "key": "economics",
+     "item": "Q47832",
      "names": {
       "en": "Economics",
       "it": "Economia",
@@ -1470,6 +1572,7 @@
     },
     {
      "key": "education",
+     "item": "Q47833",
      "names": {
       "en": "Education",
       "it": "Pedagogia",
@@ -1484,6 +1587,7 @@
     },
     {
      "key": "sociology",
+     "item": "Q47834",
      "names": {
       "en": "Sociology",
       "it": "Sociologia",
@@ -1498,6 +1602,7 @@
     },
     {
      "key": "anthropology",
+     "item": "Q47835",
      "names": {
       "en": "Anthropology",
       "it": "Antropologia",
@@ -1512,6 +1617,7 @@
     },
     {
      "key": "law",
+     "item": "Q47836",
      "names": {
       "en": "Law",
       "it": "Diritto",
@@ -1526,6 +1632,7 @@
     },
     {
      "key": "political-science",
+     "item": "Q47837",
      "names": {
       "en": "Political science",
       "it": "Scienze politiche",
@@ -1540,6 +1647,7 @@
     },
     {
      "key": "geography",
+     "item": "Q47838",
      "names": {
       "en": "Geography",
       "it": "Geografia",
@@ -1554,6 +1662,7 @@
     },
     {
      "key": "media-communication",
+     "item": "Q48092",
      "names": {
       "en": "Media and communication",
       "it": "Scienze della comunicazione",
@@ -1570,6 +1679,7 @@
   },
   {
    "key": "natural-sciences",
+   "item": "Q13282",
    "names": {
     "en": "Natural sciences",
     "it": "Scienze naturali",
@@ -1584,6 +1694,7 @@
    "children": [
     {
      "key": "mathematics",
+     "item": "Q47840",
      "names": {
       "en": "Mathematics",
       "it": "Matematica",
@@ -1598,6 +1709,7 @@
     },
     {
      "key": "computer-science",
+     "item": "Q47841",
      "names": {
       "en": "Computer science",
       "it": "Informatica",
@@ -1612,6 +1724,7 @@
     },
     {
      "key": "physics",
+     "item": "Q47842",
      "names": {
       "en": "Physics",
       "it": "Fisica",
@@ -1626,6 +1739,7 @@
     },
     {
      "key": "astronomy",
+     "item": "Q47966",
      "names": {
       "en": "Astronomy",
       "it": "Astronomia",
@@ -1640,6 +1754,7 @@
     },
     {
      "key": "chemistry",
+     "item": "Q47844",
      "names": {
       "en": "Chemistry",
       "it": "Chimica",
@@ -1654,6 +1769,7 @@
     },
     {
      "key": "earth-sciences",
+     "item": "Q47845",
      "names": {
       "en": "Earth sciences",
       "it": "Scienze della Terra",
@@ -1668,6 +1784,7 @@
      "children": [
       {
        "key": "geology",
+       "item": "Q47846",
        "names": {
         "en": "Geology",
         "it": "Geologia",
@@ -1682,6 +1799,7 @@
       },
       {
        "key": "meteorology",
+       "item": "Q48375",
        "names": {
         "en": "Meteorology and climatology",
         "it": "Meteorologia e climatologia",
@@ -1696,6 +1814,7 @@
       },
       {
        "key": "environmental-science",
+       "item": "Q47848",
        "names": {
         "en": "Environmental science",
         "it": "Scienze ambientali",
@@ -1712,6 +1831,7 @@
     },
     {
      "key": "biology",
+     "item": "Q47849",
      "names": {
       "en": "Biology",
       "it": "Biologia",
@@ -1726,6 +1846,7 @@
      "children": [
       {
        "key": "botany",
+       "item": "Q47850",
        "names": {
         "en": "Botany",
         "it": "Botanica",
@@ -1740,6 +1861,7 @@
       },
       {
        "key": "zoology",
+       "item": "Q47851",
        "names": {
         "en": "Zoology",
         "it": "Zoologia",
@@ -1754,6 +1876,7 @@
       },
       {
        "key": "genetics",
+       "item": "Q47852",
        "names": {
         "en": "Genetics",
         "it": "Genetica",
@@ -1768,6 +1891,7 @@
       },
       {
        "key": "ecology",
+       "item": "Q47853",
        "names": {
         "en": "Ecology",
         "it": "Ecologia",
@@ -1786,6 +1910,7 @@
   },
   {
    "key": "engineering-technology",
+   "item": "Q48376",
    "names": {
     "en": "Engineering and technology",
     "it": "Ingegneria e tecnologia",
@@ -1800,6 +1925,7 @@
    "children": [
     {
      "key": "civil-engineering",
+     "item": "Q47855",
      "names": {
       "en": "Civil engineering",
       "it": "Ingegneria civile",
@@ -1814,6 +1940,7 @@
     },
     {
      "key": "mechanical-engineering",
+     "item": "Q47856",
      "names": {
       "en": "Mechanical engineering",
       "it": "Ingegneria meccanica",
@@ -1828,6 +1955,7 @@
     },
     {
      "key": "electrical-engineering",
+     "item": "Q48150",
      "names": {
       "en": "Electrical and electronic engineering",
       "it": "Ingegneria elettrica ed elettronica",
@@ -1842,6 +1970,7 @@
     },
     {
      "key": "information-technology",
+     "item": "Q47858",
      "names": {
       "en": "Information technology",
       "it": "Tecnologie dell'informazione",
@@ -1856,6 +1985,7 @@
     },
     {
      "key": "aerospace-engineering",
+     "item": "Q47859",
      "names": {
       "en": "Aerospace engineering",
       "it": "Ingegneria aerospaziale",
@@ -1870,6 +2000,7 @@
     },
     {
      "key": "biotechnology",
+     "item": "Q47860",
      "names": {
       "en": "Biotechnology",
       "it": "Biotecnologie",
@@ -1886,6 +2017,7 @@
   },
   {
    "key": "medical-health-sciences",
+   "item": "Q48377",
    "names": {
     "en": "Medical and health sciences",
     "it": "Scienze mediche e della salute",
@@ -1900,6 +2032,7 @@
    "children": [
     {
      "key": "medicine",
+     "item": "Q47862",
      "names": {
       "en": "Medicine",
       "it": "Medicina",
@@ -1914,6 +2047,7 @@
     },
     {
      "key": "nursing",
+     "item": "Q47863",
      "names": {
       "en": "Nursing",
       "it": "Infermieristica",
@@ -1928,6 +2062,7 @@
     },
     {
      "key": "public-health",
+     "item": "Q47864",
      "names": {
       "en": "Public health",
       "it": "Sanità pubblica",
@@ -1942,6 +2077,7 @@
     },
     {
      "key": "pharmacology",
+     "item": "Q47865",
      "names": {
       "en": "Pharmacology",
       "it": "Farmacologia",
@@ -1958,6 +2094,7 @@
   },
   {
    "key": "religion",
+   "item": "Q47866",
    "names": {
     "en": "Religion",
     "it": "Religione",
@@ -1972,6 +2109,7 @@
    "children": [
     {
      "key": "christianity",
+     "item": "Q47867",
      "names": {
       "en": "Christianity",
       "it": "Cristianesimo",
@@ -1986,6 +2124,7 @@
      "children": [
       {
        "key": "liturgy",
+       "item": "Q48037",
        "names": {
         "en": "Liturgy",
         "it": "Liturgia",
@@ -2000,6 +2139,7 @@
       },
       {
        "key": "saints",
+       "item": "Q47869",
        "names": {
         "en": "Saints",
         "it": "Santi",
@@ -2014,6 +2154,7 @@
       },
       {
        "key": "religious-orders",
+       "item": "Q47870",
        "names": {
         "en": "Religious orders",
         "it": "Ordini religiosi",
@@ -2028,6 +2169,7 @@
       },
       {
        "key": "sacred-art",
+       "item": "Q48204",
        "names": {
         "en": "Sacred art",
         "it": "Arte sacra",
@@ -2042,6 +2184,7 @@
       },
       {
        "key": "popes",
+       "item": "Q47872",
        "names": {
         "en": "Popes",
         "it": "Papi",
@@ -2056,6 +2199,7 @@
       },
       {
        "key": "christian-denominations",
+       "item": "Q47873",
        "names": {
         "en": "Christian denominations",
         "it": "Confessioni cristiane",
@@ -2072,6 +2216,7 @@
     },
     {
      "key": "bible",
+     "item": "Q47973",
      "names": {
       "en": "The Bible",
       "it": "Bibbia",
@@ -2086,6 +2231,7 @@
     },
     {
      "key": "judaism",
+     "item": "Q47875",
      "names": {
       "en": "Judaism",
       "it": "Ebraismo",
@@ -2100,6 +2246,7 @@
     },
     {
      "key": "islam",
+     "item": "Q47876",
      "names": {
       "en": "Islam",
       "it": "Islam",
@@ -2114,6 +2261,7 @@
     },
     {
      "key": "eastern-religions",
+     "item": "Q48378",
      "names": {
       "en": "Eastern religions",
       "it": "Religioni orientali",
@@ -2128,6 +2276,7 @@
     },
     {
      "key": "traditional-religions",
+     "item": "Q48379",
      "names": {
       "en": "Traditional religions",
       "it": "Religioni tradizionali",
@@ -2142,6 +2291,7 @@
     },
     {
      "key": "new-religious-movements",
+     "item": "Q47879",
      "names": {
       "en": "New religious movements",
       "it": "Nuovi movimenti religiosi",
@@ -2158,6 +2308,7 @@
   },
   {
    "key": "popular-culture",
+   "item": "Q47880",
    "names": {
     "en": "Popular culture",
     "it": "Cultura popolare",
@@ -2172,6 +2323,7 @@
    "children": [
     {
      "key": "sport",
+     "item": "Q47881",
      "names": {
       "en": "Sport",
       "it": "Sport",
@@ -2186,6 +2338,7 @@
     },
     {
      "key": "fashion",
+     "item": "Q47882",
      "names": {
       "en": "Fashion",
       "it": "Moda",
@@ -2200,6 +2353,7 @@
     },
     {
      "key": "toys-games",
+     "item": "Q48380",
      "names": {
       "en": "Toys and games",
       "it": "Giocattoli e giochi",
@@ -2214,6 +2368,7 @@
     },
     {
      "key": "fandom",
+     "item": "Q47884",
      "names": {
       "en": "Fandom",
       "it": "Fandom",
@@ -2228,6 +2383,7 @@
     },
     {
      "key": "internet-culture",
+     "item": "Q47885",
      "names": {
       "en": "Internet culture",
       "it": "Cultura di Internet",
@@ -2246,6 +2402,7 @@
  "themes": [
   {
    "key": "theological-virtues",
+   "item": "Q48043",
    "names": {
     "en": "Theological virtues",
     "it": "Virtù teologali",
@@ -2260,6 +2417,7 @@
    "children": [
     {
      "key": "faith",
+     "item": "Q47888",
      "names": {
       "en": "Faith",
       "it": "Fede",
@@ -2274,6 +2432,7 @@
     },
     {
      "key": "hope",
+     "item": "Q47889",
      "names": {
       "en": "Hope",
       "it": "Speranza",
@@ -2288,6 +2447,7 @@
     },
     {
      "key": "charity",
+     "item": "Q47890",
      "names": {
       "en": "Charity",
       "it": "Carità",
@@ -2304,6 +2464,7 @@
   },
   {
    "key": "cardinal-virtues",
+   "item": "Q48044",
    "names": {
     "en": "Cardinal virtues",
     "it": "Virtù cardinali",
@@ -2318,6 +2479,7 @@
    "children": [
     {
      "key": "prudence",
+     "item": "Q48382",
      "names": {
       "en": "Prudence",
       "it": "Prudenza",
@@ -2332,6 +2494,7 @@
     },
     {
      "key": "justice",
+     "item": "Q47893",
      "names": {
       "en": "Justice",
       "it": "Giustizia",
@@ -2346,6 +2509,7 @@
     },
     {
      "key": "fortitude",
+     "item": "Q48210",
      "names": {
       "en": "Fortitude",
       "it": "Fortezza",
@@ -2360,6 +2524,7 @@
     },
     {
      "key": "temperance",
+     "item": "Q48383",
      "names": {
       "en": "Temperance",
       "it": "Temperanza",
@@ -2376,6 +2541,7 @@
   },
   {
    "key": "sin-grace-salvation",
+   "item": "Q48384",
    "names": {
     "en": "Sin, grace and salvation",
     "it": "Peccato, grazia e salvezza",
@@ -2390,6 +2556,7 @@
    "children": [
     {
      "key": "sin",
+     "item": "Q47897",
      "names": {
       "en": "Sin",
       "it": "Peccato",
@@ -2404,6 +2571,7 @@
     },
     {
      "key": "temptation",
+     "item": "Q48385",
      "names": {
       "en": "Temptation",
       "it": "Tentazione",
@@ -2418,6 +2586,7 @@
     },
     {
      "key": "repentance",
+     "item": "Q47899",
      "names": {
       "en": "Repentance",
       "it": "Pentimento",
@@ -2432,6 +2601,7 @@
     },
     {
      "key": "conversion",
+     "item": "Q48386",
      "names": {
       "en": "Conversion",
       "it": "Conversione",
@@ -2446,6 +2616,7 @@
     },
     {
      "key": "forgiveness",
+     "item": "Q48387",
      "names": {
       "en": "Forgiveness",
       "it": "Perdono",
@@ -2460,6 +2631,7 @@
     },
     {
      "key": "mercy",
+     "item": "Q48388",
      "names": {
       "en": "Mercy",
       "it": "Misericordia",
@@ -2474,6 +2646,7 @@
     },
     {
      "key": "redemption",
+     "item": "Q48217",
      "names": {
       "en": "Redemption",
       "it": "Redenzione",
@@ -2488,6 +2661,7 @@
     },
     {
      "key": "grace",
+     "item": "Q48389",
      "names": {
       "en": "Grace",
       "it": "Grazia",
@@ -2502,6 +2676,7 @@
     },
     {
      "key": "sacrifice",
+     "item": "Q47905",
      "names": {
       "en": "Sacrifice",
       "it": "Sacrificio",
@@ -2518,6 +2693,7 @@
   },
   {
    "key": "human-person",
+   "item": "Q48390",
    "names": {
     "en": "The human person",
     "it": "La persona umana",
@@ -2532,6 +2708,7 @@
    "children": [
     {
      "key": "conscience",
+     "item": "Q48056",
      "names": {
       "en": "Conscience",
       "it": "Coscienza",
@@ -2546,6 +2723,7 @@
     },
     {
      "key": "freedom",
+     "item": "Q47992",
      "names": {
       "en": "Freedom",
       "it": "Libertà",
@@ -2560,6 +2738,7 @@
     },
     {
      "key": "human-dignity",
+     "item": "Q48391",
      "names": {
       "en": "Human dignity",
       "it": "Dignità umana",
@@ -2574,6 +2753,7 @@
     },
     {
      "key": "suffering",
+     "item": "Q47910",
      "names": {
       "en": "Suffering",
       "it": "Sofferenza",
@@ -2588,6 +2768,7 @@
     },
     {
      "key": "death",
+     "item": "Q47911",
      "names": {
       "en": "Death",
       "it": "Morte",
@@ -2602,6 +2783,7 @@
     },
     {
      "key": "eternal-life",
+     "item": "Q48392",
      "names": {
       "en": "Eternal life",
       "it": "Vita eterna",
@@ -2616,6 +2798,7 @@
     },
     {
      "key": "vocation",
+     "item": "Q48393",
      "names": {
       "en": "Vocation",
       "it": "Vocazione",
@@ -2632,6 +2815,7 @@
   },
   {
    "key": "communion-society",
+   "item": "Q48394",
    "names": {
     "en": "Communion and society",
     "it": "Comunione e società",
@@ -2646,6 +2830,7 @@
    "children": [
     {
      "key": "family",
+     "item": "Q47915",
      "names": {
       "en": "Family",
       "it": "Famiglia",
@@ -2660,6 +2845,7 @@
     },
     {
      "key": "marriage",
+     "item": "Q47997",
      "names": {
       "en": "Marriage",
       "it": "Matrimonio",
@@ -2674,6 +2860,7 @@
     },
     {
      "key": "friendship",
+     "item": "Q47917",
      "names": {
       "en": "Friendship",
       "it": "Amicizia",
@@ -2688,6 +2875,7 @@
     },
     {
      "key": "community",
+     "item": "Q47918",
      "names": {
       "en": "Community",
       "it": "Comunità",
@@ -2702,6 +2890,7 @@
     },
     {
      "key": "work",
+     "item": "Q47919",
      "names": {
       "en": "Work",
       "it": "Lavoro",
@@ -2716,6 +2905,7 @@
     },
     {
      "key": "peace",
+     "item": "Q47920",
      "names": {
       "en": "Peace",
       "it": "Pace",
@@ -2730,6 +2920,7 @@
     },
     {
      "key": "creation",
+     "item": "Q48395",
      "names": {
       "en": "Care for creation",
       "it": "Custodia del creato",
@@ -2746,6 +2937,7 @@
   },
   {
    "key": "christ-church",
+   "item": "Q48396",
    "names": {
     "en": "Christ and the Church",
     "it": "Cristo e la Chiesa",
@@ -2760,6 +2952,7 @@
    "children": [
     {
      "key": "incarnation",
+     "item": "Q48397",
      "names": {
       "en": "Incarnation",
       "it": "Incarnazione",
@@ -2774,6 +2967,7 @@
     },
     {
      "key": "cross",
+     "item": "Q48398",
      "names": {
       "en": "The Cross",
       "it": "La Croce",
@@ -2788,6 +2982,7 @@
     },
     {
      "key": "resurrection",
+     "item": "Q47925",
      "names": {
       "en": "Resurrection",
       "it": "Risurrezione",
@@ -2802,6 +2997,7 @@
     },
     {
      "key": "eucharist",
+     "item": "Q47926",
      "names": {
       "en": "Eucharist",
       "it": "Eucaristia",
@@ -2816,6 +3012,7 @@
     },
     {
      "key": "mary",
+     "item": "Q48002",
      "names": {
       "en": "Mary",
       "it": "Maria",
@@ -2830,6 +3027,7 @@
     },
     {
      "key": "holiness",
+     "item": "Q47928",
      "names": {
       "en": "Holiness",
       "it": "Santità",
@@ -2844,6 +3042,7 @@
     },
     {
      "key": "prayer",
+     "item": "Q47929",
      "names": {
       "en": "Prayer",
       "it": "Preghiera",

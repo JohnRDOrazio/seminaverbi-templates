@@ -3,6 +3,9 @@
   "bible_missing_ref": "SV Bible quote: manca il parametro ref.",
   "bible_note": "testo in $1; non ancora disponibile in italiano",
   "bible_unsupported": "La versione biblica '$1' non è supportata da BibleGet.",
+  "category_not_on_wiki": "Voci SV con una categoria mancante su questa wiki",
+  "category_not_tree": "Voci SV archiviate in una categoria fuori dall'albero",
+  "category_two_fields": "Voci SV con più di un campo",
   "cathopedia_category": "Pagine con collegamenti a Cathopedia",
   "cathopedia_missing_title": "SV cathopedia: manca il titolo della pagina di Cathopedia.",
   "cathopedia_note": "(Cathopedia)",
@@ -15,7 +18,9 @@
   "date_decade": "anni $1",
   "date_millennium": "$1 millennio",
   "discernment_heading": "Semi del Verbo e punti di attenzione",
+  "file_summary": "Archiviazione sull'elemento Wikibase (campo SV / tema evangelico SV)",
   "infobox_missing_category": "Infobox SV con dati mancanti",
+  "infobox_unknown_type": "Infobox SV con tipo di elemento sconosciuto",
   "langname_en": "inglese",
   "langname_es": "spagnolo",
   "langname_it": "italiano",
@@ -23,6 +28,7 @@
   "managed_notice": "Questa pagina è gestita in git e sovrascritta dalla sincronizzazione: modificala su $1.",
   "quote_missing_text": "SV citazione: manca il parametro text.",
   "references_heading": "Note",
+  "tracking_category_text": "Categoria di servizio: i template SV vi inseriscono una pagina quando il suo elemento Wikibase o il suo infobox va corretto. Corretto l'elemento o la pagina, la pagina esce dalla categoria.",
   "wip_category": "Voci SV in lavorazione",
   "wip_notice": "Questa voce è in lavorazione ($1, $2)."
 }

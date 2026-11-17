@@ -72,6 +72,13 @@ def test_skill_mentions_jev_routine():
     assert "own page" in standard and "one field" in standard
 
 
+def test_skill_files_on_the_item():
+    text = (SKILL / "SKILL.md").read_text(encoding="utf-8")
+    for needle in ("SV field", "SV Gospel theme", "wikibase-add-statement", "{{SV categories}}",
+                   "{{SV infobox}}", "wikibase-search-entities", "docs/content-tasks.md"):
+        assert needle in text, needle
+
+
 def test_template_categories_are_allowed():
     for text in ((SKILL / "SKILL.md").read_text(encoding="utf-8"), render_categories(ROOT)):
         assert "maintenance and tracking categories" in text

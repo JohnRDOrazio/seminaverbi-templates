@@ -143,13 +143,116 @@ local function fieldLabel(field, lang)
 	return Util.escape(label(field.propId, lang) or field.key)
 end
 
+-- Tree item IDs from Module:SV/Data: field nodes (any level below the root) and leaf Gospel themes.
+local function treeItems(data)
+	local fields, themes = {}, {}
+	local function walkFields(nodes)
+		for _, n in ipairs(nodes or {}) do
+			if n.item then
+				fields[n.item] = true
+			end
+			walkFields(n.children)
+		end
+	end
+	local function walkThemes(nodes)
+		for _, n in ipairs(nodes or {}) do
+			if n.children and n.children[1] then
+				walkThemes(n.children)
+			elseif n.item then
+				themes[n.item] = true
+			end
+		end
+	end
+	walkFields(data.categories.fields)
+	walkThemes(data.categories.themes)
+	return fields, themes
+end
+
+local function itemIds(entity, propId)
+	local out = {}
+	for _, statement in ipairs(entity and entity.claims and entity.claims[propId] or {}) do
+		local snak = statement.mainsnak
+		local dv = snak and snak.snaktype == 'value' and snak.datavalue
+		if dv and statement.rank ~= 'deprecated' then
+			out[#out + 1] = dv.value.id
+		end
+	end
+	return out
+end
+
+-- [[Category:…]] for the item's SV field (one) and SV Gospel themes, in the wiki's language; anything
+-- unexpected goes to a tracking category instead of being dropped silently.
+function p._categories(entity, lang, sortkey)
+	if not entity then
+		return ''
+	end
+	local data = mw.loadData('Module:SV/Data')
+	local fieldItems, themeItems = treeItems(data)
+	local out, seen, tracked = {}, {}, {}
+	sortkey = sortkey and (sortkey:gsub('&#32;', ' ')) -- a blank sort key, which template parameters cannot carry
+	local suffix = sortkey and sortkey ~= '' and ('|' .. sortkey) or ''
+	local function track(key)
+		if not tracked[key] then
+			tracked[key] = true
+			out[#out + 1] = '[[Category:' .. Util.msg(key, lang) .. ']]'
+		end
+	end
+	local function add(id, allowed)
+		if not allowed[id] then
+			track('category_not_tree')
+			return
+		end
+		local title = mw.wikibase.getSitelink(id)
+		if not title then
+			track('category_not_on_wiki')
+			return
+		end
+		local name = title:match('^[^:]+:(.+)$') or title
+		if not seen[name] then
+			seen[name] = true
+			out[#out + 1] = '[[Category:' .. name .. suffix .. ']]'
+		end
+	end
+	local fields = itemIds(entity, data.wikibase.sv_field)
+	if fields[1] then
+		add(fields[1], fieldItems)
+	end
+	if fields[2] then
+		track('category_two_fields')
+	end
+	for _, id in ipairs(itemIds(entity, data.wikibase.sv_theme)) do
+		add(id, themeItems)
+	end
+	return table.concat(out, '\n')
+end
+
+-- The layout for an item: the first of its "instance of" values that config/infobox_types.json maps,
+-- else person for a human, else the generic work layout (second result true: the type is unknown).
+function p.layoutFor(entity, data)
+	local types = data.infobox_types.types
+	local values = itemIds(entity, data.wikibase.instance_of)
+	for _, id in ipairs(values) do
+		if types[id] then
+			return types[id], false
+		end
+	end
+	return 'work', true
+end
+
 function p._render(kind, args, ctx)
 	local data = mw.loadData('Module:SV/Data')
 	local lang = ctx.lang
-	local infoboxType = kind == 'person' and 'person' or (args.type or 'book')
-	local fields = data.infobox[infoboxType] or data.infobox.book
 	local id = args.item or ctx.entity_id
 	local entity = id and mw.wikibase.getEntity(id)
+	local infoboxType, unknownType
+	if kind == 'person' then
+		infoboxType = 'person'
+	elseif kind == 'auto' and not args.type then
+		infoboxType, unknownType = p.layoutFor(entity, data)
+	else
+		infoboxType = args.type or 'book'
+	end
+	local fields = data.infobox[infoboxType] or data.infobox.book
 
 	local caption = args.name
 		or (entity and id and Util.escape(label(id, lang) or ''))
@@ -198,11 +301,26 @@ function p._render(kind, args, ctx)
 	if not entity or fromItem == 0 then
 		out[#out + 1] = '[[Category:' .. Util.msg('infobox_missing_category', lang) .. ']]'
 	end
+	if unknownType then
+		out[#out + 1] = '[[Category:' .. Util.msg('infobox_unknown_type', lang) .. ']]'
+	end
+	local cats = p._categories(entity, lang, args.sortkey)
+	if cats ~= '' then
+		out[#out + 1] = cats
+	end
 	return table.concat(out, '\n')
 end
 
 function p.work(frame)
 	return p._render('work', Args.get(frame), {
+		lang = Util.lang(),
+		frame = frame,
+		entity_id = mw.wikibase.getEntityIdForCurrentPage(),
+	})
+end
+
+function p.auto(frame)
+	return p._render('auto', Args.get(frame), {
 		lang = Util.lang(),
 		frame = frame,
 		entity_id = mw.wikibase.getEntityIdForCurrentPage(),
@@ -215,6 +333,13 @@ function p.person(frame)
 		frame = frame,
 		entity_id = mw.wikibase.getEntityIdForCurrentPage(),
 	})
+end
+
+function p.categories(frame)
+	local args = Args.get(frame)
+	local id = args.item or mw.wikibase.getEntityIdForCurrentPage()
+	local entity = id and mw.wikibase.getEntity(id)
+	return p._categories(entity, Util.lang(), args.sortkey)
 end
 
 return p

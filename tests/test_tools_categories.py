@@ -264,3 +264,30 @@ def test_sitelinks_use_the_seminaverbi_site_ids():
     # the SeminaVerbi wikis are the 'seminaverbi' group, global IDs en…pt
     from tools.categories import _site
     assert [_site(lang) for lang in ("en", "it", "es", "fr", "de", "pt")] == ["en", "it", "es", "fr", "de", "pt"]
+
+
+def test_record_items_writes_ids(tmp_path, capsys):
+    import copy
+    import json
+    data = copy.deepcopy(DATA)
+    titles = [f"Category:{n.names['en']}" for n in cat.nodes(data)]
+    repo = Fake("en", items={f"Q{100 + i}": {"en": t} for i, t in enumerate(titles)})
+    path = tmp_path / "categories.json"
+    path.write_text(json.dumps(data))
+    assert cat.main(["record-items"], client_factory=lambda lang: repo, data=data, path=path) == 0
+    written = json.loads(path.read_text())
+    assert written["root"]["item"] == "Q100" and written["fields"][0]["item"] == "Q101"
+    assert list(written["fields"][0])[:2] == ["key", "item"]
+    every = [n for n in cat.nodes(written)]
+    assert len(every) == len(titles)
+
+
+def test_record_items_reports_missing(tmp_path, capsys):
+    import copy
+    import json
+    data = copy.deepcopy(DATA)
+    repo = Fake("en", items={})
+    path = tmp_path / "categories.json"
+    path.write_text(json.dumps(data))
+    assert cat.main(["record-items"], client_factory=lambda lang: repo, data=data, path=path) == 1
+    assert "no item: arts" in capsys.readouterr().out

@@ -9,8 +9,8 @@
   "death_date": "P4723",
   "death_place": "P915",
   "director": "P4722",
-  "follows": "P490",
   "followed_by": "P501",
+  "follows": "P490",
   "genre": "P344",
   "image": "P725",
   "inception": "P4732",
@@ -23,5 +23,7 @@
   "publication_date": "P4788",
   "record_label": "P1561",
   "screenwriter": "P4820",
+  "sv_field": "P10768",
+  "sv_theme": "P10769",
   "title": "P458"
 }

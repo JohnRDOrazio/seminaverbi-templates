@@ -3,6 +3,9 @@
   "bible_missing_ref": "SV Bible quote: the ref parameter is missing.",
   "bible_note": "text in $1; not yet available in English",
   "bible_unsupported": "The Bible version '$1' is not supported by BibleGet.",
+  "category_not_on_wiki": "SV articles with a category missing on this wiki",
+  "category_not_tree": "SV articles filed under a non-tree category",
+  "category_two_fields": "SV articles with more than one field",
   "cathopedia_category": "Pages linking to Cathopedia",
   "cathopedia_missing_title": "SV cathopedia: the Cathopedia page title is missing.",
   "cathopedia_note": "(Cathopedia, in Italian)",
@@ -15,7 +18,9 @@
   "date_decade": "$1s",
   "date_millennium": "$3 millennium",
   "discernment_heading": "Seeds of the Word and points of caution",
+  "file_summary": "Filing on the Wikibase item (SV field / SV Gospel theme)",
   "infobox_missing_category": "SV infobox missing data",
+  "infobox_unknown_type": "SV infoboxes with an unknown item type",
   "langname_en": "English",
   "langname_es": "Spanish",
   "langname_it": "Italian",
@@ -23,6 +28,7 @@
   "managed_notice": "This page is managed in git and overwritten by the sync: edit it at $1.",
   "quote_missing_text": "SV quote: the text parameter is missing.",
   "references_heading": "References",
+  "tracking_category_text": "Tracking category: the SV templates add a page here when its Wikibase item or infobox needs fixing. Fix the item or the page and it leaves the category.",
   "wip_category": "SV articles in progress",
   "wip_notice": "This article is a work in progress ($1, $2)."
 }

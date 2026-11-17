@@ -1,0 +1,26 @@
+{
+  "types": {
+    "Q13367": "film",
+    "Q6022": "tv",
+    "Q13121": "person",
+    "Q2404": "group",
+    "Q323": "book",
+    "Q2742": "book",
+    "Q46661": "book",
+    "Q47731": "book",
+    "Q2031": "play",
+    "Q2407": "album",
+    "Q47692": "work",
+    "Q1025": "work"
+  },
+  "fit": {
+    "book": ["literature"],
+    "film": ["film", "animation"],
+    "tv": ["television", "animation"],
+    "album": ["music"],
+    "song": ["music"],
+    "group": ["music"],
+    "play": ["theatre", "musical-theatre", "drama", "opera"],
+    "artwork": ["visual-arts", "crafts", "sacred-art"]
+  }
+}
