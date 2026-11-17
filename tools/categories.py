@@ -8,6 +8,7 @@ Credentials: SV_EDITOR_USER / SV_EDITOR_PASSWORD (a bot password).
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
@@ -162,15 +163,66 @@ def _print_report(lang: str, data: dict, report: Report) -> None:
         print(f"[{lang}] used by articles, not in the tree: {', '.join(report.untracked)}")
 
 
-def main(argv=None, client_factory=WikiClient, data=None) -> int:
+def _with_item(d: dict, item: str) -> dict:
+    """`d` with "item" right after "key" (first when there is no key)."""
+    out = {}
+    if "key" in d:
+        out["key"] = d["key"]
+    out["item"] = item
+    out.update((k, v) for k, v in d.items() if k not in ("key", "item"))
+    return out
+
+
+def record_items(repo, data: dict) -> tuple[dict, list]:
+    """A copy of `data` with each node's Wikibase item (from its en category page); keys with none."""
+    missing = []
+
+    def fill(d: dict, key: str) -> dict:
+        item = repo.item_for("en", _title(d["names"]["en"]))
+        if not item:
+            missing.append(key)
+            return dict(d)
+        return _with_item(d, item)
+
+    def walk(items):
+        out = []
+        for d in items:
+            new = fill(d, d["key"])
+            if d.get("children"):
+                new["children"] = walk(d["children"])
+            out.append(new)
+        return out
+
+    result = dict(data)
+    result["root"] = fill(data["root"], "root")
+    result["fields"] = walk(data["fields"])
+    result["themes_root"] = fill(data["themes_root"], "themes_root")
+    result["themes"] = walk(data["themes"])
+    return result, missing
+
+
+def main(argv=None, client_factory=WikiClient, data=None, path=None) -> int:
     parser = argparse.ArgumentParser(prog="python -m tools.categories")
-    parser.add_argument("command", choices=["check"])
-    parser.add_argument("--wiki", required=True)
+    parser.add_argument("command", choices=["check", "record-items"])
+    parser.add_argument("--wiki")
     parser.add_argument("--create", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--replace-missing", action="store_true",
                         help="replace an item's link for this wiki when its target page does not exist here")
     args = parser.parse_args(argv)
+    if args.command == "record-items":
+        # read-only on the wiki: no login
+        data = data or load(ROOT)
+        try:
+            result, missing = record_items(client_factory("en"), data)
+        except (SyncError, OSError) as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 1
+        target = Path(path) if path else ROOT / "config" / "categories.json"
+        target.write_text(json.dumps(result, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        for key in missing:
+            print(f"no item: {key}")
+        return 1 if missing else 0
     if args.wiki not in LANGS:
         # checked before any login, so a typo never sends the bot password to another host
         parser.error(f"unknown wiki {args.wiki}; choose from {', '.join(LANGS)}")
