@@ -1,0 +1,3 @@
+<includeonly>{{#invoke:SV/Categories|tree}}</includeonly><noinclude>
+The category navigation for the main page: the fields of the arts and sciences, then the Gospel themes, in this wiki's language. No parameters. The tree comes from <code>config/categories.json</code> in the repository; a red link means the category page does not exist on this wiki yet.
+</noinclude>

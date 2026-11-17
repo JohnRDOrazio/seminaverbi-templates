@@ -3,6 +3,7 @@
   "bible_missing_ref": "SV Bible quote: Der Parameter ref fehlt.",
   "bible_note": "Text auf $1; deutsche Übersetzung noch nicht verfügbar",
   "bible_unsupported": "Die Bibelübersetzung „$1“ wird von BibleGet nicht unterstützt.",
+  "cattree_themes_heading": "Themen des Evangeliums",
   "cite_accessed": "Abgerufen am",
   "cite_archived": "Archiviert",
   "cite_missing_title": "SV cite: Der Parameter title fehlt.",

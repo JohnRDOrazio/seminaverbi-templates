@@ -9,7 +9,7 @@ REQUIRED = [
     "infobox_missing_category", "bible_note", "bible_unsupported", "bible_missing_ref",
     "discernment_heading", "references_heading", "wip_notice", "wip_category", "managed_notice",
     "cite_accessed", "cite_archived", "cite_pages", "cite_missing_title", "bc_year",
-    "date_decade", "date_century", "date_millennium",
+    "date_decade", "date_century", "date_millennium", "cattree_themes_heading",
 ]
 
 

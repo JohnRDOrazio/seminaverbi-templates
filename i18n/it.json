@@ -3,6 +3,7 @@
   "bible_missing_ref": "SV Bible quote: manca il parametro ref.",
   "bible_note": "testo in $1; non ancora disponibile in italiano",
   "bible_unsupported": "La versione biblica '$1' non è supportata da BibleGet.",
+  "cattree_themes_heading": "Temi evangelici",
   "cite_accessed": "Consultato il",
   "cite_archived": "Archiviato",
   "cite_missing_title": "SV cite: manca il parametro title.",

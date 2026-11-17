@@ -3,6 +3,7 @@
   "bible_missing_ref": "SV Bible quote: falta o parâmetro ref.",
   "bible_note": "texto em $1; tradução portuguesa ainda não disponível",
   "bible_unsupported": "A versão bíblica '$1' não é suportada pelo BibleGet.",
+  "cattree_themes_heading": "Temas evangélicos",
   "cite_accessed": "Consultado em",
   "cite_archived": "Arquivado",
   "cite_missing_title": "SV cite: falta o parâmetro title.",

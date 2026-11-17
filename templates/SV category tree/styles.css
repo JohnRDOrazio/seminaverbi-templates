@@ -1,0 +1,32 @@
+.sv-cattree {
+	columns: 3 18em;
+	column-gap: 2em;
+	margin: 0.5em 0;
+}
+.sv-cattree-node {
+	break-inside: avoid;
+	margin-bottom: 0.6em;
+}
+.sv-cattree-title {
+	font-weight: bold;
+	line-height: 1.6;
+}
+.sv-cattree-node .sv-cattree-node {
+	margin-left: 1em;
+}
+.sv-cattree-themes-heading {
+	column-span: all;
+	font-weight: bold;
+	font-size: 1.1em;
+	margin: 1em 0 0.3em;
+	border-top: 1px solid #a2a9b1;
+	padding-top: 0.5em;
+}
+.sv-cattree-themes {
+	column-span: all;
+}
+@media screen and (max-width: 720px) {
+	.sv-cattree {
+		columns: 1;
+	}
+}
