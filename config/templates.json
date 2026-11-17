@@ -1,0 +1,82 @@
+{
+  "SV Bible quote": {
+    "summary": "Quotes a Bible passage through BibleGet, in the wiki's default version. Use it for every verse an article names or alludes to.",
+    "params": {
+      "ref": "(required) the reference, book names in the wiki's language (Jn 3:16, Gv 3,16, Jean 3,16)",
+      "version": "a BibleGet version code; defaults to the wiki's version",
+      "inline": "0 = show the passage as a block instead of a hover quote"
+    }
+  },
+  "SV WIP": {
+    "summary": "Marks an article as a work in progress (adds a maintenance category).",
+    "params": {
+      "user": "who is working on it",
+      "date": "since when"
+    }
+  },
+  "SV category tree": {
+    "summary": "The main page's category navigation (fields, then Gospel themes) from config/categories.json. No parameters.",
+    "params": {}
+  },
+  "SV cathopedia": {
+    "summary": "A link to an Italian Cathopedia page; on non-Italian wikis adds '(in Italian)'. Use under See also / External links outside it.wiki.",
+    "params": {
+      "1": "(required) the Cathopedia page title, in Italian",
+      "2": "link text in the wiki's language; defaults to the title"
+    }
+  },
+  "SV cite": {
+    "summary": "A citation (web page, book, journal, video, album liner notes, interview) with fixed parameter names and localized labels.",
+    "params": {
+      "type": "web (default), book, journal, video, liner, interview",
+      "title": "(required)",
+      "url": "",
+      "author": "",
+      "date": "",
+      "work": "site, newspaper or journal",
+      "publisher": "",
+      "isbn": "",
+      "pages": "",
+      "language": "",
+      "archive-url": "",
+      "archive-date": "",
+      "access-date": "",
+      "quote": ""
+    }
+  },
+  "SV discernment": {
+    "summary": "Starts the closing section on how the work relates to the Gospel, with the same heading on every wiki. On its own line.",
+    "params": {}
+  },
+  "SV infobox person": {
+    "summary": "Infobox for a person, filled from the page's Wikibase item. Any field (see below) overrides the item's value.",
+    "params": {
+      "item": "a Wikibase item ID, when the page is not connected to one",
+      "name": "caption; defaults to the item's label"
+    }
+  },
+  "SV infobox work": {
+    "summary": "Infobox for a work, filled from the page's Wikibase item. Any field of its type (see below) overrides the item's value.",
+    "params": {
+      "type": "book (default), film, tv, album, song, play, artwork",
+      "item": "a Wikibase item ID, when the page is not connected to one",
+      "name": "caption; defaults to the item's label"
+    }
+  },
+  "SV quote": {
+    "summary": "A quotation that is not from the Bible, optionally with its original-language text above the translation.",
+    "params": {
+      "text": "(required) the quotation in the wiki's language; wikitext allowed",
+      "author": "may be a link",
+      "source": "the work or document; may be a link",
+      "original": "the quotation in its original language",
+      "original_lang": "language code of original (it, la, grc…)"
+    }
+  },
+  "SV references": {
+    "summary": "The references heading and list. On its own line, near the end of the article.",
+    "params": {
+      "group": "a reference group name"
+    }
+  }
+}

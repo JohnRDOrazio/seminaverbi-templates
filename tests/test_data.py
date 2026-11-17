@@ -9,7 +9,8 @@ REQUIRED = [
     "infobox_missing_category", "bible_note", "bible_unsupported", "bible_missing_ref",
     "discernment_heading", "references_heading", "wip_notice", "wip_category", "managed_notice",
     "cite_accessed", "cite_archived", "cite_pages", "cite_missing_title", "bc_year",
-    "date_decade", "date_century", "date_millennium",
+    "date_decade", "date_century", "date_millennium", "cattree_themes_heading",
+    "quote_missing_text", "cathopedia_note", "cathopedia_category", "cathopedia_missing_title",
 ]
 
 
@@ -47,3 +48,8 @@ def test_data_loads_in_lua():
     assert data.bible.defaults.fr == "NVBSE"
     assert data.wikibase.author == "P3990"
     assert data.i18n.it.discernment_heading == "Semi del Verbo e punti di attenzione"
+
+
+def test_categories_compiled():
+    data = LuaEnv().require("Module:SV/Data")
+    assert data.categories.root.names.en == "Seeds of the Word"  # the existing en root category

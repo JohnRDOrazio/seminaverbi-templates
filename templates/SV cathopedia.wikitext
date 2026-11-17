@@ -1,0 +1,9 @@
+<includeonly>{{#invoke:SV/Cathopedia|link}}</includeonly><noinclude>
+A link to a page of Cathopedia, the Catholic encyclopedia (in Italian). On the Italian wiki, link Catholic topics inline; on the other wikis, use this template on a line under "See also" or "External links". Parameters:
+* first (required): the title of the Cathopedia page, in Italian (e.g. <code>Concilio Vaticano II</code>).
+* second: the link text, in this wiki's language; defaults to the title.
+
+<code><nowiki>{{SV cathopedia|Concilio Vaticano II|Second Vatican Council}}</nowiki></code>
+
+Pages using it are listed in a tracking category.
+</noinclude>

@@ -3,6 +3,10 @@
   "bible_missing_ref": "SV Bible quote: falta o parâmetro ref.",
   "bible_note": "texto em $1; tradução portuguesa ainda não disponível",
   "bible_unsupported": "A versão bíblica '$1' não é suportada pelo BibleGet.",
+  "cathopedia_category": "Páginas com ligações para a Cathopedia",
+  "cathopedia_missing_title": "SV cathopedia: falta o título da página da Cathopedia.",
+  "cathopedia_note": "(Cathopedia, em italiano)",
+  "cattree_themes_heading": "Temas evangélicos",
   "cite_accessed": "Consultado em",
   "cite_archived": "Arquivado",
   "cite_missing_title": "SV cite: falta o parâmetro title.",
@@ -17,6 +21,7 @@
   "langname_it": "italiano",
   "langname_la": "latim",
   "managed_notice": "Esta página é gerida no git e substituída pela sincronização: edite-a em $1.",
+  "quote_missing_text": "SV citação: falta o parâmetro text.",
   "references_heading": "Referências",
   "wip_category": "Artigos SV em construção",
   "wip_notice": "Este artigo está em construção ($1, $2)."

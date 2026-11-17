@@ -7,7 +7,9 @@
     "Template:SV infobox persona": "Template:SV infobox person",
     "Template:SV discernimento": "Template:SV discernment",
     "Template:SV note": "Template:SV references",
-    "Template:SV lavori in corso": "Template:SV WIP"
+    "Template:SV lavori in corso": "Template:SV WIP",
+    "Template:SV albero categorie": "Template:SV category tree",
+    "Template:SV citazione": "Template:SV quote"
   },
   "es": {
     "Template:SV cita bíblica": "Template:SV Bible quote",
@@ -16,7 +18,9 @@
     "Template:SV ficha persona": "Template:SV infobox person",
     "Template:SV discernimiento": "Template:SV discernment",
     "Template:SV referencias": "Template:SV references",
-    "Template:SV en desarrollo": "Template:SV WIP"
+    "Template:SV en desarrollo": "Template:SV WIP",
+    "Template:SV árbol de categorías": "Template:SV category tree",
+    "Template:SV cita textual": "Template:SV quote"
   },
   "fr": {
     "Template:SV citation biblique": "Template:SV Bible quote",
@@ -25,7 +29,9 @@
     "Template:SV infobox personne": "Template:SV infobox person",
     "Template:SV discernement": "Template:SV discernment",
     "Template:SV références": "Template:SV references",
-    "Template:SV en travaux": "Template:SV WIP"
+    "Template:SV en travaux": "Template:SV WIP",
+    "Template:SV arbre des catégories": "Template:SV category tree",
+    "Template:SV citation": "Template:SV quote"
   },
   "de": {
     "Template:SV Bibelzitat": "Template:SV Bible quote",
@@ -34,7 +40,9 @@
     "Template:SV Infobox Person": "Template:SV infobox person",
     "Template:SV Unterscheidung": "Template:SV discernment",
     "Template:SV Einzelnachweise": "Template:SV references",
-    "Template:SV in Arbeit": "Template:SV WIP"
+    "Template:SV in Arbeit": "Template:SV WIP",
+    "Template:SV Kategorienbaum": "Template:SV category tree",
+    "Template:SV Zitat": "Template:SV quote"
   },
   "pt": {
     "Template:SV citação bíblica": "Template:SV Bible quote",
@@ -43,6 +51,8 @@
     "Template:SV infobox pessoa": "Template:SV infobox person",
     "Template:SV discernimento": "Template:SV discernment",
     "Template:SV referências": "Template:SV references",
-    "Template:SV em construção": "Template:SV WIP"
+    "Template:SV em construção": "Template:SV WIP",
+    "Template:SV árvore de categorias": "Template:SV category tree",
+    "Template:SV citação": "Template:SV quote"
   }
 }

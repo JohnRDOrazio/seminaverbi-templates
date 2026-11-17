@@ -2,7 +2,12 @@ import pytest
 
 from sync import __main__ as cli
 from sync.plan import PageState, plan
+from sync.pages import desired_pages
 from sync.wiki import SyncError
+
+
+def en_pages():
+    return len(desired_pages(cli.ROOT, "en", "x"))
 
 BOT = "SV templates bot"
 
@@ -108,7 +113,7 @@ def test_cli_continues_after_edit_error(env, capsys):
     assert "Module:SV/Cite" not in titles and "Template:SV cite" in titles
     assert "edit of Module:SV/Cite failed" in err
     # counts are edits that went through; the failure is counted separately
-    assert "[en] create 15, update 0, unchanged 0, skipped(foreign) 0, failed 1" in out
+    assert f"[en] create {en_pages() - 1}, update 0, unchanged 0, skipped(foreign) 0, failed 1" in out
 
 
 def test_cli_continues_after_network_error_on_one_edit(env, capsys):
@@ -118,6 +123,6 @@ def test_cli_continues_after_network_error_on_one_edit(env, capsys):
     out, err = capsys.readouterr()
     assert code == 1
     assert "connection dropped while saving Module:SV/Cite" in err
-    assert "[en] create 15, update 0, unchanged 0, skipped(foreign) 0, failed 1" in out
+    assert f"[en] create {en_pages() - 1}, update 0, unchanged 0, skipped(foreign) 0, failed 1" in out
     assert "Template:SV cite" in [t for t, _ in FakeClient.instances["en"].edits]
-    assert len(FakeClient.instances["it"].edits) == 22
+    assert len(FakeClient.instances["it"].edits) == len(desired_pages(cli.ROOT, "it", "x")) - 1

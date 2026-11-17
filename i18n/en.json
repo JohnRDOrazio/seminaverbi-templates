@@ -3,6 +3,10 @@
   "bible_missing_ref": "SV Bible quote: the ref parameter is missing.",
   "bible_note": "text in $1; not yet available in English",
   "bible_unsupported": "The Bible version '$1' is not supported by BibleGet.",
+  "cathopedia_category": "Pages linking to Cathopedia",
+  "cathopedia_missing_title": "SV cathopedia: the Cathopedia page title is missing.",
+  "cathopedia_note": "(Cathopedia, in Italian)",
+  "cattree_themes_heading": "Gospel themes",
   "cite_accessed": "Accessed",
   "cite_archived": "Archived",
   "cite_missing_title": "SV cite: the title parameter is missing.",
@@ -17,6 +21,7 @@
   "langname_it": "Italian",
   "langname_la": "Latin",
   "managed_notice": "This page is managed in git and overwritten by the sync: edit it at $1.",
+  "quote_missing_text": "SV quote: the text parameter is missing.",
   "references_heading": "References",
   "wip_category": "SV articles in progress",
   "wip_notice": "This article is a work in progress ($1, $2)."

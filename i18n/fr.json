@@ -3,6 +3,10 @@
   "bible_missing_ref": "SV Bible quote : le paramètre ref est manquant.",
   "bible_note": "texte en $1 ; traduction française pas encore disponible",
   "bible_unsupported": "La version biblique « $1 » n'est pas prise en charge par BibleGet.",
+  "cathopedia_category": "Pages avec des liens vers Cathopedia",
+  "cathopedia_missing_title": "SV cathopedia : le titre de la page Cathopedia est manquant.",
+  "cathopedia_note": "(Cathopedia, en italien)",
+  "cattree_themes_heading": "Thèmes évangéliques",
   "cite_accessed": "Consulté le",
   "cite_archived": "Archivé",
   "cite_missing_title": "SV cite : le paramètre title est manquant.",
@@ -17,6 +21,7 @@
   "langname_it": "italien",
   "langname_la": "latin",
   "managed_notice": "Cette page est gérée dans git et écrasée par la synchronisation : modifiez-la sur $1.",
+  "quote_missing_text": "SV citation : le paramètre text est manquant.",
   "references_heading": "Références",
   "wip_category": "Articles SV en cours de rédaction",
   "wip_notice": "Cet article est en cours de rédaction ($1, $2)."
