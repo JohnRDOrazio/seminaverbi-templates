@@ -33,18 +33,18 @@ def test_tree_styles():
 
 
 def test_tree_top_level_links_localized():
-    assert link("Arti letterarie") in tree("it")
-    assert link(field("literary-arts")["names"]["fr"]) in tree("fr")
+    assert link("Arti visive") in tree("it")
+    assert link(field("literature")["names"]["fr"]) in tree("fr")
 
 
 def test_tree_nesting():
     out = tree()
     start = out.index('<div class="sv-cattree-node mw-collapsible">' + "\n" + '<div class="sv-cattree-title">'
                       + link("Visual arts"))
-    end = out.index(link("Formal sciences"))
+    end = out.index(link("Crafts and decorative arts"))
     block = out[start:end]
-    assert link("Painting") in block and link("Fresco painting") in block
-    assert block.index(link("Painting")) < block.index(link("Fresco painting"))
+    assert link("Painting") in block and link("Fresco") in block
+    assert block.index(link("Painting")) < block.index(link("Fresco"))
     # a leaf is a list item, not a collapsible block
     assert "* " + link("Dance") in out
     assert '<div class="sv-cattree-title">' + link("Dance") not in out
@@ -55,11 +55,24 @@ def test_tree_themes_heading_last():
     heading = '<div class="sv-cattree-themes-heading">'
     assert out.count(heading) == 1
     assert I18N["it"]["cattree_themes_heading"] + "]]</div>" in out
-    last_field = link(field("flags")["names"]["it"])
+    last = DATA["fields"][-1]
+    while last.get("children"):
+        last = last["children"][-1]
+    last_field = link(last["names"]["it"])
     assert out.index(last_field) < out.index(heading)
-    for theme in DATA["themes"]:
-        assert out.index(heading) < out.index(link(theme["names"]["it"]))
+    for group in DATA["themes"]:
+        for theme in group["children"]:
+            assert out.index(heading) < out.index(link(theme["names"]["it"]))
 
 
-def test_tree_parentheses():
-    assert link("Drama (Literature)") in tree()
+def test_tree_apostrophe_and_accents():
+    assert link("Children's literature") in tree()
+    assert link("Peinture à l'huile") in tree("fr")
+
+
+def test_tree_theme_groups_are_collapsible():
+    out = tree()
+    group = DATA["themes"][0]
+    start = out.index('<div class="sv-cattree-title">' + link(group["names"]["en"]))
+    leaf = group["children"][0]["names"]["en"]
+    assert out.index("* " + link(leaf)) > start

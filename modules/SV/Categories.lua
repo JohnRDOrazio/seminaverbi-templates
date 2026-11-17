@@ -36,9 +36,9 @@ function p.tree(frame)
 	local themesRoot = data.themes_root.names[lang] or data.themes_root.names.en
 	out[#out + 1] = '<div class="sv-cattree-themes-heading">[[:Category:' .. themesRoot .. '|'
 		.. Util.msg('cattree_themes_heading', lang) .. ']]</div>'
-	out[#out + 1] = '<div class="sv-cattree-themes hlist">'
-	for _, theme in ipairs(data.themes) do
-		out[#out + 1] = '* ' .. link(theme.names, lang)
+	out[#out + 1] = '<div class="sv-cattree-themes">'
+	for _, group in ipairs(data.themes) do
+		render(group, lang, out)
 	end
 	out[#out + 1] = '</div>\n</div>'
 	return table.concat(out, '\n')

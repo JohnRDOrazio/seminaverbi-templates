@@ -23,6 +23,8 @@
 	padding-top: 0.5em;
 }
 .sv-cattree-themes {
+	columns: 3 18em;
+	column-gap: 2em;
 	column-span: all;
 }
 @media screen and (max-width: 720px) {

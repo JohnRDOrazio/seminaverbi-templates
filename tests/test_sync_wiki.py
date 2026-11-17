@@ -136,6 +136,110 @@ def test_sitelink_reads_item():
     assert WikiClient("en", session=s).sitelink("Q9", "frwiki") is None
 
 
+def test_move_params():
+    s = Recorder(CSRF, {"move": {"from": "Category:A", "to": "Category:B"}})
+    WikiClient("en", session=s).move("Category:A", "Category:B", "why", tags="seminaverbi-mcp")
+    params = s.calls[-1][1]
+    assert (params["action"], params["from"], params["to"], params["tags"]) == ("move", "Category:A", "Category:B",
+                                                                                "seminaverbi-mcp")
+
+
+def test_move_failure_is_sync_error():
+    s = Recorder(CSRF, {"warnings": {}})
+    with pytest.raises(SyncError, match="moving Category:A to Category:B failed"):
+        WikiClient("en", session=s).move("Category:A", "Category:B", "why")
+
+
+def test_members_follows_continue():
+    s = Recorder({"continue": {"cmcontinue": "x", "continue": "-||"},
+                  "query": {"categorymembers": [{"title": "A", "ns": 0}]}},
+                 {"query": {"categorymembers": [{"title": "Categoria:B", "ns": 14}]}})
+    assert WikiClient("it", session=s).members("Categoria:X") == [("A", 0), ("Categoria:B", 14)]
+
+
+def test_category_namespaces_include_local_and_aliases():
+    s = Recorder({"query": {"namespaces": {"14": {"name": "Categoria", "canonical": "Category"}},
+                            "namespacealiases": [{"id": 14, "alias": "Cat"}, {"id": 2, "alias": "U"}]}})
+    assert WikiClient("it", session=s).category_namespaces() == ["Cat", "Categoria", "Category"]
+
+
+class Limited:
+    """Answers 429 (with Retry-After) `times` times, then the JSON body."""
+
+    def __init__(self, times, body, retry_after="1"):
+        self.left, self.body, self.retry_after, self.headers, self.calls = times, body, retry_after, {}, 0
+
+    def get(self, url, params=None, timeout=None):
+        self.calls += 1
+        if self.left:
+            self.left -= 1
+            return LimitedResponse(self.retry_after)
+        return Response(self.body)
+
+    post = get
+
+
+class LimitedResponse:
+    status_code = 429
+
+    def __init__(self, retry_after):
+        self.headers = {"Retry-After": retry_after} if retry_after else {}
+
+    def raise_for_status(self):
+        import requests
+        raise requests.HTTPError("429 Client Error: Too Many Requests")
+
+
+def test_rate_limited_requests_are_retried(monkeypatch):
+    waits = []
+    monkeypatch.setattr("sync.wiki.time.sleep", waits.append)
+    s = Limited(2, {"query": {"tokens": {"logintoken": "t"}}}, retry_after="3")
+    assert WikiClient("en", session=s)._token("login") == "t"
+    assert s.calls == 3 and waits == [3.0, 3.0]
+
+
+def test_rate_limit_gives_up_after_retries(monkeypatch):
+    import requests
+    monkeypatch.setattr("sync.wiki.time.sleep", lambda s: None)
+    s = Limited(99, {}, retry_after=None)
+    with pytest.raises(requests.HTTPError):
+        WikiClient("en", session=s)._token("login")
+    assert s.calls == 6
+
+
+def test_search_source_params():
+    s = Recorder({"query": {"search": [{"title": "Template:Libro"}]}})
+    assert WikiClient("it", session=s).search_source("Romanzo (Letteratura)") == ["Template:Libro"]
+    params = s.calls[-1][1]
+    assert params["srsearch"] == 'insource:"Romanzo (Letteratura)"' and params["srnamespace"] == "10|828"
+
+
+def test_mediawiki_ratelimited_error_is_retried(monkeypatch):
+    waits = []
+    monkeypatch.setattr("sync.wiki.time.sleep", waits.append)
+    s = Recorder({"error": {"code": "ratelimited", "info": "slow down"}},
+                 {"error": {"code": "ratelimited", "info": "slow down"}},
+                 {"query": {"tokens": {"logintoken": "t"}}})
+    assert WikiClient("en", session=s)._token("login") == "t"
+    assert len(s.calls) == 3 and waits == [65.0, 65.0]
+
+
+def test_mediawiki_ratelimited_gives_up(monkeypatch):
+    monkeypatch.setattr("sync.wiki.time.sleep", lambda s: None)
+    s = Recorder(*([{"error": {"code": "ratelimited", "info": "slow down"}}] * 7))
+    with pytest.raises(SyncError, match="ratelimited"):
+        WikiClient("en", session=s)._token("login")
+
+
+def test_retry_after_http_date_and_huge_values_are_handled(monkeypatch):
+    waits = []
+    monkeypatch.setattr("sync.wiki.time.sleep", waits.append)
+    s = Limited(1, {"query": {"tokens": {"logintoken": "t"}}}, retry_after="Wed, 21 Oct 2015 07:28:00 GMT")
+    assert WikiClient("en", session=s)._token("login") == "t"
+    s = Limited(1, {"query": {"tokens": {"logintoken": "t"}}}, retry_after="86400")
+    assert WikiClient("en", session=s)._token("login") == "t"
+    assert waits[0] == 1.0 and waits[1] == 120.0
+
 def test_page_info_follows_category_continuation():
     s = Recorder(
         {"continue": {"clcontinue": "5|M", "continue": "||"},
@@ -154,3 +258,26 @@ def test_article_categories_replaces_continuation():
         {"query": {"pages": [{"title": "C", "categories": [{"title": "Category:O"}]}]}})
     assert WikiClient("en", session=s).article_categories() == {"M", "N", "O"}
     assert "clcontinue" not in s.calls[2][1] and s.calls[2][1]["gapcontinue"] == "C"
+
+
+class Alternating:
+    """Answers HTTP 429, then a MediaWiki "ratelimited" error, forever."""
+
+    def __init__(self):
+        self.calls, self.headers = 0, {}
+
+    def get(self, url, params=None, timeout=None):
+        self.calls += 1
+        if self.calls % 2:
+            return LimitedResponse(None)
+        return Response({"error": {"code": "ratelimited", "info": "slow down"}})
+
+    post = get
+
+
+def test_both_retry_layers_share_one_budget(monkeypatch):
+    monkeypatch.setattr("sync.wiki.time.sleep", lambda s: None)
+    s = Alternating()
+    with pytest.raises(Exception):
+        WikiClient("en", session=s)._token("login")
+    assert s.calls == 6

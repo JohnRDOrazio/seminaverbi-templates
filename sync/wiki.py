@@ -2,12 +2,24 @@
 from __future__ import annotations
 
 import json
+import time
 from typing import NamedTuple
 
 import requests
 
 from sync.plan import PageState
 
+RETRIES = 5  # extra attempts per call, shared by HTTP 429 and MediaWiki "ratelimited" errors
+RATELIMITED_WAIT = 65.0  # seconds; MediaWiki does not say how long to wait
+MAX_RETRY_WAIT = 120.0
+
+
+def _retry_wait(retry_after, attempt: int) -> float:
+    """Seconds to wait after an HTTP 429: Retry-After in seconds (capped), else exponential backoff."""
+    try:
+        return min(max(float(retry_after), 0.0), MAX_RETRY_WAIT)
+    except (TypeError, ValueError):  # missing, or the HTTP-date form
+        return min(2.0 ** attempt, 30.0)
 USER_AGENT = "seminaverbi-templates-sync/1.0 (https://github.com/JohnRDOrazio/seminaverbi-templates)"
 
 
@@ -35,16 +47,36 @@ class WikiClient:
         self.session.headers["User-Agent"] = USER_AGENT
 
     def _call(self, method: str, **params) -> dict:
+        """One API call. HTTP 429 and MediaWiki "ratelimited" retries share one budget of RETRIES."""
         params.update(format="json", formatversion="2")
-        if method == "GET":
-            r = self.session.get(self.api, params=params, timeout=60)
-        else:
-            r = self.session.post(self.api, data=params, timeout=60)
-        r.raise_for_status()
-        data = r.json()
+        budget = [RETRIES]
+        while True:
+            data = self._request(method, params, budget)
+            if data.get("error", {}).get("code") != "ratelimited" or budget[0] <= 0:
+                break
+            budget[0] -= 1
+            # MediaWiki's own per-user limit ($wgRateLimits, e.g. page moves): it gives no wait time
+            time.sleep(RATELIMITED_WAIT)
         if "error" in data:
             raise SyncError(f"{self.lang}: {data['error'].get('code')}: {data['error'].get('info')}")
         return data
+
+    def _request(self, method: str, params: dict, budget: list | None = None) -> dict:
+        budget = budget if budget is not None else [RETRIES]
+        attempt = 0
+        while True:
+            if method == "GET":
+                r = self.session.get(self.api, params=params, timeout=60)
+            else:
+                r = self.session.post(self.api, data=params, timeout=60)
+            if getattr(r, "status_code", 200) != 429 or budget[0] <= 0:
+                break
+            budget[0] -= 1
+            # rate limited (nginx limit_req): wait as told, or back off, then retry the same request
+            time.sleep(_retry_wait(r.headers.get("Retry-After"), attempt))
+            attempt += 1
+        r.raise_for_status()
+        return r.json()
 
     def _dig(self, data, *keys):
         """data[k1][k2]..., raising SyncError (not KeyError) when the API answered something unexpected."""
@@ -126,6 +158,53 @@ class WikiClient:
             for t in batch:
                 out.setdefault(t, None)
         return out
+
+    def wikitext(self, title: str) -> str | None:
+        state = self.fetch([title]).get(title)
+        return state.content if state else None
+
+    def exists(self, title: str) -> bool:
+        return self.page_info([title]).get(title) is not None
+
+    def is_redirect(self, title: str) -> bool:
+        info = self.page_info([title]).get(title)
+        return bool(info and info.redirect)
+
+    def members(self, category_title: str) -> list[tuple[str, int]]:
+        """(title, namespace) of every page and subcategory in a category."""
+        params = dict(action="query", list="categorymembers", cmtitle=category_title, cmprop="title",
+                      cmlimit="max")
+        out: list[tuple[str, int]] = []
+        while True:
+            data = self._call("GET", **params)
+            out.extend((self._dig(m, "title"), m.get("ns", 0))
+                       for m in data.get("query", {}).get("categorymembers", []))
+            if "continue" not in data:
+                return out
+            params.update(data["continue"])
+
+    def category_namespaces(self) -> list[str]:
+        """Every name of namespace 14 on this wiki: canonical, localized and aliases."""
+        q = self._dig(self._call("GET", action="query", meta="siteinfo", siprop="namespaces|namespacealiases"),
+                      "query")
+        ns = q.get("namespaces", {}).get("14", {})
+        names = {"Category", ns.get("name", "Category"), ns.get("canonical", "Category")}
+        names.update(a["alias"] for a in q.get("namespacealiases", []) if a.get("id") == 14)
+        return sorted(names)
+
+    def search_source(self, phrase: str) -> list[str]:
+        """Templates and modules whose source contains `phrase` (CirrusSearch insource)."""
+        data = self._call("GET", action="query", list="search", srsearch=f'insource:"{phrase}"',
+                          srnamespace="10|828", srwhat="text", srlimit="max")
+        return [self._dig(r, "title") for r in data.get("query", {}).get("search", [])]
+
+    def move(self, old: str, new: str, reason: str, tags: str | None = None) -> None:
+        params = dict(action="move", **{"from": old}, to=new, reason=reason, movetalk="1")
+        if tags:
+            params["tags"] = tags
+        data = self._call("POST", token=self._token("csrf"), **params)
+        if "move" not in data:
+            raise SyncError(f"{self.lang}: moving {old} to {new} failed: {data}")
 
     def article_categories(self) -> set[str]:
         """Visible categories used by main-namespace articles (redirects excluded)."""

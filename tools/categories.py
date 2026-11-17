@@ -43,7 +43,22 @@ class CreateResult(NamedTuple):
 
 
 def _site(lang: str) -> str:
-    return f"{lang}wiki"
+    """The SeminaVerbi wiki's global site ID. Not '<lang>wiki': in the shared sites table those are
+    Wikipedia (the repo mirrors Wikidata items, with their Wikipedia sitelinks)."""
+    return lang
+
+
+def _bare(title: str) -> str:
+    """'Categoria:Musica' -> 'Musica': category titles compared without their (localized) namespace."""
+    return title.split(":", 1)[1] if ":" in title else title
+
+
+def _same_category(current: str, title: str, category_ns: set) -> bool:
+    """`current` is the category `title` under one of this wiki's category namespace names."""
+    if ":" not in current:
+        return False
+    ns, rest = current.split(":", 1)
+    return ns.strip().lower() in category_ns and rest == _bare(title)
 
 
 def _title(name: str) -> str:
@@ -72,11 +87,13 @@ def page_text(node, parent, lang: str) -> str:
     if parent is None:
         return "{{SV category tree}}"
     link = f"[[Category:{parent.names[lang]}]]"
-    description = node.description.get(lang)
-    return f"{description}\n\n{link}" if description else link
+    definition = node.definition.get(lang) or node.definition.get("en")
+    return f"{definition}\n\n{link}" if definition else link
 
 
-def create(lang: str, data: dict, client, repo, dry_run: bool) -> CreateResult:
+def create(lang: str, data: dict, client, repo, dry_run: bool, replace_missing: bool = False) -> CreateResult:
+    """replace_missing: an item that already links this wiki to a page that does not exist here (e.g. a
+    Wikipedia title imported from Wikidata) gets that link replaced; a link to a real page never is."""
     report = check(lang, data, client)
     tree = nodes(data)
     by_key = {n.key: n for n in tree}
@@ -96,6 +113,7 @@ def create(lang: str, data: dict, client, repo, dry_run: bool) -> CreateResult:
         created.append(title)
 
     skip = set(report.redirect) | {t for t, _ in failed}
+    category_ns = {n.lower() for n in client.category_namespaces()}
     for n in tree:
         title = _title(n.names[lang])
         if n.key in skip or title in skip or (n.key in missing and title not in created):
@@ -108,7 +126,11 @@ def create(lang: str, data: dict, client, repo, dry_run: bool) -> CreateResult:
                 conflicts.append((n.key, distinct))
             elif own:
                 continue
-            elif distinct and (current := repo.sitelink(distinct[0], _site(lang))) not in (None, title):
+            elif (distinct and (current := repo.sitelink(distinct[0], _site(lang))) is not None
+                  and _same_category(current, title, category_ns)):
+                continue  # already linked, stored under the localized namespace name ("Categoria:…")
+            elif (distinct and current not in (None, title)
+                  and not (replace_missing and client.page_info([current]).get(current) is None)):
                 # wbsetsitelink would silently move the item's existing link for this wiki
                 taken.append((n.key, distinct[0], current))
             elif dry_run:
@@ -146,6 +168,8 @@ def main(argv=None, client_factory=WikiClient, data=None) -> int:
     parser.add_argument("--wiki", required=True)
     parser.add_argument("--create", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--replace-missing", action="store_true",
+                        help="replace an item's link for this wiki when its target page does not exist here")
     args = parser.parse_args(argv)
     if args.wiki not in LANGS:
         # checked before any login, so a typo never sends the bot password to another host
@@ -165,7 +189,7 @@ def main(argv=None, client_factory=WikiClient, data=None) -> int:
         repo = client if args.wiki == "en" else client_factory("en")
         if repo is not client:
             repo.login(user, password)
-        result = create(args.wiki, data, client, repo, args.dry_run)
+        result = create(args.wiki, data, client, repo, args.dry_run, args.replace_missing)
     except (SyncError, OSError) as exc:
         print(f"[{args.wiki}] ERROR: {exc}", file=sys.stderr)
         return 1

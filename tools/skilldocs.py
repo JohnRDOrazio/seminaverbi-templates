@@ -59,14 +59,18 @@ def render_templates(root: Path) -> str:
 def render_categories(root: Path) -> str:
     data = load(root)
     out = [HEADER, "# Category tree\n\n",
-           "Only these categories may be used. An article gets at least one field category and the Gospel "
-           "themes it really explores. Write `[[Category:<name>]]` with the name for the page's wiki.\n"]
+           "Only these categories may be used. An article gets exactly one field category and the Gospel "
+           "themes it really explores. Write `[[Category:<name>]]` with the name for the page's wiki. "
+           "The maintenance and tracking categories that SV templates add themselves (e.g. `{{SV WIP}}`, "
+           "`{{SV cathopedia}}`) are the exception: they are not listed here and are never written by hand.\n"]
     for lang in LANGS:
         out.append(f"\n## {lang}\n\nRoot: {data['root']['names'][lang]}\n\n### Fields\n\n")
 
         def walk(items, depth):
             for item in items:
-                out.append(f"{'  ' * depth}- {item['names'][lang]} (`{item['key']}`)\n")
+                definition = item.get("definition", {}).get("en", "")
+                out.append(f"{'  ' * depth}- {item['names'][lang]} (`{item['key']}`)"
+                           + (f": {definition}" if lang == "en" and definition else "") + "\n")
                 walk(item.get("children", []), depth + 1)
 
         walk(data["fields"], 0)
