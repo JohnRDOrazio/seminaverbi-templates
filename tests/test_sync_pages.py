@@ -14,7 +14,8 @@ def test_titles_for_wiki():
 
 
 def test_same_content_every_wiki():
-    shared = [{t: c for t, c in desired_pages(ROOT, lang, "x").items() if not c.startswith("#REDIRECT")}
+    shared = [{t: c for t, c in desired_pages(ROOT, lang, "x").items()
+               if not c.startswith("#REDIRECT") and not t.startswith("Category:")}
               for lang in LANGS]
     assert all(s == shared[0] for s in shared)
 
@@ -36,3 +37,15 @@ def test_other_files_in_templates_are_ignored(tmp_path):
         shutil.copytree(ROOT / d, tmp_path / d)
     (tmp_path / "templates" / ".DS_Store").write_bytes(b"\x00\x05\x16\x07\xff\xfe")
     assert desired_pages(tmp_path, "it", "x") == desired_pages(ROOT, "it", "x")
+
+
+def test_tracking_categories_are_hidden_on_every_wiki():
+    import json
+    for lang in LANGS:
+        msgs = json.loads((ROOT / "i18n" / f"{lang}.json").read_text(encoding="utf-8"))
+        pages = desired_pages(ROOT, lang, "x")
+        for key in ("category_not_on_wiki", "category_not_tree", "category_two_fields",
+                    "infobox_missing_category", "infobox_unknown_type"):
+            text = pages["Category:" + msgs[key]]
+            assert text.startswith("__HIDDENCAT__") and "{{SV managed}}" in text
+            assert msgs["tracking_category_text"] in text

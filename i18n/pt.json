@@ -28,6 +28,7 @@
   "managed_notice": "Esta página é gerida no git e substituída pela sincronização: edite-a em $1.",
   "quote_missing_text": "SV citação: falta o parâmetro text.",
   "references_heading": "Referências",
+  "tracking_category_text": "Categoria de manutenção: as predefinições SV colocam aqui uma página quando o seu item do Wikibase ou a sua infocaixa precisa de correção. Corrigido o item ou a página, esta sai da categoria.",
   "wip_category": "Artigos SV em construção",
   "wip_notice": "Este artigo está em construção ($1, $2)."
 }

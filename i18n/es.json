@@ -28,6 +28,7 @@
   "managed_notice": "Esta página se gestiona en git y la sobrescribe la sincronización: edítala en $1.",
   "quote_missing_text": "SV cita textual: falta el parámetro text.",
   "references_heading": "Referencias",
+  "tracking_category_text": "Categoría de seguimiento: las plantillas SV añaden aquí una página cuando su elemento de Wikibase o su ficha necesita corrección. Al corregir el elemento o la página, esta sale de la categoría.",
   "wip_category": "Artículos SV en desarrollo",
   "wip_notice": "Este artículo está en desarrollo ($1, $2)."
 }

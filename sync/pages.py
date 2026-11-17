@@ -36,6 +36,9 @@ def compile_data(root: Path) -> str:
 REPO_URL = "https://github.com/JohnRDOrazio/seminaverbi-templates"
 NOTICE = f"This page is managed in git and overwritten by the sync: edit it at {REPO_URL}"
 MANAGED = "{{SV managed}}"
+# the categories the SV modules add when an item or infobox needs fixing: created hidden on every wiki
+TRACKING = ("category_not_on_wiki", "category_not_tree", "category_two_fields", "infobox_missing_category",
+            "infobox_unknown_type")
 
 
 def _template(name: str, text: str) -> str:
@@ -47,7 +50,8 @@ def _template(name: str, text: str) -> str:
 
 
 def desired_pages(root: Path, lang: str, sha: str) -> dict[str, str]:
-    """Title -> content for one wiki. Identical on every wiki except the alias redirects.
+    """Title -> content for one wiki. Identical on every wiki except the alias redirects and the
+    tracking categories (their names are in the wiki's language).
 
     The sha is accepted for symmetry with the edit summary but never written into content,
     so syncing an unchanged repository twice edits nothing.
@@ -68,6 +72,9 @@ def desired_pages(root: Path, lang: str, sha: str) -> dict[str, str]:
             pages["Template:" + name] = _template(name, path.read_text(encoding="utf-8"))
         elif path.suffix == ".css":
             pages["Template:" + rel] = f"/* {NOTICE} */\n" + path.read_text(encoding="utf-8")
+    msgs = json.loads((root / "i18n" / f"{lang}.json").read_text(encoding="utf-8"))
+    for key in TRACKING:
+        pages["Category:" + msgs[key]] = f"__HIDDENCAT__\n{MANAGED}\n{msgs['tracking_category_text']}\n"
     aliases = json.loads((root / "config" / "aliases.json").read_text(encoding="utf-8"))
     for alias, target in sorted(aliases.get(lang, {}).items()):
         pages[alias] = f"#REDIRECT [[{target}]]"

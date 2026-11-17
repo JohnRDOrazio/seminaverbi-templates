@@ -28,6 +28,7 @@
   "managed_notice": "This page is managed in git and overwritten by the sync: edit it at $1.",
   "quote_missing_text": "SV quote: the text parameter is missing.",
   "references_heading": "References",
+  "tracking_category_text": "Tracking category: the SV templates add a page here when its Wikibase item or infobox needs fixing. Fix the item or the page and it leaves the category.",
   "wip_category": "SV articles in progress",
   "wip_notice": "This article is a work in progress ($1, $2)."
 }
