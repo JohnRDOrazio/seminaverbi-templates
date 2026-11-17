@@ -43,6 +43,7 @@ class Plan(NamedTuple):
     skipped: list      # old category titles that are missing or already redirects
     unmatched: list    # (member title, category title): category line not found in the member's text
     redirected: list   # old category titles turned into redirects (the author may delete them)
+    via_template: list  # (member title, category title): filed by a template whose category line was re-filed
 
 
 class Report(NamedTuple):
@@ -51,6 +52,7 @@ class Report(NamedTuple):
     unmatched: list
     redirected: list
     failed: list       # (title, error)
+    via_template: list
 
 
 def _name_pattern(name: str) -> str:
@@ -87,7 +89,7 @@ def plan(lang: str, data: dict, mapping: dict, client, jev) -> Plan:
     by_key = {n.key: n for n in nodes(data)}
     namespaces = client.category_namespaces()
     mapped = set(mapping)
-    steps, author, skipped, unmatched, redirected = [], [], [], [], []
+    steps, author, skipped, unmatched, redirected, via_template = [], [], [], [], [], []
     texts: dict[str, str | None] = {}  # pages as they will be after the planned edits
 
     def current(title):
@@ -101,13 +103,25 @@ def plan(lang: str, data: dict, mapping: dict, client, jev) -> Plan:
             steps.append(("edit", title, new, old))
             texts[title] = new
 
-    def refile(members, old_name, new_name):
+    def refile_templates(old_name, new_name):
+        """Templates and modules that add the category themselves (e.g. an infobox) get their line re-filed."""
+        fixed = False
+        for source in client.search_source(old_name):
+            new, changed = refile_text(current(source) or "", old_name, new_name, namespaces)
+            if changed:
+                set_text(source, new)
+                fixed = True
+        return fixed
+
+    def refile(members, old_name, new_name, templates_fixed=False):
         for member, ns in members:
             if ns == 14 and _bare(member) in mapped:
                 continue  # that category's own entry rewrites its page
             new, changed = refile_text(current(member) or "", old_name, new_name, namespaces)
             if changed:
                 set_text(member, new)
+            elif templates_fixed:
+                via_template.append((member, _cat(old_name)))
             else:
                 unmatched.append((member, _cat(old_name)))
 
@@ -140,7 +154,7 @@ def plan(lang: str, data: dict, mapping: dict, client, jev) -> Plan:
                 set_text(old_title, f"#REDIRECT [[:{new_title}]]")
                 redirected.append(old_title)
         elif kind == "redirect" or (old_name != new_name and client.exists(new_title)):
-            refile(members, old_name, new_name)
+            refile(members, old_name, new_name, refile_templates(old_name, new_name))
             set_text(old_title, f"#REDIRECT [[:{new_title}]]")
             redirected.append(old_title)
             if kind != "redirect":
@@ -150,9 +164,9 @@ def plan(lang: str, data: dict, mapping: dict, client, jev) -> Plan:
         else:
             steps.append(("move", old_title, new_title))
             texts[new_title] = current(old_title)
-            refile(members, old_name, new_name)
+            refile(members, old_name, new_name, refile_templates(old_name, new_name))
             set_text(new_title, node_text(node))
-    return Plan(steps, author, skipped, unmatched, redirected)
+    return Plan(steps, author, skipped, unmatched, redirected, via_template)
 
 
 def execute(client, p: Plan, dry_run: bool = False, lang: str = "en") -> Report:
@@ -167,7 +181,7 @@ def execute(client, p: Plan, dry_run: bool = False, lang: str = "en") -> Report:
                     client.edit(step[1], step[2], summary, tags=TAG)
             except (SyncError, OSError) as exc:
                 failed.append((step[1], str(exc)))
-    return Report(p.author, p.skipped, p.unmatched, p.redirected, failed)
+    return Report(p.author, p.skipped, p.unmatched, p.redirected, failed, p.via_template)
 
 
 class JevAdapter:
@@ -192,6 +206,8 @@ def _print(p: Plan, report: Report, lang: str, dry_run: bool) -> None:
         print(f"[{lang}] redirect left (admin may delete): {title}")
     for title in report.skipped:
         print(f"[{lang}] skipped (missing or already a redirect): {title}")
+    for member, cat in report.via_template:
+        print(f"[{lang}] via template: {member} gets {cat} from a template whose line was re-filed")
     for member, cat in report.unmatched:
         print(f"[{lang}] UNMATCHED: {member} is in {cat} but no category line was found (template?)")
     for member, cat, d in report.author:

@@ -42,6 +42,11 @@ class Fake:
     def category_namespaces(self):
         return ["Category", "Categoria"]
 
+    def search_source(self, phrase):
+        """Template/module pages whose source contains the phrase."""
+        return [t for t, text in self.pages.items()
+                if t.startswith(("Template:", "Module:")) and phrase.lower() in text.lower()]
+
     def exists(self, title):
         return title in self.pages
 
@@ -222,3 +227,21 @@ def test_real_map_is_valid():
             kind, _, key = target.rpartition(":")
             assert kind in ("", "redirect", "split"), (lang, old)
             assert key in keys, (lang, old, target)
+
+
+def test_category_added_by_template_is_refiled_in_the_template():
+    fake = Fake(pages={"Category:Cinematography": "", "Template:Infobox film": "| main = [[Category:Cinematography]]",
+                       "Bloodshot": "{{Infobox film}}"},
+                members={"Category:Cinematography": [("Bloodshot", 0)]})
+    _, report = run(fake, {"Cinematography": "film"})
+    assert fake.pages["Template:Infobox film"] == "| main = [[Category:Film]]"
+    assert fake.pages["Bloodshot"] == "{{Infobox film}}"  # the article itself is untouched
+    assert report.unmatched == [] and report.via_template == [("Bloodshot", "Category:Cinematography")]
+
+
+def test_template_keeps_localized_prefix_matching():
+    fake = Fake(lang="it", pages={"Category:Romanzo (Letteratura)": "",
+                                  "Template:Libro": "|romanzo=[[Categoria:Romanzo (Letteratura)]]", "Hobbit": "{{Libro}}"},
+                members={"Category:Romanzo (Letteratura)": [("Hobbit", 0)]})
+    run(fake, {"Romanzo (Letteratura)": "novels"})
+    assert fake.pages["Template:Libro"] == "|romanzo=[[Category:Novels-it]]"

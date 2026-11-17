@@ -205,3 +205,10 @@ def test_rate_limit_gives_up_after_retries(monkeypatch):
     with pytest.raises(requests.HTTPError):
         WikiClient("en", session=s)._token("login")
     assert s.calls == 6
+
+
+def test_search_source_params():
+    s = Recorder({"query": {"search": [{"title": "Template:Libro"}]}})
+    assert WikiClient("it", session=s).search_source("Romanzo (Letteratura)") == ["Template:Libro"]
+    params = s.calls[-1][1]
+    assert params["srsearch"] == 'insource:"Romanzo (Letteratura)"' and params["srnamespace"] == "10|828"

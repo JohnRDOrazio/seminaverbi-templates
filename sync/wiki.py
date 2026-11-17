@@ -156,6 +156,12 @@ class WikiClient:
         names.update(a["alias"] for a in q.get("namespacealiases", []) if a.get("id") == 14)
         return sorted(names)
 
+    def search_source(self, phrase: str) -> list[str]:
+        """Templates and modules whose source contains `phrase` (CirrusSearch insource)."""
+        data = self._call("GET", action="query", list="search", srsearch=f'insource:"{phrase}"',
+                          srnamespace="10|828", srwhat="text", srlimit="max")
+        return [self._dig(r, "title") for r in data.get("query", {}).get("search", [])]
+
     def move(self, old: str, new: str, reason: str, tags: str | None = None) -> None:
         params = dict(action="move", **{"from": old}, to=new, reason=reason, movetalk="1")
         if tags:
