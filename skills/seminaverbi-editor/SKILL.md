@@ -29,8 +29,9 @@ templates or `Module:SV/…` on a wiki: they are overwritten by the sync. Change
    - every template it reports is an `SV …` template from `templates.md`, or one that already exists on
      that wiki (check with `get-page` on `Template:<name>` if unsure); never introduce Wikipedia templates;
    - no link to `w:`/`wikipedia:` without a language on a non-English wiki (see `links.md`);
-   - every category is in `categories.md` for that language, the article has exactly one field category,
-     and themes only where the text really discusses them;
+   - the article calls `{{SV infobox}}` or `{{SV categories}}`, and has no `[[Category:…]]` line for a
+     tree category (field and themes come from the item, below); any other category is in `categories.md`;
+   - every Gospel theme on the item is argued in the text (see Categories);
    - every Bible verse named or alluded to is quoted with `{{SV Bible quote|ref=…}}`;
    - red links only for articles that are planned; say which ones you left.
 4. If a tree category the page needs does not exist yet on that wiki, create it with the helper (below),
@@ -49,7 +50,16 @@ templates or `Module:SV/…` on a wiki: they are overwritten by the sync. Change
   form, or the person's main domain. A novel goes in its literature category; its film adaptation is a
   separate page in the film category; the two pages link to each other. A work's subject (a saint, a
   biblical story) is carried by the themes, the links and the infobox, never by a second field category.
-- Themes: only leaf themes (never a theme group), only those the text genuinely explores.
+- **Field and themes are statements on the article's item**, not category lines: `SV field` once (the
+  one field node), `SV Gospel theme` once per theme, each pointing to the node's item (the `item` in
+  `config/categories.json`). Write them with `wikibase-add-statement` on en. `{{SV infobox}}` (or
+  `{{SV categories}}` on a page without an infobox) outputs the categories on every language's page,
+  within about a minute of the statement.
+- Themes: only leaf themes (never a theme group), only those the text genuinely explores. **The page
+  must elaborate how the work or person relates to each Gospel theme**, with the scenes, lyrics or
+  passages that show it. When it does not, add a line to `docs/content-tasks.md` (in the repository):
+  either research and enrich the text, or remove the theme statement when the relationship cannot be
+  clearly established. Tell the author which you propose.
 - Create missing tree categories, with their cross-language links, from the repository root:
   `.venv/bin/python ~/.config/seminaverbi/runeditor.py tools.categories check --wiki <code> --create`
   (`--dry-run` first if the author wants to see the list). You may run it without asking each time; it
@@ -72,7 +82,8 @@ article's final wikitext saved to a temporary file:
    logged in `config/category_decisions.json`; an `author` outcome goes to the author, whose ruling is
    recorded next to Jev's (`author_choice`). The tree changes only through a PR to `categories.json`.
 
-Jev judges; it does not write. Never let a Jev answer override the author, and when Jev is unavailable,
+Jev's `applied` field and themes go on the item as statements (above); `author` outcomes still wait for
+the author. Jev judges; it does not write. Never let a Jev answer override the author, and when Jev is unavailable,
 ask the author instead of guessing.
 
 ## Wikibase (items live on en)
@@ -81,8 +92,12 @@ ask the author instead of guessing.
   `[[fr:…]]` lines in the text. Use `wikibase-get-entity` / `wikibase-edit-entity`.
 - The SeminaVerbi wikis' site IDs are `en`, `it`, `es`, `fr`, `de`, `pt`. Never `enwiki`, `itwiki`…:
   those are **Wikipedia**. The repository mirrors Wikidata items, Wikipedia sitelinks included.
-- On items, change only sitelinks, labels and descriptions, unless the author asks in this session for a
-  statement change: statements feed the infoboxes and are filled from Wikidata by `EnrichItems.php`.
+- **A new article first finds its subject's item:** `wikibase-search-entities` on en (the mirror holds
+  about 13k Wikidata items), then add the SeminaVerbi sitelink (`en`, `it`…) to it. Create an item only
+  when none exists.
+- On items, change only sitelinks, labels, descriptions, `SV field` and `SV Gospel theme`, unless the
+  author asks in this session for another statement change: other statements feed the infoboxes and are
+  filled from Wikidata by `EnrichItems.php`.
 
 ## Never
 
