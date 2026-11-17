@@ -192,7 +192,9 @@ def _summary(lang: str) -> str:
 
 
 def run(repo, clients: dict, data, types, props: dict, apply: bool, only_item: str | None = None,
-        classify=None, record=None, out=print) -> Report:
+        classify=None, record=None, out=print, fields: dict | None = None) -> Report:
+    """`fields`: item -> field key the author decided; it replaces the pages' field and skips Jev."""
+    fields = fields or {}
     node_item = {n.key: None for n in nodes(data)}
     node_item.update(_node_items(data))
     names_of = {n.key: n.names for n in nodes(data)}
@@ -218,7 +220,8 @@ def run(repo, clients: dict, data, types, props: dict, apply: bool, only_item: s
         existing = {key: repo.item_values(item, props[key]) for key in ("sv_field", "sv_theme")}
         instance = repo.item_values(item, props["instance_of"])
         layout = layout_for(instance, types)
-        plan = plan_item(item, pages, existing, layout, data, types, namespaces, node_item)
+        plan = plan_item(item, pages, existing, layout, data, types, namespaces, node_item,
+                         field_override=fields.get(item))
         if plan.recheck and plan.stop is None:
             if classify is None:
                 plan = plan._replace(stop=f"field {plan.field} does not fit {layout}; Jev not available")
@@ -293,7 +296,15 @@ def main(argv=None, repo=None, clients=None, classify=None, data=None) -> int:
     parser.add_argument("--wiki", default=",".join(LANGS))
     parser.add_argument("--item")
     parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--field", action="append", default=[], metavar="QID=FIELD",
+                        help="the author's field for an item (repeatable); settles a stop")
     args = parser.parse_args(argv)
+    fields = {}
+    for spec in args.field:
+        item, sep, key = spec.partition("=")
+        if not sep or not item or not key:
+            parser.error(f"--field takes QID=FIELD, got {spec!r}")
+        fields[item] = key
     langs = args.wiki.split(",")
     unknown = [lang for lang in langs if lang not in LANGS]
     if unknown:
@@ -315,7 +326,11 @@ def main(argv=None, repo=None, clients=None, classify=None, data=None) -> int:
             def classify(text):
                 holder.setdefault("client", jev.make_client())
                 return jev.classify(holder["client"], text, data)
-        report = run(repo, clients, data, types, props, args.apply, args.item, classify, jev.record)
+        unknown_fields = sorted(set(fields.values()) - set(_node_items({'fields': data['fields'], 'themes': []})))
+        if unknown_fields:
+            parser.error(f"unknown field {', '.join(unknown_fields)}")
+        report = run(repo, clients, data, types, props, args.apply, args.item, classify, jev.record,
+                     fields=fields)
     except (SyncError, KeyError, OSError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1

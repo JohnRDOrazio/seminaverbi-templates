@@ -249,13 +249,13 @@ def setup(pages_by_lang, statements=None, instance_of=None):
     return repo, clients
 
 
-def run(repo, clients, apply=True, jev=None, recorded=None, only_item=None):
+def run(repo, clients, apply=True, jev=None, recorded=None, only_item=None, fields=None):
     def classify(text):
         jev.texts.append(text)
         return fi.jev.Decision("classify", None, {}, {jev.choice: 0.9}, 0.9, jev.choice, jev.outcome)
 
     return fi.run(repo, clients, DATA, TYPES, PROPS, apply=apply, only_item=only_item,
-                  classify=classify if jev else None,
+                  classify=classify if jev else None, fields=fields,
                   record=(recorded.append if recorded is not None else (lambda d: None)))
 
 
@@ -339,3 +339,27 @@ def test_only_item():
 def test_rewrite_last_line_after_the_template_leaves_no_blank_line():
     out = rewrite("Intro.\n[[Category:Film]]\n[[Category:Love]]", ["Film", "Love"], ["Category"], has_module=False)
     assert out == "Intro.\n{{SV categories}}"
+
+
+def test_author_field_settles_a_disagreement():
+    it = {"Pagina film": ("Q1", 20, "Intro.\n[[Category:Film]]\n[[Category:Novels]]", set())}
+    repo, clients = setup({"en": FILM_EN, "it": it})
+    report = run(repo, clients, fields={"Q1": "novels"})
+    assert report.stopped == []
+    assert repo.statements["Q1"]["P10768"] == ["Q_novels"]
+    assert "{{SV categories}}" in clients["it"].pages["Pagina film"][2]
+
+
+def test_main_parses_field_decisions():
+    seen = {}
+
+    def fake_run(*args, **kwargs):
+        seen.update(kwargs)
+        return fi.Report(0, 0, 0, [], [], [], [])
+    original, fi.run = fi.run, fake_run
+    try:
+        fi.main(["--field", "Q1=novels", "--field", "Q2=music"], clients={}, repo=object(), classify=lambda t: None,
+                data=DATA)
+    finally:
+        fi.run = original
+    assert seen["fields"] == {"Q1": "novels", "Q2": "music"}
