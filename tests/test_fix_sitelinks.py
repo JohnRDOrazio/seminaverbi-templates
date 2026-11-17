@@ -34,3 +34,66 @@ def test_a_different_seminaverbi_link_is_a_conflict_and_left_alone():
 
 def test_nothing_to_do():
     assert plan_item(dict(TITLES), before=None, titles=TITLES).sitelinks == {}
+
+
+def test_a_wikipedia_link_changed_after_the_bot_is_kept():
+    # the bot wrote dewiki=Kategorie:Musik over Kategorie:Original; an editor then corrected it
+    before = dict(WIKI, dewiki="Kategorie:Original")
+    current = dict(WIKI, dewiki="Kategorie:Corrected")
+    plan = plan_item(current, before=before, titles=TITLES, written=dict(WIKI))
+    assert "dewiki" not in plan.sitelinks
+    assert ("dewiki", "Kategorie:Corrected", "Kategorie:Musik") in plan.kept
+
+
+def test_a_link_added_after_the_bot_on_a_bot_created_item_is_kept():
+    written = dict(WIKI)
+    del written["frwiki"]
+    plan = plan_item(dict(WIKI), before=None, titles=TITLES, written=written)
+    assert "frwiki" not in plan.sitelinks and plan.sitelinks["enwiki"]["remove"] == ""
+
+
+class Repo:
+    """One item; the first save answers editconflict when `conflict` is set."""
+
+    def __init__(self, conflict=False):
+        self.conflict, self.saves, self.reads = conflict, [], 0
+
+    def _call(self, method, **p):
+        if p.get("action") == "wbeditentity":
+            self.saves.append(p)
+            if self.conflict:
+                self.conflict = False
+                from sync.wiki import SyncError
+                raise SyncError("en: editconflict: Edit conflict.")
+            return {"success": 1}
+        if p.get("action") == "wbgetentities":
+            self.reads += 1
+            return {"entities": {"Q1": {"lastrevid": 40 + self.reads,
+                                        "sitelinks": {s: {"title": t} for s, t in WIKI.items()}}}}
+        if p.get("list") == "usercontribs":
+            return {"query": {"usercontribs": [{"title": "Item:Q1", "revid": 7, "parentid": 0, "new": ""}]}}
+        if p.get("prop") == "revisions":
+            import json
+            content = json.dumps({"sitelinks": {s: {"title": t} for s, t in WIKI.items()}})
+            return {"query": {"pages": [{"revisions": [{"slots": {"main": {"content": content}}}]}]}}
+        raise AssertionError(p)
+
+    def _dig(self, data, *keys):
+        for k in keys:
+            data = data[k]
+        return data
+
+    def _token(self, kind):
+        return "t"
+
+    def login(self, *a):
+        pass
+
+
+def test_save_carries_the_base_revision_and_replans_after_a_conflict(monkeypatch):
+    from tools import fix_sitelinks
+    monkeypatch.setenv("SV_EDITOR_USER", "u")
+    monkeypatch.setenv("SV_EDITOR_PASSWORD", "p")
+    repo = Repo(conflict=True)
+    assert fix_sitelinks.main(["--apply"], repo=repo, data=None) == 0
+    assert [s["baserevid"] for s in repo.saves] == ["41", "42"]
