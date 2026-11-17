@@ -7,12 +7,20 @@ local p = {}
 
 local RTL = { ar = true, he = true, fa = true, ur = true, yi = true, syc = true }
 
--- A language code safe to put in an attribute (e.g. it, grc, zh-hant), or nil.
+-- A BCP 47-shaped language tag safe to put in an attribute (it, grc, zh-Hant, he-Hebr-IL, es-419), or nil.
 local function langCode(code)
-	if code and (code:match('^%a%a%a?$') or code:match('^%a%a%a?%-%a+$')) then
-		return code:lower()
+	if not code or not code:match('^%a%a%a?') then
+		return nil
 	end
-	return nil
+	local rest = code:gsub('^%a%a%a?', '', 1)
+	while rest ~= '' do
+		local subtag = rest:match('^%-(%w%w?%w?%w?%w?%w?%w?%w?)')
+		if not subtag then
+			return nil
+		end
+		rest = rest:sub(#subtag + 2)
+	end
+	return code:lower()
 end
 
 function p.quote(frame)
