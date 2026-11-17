@@ -92,7 +92,7 @@ def test_infobox_import_resolves():
     assert all(q.startswith("Q") for qs in imp["kinds"].values() for q in qs)
     bio = imp["bio"]["it"]
     assert bio["template"] == "Bio"
-    assert set(bio["facts"].values()) <= rows["person"] | {"given_name", "nationality"}
+    assert set(bio["facts"].values()) <= rows["person"] | {"given_name", "nationality", "sex_or_gender"}
     assert set(bio["free"].values()) <= {"note", "rest", "ref"}
 
 
@@ -102,3 +102,28 @@ def test_bio_property_ids_present():
         assert w[k].startswith("P") and w[k][1:].isdigit(), k
     for k in ("male", "female"):
         assert w[k].startswith("Q") and w[k][1:].isdigit(), k
+
+
+BIO_PARAMS = """Titolo Nome Cognome Pseudonimo PostPseudonimo PostCognome PostCognomeVirgola ForzaOrdinamento
+PreData Sesso LuogoNascita LuogoNascitaLink LuogoNascitaAlt GiornoMeseNascita AnnoNascita NoteNascita
+LuogoMorte LuogoMorteLink LuogoMorteAlt GiornoMeseMorte AnnoMorte NoteMorte PreAttività Epoca Epoca2
+Attività Attività2 Attività3 AttivitàAltre Nazionalità NazionalitàNaturalizzato Cittadinanza
+PostNazionalità Categorie FineIncipit Punto Immagine Didascalia Didascalia2 DimImmagine CognomePrima
+Debug""".split()
+
+
+def test_bio_params_all_accounted_for():
+    bio = json.loads((ROOT / "config" / "infobox_import.json").read_text(encoding="utf-8"))["bio"]["it"]
+    known = set(bio["facts"]) | set(bio["free"]) | set(bio["ignored"])
+    assert not set(BIO_PARAMS) - known
+    assert bio["facts"]["Sesso"] == "sex_or_gender"
+    assert all(isinstance(v, str) and v for v in bio["ignored"].values())
+    assert not set(bio["facts"]) & set(bio["free"]) & set(bio["ignored"])
+
+
+def test_import_helpers_and_kinds():
+    imp = json.loads((ROOT / "config" / "infobox_import.json").read_text(encoding="utf-8"))
+    assert {"Start date", "Birth date", "Birth date and age", "Death date", "Death date and age",
+            "Film date"} <= set(imp["helpers"])
+    assert {"Q207628", "Q105543609"} <= set(imp["kinds"]["song"])
+    assert {"Q7397", "Q235557"} <= set(imp["kinds"]["work"])

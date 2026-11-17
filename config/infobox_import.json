@@ -282,20 +282,38 @@
  },
  "helpers": [
   "Film date",
+  "Start date",
+  "Start date and age",
+  "End date",
+  "Birth date",
+  "Birth date and age",
+  "Birth-date",
+  "Death date",
+  "Death date and age",
+  "Death-date",
+  "Release date",
   "Album ratings",
   "Album reviews",
-  "Bandiera"
+  "Bandiera",
+  "Plainlist",
+  "Flatlist",
+  "Unbulleted list",
+  "Hlist",
+  "Nowrap"
  ],
  "kinds": {
   "song": [
    "Q7366",
-   "Q134556"
+   "Q134556",
+   "Q207628",
+   "Q105543609"
   ],
   "album": [
    "Q482994"
   ],
   "film": [
-   "Q11424"
+   "Q11424",
+   "Q24856"
   ],
   "tv": [
    "Q5398426",
@@ -319,11 +337,18 @@
   ],
   "artwork": [
    "Q838948",
-   "Q3305213"
+   "Q3305213",
+   "Q1278452",
+   "Q11801536"
   ],
   "work": [
    "Q17537576",
-   "Q2095"
+   "Q2095",
+   "Q7397",
+   "Q235557",
+   "Q717040",
+   "Q167270",
+   "Q431289"
   ]
  },
  "bio": {
@@ -341,7 +366,15 @@
     "Attività": "occupation",
     "Attività2": "occupation",
     "Attività3": "occupation",
-    "Immagine": "image"
+    "Immagine": "image",
+    "Cognome": "given_name",
+    "Sesso": "sex_or_gender",
+    "LuogoNascitaLink": "birth_place",
+    "LuogoNascitaAlt": "birth_place",
+    "LuogoMorteLink": "death_place",
+    "LuogoMorteAlt": "death_place",
+    "Cittadinanza": "nationality",
+    "NazionalitàNaturalizzato": "nationality"
    },
    "free": {
     "AttivitàAltre": "rest",
@@ -350,7 +383,24 @@
     "PostCognome": "note",
     "PostPseudonimo": "note",
     "NoteNascita": "note",
-    "NoteMorte": "note"
+    "NoteMorte": "note",
+    "PreData": "note",
+    "PreAttività": "rest",
+    "FineIncipit": "rest",
+    "Didascalia": "note",
+    "Didascalia2": "note",
+    "Titolo": "note",
+    "Pseudonimo": "note"
+   },
+   "ignored": {
+    "ForzaOrdinamento": "sort key only",
+    "Epoca": "century tag used for categories, not a statement",
+    "Epoca2": "second century tag, categories only",
+    "Categorie": "suppresses automatic categories",
+    "Punto": "formatting flag",
+    "DimImmagine": "image size, presentation only",
+    "CognomePrima": "name-order flag",
+    "Debug": "module debug flag"
    }
   }
  }
