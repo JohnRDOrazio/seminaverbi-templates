@@ -43,7 +43,9 @@ class CreateResult(NamedTuple):
 
 
 def _site(lang: str) -> str:
-    return f"{lang}wiki"
+    """The SeminaVerbi wiki's global site ID. Not '<lang>wiki': in the shared sites table those are
+    Wikipedia (the repo mirrors Wikidata items, with their Wikipedia sitelinks)."""
+    return lang
 
 
 def _bare(title: str) -> str:

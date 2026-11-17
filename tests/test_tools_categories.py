@@ -120,11 +120,11 @@ def test_create_page_text_definition_and_root():
 
 
 def test_create_links_existing_item():
-    items = {"Q10": {"enwiki": "Category:Music"}}
+    items = {"Q10": {"en": "Category:Music"}}
     fr = Fake("fr", {k: v for k, v in ALL_FR.items() if k != "Category:Music-fr"}, items)
     repo = Fake("en", items=items)
     result = cat.create("fr", DATA, fr, repo, dry_run=False)
-    assert ("Q10", "frwiki", "Category:Music-fr", "seminaverbi-mcp") in repo.sitelinks
+    assert ("Q10", "fr", "Category:Music-fr", "seminaverbi-mcp") in repo.sitelinks
     assert ("Category:Music-fr", "Q10") in result.linked
 
 
@@ -133,7 +133,7 @@ def test_create_new_item_when_none():
     fr = Fake("fr", {k: v for k, v in ALL_FR.items() if k != "Category:Music-fr"}, items)
     repo = Fake("en", items=items)
     cat.create("fr", DATA, fr, repo, dry_run=False)
-    made = {sitelinks["frwiki"]: (labels, descriptions, tags)
+    made = {sitelinks["fr"]: (labels, descriptions, tags)
             for _, labels, descriptions, sitelinks, tags in repo.new_items}
     labels, descriptions, tags = made["Category:Music-fr"]
     assert labels == names("Music") and tags == "seminaverbi-mcp"
@@ -141,7 +141,7 @@ def test_create_new_item_when_none():
 
 
 def test_create_conflict():
-    items = {"Q10": {"enwiki": "Category:Music"}, "Q11": {"itwiki": "Category:Music-it"}}
+    items = {"Q10": {"en": "Category:Music"}, "Q11": {"it": "Category:Music-it"}}
     fr = Fake("fr", ALL_FR, items)
     repo = Fake("en", items=items)
     result = cat.create("fr", DATA, fr, repo, dry_run=False)
@@ -151,29 +151,29 @@ def test_create_conflict():
 
 def test_create_never_moves_an_existing_sitelink():
     # Q10 already links frwiki to another page: re-pointing it would silently drop that link
-    items = {"Q10": {"enwiki": "Category:Music", "frwiki": "Category:Old music"}}
+    items = {"Q10": {"en": "Category:Music", "fr": "Category:Old music"}}
     fr = Fake("fr", ALL_FR, items)
     repo = Fake("en", items=items)
     result = cat.create("fr", DATA, fr, repo, dry_run=False)
     assert result.taken == [("music", "Q10", "Category:Old music")]
-    assert repo.sitelinks == [] and items["Q10"]["frwiki"] == "Category:Old music"
+    assert repo.sitelinks == [] and items["Q10"]["fr"] == "Category:Old music"
 
 
 def test_replace_missing_replaces_a_link_to_a_page_that_does_not_exist_here():
     # imported from Wikidata: frwiki points to a Wikipedia category title absent from this wiki
-    items = {"Q10": {"enwiki": "Category:Music", "frwiki": "Category:Musique (Wikipedia)"}}
+    items = {"Q10": {"en": "Category:Music", "fr": "Category:Musique (Wikipedia)"}}
     fr = Fake("fr", ALL_FR, items)
     repo = Fake("en", items=items)
     result = cat.create("fr", DATA, fr, repo, dry_run=False, replace_missing=True)
     assert result.taken == []
-    assert ("Q10", "frwiki", "Category:Music-fr", "seminaverbi-mcp") in repo.sitelinks
+    assert ("Q10", "fr", "Category:Music-fr", "seminaverbi-mcp") in repo.sitelinks
     assert ("Category:Music-fr", "Q10") in result.linked
 
 
 def test_replace_missing_never_replaces_a_link_to_an_existing_page():
     pages = dict(ALL_FR)
     pages["Category:Old music"] = page()  # a real page on this wiki
-    items = {"Q10": {"enwiki": "Category:Music", "frwiki": "Category:Old music"}}
+    items = {"Q10": {"en": "Category:Music", "fr": "Category:Old music"}}
     fr = Fake("fr", pages, items)
     repo = Fake("en", items=items)
     result = cat.create("fr", DATA, fr, repo, dry_run=False, replace_missing=True)
@@ -183,7 +183,7 @@ def test_replace_missing_never_replaces_a_link_to_an_existing_page():
 
 def test_link_stored_under_the_localized_namespace_is_not_a_conflict():
     # Wikibase stores the normalized title: "Catégorie:Music-fr" is the same page as "Category:Music-fr"
-    items = {"Q10": {"enwiki": "Category:Music", "frwiki": "Catégorie:Music-fr"}}
+    items = {"Q10": {"en": "Category:Music", "fr": "Catégorie:Music-fr"}}
     fr = Fake("fr", ALL_FR, items)
     repo = Fake("en", items=items)
     result = cat.create("fr", DATA, fr, repo, dry_run=False)
@@ -192,7 +192,7 @@ def test_link_stored_under_the_localized_namespace_is_not_a_conflict():
 
 
 def test_link_to_a_same_named_page_in_another_namespace_is_a_conflict():
-    items = {"Q10": {"enwiki": "Category:Music", "frwiki": "Music-fr"}}  # the article, not the category
+    items = {"Q10": {"en": "Category:Music", "fr": "Music-fr"}}  # the article, not the category
     fr = Fake("fr", dict(ALL_FR, **{"Music-fr": page()}), items)
     repo = Fake("en", items=items)
     result = cat.create("fr", DATA, fr, repo, dry_run=False)
@@ -200,12 +200,12 @@ def test_link_to_a_same_named_page_in_another_namespace_is_a_conflict():
 
 
 def test_cli_reports_taken_sitelink(env, capsys):
-    items = {"Q10": {"enwiki": "Category:Music", "frwiki": "Category:Old music"}}
+    items = {"Q10": {"en": "Category:Music", "fr": "Category:Old music"}}
     clients = {"fr": Fake("fr", ALL_FR, items), "en": Fake("en", items=items)}
     for c in clients.values():
         c.login = lambda user, password: None
     assert cat.main(["check", "--wiki", "fr", "--create"], client_factory=clients.__getitem__, data=DATA) == 1
-    assert "Q10 already links frwiki to Category:Old music" in capsys.readouterr().out
+    assert "Q10 already links fr to Category:Old music" in capsys.readouterr().out
 
 
 def test_dry_run_writes_nothing():
@@ -224,7 +224,7 @@ def test_edit_failure_continues():
     assert [t for t, _ in result.failed] == ["Category:Arts-fr"]
     assert "Category:Music-fr" in result.created
     # a page that could not be created gets no sitelink
-    assert all(sitelinks.get("frwiki") != "Category:Arts-fr" for sitelinks in fr.items.values())
+    assert all(sitelinks.get("fr") != "Category:Arts-fr" for sitelinks in fr.items.values())
 
 
 @pytest.fixture
@@ -257,3 +257,10 @@ def test_cli_login_error_hides_password(env, capsys):
     out, err = capsys.readouterr()
     assert "login failed" in err
     assert "hunter2-secret" not in out + err
+
+
+def test_sitelinks_use_the_seminaverbi_site_ids():
+    # enwiki…ptwiki are Wikipedia in the shared sites table (the repo mirrors Wikidata items);
+    # the SeminaVerbi wikis are the 'seminaverbi' group, global IDs en…pt
+    from tools.categories import _site
+    assert [_site(lang) for lang in ("en", "it", "es", "fr", "de", "pt")] == ["en", "it", "es", "fr", "de", "pt"]

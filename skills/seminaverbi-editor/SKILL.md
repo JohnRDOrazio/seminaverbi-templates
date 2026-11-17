@@ -79,6 +79,8 @@ ask the author instead of guessing.
 
 - Translations and categories are linked across languages through **sitelinks** on the item, never with
   `[[fr:…]]` lines in the text. Use `wikibase-get-entity` / `wikibase-edit-entity`.
+- The SeminaVerbi wikis' site IDs are `en`, `it`, `es`, `fr`, `de`, `pt`. Never `enwiki`, `itwiki`…:
+  those are **Wikipedia**. The repository mirrors Wikidata items, Wikipedia sitelinks included.
 - On items, change only sitelinks, labels and descriptions, unless the author asks in this session for a
   statement change: statements feed the infoboxes and are filled from Wikidata by `EnrichItems.php`.
 
