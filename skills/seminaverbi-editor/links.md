@@ -18,12 +18,12 @@ too (`w:en:`), for uniformity:
 
 | wiki | example |
 |---|---|
-| en | `[[w:en:Second Vatican Council|Second Vatican Council]]` |
-| it | `[[w:it:Concilio Vaticano II|Concilio Vaticano II]]` (existing it pages use `[[wikipedia:it:…]]`, same thing) |
-| es | `[[w:es:Concilio Vaticano II|Concilio Vaticano II]]` |
-| fr | `[[w:fr:Concile Vatican II|concile Vatican II]]` |
-| de | `[[w:de:Zweites Vatikanisches Konzil|Zweiten Vatikanischen Konzil]]` |
-| pt | `[[w:pt:Concílio Vaticano II|Concílio Vaticano II]]` |
+| en | `[[w:en:Second Vatican Council\|Second Vatican Council]]` |
+| it | `[[w:it:Concilio Vaticano II\|Concilio Vaticano II]]` (existing it pages use `[[wikipedia:it:…]]`, same thing) |
+| es | `[[w:es:Concilio Vaticano II\|Concilio Vaticano II]]` |
+| fr | `[[w:fr:Concile Vatican II\|concile Vatican II]]` |
+| de | `[[w:de:Zweites Vatikanisches Konzil\|Zweiten Vatikanischen Konzil]]` |
+| pt | `[[w:pt:Concílio Vaticano II\|Concílio Vaticano II]]` |
 
 Before linking, confirm the article exists on that language's Wikipedia (and use its exact title). If it
 does not, link the English article with `w:en:` and tell the author, or leave the text unlinked.

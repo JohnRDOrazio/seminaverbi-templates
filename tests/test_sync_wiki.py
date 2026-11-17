@@ -134,3 +134,23 @@ def test_sitelink_reads_item():
     assert WikiClient("en", session=s).sitelink("Q9", "enwiki") == "Category:Video games"
     s = Recorder({"entities": {"Q9": {"id": "Q9", "sitelinks": {}}}})
     assert WikiClient("en", session=s).sitelink("Q9", "frwiki") is None
+
+
+def test_page_info_follows_category_continuation():
+    s = Recorder(
+        {"continue": {"clcontinue": "5|M", "continue": "||"},
+         "query": {"pages": [{"title": "Category:A", "pageid": 5, "categories": [{"title": "Category:B"}]}]}},
+        {"query": {"pages": [{"title": "Category:A", "pageid": 5, "categories": [{"title": "Category:Parent"}],
+                              "pageprops": {"wikibase_item": "Q1"}}]}})
+    info = WikiClient("en", session=s).page_info(["Category:A"])
+    assert info["Category:A"].categories == ["B", "Parent"] and info["Category:A"].item == "Q1"
+    assert s.calls[1][1]["clcontinue"] == "5|M"
+
+
+def test_article_categories_replaces_continuation():
+    s = Recorder(
+        {"continue": {"clcontinue": "1|X", "continue": "||"}, "query": {"pages": [{"title": "A", "categories": [{"title": "Category:M"}]}]}},
+        {"continue": {"gapcontinue": "C", "continue": "gapcontinue||"}, "query": {"pages": [{"title": "A", "categories": [{"title": "Category:N"}]}]}},
+        {"query": {"pages": [{"title": "C", "categories": [{"title": "Category:O"}]}]}})
+    assert WikiClient("en", session=s).article_categories() == {"M", "N", "O"}
+    assert "clcontinue" not in s.calls[2][1] and s.calls[2][1]["gapcontinue"] == "C"

@@ -22,8 +22,8 @@ templates or `Module:SV/…` on a wiki: they are overwritten by the sync. Change
 
 ## Edit routine (every save)
 
-1. Fetch the current page (`get-page`) on the right wiki. If someone other than you edited it since the
-   author last looked, show the author the change before overwriting anything.
+1. Fetch the current page (`get-page`) on the right wiki and keep its `latestRevisionId`. If someone other
+   than you edited it since the author last looked, show the author the change before overwriting anything.
 2. Write the full wikitext.
 3. Check it with `parse-wikitext` on that wiki, and fix before saving:
    - every template it reports is an `SV …` template from `templates.md`, or one that already exists on
@@ -35,7 +35,9 @@ templates or `Module:SV/…` on a wiki: they are overwritten by the sync. Change
    - red links only for articles that are planned; say which ones you left.
 4. If a tree category the page needs does not exist yet on that wiki, create it with the helper (below),
    never by hand.
-5. Save (`create-page` / `update-page`) with a short summary **in the wiki's language**.
+5. Save with a short summary **in the wiki's language**: `create-page` for a new page; `update-page` with
+   `latestId` set to the `latestRevisionId` from step 1, so the server refuses the save if anyone edited
+   the page in between (then go back to step 1).
 6. Tell the author what you changed and give the diff link.
 
 ## Categories

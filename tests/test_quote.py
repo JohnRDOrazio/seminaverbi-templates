@@ -51,3 +51,14 @@ def test_quote_missing_text():
     assert out.startswith('<strong class="error">')
     assert msg("it", "quote_missing_text") in out
     assert "blockquote" not in out
+
+
+def test_quote_accepts_multi_subtag_and_numeric_region():
+    assert 'lang="he-hebr-il" dir="rtl"' in quote(text="T", original="O", original_lang="he-Hebr-IL")
+    assert 'lang="es-419" dir="ltr"' in quote(text="T", original="O", original_lang="es-419")
+
+
+def test_quote_rejects_attribute_breakers():
+    for bad in ('he" dir="ltr', "he'x", "he x", "he-<b>", "-he", "he--il"):
+        out = quote(text="T", original="O", original_lang=bad)
+        assert "lang=" not in out, bad

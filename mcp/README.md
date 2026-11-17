@@ -3,7 +3,8 @@
 Claude Code reads and edits the six SeminaVerbi wikis through
 [`@professional-wiki/mediawiki-mcp-server`](https://www.npmjs.com/package/@professional-wiki/mediawiki-mcp-server)
 (MIT), logged in as **SV editor bot** (bot password `mcp`). Its edits are bot-flagged and tagged
-`seminaverbi-mcp`, so `Special:RecentChanges?tagfilter=seminaverbi-mcp` lists exactly what it did.
+`seminaverbi-mcp`, so `Special:RecentChanges?tagfilter=seminaverbi-mcp&hidebots=0` lists exactly what it did (bot edits are
+hidden from RecentChanges unless `hidebots=0`).
 How the bot is expected to edit is in `skills/seminaverbi-editor/`.
 
 - `config.json`: the six wikis (keys `en it es fr de pt`). No secrets: the username and password are

@@ -99,16 +99,28 @@ class WikiClient:
         out: dict[str, PageInfo | None] = {}
         for i in range(0, len(titles), 50):
             batch = titles[i:i + 50]
-            q = self._dig(self._call("GET", action="query", prop="info|categories|pageprops",
-                                     ppprop="wikibase_item", clshow="!hidden", cllimit="max",
-                                     titles="|".join(batch)), "query")
-            back = {self._dig(n, "to"): self._dig(n, "from") for n in q.get("normalized", [])}
-            for page in q.get("pages", []):
-                title = back.get(self._dig(page, "title"), page["title"])
+            base = dict(action="query", prop="info|categories|pageprops", ppprop="wikibase_item",
+                        clshow="!hidden", cllimit="max", titles="|".join(batch))
+            pages: dict[str, dict] = {}
+            back: dict[str, str] = {}
+            params = dict(base)
+            while True:
+                q = self._call("GET", **params)
+                query = self._dig(q, "query")
+                back.update({self._dig(n, "to"): self._dig(n, "from") for n in query.get("normalized", [])})
+                for page in query.get("pages", []):
+                    merged = pages.setdefault(self._dig(page, "title"), {"categories": []})
+                    merged.update({k: v for k, v in page.items() if k != "categories"})
+                    merged["categories"].extend(page.get("categories", []))
+                if "continue" not in q:
+                    break
+                params = dict(base, **q["continue"])  # categories of 50 pages may span several responses
+            for title, page in pages.items():
+                title = back.get(title, title)
                 if page.get("missing") or page.get("invalid"):
                     out[title] = None
                     continue
-                cats = [_bare(self._dig(c, "title")) for c in page.get("categories", [])]
+                cats = [_bare(self._dig(c, "title")) for c in page["categories"]]
                 out[title] = PageInfo(True, bool(page.get("redirect")), cats,
                                       page.get("pageprops", {}).get("wikibase_item"))
             for t in batch:
@@ -117,16 +129,18 @@ class WikiClient:
 
     def article_categories(self) -> set[str]:
         """Visible categories used by main-namespace articles (redirects excluded)."""
-        params = dict(action="query", generator="allpages", gapnamespace="0", gapfilterredir="nonredirects",
-                      gaplimit="max", prop="categories", clshow="!hidden", cllimit="max")
+        base = dict(action="query", generator="allpages", gapnamespace="0", gapfilterredir="nonredirects",
+                    gaplimit="max", prop="categories", clshow="!hidden", cllimit="max")
         found: set[str] = set()
+        params = dict(base)
         while True:
             data = self._call("GET", **params)
             for page in data.get("query", {}).get("pages", []):
                 found.update(_bare(self._dig(c, "title")) for c in page.get("categories", []))
             if "continue" not in data:
                 return found
-            params.update(data["continue"])
+            # only the latest continuation: a finished clcontinue must not leak into the next page batch
+            params = dict(base, **data["continue"])
 
     def item_for(self, site: str, title: str) -> str | None:
         """The Wikibase item a page on `site` is linked to, or None."""
