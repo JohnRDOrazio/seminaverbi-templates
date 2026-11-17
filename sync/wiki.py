@@ -316,3 +316,32 @@ class WikiClient:
         """The page's categories now (template-added included), bare names."""
         data = self._call("GET", action="query", prop="categories", titles=title, cllimit="max")
         return {c["title"].split(":", 1)[1] for c in self._dig(data, "query", "pages", 0).get("categories", [])}
+
+    def articles(self) -> list[str]:
+        """Titles of every main-namespace page that is not a redirect."""
+        titles, cont = [], {}
+        while True:
+            data = self._call("GET", action="query", list="allpages", apnamespace="0",
+                              apfilterredir="nonredirects", aplimit="max", **cont)
+            titles += [p["title"] for p in self._dig(data, "query", "allpages")]
+            if "continue" not in data:
+                return titles
+            cont = data["continue"]
+
+    def items_for(self, site: str, titles: list[str]) -> dict[str, str]:
+        """title -> item for the titles on `site` that are linked to an item (50 per request)."""
+        out = {}
+        for i in range(0, len(titles), 50):
+            chunk = titles[i:i + 50]
+            entities = self._dig(self._call("GET", action="wbgetentities", sites=site, titles="|".join(chunk),
+                                            props="sitelinks", sitefilter=site), "entities")
+            for key, entity in entities.items():
+                if key.startswith("Q") and "missing" not in entity:
+                    out[entity["sitelinks"][site]["title"]] = key
+        return out
+
+    def label(self, item: str, lang: str = "en") -> str | None:
+        entities = self._dig(self._call("GET", action="wbgetentities", ids=item, props="labels",
+                                        languages=lang), "entities")
+        return self._dig(entities, item).get("labels", {}).get(lang, {}).get("value")
+

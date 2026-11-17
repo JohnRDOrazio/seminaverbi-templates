@@ -334,3 +334,25 @@ def test_page_categories_bare_names():
     s = Recorder({"query": {"pages": [{"title": "X", "categories": [{"title": "Categoria:Musica"},
                                                                        {"title": "Categoria:Arti dello spettacolo"}]}]}})
     assert WikiClient("it", session=s).page_categories("X") == {"Musica", "Arti dello spettacolo"}
+
+
+def test_articles_lists_main_namespace_non_redirects():
+    s = Recorder({"query": {"allpages": [{"title": "A"}]}, "continue": {"apcontinue": "B", "continue": "-||"}},
+                 {"query": {"allpages": [{"title": "B"}]}})
+    assert WikiClient("en", session=s).articles() == ["A", "B"]
+    params = s.calls[0][1]
+    assert params["apnamespace"] == "0" and params["apfilterredir"] == "nonredirects"
+    assert s.calls[1][1]["apcontinue"] == "B"
+
+
+def test_items_for_batches_titles():
+    body = {"entities": {"Q1": {"id": "Q1", "sitelinks": {"it": {"site": "it", "title": "A"}}},
+                         "-1": {"site": "it", "title": "B", "missing": ""}}}
+    s = Recorder(body)
+    assert WikiClient("en", session=s).items_for("it", ["A", "B"]) == {"A": "Q1"}
+    assert s.calls[0][1]["sites"] == "it" and s.calls[0][1]["titles"] == "A|B"
+
+
+def test_label():
+    s = Recorder({"entities": {"Q6022": {"id": "Q6022", "labels": {"en": {"language": "en", "value": "television series"}}}}})
+    assert WikiClient("en", session=s).label("Q6022") == "television series"

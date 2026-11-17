@@ -10,10 +10,18 @@ Credentials: SV_EDITOR_USER / SV_EDITOR_PASSWORD (a bot password).
 """
 from __future__ import annotations
 
+import argparse
+import json
+import os
 import re
+import sys
+from pathlib import Path
 from typing import NamedTuple
 
-from sync.categories import leaf_themes, nodes
+from sync.categories import leaf_themes, load, nodes
+from sync.pages import LANGS
+from sync.wiki import SyncError, WikiClient
+from tools import jev
 from tools.migrate_categories import _line_regex
 
 MODULE_CALL = re.compile(r"\{\{\s*SV[ _](?:infobox(?:[ _](?:work|person))?|categories)\s*(\|[^{}]*)?\}\}")
@@ -87,7 +95,7 @@ def rewrite(text: str, remove: list, namespaces, has_module: bool) -> str:
             # drop the whole line: its newline after, or before when it is the last line
             if text[end:end + 1] == "\n":
                 end += 1
-            elif start > 0 and text[start - 1] == "\n" and (not out or not out[-1].endswith(marker)):
+            elif start > 0 and text[start - 1] == "\n":
                 start -= 1
         out.append(text[pos:start])
         if i == 0 and not has_module:
@@ -140,3 +148,174 @@ def plan_item(item: str, pages: list, existing: dict, layout: str, data, types, 
             edits[p.lang] = (p.title, new, p.revid)
     recheck = bool(field) and field_override is None and not fits(field, layout, data, types)
     return ItemPlan(item, field, themes, add, edits, None, recheck)
+
+
+# --- execution ---
+
+ROOT = Path(__file__).resolve().parent.parent
+TAG = "seminaverbi-mcp"
+MAIN_PAGE_ITEM = "Q4"
+
+
+class Report(NamedTuple):
+    planned: int
+    added: int
+    edited: int
+    stopped: list      # (item, reason)
+    unsafe: list       # (lang, title, tree categories the preview lost)
+    failed: list       # (lang or "repo", title or item, error)
+    unconnected: list  # (lang, title)
+
+    @property
+    def exit_code(self) -> int:
+        return 1 if self.stopped or self.unsafe or self.failed else 0
+
+
+def layout_for(instance_of: list, types) -> str:
+    """Same rule as Module:SV/Infobox layoutFor: the first mapped instance-of value, else work."""
+    return next((types["types"][q] for q in instance_of if q in types["types"]), "work")
+
+
+def _summary(lang: str) -> str:
+    return json.loads((ROOT / "i18n" / f"{lang}.json").read_text(encoding="utf-8"))["file_summary"]
+
+
+def run(repo, clients: dict, data, types, props: dict, apply: bool, only_item: str | None = None,
+        classify=None, record=None, out=print) -> Report:
+    node_item = {n.key: None for n in nodes(data)}
+    node_item.update(_node_items(data))
+    names_of = {n.key: n.names for n in nodes(data)}
+    groups, unconnected = {}, []
+    for lang, client in clients.items():
+        titles = client.articles()
+        linked = client.items_for(lang, titles)
+        for title in titles:
+            item = linked.get(title)
+            if not item:
+                unconnected.append((lang, title))
+            elif item != MAIN_PAGE_ITEM and (only_item is None or item == only_item):
+                groups.setdefault(item, []).append((lang, title))
+    planned = added = edited = 0
+    stopped, unsafe, failed = [], [], []
+    for item in sorted(groups, key=lambda q: int(q[1:]) if q[1:].isdigit() else q):
+        pages, namespaces = [], {}
+        for lang, title in groups[item]:
+            client = clients[lang]
+            revid, text = client.revision(title)
+            pages.append(PageFacts(lang, title, revid, text, client.page_categories(title)))
+            namespaces[lang] = client.category_namespaces()
+        existing = {key: repo.item_values(item, props[key]) for key in ("sv_field", "sv_theme")}
+        instance = repo.item_values(item, props["instance_of"])
+        layout = layout_for(instance, types)
+        plan = plan_item(item, pages, existing, layout, data, types, namespaces, node_item)
+        if plan.recheck and plan.stop is None:
+            if classify is None:
+                plan = plan._replace(stop=f"field {plan.field} does not fit {layout}; Jev not available")
+            else:
+                typed = next((q for q in instance if q in types["types"]), instance[0] if instance else None)
+                label = (repo.label(typed) if typed else None) or layout
+                first = min(pages, key=lambda p: LANGS.index(p.lang))
+                decision = classify(f"Type: {label}.\n\n{first.text}")
+                if apply and record:
+                    record(decision)
+                if decision.outcome == "applied":
+                    plan = plan_item(item, pages, existing, layout, data, types, namespaces, node_item,
+                                     field_override=decision.choice)
+                else:
+                    plan = plan._replace(stop=f"field for the author: pages say {plan.field}, Jev suggests "
+                                              f"{decision.choice} ({decision.outcome}, confidence "
+                                              f"{decision.confidence:.2f}) for a {label}")
+        if plan.stop:
+            stopped.append((item, plan.stop))
+            out(f"{item}: STOP {plan.stop}")
+            continue
+        if not plan.add and not plan.edits:
+            continue
+        planned += 1
+        out(f"{item}: field {plan.field}; themes {', '.join(plan.themes) or '-'}; "
+            f"add {len(plan.add)}; edit {', '.join(f'{lang}:{e[0]}' for lang, e in plan.edits.items()) or '-'}")
+        if not apply:
+            continue
+        try:
+            for key, value in plan.add:
+                repo.add_item_claim(item, props[key], value, tags=TAG, summary=_summary("en"))
+                added += 1
+        except SyncError as exc:
+            failed.append(("repo", item, str(exc)))
+            continue
+        by_lang = {p.lang: p for p in pages}
+        for lang, (title, text, revid) in plan.edits.items():
+            page = by_lang[lang]
+            fields, themes = tree_keys(lang, page.categories, data)
+            keep = {names_of[k][lang] for k in themes | fields if k == plan.field or k in themes}
+            if plan.field:
+                keep.add(names_of[plan.field][lang])
+            lost = sorted(keep - clients[lang].preview_categories(title, text))
+            if lost:
+                unsafe.append((lang, title, lost))
+                out(f"{item}: UNSAFE {lang}:{title} would lose {', '.join(lost)}; not saved")
+                continue
+            try:
+                clients[lang].edit(title, text, _summary(lang), tags=TAG, baserevid=revid)
+                edited += 1
+            except SyncError as exc:
+                failed.append((lang, title, str(exc)))
+                out(f"{item}: FAILED {lang}:{title}: {exc}")
+    return Report(planned, added, edited, stopped, unsafe, failed, unconnected)
+
+
+def _node_items(data) -> dict:
+    out = {}
+
+    def walk(items):
+        for d in items:
+            if "item" in d:
+                out[d["key"]] = d["item"]
+            walk(d.get("children", []))
+    walk(data["fields"])
+    walk(data["themes"])
+    return out
+
+
+def main(argv=None, repo=None, clients=None, classify=None, data=None) -> int:
+    parser = argparse.ArgumentParser(prog="python -m tools.file_items")
+    parser.add_argument("--wiki", default=",".join(LANGS))
+    parser.add_argument("--item")
+    parser.add_argument("--apply", action="store_true")
+    args = parser.parse_args(argv)
+    langs = args.wiki.split(",")
+    unknown = [lang for lang in langs if lang not in LANGS]
+    if unknown:
+        parser.error(f"unknown wiki {', '.join(unknown)}; choose from {', '.join(LANGS)}")
+    data = data or load(ROOT)
+    types = json.loads((ROOT / "config" / "infobox_types.json").read_text(encoding="utf-8"))
+    props = json.loads((ROOT / "config" / "wikibase.json").read_text(encoding="utf-8"))
+    try:
+        if clients is None:
+            clients = {lang: WikiClient(lang) for lang in langs}
+            repo = clients.get("en") or WikiClient("en")
+            if args.apply:
+                user, password = os.environ["SV_EDITOR_USER"], os.environ["SV_EDITOR_PASSWORD"]
+                for client in {id(c): c for c in [*clients.values(), repo]}.values():
+                    client.login(user, password)
+        if classify is None:
+            holder = {}
+
+            def classify(text):
+                holder.setdefault("client", jev.make_client())
+                return jev.classify(holder["client"], text, data)
+        report = run(repo, clients, data, types, props, args.apply, args.item, classify, jev.record)
+    except (SyncError, KeyError, OSError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    verb = "" if args.apply else " (dry run: nothing written)"
+    print(f"items to file {report.planned}; statements added {report.added}; pages edited {report.edited}{verb}")
+    print(f"stopped {len(report.stopped)}; unsafe {len(report.unsafe)}; failed {len(report.failed)}; "
+          f"unconnected articles {len(report.unconnected)}")
+    for lang, title in report.unconnected:
+        print(f"  unconnected: {lang}:{title}")
+    return report.exit_code
+
+
+if __name__ == "__main__":
+    sys.exit(main())

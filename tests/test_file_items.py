@@ -127,3 +127,197 @@ def test_fits():
     assert fits("film", "person", DATA, TYPES)
     assert fits("novels", "book", DATA, TYPES)
     assert fits("animation", "tv", DATA, TYPES)
+
+
+# --- execution (Task 6) ---
+
+import re as _re
+
+import pytest
+
+from sync.wiki import SyncError
+from tools import file_items as fi
+
+PROPS = {"sv_field": "P10768", "sv_theme": "P10769", "instance_of": "P2016"}
+CAT_LINE = _re.compile(r"\[\[Category:([^\]|]+)(?:\|[^\]]*)?\]\]")
+
+
+class Repo:
+    def __init__(self, statements=None, instance_of=None):
+        self.statements = statements or {}   # item -> {prop: [Q]}
+        self.instance_of = instance_of or {}
+        self.calls = []
+
+    def item_values(self, item, prop):
+        if prop == PROPS["instance_of"]:
+            return list(self.instance_of.get(item, []))
+        return list(self.statements.get(item, {}).get(prop, []))
+
+    def add_item_claim(self, item, prop, value, tags=None, summary=None):
+        self.calls.append(("claim", item, prop, value))
+        self.statements.setdefault(item, {}).setdefault(prop, []).append(value)
+
+    def label(self, item, lang="en"):
+        return {"Q_tv": "television series"}.get(item)
+
+
+class Client:
+    """One wiki: pages are (item, revid, text, template-added categories)."""
+
+    def __init__(self, lang, repo, pages, log):
+        self.lang, self.repo, self.pages, self.log = lang, repo, pages, log
+        self.conflict = set()
+        self.drop_from_preview = set()
+
+    def _cats(self, item, text, template_cats):
+        cats = set(template_cats) | {m.group(1).strip() for m in CAT_LINE.finditer(text)}
+        if fi.calls_module(text):
+            by_item = {n["item"]: n["names"][self.lang] for n in _all_nodes()}
+            for prop in ("P10768", "P10769"):
+                cats |= {by_item[q] for q in self.repo.statements.get(item, {}).get(prop, [])}
+        return cats
+
+    def articles(self):
+        return list(self.pages)
+
+    def items_for(self, site, titles):
+        return {t: self.pages[t][0] for t in titles if self.pages[t][0]}
+
+    def revision(self, title):
+        _, revid, text, _ = self.pages[title]
+        return revid, text
+
+    def page_categories(self, title):
+        item, _, text, tc = self.pages[title]
+        return self._cats(item, text, tc)
+
+    def preview_categories(self, title, text):
+        item, _, _, tc = self.pages[title]
+        return self._cats(item, text, tc) - self.drop_from_preview
+
+    def category_namespaces(self):
+        return ["Category"]
+
+    def edit(self, title, text, summary, tags=None, createonly=False, baserevid=None):
+        self.log.append(("edit", self.lang, title))
+        if title in self.conflict:
+            raise SyncError(f"{self.lang}: editconflict: Edit conflict.")
+        item, revid, _, tc = self.pages[title]
+        assert baserevid == revid
+        self.pages[title] = (item, revid + 1, text, tc)
+
+
+def _all_nodes():
+    out = [DATA["root"], DATA["themes_root"]]
+
+    def walk(ns):
+        for n in ns:
+            out.append(n)
+            walk(n.get("children", []))
+    walk(DATA["fields"])
+    walk(DATA["themes"])
+    return out
+
+
+class Jev:
+    def __init__(self, choice, outcome):
+        self.choice, self.outcome, self.texts = choice, outcome, []
+
+
+def setup(pages_by_lang, statements=None, instance_of=None):
+    repo = Repo(statements, instance_of)
+    log = repo.calls
+    clients = {lang: Client(lang, repo, dict(pages), log) for lang, pages in pages_by_lang.items()}
+    return repo, clients
+
+
+def run(repo, clients, apply=True, jev=None, recorded=None, only_item=None):
+    def classify(text):
+        jev.texts.append(text)
+        return fi.jev.Decision("classify", None, {}, {jev.choice: 0.9}, 0.9, jev.choice, jev.outcome)
+
+    return fi.run(repo, clients, DATA, TYPES, PROPS, apply=apply, only_item=only_item,
+                  classify=classify if jev else None,
+                  record=(recorded.append if recorded is not None else (lambda d: None)))
+
+
+FILM_EN = {"Film page": ("Q1", 10, "Intro.\n[[Category:Film]]\n[[Category:Faith]]", set())}
+FILM_IT = {"Pagina film": ("Q1", 20, "Intro.\n[[Category:Film]]\n[[Category:Love]]", set())}
+
+
+def test_dry_run_writes_nothing():
+    repo, clients = setup({"en": FILM_EN, "it": FILM_IT})
+    report = run(repo, clients, apply=False)
+    assert repo.calls == [] and report.planned == 1
+
+
+def test_statements_before_edits():
+    repo, clients = setup({"en": FILM_EN, "it": FILM_IT}, instance_of={"Q1": ["Q_film_type"]})
+    report = run(repo, clients)
+    kinds = [c[0] for c in repo.calls]
+    assert kinds.index("edit") > max(i for i, k in enumerate(kinds) if k == "claim")
+    assert repo.statements["Q1"] == {"P10768": ["Q_film"], "P10769": ["Q_faith", "Q_love"]}
+    assert clients["it"].pages["Pagina film"][2] == "Intro.\n{{SV categories}}"
+    assert report.edited == 2 and not report.unsafe
+
+
+def test_unsafe_preview_skips_edit():
+    repo, clients = setup({"en": FILM_EN})
+    clients["en"].drop_from_preview = {"Faith"}
+    report = run(repo, clients)
+    assert ("edit", "en", "Film page") not in repo.calls
+    assert report.unsafe == [("en", "Film page", ["Faith"])] and report.exit_code == 1
+
+
+def test_editconflict_reported_and_run_continues():
+    repo, clients = setup({"en": FILM_EN, "it": FILM_IT})
+    clients["en"].conflict = {"Film page"}
+    report = run(repo, clients)
+    assert report.failed and "editconflict" in report.failed[0][2]
+    assert clients["it"].pages["Pagina film"][2] == "Intro.\n{{SV categories}}"
+
+
+def test_recheck_applied_replaces_field_and_records():
+    repo, clients = setup({"en": FILM_EN}, instance_of={"Q1": ["Q_tv"]})
+    recorded, jev = [], Jev("television", "applied")
+    run(repo, clients, jev=jev, recorded=recorded)
+    assert repo.statements["Q1"]["P10768"] == ["Q_television"]
+    assert len(recorded) == 1 and jev.texts[0].startswith("Type: television series.")
+    assert "Film]]" not in clients["en"].pages["Film page"][2]
+
+
+def test_recheck_author_stops_item():
+    repo, clients = setup({"en": FILM_EN}, instance_of={"Q1": ["Q_tv"]})
+    report = run(repo, clients, jev=Jev("film", "author"), recorded=[])
+    assert repo.calls == [] and report.stopped and "author" in report.stopped[0][1]
+
+
+def test_main_page_never_planned():
+    repo, clients = setup({"en": {"Main Page": ("Q4", 1, "[[Category:Film]]", set())}})
+    report = run(repo, clients)
+    assert repo.calls == [] and report.planned == 0
+
+
+def test_unconnected_articles_reported():
+    repo, clients = setup({"en": {"Loose": (None, 1, "[[Category:Film]]", set())}})
+    report = run(repo, clients)
+    assert report.unconnected == [("en", "Loose")]
+
+
+def test_second_run_is_a_no_op():
+    repo, clients = setup({"en": FILM_EN, "it": FILM_IT})
+    run(repo, clients)
+    before = list(repo.calls)
+    report = run(repo, clients)
+    assert repo.calls == before and report.edited == 0
+
+
+def test_only_item():
+    repo, clients = setup({"en": dict(FILM_EN, **{"Other": ("Q2", 5, "[[Category:Music]]", set())})})
+    run(repo, clients, only_item="Q2")
+    assert [c[1] for c in repo.calls if c[0] == "claim"] == ["Q2"]
+
+
+def test_rewrite_last_line_after_the_template_leaves_no_blank_line():
+    out = rewrite("Intro.\n[[Category:Film]]\n[[Category:Love]]", ["Film", "Love"], ["Category"], has_module=False)
+    assert out == "Intro.\n{{SV categories}}"
