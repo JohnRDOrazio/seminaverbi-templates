@@ -41,7 +41,10 @@ carry today, each with its own parameters per language. Two steps, in order:
 - **Jägermeister is on topic** (the logo and the story behind it). Christmas tree, Easter egg and Easter
   bread are genuine articles.
 - **Approach 1** (below): bare `{{SV infobox}}`; facts live on the item.
-- **it `{{Bio}}`**: written out as prose when its page switches (Step 2.6).
+- **it `{{Bio}}` → a new `{{SV bio}}`** that writes a person's opening sentence from the item, in each
+  wiki's language, with no categories, so a fact changed once (on the item, from Wikidata) updates the
+  infobox and the opening sentence on every wiki (Step 2.6 and "`{{SV bio}}`" below). This replaces the
+  earlier decision to write Bio's sentence out as prose.
 
 ## Approaches considered
 
@@ -66,7 +69,7 @@ carry today, each with its own parameters per language. Two steps, in order:
 ## Non-goals
 
 - Deleting pages or the now-unused Wikipedia templates (the author decides later; the bot cannot).
-- New infobox designs or layouts beyond what the in-use kinds need (a kind with no fitting layout uses
+- New infobox designs or layouts beyond what the in-use kinds need (`{{SV bio}}` is the one new template) (a kind with no fitting layout uses
   `work` / `person` and is reported).
 - Article prose, translations, the theme content tasks (`docs/content-tasks.md`).
 - Rows the SV layout doesn't show: an old infobox field with no SV row is dropped without ceremony.
@@ -143,11 +146,38 @@ Per connected page with a Wikipedia infobox:
    keeping a `type=` only when the item's instance of doesn't give the right layout. Guarded edit as in
    `file_items`; `{{SV categories}}` on the page is removed when `{{SV infobox}}` takes over (same
    categories).
-6. **it `{{Bio}}`** is not an infobox: it writes the biography's opening sentence (and adds
-   Wikipedia categories). On a switched page its call is replaced by its rendered sentence as plain
-   wikitext (links and references kept); its categories go. *(Author's decision, 2026-11-18.)* A page
-   whose Bio sentence can't be rendered cleanly is blocked and reported.
+6. **it `{{Bio}}`** is not an infobox: it writes the biography's opening sentence from page parameters
+   (and adds Wikipedia categories). On a switched page `{{Bio|…}}` becomes `{{SV bio}}`, carrying over
+   only the free text Bio held (the parts not derived from facts, e.g. a pseudonym note, what follows the
+   occupation, references), after Bio's facts are moved to the item like the infobox's. The swap is
+   gated: `{{SV bio}}`'s rendered sentence must match the old one's facts (name, places, dates,
+   occupation, nationality); a page where they differ is blocked and reported with both sentences.
+   *(Author's decision, 2026-11-18.)*
 7. **Report**: per page — switched / blocked (with the unresolved rows) / no infobox.
+
+### `{{SV bio}}`
+
+A new template and Lua function (alongside `Module:SV/Infobox`, reading the same item and properties)
+that renders a person's opening sentence in the wiki's language. Parts:
+
+- **Name**: the item's label in the wiki's language; optional `name=` for a fuller form (e.g. "Filippo
+  Neviani") and `note=` for free text after it ("pseudonimo di …").
+- **Dates and places**: birth place and date, death place and date, formatted like the infobox does,
+  in the parenthesis conventions of each language (it "(Sassuolo, 6 gennaio 1972)", en "(born 6 January
+  1972 in Sassuolo)" or "(6 January 1972 – …)").
+- **Predicate**: copula in the right tense (living or dead: it "è / è stato", en "is / was", es "es /
+  fue", fr "est / était", de "ist / war", pt "é / foi"), article and occupation label agreeing with the
+  person's sex or gender (P21): Wikidata's female form of the label (P2521) where it exists, else the
+  label; nationality from country of citizenship (P27) as the adjective form where available, else
+  omitted rather than guessed; several occupations joined as each language joins lists.
+- **Tail**: `rest=` free text continuing the sentence; references via `ref=` (or written after the
+  call).
+- **No categories.** Missing facts leave their part out (no empty parentheses); the infobox tracking
+  category applies when the name or occupation is missing.
+- Per-language grammar lives in `i18n/*.json` plus small rules in the module; tests cover all six
+  languages, male/female/unknown, living/dead, missing parts.
+- New properties for `config/wikibase.json` as needed (sex or gender, country of citizenship, the
+  female-form qualifier); `server/properties.txt` gains their Wikidata IDs so EnrichItems fills them.
 
 ### Rendering checks and the author's checkpoint
 
