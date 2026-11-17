@@ -307,6 +307,19 @@ class WikiClient:
         if not data.get("success"):
             raise SyncError(f"{self.lang}: adding {prop}={value} to {item} failed: {data}")
 
+    def add_claim(self, item: str, prop: str, datavalue: dict, tags: str | None = None,
+                  summary: str | None = None) -> None:
+        """A statement of any datatype: `datavalue` is a Wikibase datavalue ({"type": …, "value": …})."""
+        params = dict(action="wbcreateclaim", entity=item, property=prop, snaktype="value", bot="1",
+                      value=json.dumps(datavalue["value"], ensure_ascii=False))
+        if tags:
+            params["tags"] = tags
+        if summary:
+            params["summary"] = summary
+        data = self._call("POST", token=self._token("csrf"), **params)
+        if not data.get("success"):
+            raise SyncError(f"{self.lang}: adding {prop} to {item} failed: {data}")
+
     def revision(self, title: str) -> tuple[int, str] | None:
         """(latest revid, wikitext) of `title`, or None when the page does not exist."""
         data = self._call("GET", action="query", prop="revisions", titles=title, rvprop="ids|content",
@@ -360,6 +373,22 @@ class WikiClient:
                 if key.startswith("Q") and "missing" not in entity:
                     out[entity["sitelinks"][site]["title"]] = key
         return out
+
+    def sitelinks(self, items: list[str]) -> dict[str, dict[str, str]]:
+        """item -> {site: title} for the given items (50 per request); items without sitelinks are left out."""
+        out = {}
+        for i in range(0, len(items), 50):
+            entities = self._dig(self._call("GET", action="wbgetentities", ids="|".join(items[i:i + 50]),
+                                            props="sitelinks"), "entities")
+            for key, entity in entities.items():
+                links = {site: link["title"] for site, link in entity.get("sitelinks", {}).items()}
+                if links and "missing" not in entity:
+                    out[key] = links
+        return out
+
+    def main_page(self) -> str:
+        data = self._call("GET", action="query", meta="siteinfo", siprop="general")
+        return self._dig(data, "query", "general", "mainpage")
 
     def label(self, item: str, lang: str = "en") -> str | None:
         entities = self._dig(self._call("GET", action="wbgetentities", ids=item, props="labels",

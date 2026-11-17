@@ -395,3 +395,32 @@ def test_revision_categories_parses_that_revision():
     assert WikiClient("it", session=s).revision_categories(42) == {"Arti dello spettacolo"}
     params = s.calls[0][1]
     assert params["action"] == "parse" and params["oldid"] == 42 and params["prop"] == "categories"
+
+
+def test_add_claim_params():
+    s = Recorder(CSRF, {"success": 1, "claim": {"id": "Q5$y"}})
+    datavalue = {"type": "time", "value": {"time": "+1947-01-08T00:00:00Z", "precision": 11}}
+    WikiClient("en", session=s).add_claim("Q5", "P4712", datavalue, tags="seminaverbi-mcp", summary="s")
+    params = s.calls[-1][1]
+    assert (params["action"], params["entity"], params["property"], params["snaktype"]) == (
+        "wbcreateclaim", "Q5", "P4712", "value")
+    assert params["value"] == '{"time": "+1947-01-08T00:00:00Z", "precision": 11}'
+    assert params["bot"] == "1" and params["tags"] == "seminaverbi-mcp" and params["summary"] == "s"
+    s = Recorder(CSRF, {"error": {"code": "invalid-snak", "info": "bad"}})
+    with pytest.raises(SyncError):
+        WikiClient("en", session=s).add_claim("Q5", "P4712", datavalue)
+
+
+def test_sitelinks_of_items_batched():
+    ids = [f"Q{n}" for n in range(1, 61)]
+    first = {"entities": {"Q1": {"id": "Q1", "sitelinks": {"en": {"site": "en", "title": "A"},
+                                                           "enwiki": {"site": "enwiki", "title": "A (x)"}}}}}
+    s = Recorder(first, {"entities": {"Q60": {"id": "Q60", "missing": ""}}})
+    assert WikiClient("en", session=s).sitelinks(ids) == {"Q1": {"en": "A", "enwiki": "A (x)"}}
+    assert len(s.calls) == 2 and s.calls[0][1]["ids"].count("|") == 49 and s.calls[0][1]["props"] == "sitelinks"
+
+
+def test_main_page_from_siteinfo():
+    s = Recorder({"query": {"general": {"mainpage": "Página principal"}}})
+    assert WikiClient("es", session=s).main_page() == "Página principal"
+    assert s.calls[0][1]["meta"] == "siteinfo"
