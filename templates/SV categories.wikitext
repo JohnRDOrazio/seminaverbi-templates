@@ -1,0 +1,3 @@
+<includeonly>{{#invoke:SV/Infobox|categories}}</includeonly><noinclude>
+Files the page under the categories its Wikibase item gives it: the item's <code>SV field</code> (one field of the arts and sciences) and its <code>SV Gospel theme</code> statements, in this wiki's language. Use it on pages without an SV infobox (every SV infobox outputs the same categories). Optional parameters: <code>item</code> (an item ID, when the page is not connected to one), <code>sortkey</code>.
+</noinclude>

@@ -38,6 +38,15 @@ Aliases: it: `SV lavori in corso`, es: `SV en desarrollo`, fr: `SV en travaux`, 
 | `user` | who is working on it |
 | `date` | since when |
 
+## SV categories
+
+Files the page under its Wikibase item's SV field and SV Gospel theme categories, in the wiki's language. Use it on pages without an SV infobox; every SV infobox outputs the same categories.
+
+| parameter | meaning |
+|---|---|
+| `item` | a Wikibase item ID, when the page is not connected to one |
+| `sortkey` | sort key for the categories (e.g. the title without its article) |
+
 ## SV category tree
 
 The main page's category navigation (fields, then Gospel themes) from config/categories.json. No parameters.
@@ -92,6 +101,7 @@ Aliases: it: `SV infobox persona`, es: `SV ficha persona`, fr: `SV infobox perso
 |---|---|
 | `item` | a Wikibase item ID, when the page is not connected to one |
 | `name` | caption; defaults to the item's label |
+| `sortkey` | sort key for the item's categories |
 
 Fields: image, birth_date, birth_place, death_date, death_place, occupation
 
@@ -106,6 +116,7 @@ Aliases: it: `SV infobox opera`, es: `SV ficha obra`, fr: `SV infobox œuvre`, d
 | `type` | book (default), film, tv, album, song, play, artwork |
 | `item` | a Wikibase item ID, when the page is not connected to one |
 | `name` | caption; defaults to the item's label |
+| `sortkey` | sort key for the item's categories |
 
 Fields per `type`:
 

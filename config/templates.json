@@ -14,6 +14,13 @@
       "date": "since when"
     }
   },
+  "SV categories": {
+    "summary": "Files the page under its Wikibase item's SV field and SV Gospel theme categories, in the wiki's language. Use it on pages without an SV infobox; every SV infobox outputs the same categories.",
+    "params": {
+      "item": "a Wikibase item ID, when the page is not connected to one",
+      "sortkey": "sort key for the categories (e.g. the title without its article)"
+    }
+  },
   "SV category tree": {
     "summary": "The main page's category navigation (fields, then Gospel themes) from config/categories.json. No parameters.",
     "params": {}
@@ -52,7 +59,8 @@
     "summary": "Infobox for a person, filled from the page's Wikibase item. Any field (see below) overrides the item's value.",
     "params": {
       "item": "a Wikibase item ID, when the page is not connected to one",
-      "name": "caption; defaults to the item's label"
+      "name": "caption; defaults to the item's label",
+      "sortkey": "sort key for the item's categories"
     }
   },
   "SV infobox work": {
@@ -60,7 +68,8 @@
     "params": {
       "type": "book (default), film, tv, album, song, play, artwork",
       "item": "a Wikibase item ID, when the page is not connected to one",
-      "name": "caption; defaults to the item's label"
+      "name": "caption; defaults to the item's label",
+      "sortkey": "sort key for the item's categories"
     }
   },
   "SV quote": {
