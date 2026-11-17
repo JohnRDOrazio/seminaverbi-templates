@@ -18,17 +18,16 @@ Root: Seeds of the Word
     - Drama (`drama`): Plays and other dramatic works as written texts. Their staging belongs under Theatre.
     - Essays (`essays`): Non-fiction prose of literary value: essays, letters, memoirs, autobiographies, spiritual writings published as literature.
     - Children's literature (`childrens-literature`): Literature written for children and young readers, in any form.
-  - Comics (`comics`): Sequential art telling a story in drawn panels: comic strips, comic books, graphic novels, manga.
   - Performing arts (`performing-arts`): Arts performed live before an audience: music, theatre, dance and their combined forms.
     - Music (`music`): Musical works, songs, albums and performers. Studies about music belong under Musicology.
       - Classical music (`classical-music`): Art music of the Western tradition and its concert repertoire: symphonies, chamber music, concertos, art songs.
       - Sacred music (`sacred-music`): Music for worship or on religious texts: chant, masses, oratorios, hymns, gospel and contemporary Christian music.
       - Popular music (`popular-music`): Commercial music of mass audiences: pop, rock, folk-rock, country, singer-songwriters, soundtracks released as songs.
       - Folk music (`folk-music`): Traditional music transmitted within a people or region.
-      - Opera (`opera`): Staged works sung throughout with orchestra: opera, operetta, and their libretti as staged works.
-      - Musical theatre (`musical-theatre`): Stage musicals combining songs, spoken dialogue and dance.
     - Theatre (`theatre`): The staging and performance of plays and theatrical shows. Plays as texts belong under Drama.
     - Dance (`dance`): Dance works and forms: ballet, modern dance, folk and liturgical dance.
+    - Musical theatre (`musical-theatre`): Stage musicals combining songs, spoken dialogue and dance.
+    - Opera (`opera`): Staged works sung throughout with orchestra: opera, operetta, and their libretti as staged works.
   - Visual arts (`visual-arts`): Arts that produce works to be seen: painting, sculpture, drawing, printmaking, photography.
     - Painting (`painting`): Works of paint applied to a surface, by technique.
       - Fresco (`fresco`): Painting on fresh plaster, including church and palace cycles.
@@ -48,6 +47,7 @@ Root: Seeds of the Word
       - HDR photography (`hdr-photography`): Photographs made with high-dynamic-range technique.
       - Landscape photography (`landscape-photography`): Photographs whose subject is natural or built landscape.
       - Portrait photography (`portrait-photography`): Photographs whose subject is a person or group.
+    - Comics (`comics`): Sequential art telling a story in drawn panels: comic strips, comic books, graphic novels, manga.
   - Crafts and decorative arts (`crafts`): Applied and decorative arts producing crafted objects: ceramics, glass, mosaic, textiles, metalwork, calligraphy.
     - Ceramic art (`ceramics`): Pottery, porcelain and other fired-clay works.
     - Glass art (`glass-art`): Works made of or in glass.
@@ -94,6 +94,7 @@ Root: Seeds of the Word
     - Metaphysics (`metaphysics`): Being, causes, God as known by reason, the nature of reality.
     - Epistemology (`epistemology`): Knowledge, truth and certainty.
     - Ethics (`ethics`): Philosophical moral reflection: the good, virtue, duty, natural law.
+      - Bioethics (`bioethics`): Ethical questions of life, medicine and biotechnology.
     - Logic (`logic`): The study of valid reasoning and argument.
     - Aesthetics (`aesthetics`): Beauty, art and taste as philosophical questions.
     - Political philosophy (`political-philosophy`): The common good, justice, authority and the state as philosophical questions.
@@ -143,7 +144,6 @@ Root: Seeds of the Word
   - Nursing (`nursing`): The care of the sick.
   - Public health (`public-health`): The health of populations: epidemics, prevention, health systems.
   - Pharmacology (`pharmacology`): Drugs and their effects.
-  - Bioethics (`bioethics`): Ethical questions of life, medicine and biotechnology.
 - Religion (`religion`): Religious traditions and their life, worship, persons and art as expressions of culture. Theology as an academic discipline belongs under Humanities.
   - Christianity (`christianity`): The Christian faith as lived: churches, worship, saints, religious life.
     - Liturgy (`liturgy`): The public worship of the Church: Mass, sacraments, the liturgical year, the Liturgy of the Hours.
@@ -225,17 +225,16 @@ Root: Semi del Verbo
     - Drammaturgia (`drama`)
     - Saggistica (`essays`)
     - Letteratura per ragazzi (`childrens-literature`)
-  - Fumetto (`comics`)
   - Arti dello spettacolo (`performing-arts`)
     - Musica (`music`)
       - Musica classica (`classical-music`)
       - Musica sacra (`sacred-music`)
       - Musica leggera (`popular-music`)
       - Musica popolare tradizionale (`folk-music`)
-      - Opera lirica (`opera`)
-      - Teatro musicale (`musical-theatre`)
     - Teatro (`theatre`)
     - Danza (`dance`)
+    - Teatro musicale (`musical-theatre`)
+    - Opera lirica (`opera`)
   - Arti visive (`visual-arts`)
     - Pittura (`painting`)
       - Affresco (`fresco`)
@@ -255,6 +254,7 @@ Root: Semi del Verbo
       - Fotografia HDR (`hdr-photography`)
       - Fotografia di paesaggio (`landscape-photography`)
       - Fotografia di ritratto (`portrait-photography`)
+    - Fumetto (`comics`)
   - Arti decorative (`crafts`)
     - Arte ceramica (`ceramics`)
     - Arte vetraria (`glass-art`)
@@ -301,6 +301,7 @@ Root: Semi del Verbo
     - Metafisica (`metaphysics`)
     - Epistemologia (`epistemology`)
     - Etica (`ethics`)
+      - Bioetica (`bioethics`)
     - Logica (`logic`)
     - Estetica (`aesthetics`)
     - Filosofia politica (`political-philosophy`)
@@ -350,7 +351,6 @@ Root: Semi del Verbo
   - Infermieristica (`nursing`)
   - Sanità pubblica (`public-health`)
   - Farmacologia (`pharmacology`)
-  - Bioetica (`bioethics`)
 - Religione (`religion`)
   - Cristianesimo (`christianity`)
     - Liturgia (`liturgy`)
@@ -432,17 +432,16 @@ Root: Semillas de la Palabra
     - Dramaturgia (`drama`)
     - Ensayos (`essays`)
     - Literatura infantil (`childrens-literature`)
-  - Historieta (`comics`)
   - Artes escénicas (`performing-arts`)
     - Música (`music`)
       - Música clásica (`classical-music`)
       - Música sacra (`sacred-music`)
       - Música popular (`popular-music`)
       - Música folclórica (`folk-music`)
-      - Ópera (`opera`)
-      - Teatro musical (`musical-theatre`)
     - Teatro (`theatre`)
     - Danza (`dance`)
+    - Teatro musical (`musical-theatre`)
+    - Ópera (`opera`)
   - Artes visuales (`visual-arts`)
     - Pintura (`painting`)
       - Fresco (`fresco`)
@@ -462,6 +461,7 @@ Root: Semillas de la Palabra
       - Fotografía HDR (`hdr-photography`)
       - Fotografía de paisaje (`landscape-photography`)
       - Fotografía de retrato (`portrait-photography`)
+    - Historieta (`comics`)
   - Artes decorativas (`crafts`)
     - Cerámica artística (`ceramics`)
     - Arte en vidrio (`glass-art`)
@@ -508,6 +508,7 @@ Root: Semillas de la Palabra
     - Metafísica (`metaphysics`)
     - Epistemología (`epistemology`)
     - Ética (`ethics`)
+      - Bioética (`bioethics`)
     - Lógica (`logic`)
     - Estética (`aesthetics`)
     - Filosofía política (`political-philosophy`)
@@ -557,7 +558,6 @@ Root: Semillas de la Palabra
   - Enfermería (`nursing`)
   - Salud pública (`public-health`)
   - Farmacología (`pharmacology`)
-  - Bioética (`bioethics`)
 - Religión (`religion`)
   - Cristianismo (`christianity`)
     - Liturgia (`liturgy`)
@@ -639,17 +639,16 @@ Root: Semences du Verbe
     - Œuvres dramatiques (`drama`)
     - Essais (`essays`)
     - Littérature d'enfance et de jeunesse (`childrens-literature`)
-  - Bande dessinée (`comics`)
   - Arts du spectacle (`performing-arts`)
     - Musique (`music`)
       - Musique classique (`classical-music`)
       - Musique sacrée (`sacred-music`)
       - Musique populaire (`popular-music`)
       - Musique traditionnelle (`folk-music`)
-      - Opéra (`opera`)
-      - Comédie musicale (`musical-theatre`)
     - Théâtre (`theatre`)
     - Danse (`dance`)
+    - Comédie musicale (`musical-theatre`)
+    - Opéra (`opera`)
   - Arts visuels (`visual-arts`)
     - Peinture (`painting`)
       - Fresque (`fresco`)
@@ -669,6 +668,7 @@ Root: Semences du Verbe
       - Photographie HDR (`hdr-photography`)
       - Photographie de paysage (`landscape-photography`)
       - Portrait photographique (`portrait-photography`)
+    - Bande dessinée (`comics`)
   - Arts décoratifs (`crafts`)
     - Céramique (`ceramics`)
     - Art du verre (`glass-art`)
@@ -715,6 +715,7 @@ Root: Semences du Verbe
     - Métaphysique (`metaphysics`)
     - Épistémologie (`epistemology`)
     - Éthique (`ethics`)
+      - Bioéthique (`bioethics`)
     - Logique (`logic`)
     - Esthétique (`aesthetics`)
     - Philosophie politique (`political-philosophy`)
@@ -764,7 +765,6 @@ Root: Semences du Verbe
   - Soins infirmiers (`nursing`)
   - Santé publique (`public-health`)
   - Pharmacologie (`pharmacology`)
-  - Bioéthique (`bioethics`)
 - Religion (`religion`)
   - Christianisme (`christianity`)
     - Liturgie (`liturgy`)
@@ -846,17 +846,16 @@ Root: Samen des Wortes
     - Dramatik (`drama`)
     - Essays (`essays`)
     - Kinder- und Jugendliteratur (`childrens-literature`)
-  - Comic (`comics`)
   - Darstellende Kunst (`performing-arts`)
     - Musik (`music`)
       - Klassische Musik (`classical-music`)
       - Geistliche Musik (`sacred-music`)
       - Populäre Musik (`popular-music`)
       - Volksmusik (`folk-music`)
-      - Oper (`opera`)
-      - Musical (`musical-theatre`)
     - Theater (`theatre`)
     - Tanz (`dance`)
+    - Musical (`musical-theatre`)
+    - Oper (`opera`)
   - Bildende Kunst (`visual-arts`)
     - Malerei (`painting`)
       - Fresko (`fresco`)
@@ -876,6 +875,7 @@ Root: Samen des Wortes
       - HDR-Fotografie (`hdr-photography`)
       - Landschaftsfotografie (`landscape-photography`)
       - Porträtfotografie (`portrait-photography`)
+    - Comic (`comics`)
   - Kunsthandwerk (`crafts`)
     - Keramik (`ceramics`)
     - Glaskunst (`glass-art`)
@@ -922,6 +922,7 @@ Root: Samen des Wortes
     - Metaphysik (`metaphysics`)
     - Erkenntnistheorie (`epistemology`)
     - Ethik (`ethics`)
+      - Bioethik (`bioethics`)
     - Logik (`logic`)
     - Ästhetik (`aesthetics`)
     - Politische Philosophie (`political-philosophy`)
@@ -971,7 +972,6 @@ Root: Samen des Wortes
   - Krankenpflege (`nursing`)
   - Öffentliche Gesundheit (`public-health`)
   - Pharmakologie (`pharmacology`)
-  - Bioethik (`bioethics`)
 - Religion (`religion`)
   - Christentum (`christianity`)
     - Liturgie (`liturgy`)
@@ -1053,17 +1053,16 @@ Root: Sementes do Verbo
     - Dramaturgia (`drama`)
     - Ensaios (`essays`)
     - Literatura infantojuvenil (`childrens-literature`)
-  - Histórias em quadrinhos (`comics`)
   - Artes cênicas (`performing-arts`)
     - Música (`music`)
       - Música clássica (`classical-music`)
       - Música sacra (`sacred-music`)
       - Música popular (`popular-music`)
       - Música folclórica (`folk-music`)
-      - Ópera (`opera`)
-      - Teatro musical (`musical-theatre`)
     - Teatro (`theatre`)
     - Dança (`dance`)
+    - Teatro musical (`musical-theatre`)
+    - Ópera (`opera`)
   - Artes visuais (`visual-arts`)
     - Pintura (`painting`)
       - Afresco (`fresco`)
@@ -1083,6 +1082,7 @@ Root: Sementes do Verbo
       - Fotografia HDR (`hdr-photography`)
       - Fotografia de paisagem (`landscape-photography`)
       - Fotografia de retrato (`portrait-photography`)
+    - Histórias em quadrinhos (`comics`)
   - Artes decorativas (`crafts`)
     - Arte cerâmica (`ceramics`)
     - Arte em vidro (`glass-art`)
@@ -1129,6 +1129,7 @@ Root: Sementes do Verbo
     - Metafísica (`metaphysics`)
     - Epistemologia (`epistemology`)
     - Ética (`ethics`)
+      - Bioética (`bioethics`)
     - Lógica (`logic`)
     - Estética (`aesthetics`)
     - Filosofia política (`political-philosophy`)
@@ -1178,7 +1179,6 @@ Root: Sementes do Verbo
   - Enfermagem (`nursing`)
   - Saúde pública (`public-health`)
   - Farmacologia (`pharmacology`)
-  - Bioética (`bioethics`)
 - Religião (`religion`)
   - Cristianismo (`christianity`)
     - Liturgia (`liturgy`)

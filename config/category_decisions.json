@@ -1,1 +1,1174 @@
-[]
+[
+ {
+  "id": "2026-11-17-comics-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "comics",
+  "options": {
+   "arts": {
+    "name": "Arts",
+    "path": "Arts",
+    "definition": "Creative practices and their works, following UNESCO's cultural domains: literature, the performing, visual and audiovisual arts, architecture, crafts, cultural heritage and gastronomy."
+   },
+   "visual-arts": {
+    "name": "Visual arts",
+    "path": "Arts > Visual arts",
+    "definition": "Arts that produce works to be seen: painting, sculpture, drawing, printmaking, photography."
+   },
+   "literature": {
+    "name": "Literature",
+    "path": "Arts > Literature",
+    "definition": "Written and oral works of imagination and of artful prose, in any language. Studies about literature belong under Literary studies."
+   },
+   "popular-culture": {
+    "name": "Popular culture",
+    "path": "Popular culture",
+    "definition": "Everyday mass culture that is not itself an art form: sport, fashion, games and toys, fandom, internet culture."
+   }
+  },
+  "probabilities": {
+   "arts": 0.43,
+   "visual-arts": 0.44,
+   "literature": 0.1,
+   "popular-culture": 0.03
+  },
+  "confidence": 0.25,
+  "choice": "visual-arts",
+  "outcome": "author",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  },
+  "author_choice": "visual-arts"
+ },
+ {
+  "id": "2026-11-17-animation-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "animation",
+  "options": {
+   "audiovisual-media": {
+    "name": "Audiovisual and interactive media",
+    "path": "Arts > Audiovisual and interactive media",
+    "definition": "Works made to be watched, heard or played on a screen or broadcast: film, television, radio, animation, video games."
+   },
+   "visual-arts": {
+    "name": "Visual arts",
+    "path": "Arts > Visual arts",
+    "definition": "Arts that produce works to be seen: painting, sculpture, drawing, printmaking, photography."
+   },
+   "popular-culture": {
+    "name": "Popular culture",
+    "path": "Popular culture",
+    "definition": "Everyday mass culture that is not itself an art form: sport, fashion, games and toys, fandom, internet culture."
+   }
+  },
+  "probabilities": {
+   "audiovisual-media": 1.0,
+   "visual-arts": 0.0,
+   "popular-culture": 0.0
+  },
+  "confidence": 1.0,
+  "choice": "audiovisual-media",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-video-games-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "video-games",
+  "options": {
+   "audiovisual-media": {
+    "name": "Audiovisual and interactive media",
+    "path": "Arts > Audiovisual and interactive media",
+    "definition": "Works made to be watched, heard or played on a screen or broadcast: film, television, radio, animation, video games."
+   },
+   "popular-culture": {
+    "name": "Popular culture",
+    "path": "Popular culture",
+    "definition": "Everyday mass culture that is not itself an art form: sport, fashion, games and toys, fandom, internet culture."
+   },
+   "information-technology": {
+    "name": "Information technology",
+    "path": "Engineering and technology > Information technology",
+    "definition": "Computers, networks, the internet and software as technology in use."
+   }
+  },
+  "probabilities": {
+   "audiovisual-media": 0.97,
+   "popular-culture": 0.03,
+   "information-technology": 0.0
+  },
+  "confidence": 0.96,
+  "choice": "audiovisual-media",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-radio-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "radio",
+  "options": {
+   "audiovisual-media": {
+    "name": "Audiovisual and interactive media",
+    "path": "Arts > Audiovisual and interactive media",
+    "definition": "Works made to be watched, heard or played on a screen or broadcast: film, television, radio, animation, video games."
+   },
+   "media-communication": {
+    "name": "Media and communication",
+    "path": "Social sciences > Media and communication",
+    "definition": "Journalism, mass media and social communication."
+   }
+  },
+  "probabilities": {
+   "audiovisual-media": 0.98,
+   "media-communication": 0.02
+  },
+  "confidence": 0.96,
+  "choice": "audiovisual-media",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-christian-roots-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "christian-roots",
+  "options": {
+   "heritage": {
+    "name": "Cultural heritage",
+    "path": "Arts > Cultural heritage",
+    "definition": "Inherited tangible and intangible culture: monuments, traditions, festivals, folklore and symbols of peoples."
+   },
+   "church-history": {
+    "name": "Church history",
+    "path": "Humanities > History > Church history",
+    "definition": "The history of the Church and of Christianity."
+   },
+   "christianity": {
+    "name": "Christianity",
+    "path": "Religion > Christianity",
+    "definition": "The Christian faith as lived: churches, worship, saints, religious life."
+   }
+  },
+  "probabilities": {
+   "heritage": 0.59,
+   "church-history": 0.33,
+   "christianity": 0.08
+  },
+  "confidence": 0.38,
+  "choice": "heritage",
+  "outcome": "author",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  },
+  "author_choice": "heritage"
+ },
+ {
+  "id": "2026-11-17-cultural-traditions-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "cultural-traditions",
+  "options": {
+   "heritage": {
+    "name": "Cultural heritage",
+    "path": "Arts > Cultural heritage",
+    "definition": "Inherited tangible and intangible culture: monuments, traditions, festivals, folklore and symbols of peoples."
+   },
+   "popular-culture": {
+    "name": "Popular culture",
+    "path": "Popular culture",
+    "definition": "Everyday mass culture that is not itself an art form: sport, fashion, games and toys, fandom, internet culture."
+   },
+   "anthropology": {
+    "name": "Anthropology",
+    "path": "Social sciences > Anthropology",
+    "definition": "Cultural and social anthropology: the comparative study of peoples and cultures."
+   }
+  },
+  "probabilities": {
+   "heritage": 0.98,
+   "popular-culture": 0.0,
+   "anthropology": 0.02
+  },
+  "confidence": 0.97,
+  "choice": "heritage",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-flags-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "flags",
+  "options": {
+   "heritage": {
+    "name": "Cultural heritage",
+    "path": "Arts > Cultural heritage",
+    "definition": "Inherited tangible and intangible culture: monuments, traditions, festivals, folklore and symbols of peoples."
+   },
+   "popular-culture": {
+    "name": "Popular culture",
+    "path": "Popular culture",
+    "definition": "Everyday mass culture that is not itself an art form: sport, fashion, games and toys, fandom, internet culture."
+   },
+   "history": {
+    "name": "History",
+    "path": "Humanities > History",
+    "definition": "The study of the human past and historical works, by period."
+   }
+  },
+  "probabilities": {
+   "heritage": 1.0,
+   "popular-culture": 0.0,
+   "history": 0.0
+  },
+  "confidence": 1.0,
+  "choice": "heritage",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-folklore-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "folklore",
+  "options": {
+   "heritage": {
+    "name": "Cultural heritage",
+    "path": "Arts > Cultural heritage",
+    "definition": "Inherited tangible and intangible culture: monuments, traditions, festivals, folklore and symbols of peoples."
+   },
+   "literature": {
+    "name": "Literature",
+    "path": "Arts > Literature",
+    "definition": "Written and oral works of imagination and of artful prose, in any language. Studies about literature belong under Literary studies."
+   },
+   "anthropology": {
+    "name": "Anthropology",
+    "path": "Social sciences > Anthropology",
+    "definition": "Cultural and social anthropology: the comparative study of peoples and cultures."
+   }
+  },
+  "probabilities": {
+   "heritage": 0.94,
+   "literature": 0.04,
+   "anthropology": 0.02
+  },
+  "confidence": 0.91,
+  "choice": "heritage",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-monuments-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "monuments",
+  "options": {
+   "heritage": {
+    "name": "Cultural heritage",
+    "path": "Arts > Cultural heritage",
+    "definition": "Inherited tangible and intangible culture: monuments, traditions, festivals, folklore and symbols of peoples."
+   },
+   "architecture": {
+    "name": "Architecture",
+    "path": "Arts > Architecture",
+    "definition": "Buildings and the art of designing them, by type and style. The engineering of structures belongs under Civil engineering."
+   }
+  },
+  "probabilities": {
+   "heritage": 0.99,
+   "architecture": 0.01
+  },
+  "confidence": 0.98,
+  "choice": "heritage",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-culinary-arts-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "culinary-arts",
+  "options": {
+   "arts": {
+    "name": "Arts",
+    "path": "Arts",
+    "definition": "Creative practices and their works, following UNESCO's cultural domains: literature, the performing, visual and audiovisual arts, architecture, crafts, cultural heritage and gastronomy."
+   },
+   "heritage": {
+    "name": "Cultural heritage",
+    "path": "Arts > Cultural heritage",
+    "definition": "Inherited tangible and intangible culture: monuments, traditions, festivals, folklore and symbols of peoples."
+   },
+   "popular-culture": {
+    "name": "Popular culture",
+    "path": "Popular culture",
+    "definition": "Everyday mass culture that is not itself an art form: sport, fashion, games and toys, fandom, internet culture."
+   }
+  },
+  "probabilities": {
+   "arts": 1.0,
+   "heritage": 0.0,
+   "popular-culture": 0.0
+  },
+  "confidence": 1.0,
+  "choice": "arts",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-architecture-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "architecture",
+  "options": {
+   "arts": {
+    "name": "Arts",
+    "path": "Arts",
+    "definition": "Creative practices and their works, following UNESCO's cultural domains: literature, the performing, visual and audiovisual arts, architecture, crafts, cultural heritage and gastronomy."
+   },
+   "engineering-technology": {
+    "name": "Engineering and technology",
+    "path": "Engineering and technology",
+    "definition": "The design and making of structures, machines, systems and materials, following OECD Fields of Science group 2."
+   }
+  },
+  "probabilities": {
+   "arts": 1.0,
+   "engineering-technology": 0.0
+  },
+  "confidence": 1.0,
+  "choice": "arts",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-design-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "design",
+  "options": {
+   "arts": {
+    "name": "Arts",
+    "path": "Arts",
+    "definition": "Creative practices and their works, following UNESCO's cultural domains: literature, the performing, visual and audiovisual arts, architecture, crafts, cultural heritage and gastronomy."
+   },
+   "engineering-technology": {
+    "name": "Engineering and technology",
+    "path": "Engineering and technology",
+    "definition": "The design and making of structures, machines, systems and materials, following OECD Fields of Science group 2."
+   }
+  },
+  "probabilities": {
+   "arts": 0.96,
+   "engineering-technology": 0.04
+  },
+  "confidence": 0.92,
+  "choice": "arts",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-fashion-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "fashion",
+  "options": {
+   "popular-culture": {
+    "name": "Popular culture",
+    "path": "Popular culture",
+    "definition": "Everyday mass culture that is not itself an art form: sport, fashion, games and toys, fandom, internet culture."
+   },
+   "design": {
+    "name": "Design",
+    "path": "Arts > Design",
+    "definition": "The design of objects and visual communication."
+   },
+   "crafts": {
+    "name": "Crafts and decorative arts",
+    "path": "Arts > Crafts and decorative arts",
+    "definition": "Applied and decorative arts producing crafted objects: ceramics, glass, mosaic, textiles, metalwork, calligraphy."
+   }
+  },
+  "probabilities": {
+   "popular-culture": 0.98,
+   "design": 0.02,
+   "crafts": 0.0
+  },
+  "confidence": 0.97,
+  "choice": "popular-culture",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-opera-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "opera",
+  "options": {
+   "music": {
+    "name": "Music",
+    "path": "Arts > Performing arts > Music",
+    "definition": "Musical works, songs, albums and performers. Studies about music belong under Musicology."
+   },
+   "theatre": {
+    "name": "Theatre",
+    "path": "Arts > Performing arts > Theatre",
+    "definition": "The staging and performance of plays and theatrical shows. Plays as texts belong under Drama."
+   },
+   "performing-arts": {
+    "name": "Performing arts",
+    "path": "Arts > Performing arts",
+    "definition": "Arts performed live before an audience: music, theatre, dance and their combined forms."
+   }
+  },
+  "probabilities": {
+   "music": 0.12,
+   "theatre": 0.18,
+   "performing-arts": 0.7
+  },
+  "confidence": 0.55,
+  "choice": "performing-arts",
+  "outcome": "author",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  },
+  "author_choice": "performing-arts"
+ },
+ {
+  "id": "2026-11-17-musical-theatre-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "musical-theatre",
+  "options": {
+   "music": {
+    "name": "Music",
+    "path": "Arts > Performing arts > Music",
+    "definition": "Musical works, songs, albums and performers. Studies about music belong under Musicology."
+   },
+   "theatre": {
+    "name": "Theatre",
+    "path": "Arts > Performing arts > Theatre",
+    "definition": "The staging and performance of plays and theatrical shows. Plays as texts belong under Drama."
+   },
+   "performing-arts": {
+    "name": "Performing arts",
+    "path": "Arts > Performing arts",
+    "definition": "Arts performed live before an audience: music, theatre, dance and their combined forms."
+   }
+  },
+  "probabilities": {
+   "music": 0.0,
+   "theatre": 0.12,
+   "performing-arts": 0.88
+  },
+  "confidence": 0.82,
+  "choice": "performing-arts",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-sacred-music-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "sacred-music",
+  "options": {
+   "music": {
+    "name": "Music",
+    "path": "Arts > Performing arts > Music",
+    "definition": "Musical works, songs, albums and performers. Studies about music belong under Musicology."
+   },
+   "christianity": {
+    "name": "Christianity",
+    "path": "Religion > Christianity",
+    "definition": "The Christian faith as lived: churches, worship, saints, religious life."
+   }
+  },
+  "probabilities": {
+   "music": 0.97,
+   "christianity": 0.03
+  },
+  "confidence": 0.94,
+  "choice": "music",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-sacred-architecture-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "sacred-architecture",
+  "options": {
+   "architecture": {
+    "name": "Architecture",
+    "path": "Arts > Architecture",
+    "definition": "Buildings and the art of designing them, by type and style. The engineering of structures belongs under Civil engineering."
+   },
+   "christianity": {
+    "name": "Christianity",
+    "path": "Religion > Christianity",
+    "definition": "The Christian faith as lived: churches, worship, saints, religious life."
+   }
+  },
+  "probabilities": {
+   "architecture": 0.94,
+   "christianity": 0.06
+  },
+  "confidence": 0.88,
+  "choice": "architecture",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-icon-painting-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "icon-painting",
+  "options": {
+   "painting": {
+    "name": "Painting",
+    "path": "Arts > Visual arts > Painting",
+    "definition": "Works of paint applied to a surface, by technique."
+   },
+   "christianity": {
+    "name": "Christianity",
+    "path": "Religion > Christianity",
+    "definition": "The Christian faith as lived: churches, worship, saints, religious life."
+   }
+  },
+  "probabilities": {
+   "painting": 0.91,
+   "christianity": 0.09
+  },
+  "confidence": 0.82,
+  "choice": "painting",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-sacred-art-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "sacred-art",
+  "options": {
+   "christianity": {
+    "name": "Christianity",
+    "path": "Religion > Christianity",
+    "definition": "The Christian faith as lived: churches, worship, saints, religious life."
+   },
+   "visual-arts": {
+    "name": "Visual arts",
+    "path": "Arts > Visual arts",
+    "definition": "Arts that produce works to be seen: painting, sculpture, drawing, printmaking, photography."
+   },
+   "arts": {
+    "name": "Arts",
+    "path": "Arts",
+    "definition": "Creative practices and their works, following UNESCO's cultural domains: literature, the performing, visual and audiovisual arts, architecture, crafts, cultural heritage and gastronomy."
+   }
+  },
+  "probabilities": {
+   "christianity": 0.02,
+   "visual-arts": 0.24,
+   "arts": 0.74
+  },
+  "confidence": 0.61,
+  "choice": "arts",
+  "outcome": "author",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  },
+  "author_choice": "christianity"
+ },
+ {
+  "id": "2026-11-17-theology-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "theology",
+  "options": {
+   "humanities": {
+    "name": "Humanities",
+    "path": "Humanities",
+    "definition": "The study of human culture and thought, following OECD Fields of Science group 6: history, languages and literature, philosophy, theology, the study of the arts."
+   },
+   "religion": {
+    "name": "Religion",
+    "path": "Religion",
+    "definition": "Religious traditions and their life, worship, persons and art as expressions of culture. Theology as an academic discipline belongs under Humanities."
+   }
+  },
+  "probabilities": {
+   "humanities": 1.0,
+   "religion": 0.0
+  },
+  "confidence": 1.0,
+  "choice": "humanities",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-bible-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "bible",
+  "options": {
+   "religion": {
+    "name": "Religion",
+    "path": "Religion",
+    "definition": "Religious traditions and their life, worship, persons and art as expressions of culture. Theology as an academic discipline belongs under Humanities."
+   },
+   "christianity": {
+    "name": "Christianity",
+    "path": "Religion > Christianity",
+    "definition": "The Christian faith as lived: churches, worship, saints, religious life."
+   },
+   "biblical-studies": {
+    "name": "Biblical studies",
+    "path": "Humanities > Theology > Biblical studies",
+    "definition": "Exegesis, interpretation and the history of the books of the Bible."
+   },
+   "literature": {
+    "name": "Literature",
+    "path": "Arts > Literature",
+    "definition": "Written and oral works of imagination and of artful prose, in any language. Studies about literature belong under Literary studies."
+   }
+  },
+  "probabilities": {
+   "religion": 0.2,
+   "christianity": 0.02,
+   "biblical-studies": 0.66,
+   "literature": 0.12
+  },
+  "confidence": 0.55,
+  "choice": "biblical-studies",
+  "outcome": "author",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  },
+  "author_choice": "religion"
+ },
+ {
+  "id": "2026-11-17-liturgy-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "liturgy",
+  "options": {
+   "christianity": {
+    "name": "Christianity",
+    "path": "Religion > Christianity",
+    "definition": "The Christian faith as lived: churches, worship, saints, religious life."
+   },
+   "theology": {
+    "name": "Theology",
+    "path": "Humanities > Theology",
+    "definition": "The study of God and of revelation in the light of faith, as an academic discipline. Religious life and practice belong under Religion."
+   }
+  },
+  "probabilities": {
+   "christianity": 1.0,
+   "theology": 0.0
+  },
+  "confidence": 1.0,
+  "choice": "christianity",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-saints-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "saints",
+  "options": {
+   "christianity": {
+    "name": "Christianity",
+    "path": "Religion > Christianity",
+    "definition": "The Christian faith as lived: churches, worship, saints, religious life."
+   },
+   "church-history": {
+    "name": "Church history",
+    "path": "Humanities > History > Church history",
+    "definition": "The history of the Church and of Christianity."
+   }
+  },
+  "probabilities": {
+   "christianity": 0.98,
+   "church-history": 0.02
+  },
+  "confidence": 0.96,
+  "choice": "christianity",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-church-history-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "church-history",
+  "options": {
+   "history": {
+    "name": "History",
+    "path": "Humanities > History",
+    "definition": "The study of the human past and historical works, by period."
+   },
+   "theology": {
+    "name": "Theology",
+    "path": "Humanities > Theology",
+    "definition": "The study of God and of revelation in the light of faith, as an academic discipline. Religious life and practice belong under Religion."
+   },
+   "christianity": {
+    "name": "Christianity",
+    "path": "Religion > Christianity",
+    "definition": "The Christian faith as lived: churches, worship, saints, religious life."
+   }
+  },
+  "probabilities": {
+   "history": 0.85,
+   "theology": 0.01,
+   "christianity": 0.14
+  },
+  "confidence": 0.77,
+  "choice": "history",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-history-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "history",
+  "options": {
+   "humanities": {
+    "name": "Humanities",
+    "path": "Humanities",
+    "definition": "The study of human culture and thought, following OECD Fields of Science group 6: history, languages and literature, philosophy, theology, the study of the arts."
+   },
+   "social-sciences": {
+    "name": "Social sciences",
+    "path": "Social sciences",
+    "definition": "The study of human behaviour and society, following OECD Fields of Science group 5."
+   }
+  },
+  "probabilities": {
+   "humanities": 1.0,
+   "social-sciences": 0.0
+  },
+  "confidence": 1.0,
+  "choice": "humanities",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-anthropology-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "anthropology",
+  "options": {
+   "social-sciences": {
+    "name": "Social sciences",
+    "path": "Social sciences",
+    "definition": "The study of human behaviour and society, following OECD Fields of Science group 5."
+   },
+   "humanities": {
+    "name": "Humanities",
+    "path": "Humanities",
+    "definition": "The study of human culture and thought, following OECD Fields of Science group 6: history, languages and literature, philosophy, theology, the study of the arts."
+   }
+  },
+  "probabilities": {
+   "social-sciences": 0.91,
+   "humanities": 0.09
+  },
+  "confidence": 0.82,
+  "choice": "social-sciences",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-linguistics-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "linguistics",
+  "options": {
+   "humanities": {
+    "name": "Humanities",
+    "path": "Humanities",
+    "definition": "The study of human culture and thought, following OECD Fields of Science group 6: history, languages and literature, philosophy, theology, the study of the arts."
+   },
+   "social-sciences": {
+    "name": "Social sciences",
+    "path": "Social sciences",
+    "definition": "The study of human behaviour and society, following OECD Fields of Science group 5."
+   }
+  },
+  "probabilities": {
+   "humanities": 0.97,
+   "social-sciences": 0.03
+  },
+  "confidence": 0.94,
+  "choice": "humanities",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-law-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "law",
+  "options": {
+   "social-sciences": {
+    "name": "Social sciences",
+    "path": "Social sciences",
+    "definition": "The study of human behaviour and society, following OECD Fields of Science group 5."
+   },
+   "humanities": {
+    "name": "Humanities",
+    "path": "Humanities",
+    "definition": "The study of human culture and thought, following OECD Fields of Science group 6: history, languages and literature, philosophy, theology, the study of the arts."
+   }
+  },
+  "probabilities": {
+   "social-sciences": 0.76,
+   "humanities": 0.24
+  },
+  "confidence": 0.52,
+  "choice": "social-sciences",
+  "outcome": "author",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  },
+  "author_choice": "social-sciences"
+ },
+ {
+  "id": "2026-11-17-education-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "education",
+  "options": {
+   "social-sciences": {
+    "name": "Social sciences",
+    "path": "Social sciences",
+    "definition": "The study of human behaviour and society, following OECD Fields of Science group 5."
+   },
+   "humanities": {
+    "name": "Humanities",
+    "path": "Humanities",
+    "definition": "The study of human culture and thought, following OECD Fields of Science group 6: history, languages and literature, philosophy, theology, the study of the arts."
+   }
+  },
+  "probabilities": {
+   "social-sciences": 0.8,
+   "humanities": 0.2
+  },
+  "confidence": 0.6,
+  "choice": "social-sciences",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-geography-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "geography",
+  "options": {
+   "social-sciences": {
+    "name": "Social sciences",
+    "path": "Social sciences",
+    "definition": "The study of human behaviour and society, following OECD Fields of Science group 5."
+   },
+   "natural-sciences": {
+    "name": "Natural sciences",
+    "path": "Natural sciences",
+    "definition": "The sciences of nature and of formal systems, following OECD Fields of Science group 1: mathematics, computer science, physics, astronomy, chemistry, earth and life sciences."
+   },
+   "earth-sciences": {
+    "name": "Earth sciences",
+    "path": "Natural sciences > Earth sciences",
+    "definition": "The planet Earth and its environment."
+   }
+  },
+  "probabilities": {
+   "social-sciences": 0.78,
+   "natural-sciences": 0.05,
+   "earth-sciences": 0.17
+  },
+  "confidence": 0.67,
+  "choice": "social-sciences",
+  "outcome": "author",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  },
+  "author_choice": "social-sciences"
+ },
+ {
+  "id": "2026-11-17-psychology-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "psychology",
+  "options": {
+   "social-sciences": {
+    "name": "Social sciences",
+    "path": "Social sciences",
+    "definition": "The study of human behaviour and society, following OECD Fields of Science group 5."
+   },
+   "medical-health-sciences": {
+    "name": "Medical and health sciences",
+    "path": "Medical and health sciences",
+    "definition": "Human health and its care, following OECD Fields of Science group 3."
+   }
+  },
+  "probabilities": {
+   "social-sciences": 0.98,
+   "medical-health-sciences": 0.02
+  },
+  "confidence": 0.96,
+  "choice": "social-sciences",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-logic-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "logic",
+  "options": {
+   "philosophy": {
+    "name": "Philosophy",
+    "path": "Humanities > Philosophy",
+    "definition": "Philosophical works, thinkers and disciplines."
+   },
+   "mathematics": {
+    "name": "Mathematics",
+    "path": "Natural sciences > Mathematics",
+    "definition": "Number, quantity, structure, space and change."
+   }
+  },
+  "probabilities": {
+   "philosophy": 0.98,
+   "mathematics": 0.02
+  },
+  "confidence": 0.96,
+  "choice": "philosophy",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-computer-science-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "computer-science",
+  "options": {
+   "natural-sciences": {
+    "name": "Natural sciences",
+    "path": "Natural sciences",
+    "definition": "The sciences of nature and of formal systems, following OECD Fields of Science group 1: mathematics, computer science, physics, astronomy, chemistry, earth and life sciences."
+   },
+   "engineering-technology": {
+    "name": "Engineering and technology",
+    "path": "Engineering and technology",
+    "definition": "The design and making of structures, machines, systems and materials, following OECD Fields of Science group 2."
+   }
+  },
+  "probabilities": {
+   "natural-sciences": 0.99,
+   "engineering-technology": 0.01
+  },
+  "confidence": 0.98,
+  "choice": "natural-sciences",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-bioethics-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "bioethics",
+  "options": {
+   "medical-health-sciences": {
+    "name": "Medical and health sciences",
+    "path": "Medical and health sciences",
+    "definition": "Human health and its care, following OECD Fields of Science group 3."
+   },
+   "ethics": {
+    "name": "Ethics",
+    "path": "Humanities > Philosophy > Ethics",
+    "definition": "Philosophical moral reflection: the good, virtue, duty, natural law."
+   },
+   "moral-theology": {
+    "name": "Moral theology",
+    "path": "Humanities > Theology > Moral theology",
+    "definition": "Christian moral life in the light of faith, including Catholic social teaching."
+   }
+  },
+  "probabilities": {
+   "medical-health-sciences": 0.04,
+   "ethics": 0.96,
+   "moral-theology": 0.0
+  },
+  "confidence": 0.94,
+  "choice": "ethics",
+  "outcome": "applied",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  }
+ },
+ {
+  "id": "2026-11-17-environmental-science-1",
+  "date": "2026-11-17",
+  "model": "jev-1.14.0",
+  "question": "place",
+  "node": "environmental-science",
+  "options": {
+   "earth-sciences": {
+    "name": "Earth sciences",
+    "path": "Natural sciences > Earth sciences",
+    "definition": "The planet Earth and its environment."
+   },
+   "biology": {
+    "name": "Biology",
+    "path": "Natural sciences > Biology",
+    "definition": "Living organisms and life processes."
+   },
+   "natural-sciences": {
+    "name": "Natural sciences",
+    "path": "Natural sciences",
+    "definition": "The sciences of nature and of formal systems, following OECD Fields of Science group 1: mathematics, computer science, physics, astronomy, chemistry, earth and life sciences."
+   }
+  },
+  "probabilities": {
+   "earth-sciences": 0.32,
+   "biology": 0.0,
+   "natural-sciences": 0.68
+  },
+  "confidence": 0.52,
+  "choice": "natural-sciences",
+  "outcome": "author",
+  "thresholds": {
+   "choice_probability": 0.8,
+   "choice_confidence": 0.6
+  },
+  "author_choice": "earth-sciences"
+ }
+]

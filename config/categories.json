@@ -141,20 +141,6 @@
      ]
     },
     {
-     "key": "comics",
-     "names": {
-      "en": "Comics",
-      "it": "Fumetto",
-      "es": "Historieta",
-      "fr": "Bande dessinée",
-      "de": "Comic",
-      "pt": "Histórias em quadrinhos"
-     },
-     "definition": {
-      "en": "Sequential art telling a story in drawn panels: comic strips, comic books, graphic novels, manga."
-     }
-    },
-    {
      "key": "performing-arts",
      "names": {
       "en": "Performing arts",
@@ -237,34 +223,6 @@
          "definition": {
           "en": "Traditional music transmitted within a people or region."
          }
-        },
-        {
-         "key": "opera",
-         "names": {
-          "en": "Opera",
-          "it": "Opera lirica",
-          "es": "Ópera",
-          "fr": "Opéra",
-          "de": "Oper",
-          "pt": "Ópera"
-         },
-         "definition": {
-          "en": "Staged works sung throughout with orchestra: opera, operetta, and their libretti as staged works."
-         }
-        },
-        {
-         "key": "musical-theatre",
-         "names": {
-          "en": "Musical theatre",
-          "it": "Teatro musicale",
-          "es": "Teatro musical",
-          "fr": "Comédie musicale",
-          "de": "Musical",
-          "pt": "Teatro musical"
-         },
-         "definition": {
-          "en": "Stage musicals combining songs, spoken dialogue and dance."
-         }
         }
        ]
       },
@@ -294,6 +252,34 @@
        },
        "definition": {
         "en": "Dance works and forms: ballet, modern dance, folk and liturgical dance."
+       }
+      },
+      {
+       "key": "musical-theatre",
+       "names": {
+        "en": "Musical theatre",
+        "it": "Teatro musicale",
+        "es": "Teatro musical",
+        "fr": "Comédie musicale",
+        "de": "Musical",
+        "pt": "Teatro musical"
+       },
+       "definition": {
+        "en": "Stage musicals combining songs, spoken dialogue and dance."
+       }
+      },
+      {
+       "key": "opera",
+       "names": {
+        "en": "Opera",
+        "it": "Opera lirica",
+        "es": "Ópera",
+        "fr": "Opéra",
+        "de": "Oper",
+        "pt": "Ópera"
+       },
+       "definition": {
+        "en": "Staged works sung throughout with orchestra: opera, operetta, and their libretti as staged works."
        }
       }
      ]
@@ -571,6 +557,20 @@
          }
         }
        ]
+      },
+      {
+       "key": "comics",
+       "names": {
+        "en": "Comics",
+        "it": "Fumetto",
+        "es": "Historieta",
+        "fr": "Bande dessinée",
+        "de": "Comic",
+        "pt": "Histórias em quadrinhos"
+       },
+       "definition": {
+        "en": "Sequential art telling a story in drawn panels: comic strips, comic books, graphic novels, manga."
+       }
       }
      ]
     },
@@ -1234,7 +1234,23 @@
        },
        "definition": {
         "en": "Philosophical moral reflection: the good, virtue, duty, natural law."
-       }
+       },
+       "children": [
+        {
+         "key": "bioethics",
+         "names": {
+          "en": "Bioethics",
+          "it": "Bioetica",
+          "es": "Bioética",
+          "fr": "Bioéthique",
+          "de": "Bioethik",
+          "pt": "Bioética"
+         },
+         "definition": {
+          "en": "Ethical questions of life, medicine and biotechnology."
+         }
+        }
+       ]
       },
       {
        "key": "logic",
@@ -1936,20 +1952,6 @@
      },
      "definition": {
       "en": "Drugs and their effects."
-     }
-    },
-    {
-     "key": "bioethics",
-     "names": {
-      "en": "Bioethics",
-      "it": "Bioetica",
-      "es": "Bioética",
-      "fr": "Bioéthique",
-      "de": "Bioethik",
-      "pt": "Bioética"
-     },
-     "definition": {
-      "en": "Ethical questions of life, medicine and biotechnology."
      }
     }
    ]
