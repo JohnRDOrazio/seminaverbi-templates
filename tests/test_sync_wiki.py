@@ -258,3 +258,26 @@ def test_article_categories_replaces_continuation():
         {"query": {"pages": [{"title": "C", "categories": [{"title": "Category:O"}]}]}})
     assert WikiClient("en", session=s).article_categories() == {"M", "N", "O"}
     assert "clcontinue" not in s.calls[2][1] and s.calls[2][1]["gapcontinue"] == "C"
+
+
+class Alternating:
+    """Answers HTTP 429, then a MediaWiki "ratelimited" error, forever."""
+
+    def __init__(self):
+        self.calls, self.headers = 0, {}
+
+    def get(self, url, params=None, timeout=None):
+        self.calls += 1
+        if self.calls % 2:
+            return LimitedResponse(None)
+        return Response({"error": {"code": "ratelimited", "info": "slow down"}})
+
+    post = get
+
+
+def test_both_retry_layers_share_one_budget(monkeypatch):
+    monkeypatch.setattr("sync.wiki.time.sleep", lambda s: None)
+    s = Alternating()
+    with pytest.raises(Exception):
+        WikiClient("en", session=s)._token("login")
+    assert s.calls == 6

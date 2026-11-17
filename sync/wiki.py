@@ -9,7 +9,7 @@ import requests
 
 from sync.plan import PageState
 
-RETRIES = 5  # extra attempts after an HTTP 429 or a MediaWiki "ratelimited" error
+RETRIES = 5  # extra attempts per call, shared by HTTP 429 and MediaWiki "ratelimited" errors
 RATELIMITED_WAIT = 65.0  # seconds; MediaWiki does not say how long to wait
 MAX_RETRY_WAIT = 120.0
 
@@ -47,27 +47,34 @@ class WikiClient:
         self.session.headers["User-Agent"] = USER_AGENT
 
     def _call(self, method: str, **params) -> dict:
+        """One API call. HTTP 429 and MediaWiki "ratelimited" retries share one budget of RETRIES."""
         params.update(format="json", formatversion="2")
-        for attempt in range(RETRIES + 1):
-            data = self._request(method, params)
-            if data.get("error", {}).get("code") != "ratelimited" or attempt == RETRIES:
+        budget = [RETRIES]
+        while True:
+            data = self._request(method, params, budget)
+            if data.get("error", {}).get("code") != "ratelimited" or budget[0] <= 0:
                 break
+            budget[0] -= 1
             # MediaWiki's own per-user limit ($wgRateLimits, e.g. page moves): it gives no wait time
             time.sleep(RATELIMITED_WAIT)
         if "error" in data:
             raise SyncError(f"{self.lang}: {data['error'].get('code')}: {data['error'].get('info')}")
         return data
 
-    def _request(self, method: str, params: dict) -> dict:
-        for attempt in range(RETRIES + 1):
+    def _request(self, method: str, params: dict, budget: list | None = None) -> dict:
+        budget = budget if budget is not None else [RETRIES]
+        attempt = 0
+        while True:
             if method == "GET":
                 r = self.session.get(self.api, params=params, timeout=60)
             else:
                 r = self.session.post(self.api, data=params, timeout=60)
-            if getattr(r, "status_code", 200) != 429 or attempt == RETRIES:
+            if getattr(r, "status_code", 200) != 429 or budget[0] <= 0:
                 break
+            budget[0] -= 1
             # rate limited (nginx limit_req): wait as told, or back off, then retry the same request
             time.sleep(_retry_wait(r.headers.get("Retry-After"), attempt))
+            attempt += 1
         r.raise_for_status()
         return r.json()
 
