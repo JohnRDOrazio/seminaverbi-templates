@@ -39,15 +39,29 @@ local function endsWith(s, suffix)
 	return suffix == '' or s:sub(-#suffix) == suffix
 end
 
+-- Ending → feminine ending (nil: the ending is invariant), checked in order before -o → -a and -e.
+local ES_FEMININE = { { 'és', 'esa' }, { 'án', 'ana' }, { 'ón', 'ona' }, { 'ín', 'ina' },
+	{ 'a' }, { 'í' }, { 'ú' } }
+local PT_FEMININE = { { 'ão', 'ã' }, { 'ês', 'esa' }, { 'ol', 'ola' }, { 'or', 'ora' }, { 'a' }, { 'l' } }
+
 -- The regular feminine of a masculine adjective, or nil when the language has no safe rule for it.
 local function regularFeminine(lang, w)
 	if lang == 'en' then
 		return w
 	elseif lang == 'it' or lang == 'es' or lang == 'pt' then
+		for _, rule in ipairs(lang == 'es' and ES_FEMININE or lang == 'pt' and PT_FEMININE or {}) do
+			if endsWith(w, rule[1]) then
+				return rule[2] and (w:sub(1, #w - #rule[1]) .. rule[2]) or w
+			end
+		end
 		if endsWith(w, 'o') then
 			return w:sub(1, -2) .. 'a'
 		elseif endsWith(w, 'e') then
 			return w
+		end
+		-- es: any other final consonant takes -a (español → española)
+		if lang == 'es' and w:sub(-1):match('[b-df-hj-np-tv-z]') then
+			return w .. 'a'
 		end
 	elseif lang == 'fr' then
 		if endsWith(w, 'e') then
@@ -129,10 +143,21 @@ end
 
 -- The indefinite article before a phrase (the phrase starts with its first word).
 function p._article(lang, phrase, female)
-	if lang == 'en' then
-		return (startsWithVowel(phrase) and 'an ' or 'a ') .. phrase
-	end
 	local lower = phrase:lower()
+	if lang == 'en' then
+		-- by sound: a /juː/ or /w/ start takes "a", a silent h takes "an"
+		for _, start in ipairs({ 'eu', 'uni', 'use', 'usu', 'uti', 'one', 'once' }) do
+			if lower:sub(1, #start) == start then
+				return 'a ' .. phrase
+			end
+		end
+		for _, start in ipairs({ 'hour', 'honest', 'honour', 'honor', 'heir' }) do
+			if lower:sub(1, #start) == start then
+				return 'an ' .. phrase
+			end
+		end
+		return (startsWithVowel(lower) and 'an ' or 'a ') .. phrase
+	end
 	if lang == 'it' then
 		if female then
 			if startsWithVowel(lower) then
@@ -224,7 +249,8 @@ local function predicate(entity, lang, wb, gender)
 			phrase = occupation .. ' ' .. nationality
 		end
 	end
-	if agree then
+	-- English always takes the article: it has no agreement to get wrong
+	if agree or lang == 'en' then
 		phrase = p._article(lang, phrase, female)
 	end
 	return phrase

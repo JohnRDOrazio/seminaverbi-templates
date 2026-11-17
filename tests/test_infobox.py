@@ -177,6 +177,15 @@ def test_decade_century_millennium():
     assert row(label, "II millennio") in out
 
 
+def test_day_format_per_language():
+    out, label = date_row("+1954-07-29T00:00:00Z", 11, lang="de")
+    assert row(label, "j. F Y|1954-07-29") in out
+    out, label = date_row("+1954-07-29T00:00:00Z", 11, lang="es")
+    assert row(label, 'j "de" F "de" Y|1954-07-29') in out
+    out, label = date_row("+1954-07-00T00:00:00Z", 10, lang="es")
+    assert row(label, 'F "de" Y|1954-07-01') in out
+
+
 def test_bc_century():
     out, label = date_row("-0500-00-00T00:00:00Z", 7)
     assert row(label, "V secolo a.C.") in out

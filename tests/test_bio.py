@@ -250,9 +250,7 @@ def test_demonym_it_es_pt():
     assert nationality("es", ["estadounidense"], True) == "estadounidense"
     # a lone form ending in -a might be the feminine itself: undecidable
     assert nationality("it", ["italiana"]) is None
-    # consonant endings: no rule, so no feminine
     assert nationality("es", ["español"]) == "español"
-    assert nationality("es", ["español"], True) is None
     # two unrelated forms: cannot tell which is masculine
     assert nationality("it", ["italiano", "italico"]) is None
 
@@ -289,7 +287,11 @@ def test_demonym_en():
 def test_en_article():
     e = env("en")
     for word, art in (("Italian", "an"), ("actor", "an"), ("singer", "a"), ("Umbrian", "an"),
-                      ("English", "an"), ("opera singer", "an"), ("British", "a")):
+                      ("English", "an"), ("opera singer", "an"), ("British", "a"),
+                      ("European", "a"), ("university professor", "a"), ("unique", "a"), ("useful", "a"),
+                      ("usual", "a"), ("utilitarian", "a"), ("one-man band", "a"), ("once-famous", "a"),
+                      ("hour", "an"), ("honest", "an"), ("honourable", "an"), ("honorary", "an"),
+                      ("heir", "an"), ("historian", "a"), ("Umbrian", "an")):
         assert e.call("Module:SV/Bio", "_article", "en", word, False) == art + " " + word
 
 
@@ -310,3 +312,40 @@ def test_es_conjunction():
     assert e.call("Module:SV/Bio", "_list", "es", t(["cantante", "actor"])) == "cantante y actor"
     assert e.call("Module:SV/Bio", "_list", "es", t(["cantante", "intérprete"])) == "cantante e intérprete"
     assert e.call("Module:SV/Bio", "_list", "es", t(["a", "b", "c"])) == "a, b y c"
+
+
+def test_en_article_whatever_the_gender():
+    assert bio("en", entities=with_nek(gender=None)) == \
+        "Nek (born 6 January 1972 in Sassuolo) is an Italian singer-songwriter"
+    assert bio("en", entities=with_nek(gender=FEMALE)) == \
+        "Nek (born 6 January 1972 in Sassuolo) is an Italian singer-songwriter"
+    ents = dict(BASE, **{ITALY: {"claims": {"P489": [mono("European", "en")]}}})
+    assert bio("en", entities=ents) == "Nek (born 6 January 1972 in Sassuolo) is a European singer-songwriter"
+
+
+def test_demonym_es_consonants():
+    for masc, fem in (("inglés", "inglesa"), ("francés", "francesa"), ("alemán", "alemana"),
+                      ("bretón", "bretona"), ("mallorquín", "mallorquina"), ("español", "española")):
+        assert nationality("es", [masc], True) == fem
+        assert nationality("es", [fem, masc]) == masc
+    for invariant in ("canadiense", "marroquí", "hindú"):
+        assert nationality("es", [invariant], True) == invariant
+    assert nationality("es", ["belga", "belga"], True) is None  # lone -a: may be the feminine
+
+
+def test_demonym_pt_consonants():
+    for masc, fem in (("alemão", "alemã"), ("português", "portuguesa"), ("inglês", "inglesa"),
+                      ("espanhol", "espanhola"), ("trabalhador", "trabalhadora")):
+        assert nationality("pt", [masc], True) == fem
+        assert nationality("pt", [fem, masc]) == masc
+    assert nationality("pt", ["canadense"], True) == "canadense"
+    # -l other than -ol is invariant (e.g. -al), other consonants have no rule
+    assert nationality("pt", ["oriental"], True) == "oriental"
+    assert nationality("pt", ["xyz"], True) is None
+
+
+def test_demonym_fr_more():
+    for masc, fem in (("anglais", "anglaise"), ("chinois", "chinoise"), ("argentin", "argentine"),
+                      ("américain", "américaine"), ("allemand", "allemande"), ("espagnol", "espagnole")):
+        assert nationality("fr", [masc], True) == fem
+        assert nationality("fr", [fem, masc]) == masc
