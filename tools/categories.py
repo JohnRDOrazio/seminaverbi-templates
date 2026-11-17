@@ -46,6 +46,11 @@ def _site(lang: str) -> str:
     return f"{lang}wiki"
 
 
+def _bare(title: str) -> str:
+    """'Categoria:Musica' -> 'Musica': category titles compared without their (localized) namespace."""
+    return title.split(":", 1)[1] if ":" in title else title
+
+
 def _title(name: str) -> str:
     return "Category:" + name
 
@@ -110,7 +115,9 @@ def create(lang: str, data: dict, client, repo, dry_run: bool, replace_missing: 
                 conflicts.append((n.key, distinct))
             elif own:
                 continue
-            elif (distinct and (current := repo.sitelink(distinct[0], _site(lang))) not in (None, title)
+            elif distinct and (current := repo.sitelink(distinct[0], _site(lang))) is not None and _bare(current) == _bare(title):
+                continue  # already linked, stored under the localized namespace name ("Categoria:…")
+            elif (distinct and current not in (None, title)
                   and not (replace_missing and client.page_info([current]).get(current) is None)):
                 # wbsetsitelink would silently move the item's existing link for this wiki
                 taken.append((n.key, distinct[0], current))

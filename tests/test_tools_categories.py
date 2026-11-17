@@ -178,6 +178,16 @@ def test_replace_missing_never_replaces_a_link_to_an_existing_page():
     assert repo.sitelinks == []
 
 
+def test_link_stored_under_the_localized_namespace_is_not_a_conflict():
+    # Wikibase stores the normalized title: "Catégorie:Music-fr" is the same page as "Category:Music-fr"
+    items = {"Q10": {"enwiki": "Category:Music", "frwiki": "Catégorie:Music-fr"}}
+    fr = Fake("fr", ALL_FR, items)
+    repo = Fake("en", items=items)
+    result = cat.create("fr", DATA, fr, repo, dry_run=False)
+    assert result.taken == [] and result.conflicts == []
+    assert repo.sitelinks == []
+
+
 def test_cli_reports_taken_sitelink(env, capsys):
     items = {"Q10": {"enwiki": "Category:Music", "frwiki": "Category:Old music"}}
     clients = {"fr": Fake("fr", ALL_FR, items), "en": Fake("en", items=items)}
