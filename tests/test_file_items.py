@@ -74,9 +74,22 @@ def test_item_with_a_different_field_stops():
     assert p.stop and "music" in p.stop and p.add == []
 
 
-def test_template_only_category_no_edit():
-    p = plan_item("Q1", [page("en", ["Film"], text="{{Infobox film}} Intro.")], {}, "film", DATA, TYPES, NS, NODE_ITEM)
-    assert p.add == [("sv_field", "Q_film")] and p.edits == {}
+def test_template_only_category_page_gets_the_module_call():
+    # the item's themes are the union over all wikis: every page must call the module to show them
+    p = plan_item("Q1", [page("en", ["Film"], text="{{Infobox film}} Intro.\n[[Category:Other]]")], {}, "film",
+                  DATA, TYPES, NS, NODE_ITEM)
+    assert p.add == [("sv_field", "Q_film")]
+    assert p.edits["en"][1] == "{{Infobox film}} Intro.\n{{SV categories}}\n[[Category:Other]]"
+
+
+def test_page_already_calling_the_module_is_not_edited():
+    p = plan_item("Q1", [page("en", ["Film"], text="{{SV infobox}} Intro.")], {}, "film", DATA, TYPES, NS, NODE_ITEM)
+    assert p.edits == {}
+
+
+def test_module_call_appended_when_no_category_line():
+    p = plan_item("Q1", [page("en", ["Film"], text="Intro.")], {}, "film", DATA, TYPES, NS, NODE_ITEM)
+    assert p.edits["en"][1] == "Intro.\n\n{{SV categories}}"
 
 
 def test_edits_carry_title_text_and_base_revision():

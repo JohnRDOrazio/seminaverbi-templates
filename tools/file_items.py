@@ -115,6 +115,15 @@ def rewrite(text: str, remove: list, namespaces, has_module: bool) -> str:
     return result
 
 
+def add_module_call(text: str, namespaces) -> str:
+    """`text` with {{SV categories}} before its first category line, or at the end."""
+    ns = "|".join(re.escape(n) for n in sorted(namespaces, key=len, reverse=True))
+    first = re.search(r"^\[\[\s*(?i:" + ns + r")\s*:", text, re.M)
+    if first:
+        return text[:first.start()] + "{{SV categories}}\n" + text[first.start():]
+    return text.rstrip("\n") + "\n\n{{SV categories}}"
+
+
 def plan_item(item: str, pages: list, existing: dict, layout: str, data, types, namespaces: dict,
               node_item: dict, field_override: str | None = None) -> ItemPlan:
     """What filing `item` on itself takes. `existing`: prop key -> Q-IDs the item already has."""
@@ -144,6 +153,8 @@ def plan_item(item: str, pages: list, existing: dict, layout: str, data, types, 
         fields, ts = per_page[p.lang]
         remove = [names_of[k][p.lang] for k in sorted(fields | ts)]
         new = rewrite(p.text, remove, namespaces[p.lang], calls_module(p.text))
+        if not calls_module(new):
+            new = add_module_call(new, namespaces[p.lang])
         if new != p.text:
             edits[p.lang] = (p.title, new, p.revid)
     recheck = bool(field) and field_override is None and not fits(field, layout, data, types)
