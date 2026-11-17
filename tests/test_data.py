@@ -64,3 +64,33 @@ def test_infobox_types_resolve():
     assert set(types["fit"]) <= set(layouts)
     assert {k for ks in types["fit"].values() for k in ks} <= keys
     assert {"work", "group"} <= set(layouts)
+
+
+SURVEY = {
+    "en": ["Infobox song", "Infobox television", "Infobox film", "Infobox album", "Infobox person",
+           "Infobox musical artist", "Infobox stage production", "Infobox saint", "Infobox food",
+           "Infobox musical composition", "Infobox scientist", "Infobox comics species and title",
+           "Infobox software", "Infobox file format", "Infobox television episode", "Infobox book series"],
+    "it": ["Album", "Artista musicale", "Brano musicale", "FictionTV", "Film", "Personaggio", "Libro",
+           "Dramma", "Opera d'arte"],
+}
+
+
+def test_infobox_import_resolves():
+    imp = json.loads((ROOT / "config" / "infobox_import.json").read_text(encoding="utf-8"))
+    layouts = json.loads((ROOT / "config" / "infobox.json").read_text(encoding="utf-8"))
+    rows = {name: {r["key"] for r in rs} for name, rs in layouts.items()}
+    for lang, names in SURVEY.items():
+        for name in names:
+            assert name in imp["templates"][lang], f"{lang}:{name}"
+    for lang, tpls in imp["templates"].items():
+        for name, spec in tpls.items():
+            assert spec["layout"] in layouts, f"{lang}:{name}"
+            assert set(spec["params"].values()) <= rows[spec["layout"]], f"{lang}:{name}"
+    assert {"Film date", "Album ratings", "Album reviews", "Bandiera"} <= set(imp["helpers"])
+    assert set(imp["kinds"]) <= set(layouts)
+    assert all(q.startswith("Q") for qs in imp["kinds"].values() for q in qs)
+    bio = imp["bio"]["it"]
+    assert bio["template"] == "Bio"
+    assert set(bio["facts"].values()) <= rows["person"] | {"given_name", "nationality"}
+    assert set(bio["free"].values()) <= {"note", "rest", "ref"}
