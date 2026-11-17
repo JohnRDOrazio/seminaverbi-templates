@@ -9,7 +9,8 @@ import requests
 
 from sync.plan import PageState
 
-RETRIES = 5  # extra attempts after an HTTP 429
+RETRIES = 5  # extra attempts after an HTTP 429 or a MediaWiki "ratelimited" error
+RATELIMITED_WAIT = 65.0  # seconds; MediaWiki does not say how long to wait
 USER_AGENT = "seminaverbi-templates-sync/1.0 (https://github.com/JohnRDOrazio/seminaverbi-templates)"
 
 
@@ -39,6 +40,17 @@ class WikiClient:
     def _call(self, method: str, **params) -> dict:
         params.update(format="json", formatversion="2")
         for attempt in range(RETRIES + 1):
+            data = self._request(method, params)
+            if data.get("error", {}).get("code") != "ratelimited" or attempt == RETRIES:
+                break
+            # MediaWiki's own per-user limit ($wgRateLimits, e.g. page moves): it gives no wait time
+            time.sleep(RATELIMITED_WAIT)
+        if "error" in data:
+            raise SyncError(f"{self.lang}: {data['error'].get('code')}: {data['error'].get('info')}")
+        return data
+
+    def _request(self, method: str, params: dict) -> dict:
+        for attempt in range(RETRIES + 1):
             if method == "GET":
                 r = self.session.get(self.api, params=params, timeout=60)
             else:
@@ -49,10 +61,7 @@ class WikiClient:
             retry_after = r.headers.get("Retry-After")
             time.sleep(float(retry_after) if retry_after else min(2.0 ** attempt, 30.0))
         r.raise_for_status()
-        data = r.json()
-        if "error" in data:
-            raise SyncError(f"{self.lang}: {data['error'].get('code')}: {data['error'].get('info')}")
-        return data
+        return r.json()
 
     def _dig(self, data, *keys):
         """data[k1][k2]..., raising SyncError (not KeyError) when the API answered something unexpected."""

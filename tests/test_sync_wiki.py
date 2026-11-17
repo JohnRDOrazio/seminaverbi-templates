@@ -212,3 +212,20 @@ def test_search_source_params():
     assert WikiClient("it", session=s).search_source("Romanzo (Letteratura)") == ["Template:Libro"]
     params = s.calls[-1][1]
     assert params["srsearch"] == 'insource:"Romanzo (Letteratura)"' and params["srnamespace"] == "10|828"
+
+
+def test_mediawiki_ratelimited_error_is_retried(monkeypatch):
+    waits = []
+    monkeypatch.setattr("sync.wiki.time.sleep", waits.append)
+    s = Recorder({"error": {"code": "ratelimited", "info": "slow down"}},
+                 {"error": {"code": "ratelimited", "info": "slow down"}},
+                 {"query": {"tokens": {"logintoken": "t"}}})
+    assert WikiClient("en", session=s)._token("login") == "t"
+    assert len(s.calls) == 3 and waits == [65.0, 65.0]
+
+
+def test_mediawiki_ratelimited_gives_up(monkeypatch):
+    monkeypatch.setattr("sync.wiki.time.sleep", lambda s: None)
+    s = Recorder(*([{"error": {"code": "ratelimited", "info": "slow down"}}] * 7))
+    with pytest.raises(SyncError, match="ratelimited"):
+        WikiClient("en", session=s)._token("login")
