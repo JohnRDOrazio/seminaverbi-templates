@@ -76,7 +76,9 @@ def page_text(node, parent, lang: str) -> str:
     return f"{definition}\n\n{link}" if definition else link
 
 
-def create(lang: str, data: dict, client, repo, dry_run: bool) -> CreateResult:
+def create(lang: str, data: dict, client, repo, dry_run: bool, replace_missing: bool = False) -> CreateResult:
+    """replace_missing: an item that already links this wiki to a page that does not exist here (e.g. a
+    Wikipedia title imported from Wikidata) gets that link replaced; a link to a real page never is."""
     report = check(lang, data, client)
     tree = nodes(data)
     by_key = {n.key: n for n in tree}
@@ -108,7 +110,8 @@ def create(lang: str, data: dict, client, repo, dry_run: bool) -> CreateResult:
                 conflicts.append((n.key, distinct))
             elif own:
                 continue
-            elif distinct and (current := repo.sitelink(distinct[0], _site(lang))) not in (None, title):
+            elif (distinct and (current := repo.sitelink(distinct[0], _site(lang))) not in (None, title)
+                  and not (replace_missing and client.page_info([current]).get(current) is None)):
                 # wbsetsitelink would silently move the item's existing link for this wiki
                 taken.append((n.key, distinct[0], current))
             elif dry_run:
@@ -146,6 +149,8 @@ def main(argv=None, client_factory=WikiClient, data=None) -> int:
     parser.add_argument("--wiki", required=True)
     parser.add_argument("--create", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--replace-missing", action="store_true",
+                        help="replace an item's link for this wiki when its target page does not exist here")
     args = parser.parse_args(argv)
     if args.wiki not in LANGS:
         # checked before any login, so a typo never sends the bot password to another host
@@ -165,7 +170,7 @@ def main(argv=None, client_factory=WikiClient, data=None) -> int:
         repo = client if args.wiki == "en" else client_factory("en")
         if repo is not client:
             repo.login(user, password)
-        result = create(args.wiki, data, client, repo, args.dry_run)
+        result = create(args.wiki, data, client, repo, args.dry_run, args.replace_missing)
     except (SyncError, OSError) as exc:
         print(f"[{args.wiki}] ERROR: {exc}", file=sys.stderr)
         return 1

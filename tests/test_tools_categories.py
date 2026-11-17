@@ -156,6 +156,28 @@ def test_create_never_moves_an_existing_sitelink():
     assert repo.sitelinks == [] and items["Q10"]["frwiki"] == "Category:Old music"
 
 
+def test_replace_missing_replaces_a_link_to_a_page_that_does_not_exist_here():
+    # imported from Wikidata: frwiki points to a Wikipedia category title absent from this wiki
+    items = {"Q10": {"enwiki": "Category:Music", "frwiki": "Category:Musique (Wikipedia)"}}
+    fr = Fake("fr", ALL_FR, items)
+    repo = Fake("en", items=items)
+    result = cat.create("fr", DATA, fr, repo, dry_run=False, replace_missing=True)
+    assert result.taken == []
+    assert ("Q10", "frwiki", "Category:Music-fr", "seminaverbi-mcp") in repo.sitelinks
+    assert ("Category:Music-fr", "Q10") in result.linked
+
+
+def test_replace_missing_never_replaces_a_link_to_an_existing_page():
+    pages = dict(ALL_FR)
+    pages["Category:Old music"] = page()  # a real page on this wiki
+    items = {"Q10": {"enwiki": "Category:Music", "frwiki": "Category:Old music"}}
+    fr = Fake("fr", pages, items)
+    repo = Fake("en", items=items)
+    result = cat.create("fr", DATA, fr, repo, dry_run=False, replace_missing=True)
+    assert result.taken == [("music", "Q10", "Category:Old music")]
+    assert repo.sitelinks == []
+
+
 def test_cli_reports_taken_sitelink(env, capsys):
     items = {"Q10": {"enwiki": "Category:Music", "frwiki": "Category:Old music"}}
     clients = {"fr": Fake("fr", ALL_FR, items), "en": Fake("en", items=items)}
