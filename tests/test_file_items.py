@@ -208,6 +208,10 @@ class Client:
         item, _, text, tc = self.pages[title]
         return self._cats(item, text, tc)
 
+    def revision_categories(self, revid):
+        item, _, text, tc = next(v for v in self.pages.values() if v[1] == revid)
+        return self._cats(item, text, tc)
+
     def preview_categories(self, title, text):
         item, _, _, tc = self.pages[title]
         return self._cats(item, text, tc) - self.drop_from_preview
@@ -505,3 +509,18 @@ def test_sortkey_added_to_a_call_containing_a_comment_keeps_the_comment():
     text = "{{SV infobox|name=X<!-- the title -->}}\n[[Category:Film|Zed]]"
     out = rewrite(text, ["Film"], ["Category"], has_module=True)
     assert out == "{{SV infobox|name=X<!-- the title -->|sortkey=Zed}}"
+
+
+def test_verification_reads_the_saved_revision():
+    repo, clients = setup({"en": FILM_EN})
+    en = clients["en"]
+    real_edit = en.edit
+    seen = []
+
+    def edit(title, text, summary, tags=None, createonly=False, baserevid=None):
+        real_edit(title, text, summary, tags, createonly, baserevid)
+        return {"result": "Success", "newrevid": 777}
+    en.edit = edit
+    en.revision_categories = lambda revid: seen.append(revid) or en.page_categories("Film page")
+    run(repo, clients)
+    assert seen == [777]

@@ -306,10 +306,13 @@ def run(repo, clients: dict, data, types, props: dict, apply: bool, only_item: s
                 out(f"{item}: FAILED {lang}:{title}: changed since it was read; run again")
                 continue
             try:
-                clients[lang].edit(title, text, _summary(lang), tags=TAG, baserevid=revid)
+                result = clients[lang].edit(title, text, _summary(lang), tags=TAG, baserevid=revid) or {}
                 edited += 1
-                # MediaWiki may have merged a concurrent edit (its oldrevid does not tell): verify every save
-                lost = sorted(keep - clients[lang].page_categories(title))
+                # MediaWiki may have merged a concurrent edit (its oldrevid does not tell): verify every save,
+                # on the revision it created when the API names it
+                saved = result.get("newrevid")
+                now = clients[lang].revision_categories(saved) if saved else clients[lang].page_categories(title)
+                lost = sorted(keep - now)
                 if lost:
                     unsafe.append((lang, title, lost))
                     out(f"{item}: UNSAFE {lang}:{title} saved without {', '.join(lost)} (a concurrent edit "

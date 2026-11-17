@@ -323,6 +323,11 @@ class WikiClient:
                           contentmodel="wikitext")
         return {c["category"].replace("_", " ") for c in self._dig(data, "parse", "categories")}
 
+    def revision_categories(self, revid: int) -> set[str]:
+        """The categories of one saved revision (parsed), bare names."""
+        data = self._call("GET", action="parse", oldid=revid, prop="categories")
+        return {c["category"].replace("_", " ") for c in self._dig(data, "parse").get("categories", [])}
+
     def page_categories(self, title: str) -> set[str]:
         """The page's categories now (template-added included), bare names."""
         params, out = dict(action="query", prop="categories", titles=title, cllimit="max"), set()

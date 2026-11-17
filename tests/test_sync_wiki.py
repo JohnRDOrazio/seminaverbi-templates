@@ -388,3 +388,10 @@ def test_page_categories_follows_continuation():
                  {"query": {"pages": [{"title": "X", "categories": [{"title": "Category:B"}]}]}})
     assert WikiClient("en", session=s).page_categories("X") == {"A", "B"}
     assert s.calls[1][1]["clcontinue"] == "1|B"
+
+
+def test_revision_categories_parses_that_revision():
+    s = Recorder({"parse": {"categories": [{"category": "Arti_dello_spettacolo"}]}})
+    assert WikiClient("it", session=s).revision_categories(42) == {"Arti dello spettacolo"}
+    params = s.calls[0][1]
+    assert params["action"] == "parse" and params["oldid"] == 42 and params["prop"] == "categories"
