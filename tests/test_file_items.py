@@ -370,3 +370,18 @@ def test_author_field_holds_after_an_earlier_item_was_edited():
     repo, clients = setup({"en": en})
     report = run(repo, clients, fields={"Q9": "novels"})
     assert report.stopped == [] and repo.statements["Q9"]["P10768"] == ["Q_novels"]
+
+
+def test_recheck_skipped_when_the_item_already_has_the_field():
+    page = {"Film page": ("Q1", 10, "Intro.\n{{SV categories}}", {"Film"})}
+    repo, clients = setup({"en": page}, statements={"Q1": {"P10768": ["Q_film"]}}, instance_of={"Q1": ["Q_tv"]})
+    recorded, jev = [], Jev("television", "applied")
+    report = run(repo, clients, jev=jev, recorded=recorded)
+    assert jev.texts == [] and recorded == [] and report.stopped == [] and repo.calls == []
+
+
+def test_recorded_decision_names_the_item():
+    repo, clients = setup({"en": FILM_EN}, instance_of={"Q1": ["Q_tv"]})
+    recorded = []
+    run(repo, clients, jev=Jev("television", "applied"), recorded=recorded)
+    assert recorded[0].node == "Q1"

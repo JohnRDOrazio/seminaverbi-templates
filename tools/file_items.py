@@ -157,7 +157,8 @@ def plan_item(item: str, pages: list, existing: dict, layout: str, data, types, 
             new = add_module_call(new, namespaces[p.lang])
         if new != p.text:
             edits[p.lang] = (p.title, new, p.revid)
-    recheck = bool(field) and field_override is None and not fits(field, layout, data, types)
+    recheck = (bool(field) and field_override is None and node_item[field] not in have_field
+               and not fits(field, layout, data, types))
     return ItemPlan(item, field, themes, add, edits, None, recheck)
 
 
@@ -231,7 +232,7 @@ def run(repo, clients: dict, data, types, props: dict, apply: bool, only_item: s
                 first = min(pages, key=lambda p: LANGS.index(p.lang))
                 decision = classify(f"Type: {label}.\n\n{first.text}")
                 if apply and record:
-                    record(decision)
+                    record(decision._replace(node=item))
                 if decision.outcome == "applied":
                     plan = plan_item(item, pages, existing, layout, data, types, namespaces, node_item,
                                      field_override=decision.choice)
