@@ -197,7 +197,7 @@ def test_subcategory_members_in_map_are_not_refiled_twice():
 
 def test_old_redirect_or_missing_skipped():
     fake = Fake(pages={"Category:Dance": "#REDIRECT [[Category:Danza]]"}, redirects={"Category:Dance"})
-    steps, report = run(fake, {"Dance": "film", "Missing": "film"})
+    steps, report = run(fake, {"Dance": "film", "Missing": "film"})  # redirect without members: nothing to do
     assert fake.edits == [] and fake.moves == []
     assert set(report.skipped) == {"Category:Dance", "Category:Missing"}
 
@@ -246,3 +246,13 @@ def test_template_keeps_localized_prefix_matching():
                 members={"Category:Romanzo (Letteratura)": [("Hobbit", 0)]})
     run(fake, {"Romanzo (Letteratura)": "novels"})
     assert fake.pages["Template:Libro"] == "|romanzo=[[Categoria:Novels-it]]"
+
+
+def test_redirected_old_category_with_leftover_members_is_finished():
+    # an earlier run moved the page but failed to re-file one member: finish the re-file, nothing else
+    fake = Fake(pages={"Category:Video gaming": "#REDIRECT [[:Category:Film]]", "Category:Film": "x",
+                       "Song": "[[Category:Video gaming]]"},
+                members={"Category:Video gaming": [("Song", 0)]}, redirects={"Category:Video gaming"})
+    _, report = run(fake, {"Video gaming": "film"})
+    assert fake.pages["Song"] == "[[Category:Film]]"
+    assert [t for t, _, _ in fake.edits] == ["Song"]

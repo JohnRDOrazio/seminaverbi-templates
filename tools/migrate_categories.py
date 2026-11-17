@@ -131,14 +131,21 @@ def plan(lang: str, data: dict, mapping: dict, client, jev) -> Plan:
 
     for old_name, target in mapping.items():
         old_title = _cat(old_name)
-        if not client.exists(old_title) or client.is_redirect(old_title):
-            skipped.append(old_title)
-            continue
         kind, _, key = target.rpartition(":")
         node = by_key[key]
         new_name = node.names[lang]
         new_title = _cat(new_name)
+        if not client.exists(old_title):
+            skipped.append(old_title)
+            continue
         members = client.members(old_title)
+        if client.is_redirect(old_title):
+            # already migrated; finish any member whose re-file failed in an earlier run
+            if members and kind != "split":
+                refile(members, old_name, new_name, refile_templates(old_name, new_name))
+            else:
+                skipped.append(old_title)
+            continue
         if kind == "split":
             pending = 0
             for member, ns in members:
