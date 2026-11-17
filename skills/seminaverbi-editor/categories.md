@@ -6,7 +6,7 @@ Only these categories may be used. An article gets at least one field category a
 
 ## en
 
-Root: Semina Verbi
+Root: Seeds of the Word
 
 ### Fields
 
@@ -93,7 +93,7 @@ Root: Semina Verbi
 
 ## it
 
-Root: Semina Verbi
+Root: Semi del Verbo
 
 ### Fields
 
@@ -180,7 +180,7 @@ Root: Semina Verbi
 
 ## es
 
-Root: Semina Verbi
+Root: Semillas de la Palabra
 
 ### Fields
 
@@ -267,7 +267,7 @@ Root: Semina Verbi
 
 ## fr
 
-Root: Semina Verbi
+Root: Semences du Verbe
 
 ### Fields
 
@@ -354,7 +354,7 @@ Root: Semina Verbi
 
 ## de
 
-Root: Semina Verbi
+Root: Samen des Wortes
 
 ### Fields
 
@@ -441,7 +441,7 @@ Root: Semina Verbi
 
 ## pt
 
-Root: Semina Verbi
+Root: Sementes do Verbo
 
 ### Fields
 

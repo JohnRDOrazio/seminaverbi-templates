@@ -52,4 +52,4 @@ def test_data_loads_in_lua():
 
 def test_categories_compiled():
     data = LuaEnv().require("Module:SV/Data")
-    assert data.categories.root.names.en == "Semina Verbi"
+    assert data.categories.root.names.en == "Seeds of the Word"  # the existing en root category
