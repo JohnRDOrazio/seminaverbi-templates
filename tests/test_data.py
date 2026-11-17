@@ -47,3 +47,8 @@ def test_data_loads_in_lua():
     assert data.bible.defaults.fr == "NVBSE"
     assert data.wikibase.author == "P3990"
     assert data.i18n.it.discernment_heading == "Semi del Verbo e punti di attenzione"
+
+
+def test_categories_compiled():
+    data = LuaEnv().require("Module:SV/Data")
+    assert data.categories.root.names.en == "Semina Verbi"

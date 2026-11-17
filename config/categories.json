@@ -1,0 +1,897 @@
+{
+ "root": {
+  "names": {
+   "en": "Semina Verbi",
+   "it": "Semina Verbi",
+   "es": "Semina Verbi",
+   "fr": "Semina Verbi",
+   "de": "Semina Verbi",
+   "pt": "Semina Verbi"
+  }
+ },
+ "themes_root": {
+  "names": {
+   "en": "Gospel themes",
+   "it": "Temi evangelici",
+   "es": "Temas evangélicos",
+   "fr": "Thèmes évangéliques",
+   "de": "Themen des Evangeliums",
+   "pt": "Temas evangélicos"
+  }
+ },
+ "fields": [
+  {
+   "key": "literary-arts",
+   "names": {
+    "en": "Literary arts",
+    "it": "Arti letterarie",
+    "es": "Artes literarias",
+    "fr": "Arts littéraires",
+    "de": "Literarische Künste",
+    "pt": "Artes literárias"
+   },
+   "children": [
+    {
+     "key": "drama",
+     "names": {
+      "en": "Drama (Literature)",
+      "it": "Opera Drammatica (Letteratura)",
+      "es": "Drama (Literatura)",
+      "fr": "Drame (littérature)",
+      "de": "Drama (Literatur)",
+      "pt": "Drama (Literatura)"
+     }
+    },
+    {
+     "key": "fiction",
+     "names": {
+      "en": "Fiction (Literature)",
+      "it": "Narrativa (Letteratura)",
+      "es": "Narrativa (Literatura)",
+      "fr": "Fiction (littérature)",
+      "de": "Erzählende Literatur",
+      "pt": "Ficção (Literatura)"
+     }
+    },
+    {
+     "key": "poetry",
+     "names": {
+      "en": "Poetry (Literature)",
+      "it": "Poesia (Letteratura)",
+      "es": "Poesía (Literatura)",
+      "fr": "Poésie (littérature)",
+      "de": "Lyrik",
+      "pt": "Poesia (Literatura)"
+     }
+    },
+    {
+     "key": "prose",
+     "names": {
+      "en": "Prose (Literature)",
+      "it": "Prosa (Letteratura)",
+      "es": "Prosa (Literatura)",
+      "fr": "Prose (littérature)",
+      "de": "Prosa (Literatur)",
+      "pt": "Prosa (Literatura)"
+     }
+    },
+    {
+     "key": "novel",
+     "names": {
+      "en": "Novel (Literature)",
+      "it": "Romanzo (Letteratura)",
+      "es": "Novela (Literatura)",
+      "fr": "Roman (littérature)",
+      "de": "Roman (Literatur)",
+      "pt": "Romance (Literatura)"
+     }
+    }
+   ]
+  },
+  {
+   "key": "performing-arts",
+   "names": {
+    "en": "Performing arts",
+    "it": "Arti dello spettacolo",
+    "es": "Artes escénicas",
+    "fr": "Arts du spectacle",
+    "de": "Darstellende Kunst",
+    "pt": "Artes cênicas"
+   },
+   "children": [
+    {
+     "key": "dance",
+     "names": {
+      "en": "Dance",
+      "it": "Danza",
+      "es": "Danza",
+      "fr": "Danse",
+      "de": "Tanz",
+      "pt": "Dança"
+     }
+    },
+    {
+     "key": "music",
+     "names": {
+      "en": "Music",
+      "it": "Musica",
+      "es": "Música",
+      "fr": "Musique",
+      "de": "Musik",
+      "pt": "Música"
+     }
+    },
+    {
+     "key": "theatre",
+     "names": {
+      "en": "Theatre",
+      "it": "Teatro",
+      "es": "Teatro",
+      "fr": "Théâtre",
+      "de": "Theater",
+      "pt": "Teatro"
+     }
+    }
+   ]
+  },
+  {
+   "key": "visual-arts",
+   "names": {
+    "en": "Visual arts",
+    "it": "Arti visive",
+    "es": "Artes visuales",
+    "fr": "Arts visuels",
+    "de": "Bildende Kunst",
+    "pt": "Artes visuais"
+   },
+   "children": [
+    {
+     "key": "architecture",
+     "names": {
+      "en": "Architecture",
+      "it": "Architettura",
+      "es": "Arquitectura",
+      "fr": "Architecture",
+      "de": "Architektur",
+      "pt": "Arquitetura"
+     }
+    },
+    {
+     "key": "animation",
+     "names": {
+      "en": "Animation",
+      "it": "Animazione",
+      "es": "Animación",
+      "fr": "Animation",
+      "de": "Animation",
+      "pt": "Animação"
+     }
+    },
+    {
+     "key": "ceramic-art",
+     "names": {
+      "en": "Ceramic art",
+      "it": "Arte ceramica",
+      "es": "Cerámica artística",
+      "fr": "Art céramique",
+      "de": "Keramische Kunst",
+      "pt": "Arte cerâmica"
+     }
+    },
+    {
+     "key": "cinematography",
+     "names": {
+      "en": "Cinematography",
+      "it": "Cinematografia",
+      "es": "Cinematografía",
+      "fr": "Cinéma",
+      "de": "Film",
+      "pt": "Cinema"
+     },
+     "children": [
+      {
+       "key": "sitcom",
+       "names": {
+        "en": "Sitcom",
+        "it": "Sitcom",
+        "es": "Comedia de situación",
+        "fr": "Sitcom",
+        "de": "Sitcom",
+        "pt": "Sitcom"
+       }
+      },
+      {
+       "key": "feature-film",
+       "names": {
+        "en": "Feature film",
+        "it": "Lungometraggio",
+        "es": "Largometraje",
+        "fr": "Long métrage",
+        "de": "Spielfilm",
+        "pt": "Longa-metragem"
+       }
+      },
+      {
+       "key": "short-film",
+       "names": {
+        "en": "Short film",
+        "it": "Cortometraggio",
+        "es": "Cortometraje",
+        "fr": "Court métrage",
+        "de": "Kurzfilm",
+        "pt": "Curta-metragem"
+       }
+      }
+     ]
+    },
+    {
+     "key": "comics",
+     "names": {
+      "en": "Comics",
+      "it": "Fumetto",
+      "es": "Historieta",
+      "fr": "Bande dessinée",
+      "de": "Comic",
+      "pt": "Histórias em quadrinhos"
+     }
+    },
+    {
+     "key": "video-games",
+     "names": {
+      "en": "Video gaming",
+      "it": "Videogiochi",
+      "es": "Videojuegos",
+      "fr": "Jeux vidéo",
+      "de": "Videospiele",
+      "pt": "Jogos eletrônicos"
+     }
+    },
+    {
+     "key": "drawing",
+     "names": {
+      "en": "Drawing",
+      "it": "Disegno",
+      "es": "Dibujo",
+      "fr": "Dessin",
+      "de": "Zeichnung",
+      "pt": "Desenho"
+     },
+     "children": [
+      {
+       "key": "engraving",
+       "names": {
+        "en": "Engraving",
+        "it": "Incisione",
+        "es": "Grabado",
+        "fr": "Gravure",
+        "de": "Druckgrafik",
+        "pt": "Gravura"
+       }
+      },
+      {
+       "key": "etching",
+       "names": {
+        "en": "Etching",
+        "it": "Acquaforte",
+        "es": "Aguafuerte",
+        "fr": "Eau-forte",
+        "de": "Radierung",
+        "pt": "Água-forte"
+       }
+      },
+      {
+       "key": "cave-painting",
+       "names": {
+        "en": "Cave painting",
+        "it": "Pittura rupestre",
+        "es": "Pintura rupestre",
+        "fr": "Art pariétal",
+        "de": "Höhlenmalerei",
+        "pt": "Pintura rupestre"
+       }
+      },
+      {
+       "key": "charcoal-drawing",
+       "names": {
+        "en": "Charcoal drawing",
+        "it": "Disegno a carboncino",
+        "es": "Dibujo al carbón",
+        "fr": "Dessin au fusain",
+        "de": "Kohlezeichnung",
+        "pt": "Desenho a carvão"
+       }
+      },
+      {
+       "key": "pencil-drawing",
+       "names": {
+        "en": "Pencil drawing",
+        "it": "Disegno a matita",
+        "es": "Dibujo a lápiz",
+        "fr": "Dessin au crayon",
+        "de": "Bleistiftzeichnung",
+        "pt": "Desenho a lápis"
+       }
+      }
+     ]
+    },
+    {
+     "key": "glass-art",
+     "names": {
+      "en": "Glass art",
+      "it": "Arti vitree",
+      "es": "Arte en vidrio",
+      "fr": "Art du verre",
+      "de": "Glaskunst",
+      "pt": "Arte em vidro"
+     },
+     "children": [
+      {
+       "key": "glassblowing",
+       "names": {
+        "en": "Glassblowing",
+        "it": "Vetro soffiato",
+        "es": "Vidrio soplado",
+        "fr": "Verre soufflé",
+        "de": "Glasbläserei",
+        "pt": "Vidro soprado"
+       }
+      },
+      {
+       "key": "stained-glass",
+       "names": {
+        "en": "Stained glass",
+        "it": "Vetro colorato",
+        "es": "Vitral",
+        "fr": "Vitrail",
+        "de": "Glasmalerei",
+        "pt": "Vitral"
+       }
+      }
+     ]
+    },
+    {
+     "key": "mosaic",
+     "names": {
+      "en": "Mosaic art",
+      "it": "Arte del mosaico",
+      "es": "Mosaico",
+      "fr": "Mosaïque",
+      "de": "Mosaik",
+      "pt": "Mosaico"
+     }
+    },
+    {
+     "key": "painting",
+     "names": {
+      "en": "Painting",
+      "it": "Pittura",
+      "es": "Pintura",
+      "fr": "Peinture",
+      "de": "Malerei",
+      "pt": "Pintura"
+     },
+     "children": [
+      {
+       "key": "fresco",
+       "names": {
+        "en": "Fresco painting",
+        "it": "Affresco",
+        "es": "Fresco",
+        "fr": "Fresque",
+        "de": "Freskomalerei",
+        "pt": "Afresco"
+       }
+      },
+      {
+       "key": "oil-painting",
+       "names": {
+        "en": "Oil painting",
+        "it": "Pittura ad olio",
+        "es": "Pintura al óleo",
+        "fr": "Peinture à l'huile",
+        "de": "Ölmalerei",
+        "pt": "Pintura a óleo"
+       }
+      },
+      {
+       "key": "watercolor",
+       "names": {
+        "en": "Watercolor painting",
+        "it": "Acquerello",
+        "es": "Acuarela",
+        "fr": "Aquarelle",
+        "de": "Aquarellmalerei",
+        "pt": "Aquarela"
+       }
+      }
+     ]
+    },
+    {
+     "key": "photography",
+     "names": {
+      "en": "Photography",
+      "it": "Fotografia",
+      "es": "Fotografía",
+      "fr": "Photographie",
+      "de": "Fotografie",
+      "pt": "Fotografia"
+     },
+     "children": [
+      {
+       "key": "bw-photography",
+       "names": {
+        "en": "Black and White photography",
+        "it": "Fotografia in bianco e nero",
+        "es": "Fotografía en blanco y negro",
+        "fr": "Photographie en noir et blanc",
+        "de": "Schwarzweißfotografie",
+        "pt": "Fotografia em preto e branco"
+       }
+      },
+      {
+       "key": "hdr-photography",
+       "names": {
+        "en": "HDR photography",
+        "it": "Fotografia HDR",
+        "es": "Fotografía HDR",
+        "fr": "Photographie HDR",
+        "de": "HDR-Fotografie",
+        "pt": "Fotografia HDR"
+       }
+      },
+      {
+       "key": "landscape-photography",
+       "names": {
+        "en": "Landscape photography",
+        "it": "Fotografia di paesaggio",
+        "es": "Fotografía de paisaje",
+        "fr": "Photographie de paysage",
+        "de": "Landschaftsfotografie",
+        "pt": "Fotografia de paisagem"
+       }
+      },
+      {
+       "key": "portrait-photography",
+       "names": {
+        "en": "Portrait photography",
+        "it": "Fotografia di ritratto",
+        "es": "Fotografía de retrato",
+        "fr": "Portrait photographique",
+        "de": "Porträtfotografie",
+        "pt": "Fotografia de retrato"
+       }
+      }
+     ]
+    },
+    {
+     "key": "sculpture",
+     "names": {
+      "en": "Sculpting",
+      "it": "Scultura",
+      "es": "Escultura",
+      "fr": "Sculpture",
+      "de": "Bildhauerei",
+      "pt": "Escultura"
+     }
+    },
+    {
+     "key": "tapestry",
+     "names": {
+      "en": "Tapestry",
+      "it": "Arazzo",
+      "es": "Tapiz",
+      "fr": "Tapisserie",
+      "de": "Tapisserie",
+      "pt": "Tapeçaria"
+     }
+    }
+   ]
+  },
+  {
+   "key": "formal-sciences",
+   "names": {
+    "en": "Formal sciences",
+    "it": "Scienze formali",
+    "es": "Ciencias formales",
+    "fr": "Sciences formelles",
+    "de": "Formalwissenschaften",
+    "pt": "Ciências formais"
+   },
+   "children": [
+    {
+     "key": "history",
+     "names": {
+      "en": "History",
+      "it": "Storia",
+      "es": "Historia",
+      "fr": "Histoire",
+      "de": "Geschichte",
+      "pt": "História"
+     }
+    },
+    {
+     "key": "philosophy",
+     "names": {
+      "en": "Philosophy",
+      "it": "Filosofia",
+      "es": "Filosofía",
+      "fr": "Philosophie",
+      "de": "Philosophie",
+      "pt": "Filosofia"
+     }
+    },
+    {
+     "key": "logic",
+     "names": {
+      "en": "Logic",
+      "it": "Logica",
+      "es": "Lógica",
+      "fr": "Logique",
+      "de": "Logik",
+      "pt": "Lógica"
+     }
+    },
+    {
+     "key": "mathematics",
+     "names": {
+      "en": "Mathematics",
+      "it": "Matematica",
+      "es": "Matemáticas",
+      "fr": "Mathématiques",
+      "de": "Mathematik",
+      "pt": "Matemática"
+     }
+    },
+    {
+     "key": "computer-science",
+     "names": {
+      "en": "Computer science",
+      "it": "Informatica",
+      "es": "Informática",
+      "fr": "Informatique",
+      "de": "Informatik",
+      "pt": "Ciência da computação"
+     }
+    }
+   ]
+  },
+  {
+   "key": "natural-sciences",
+   "names": {
+    "en": "Natural sciences",
+    "it": "Scienze naturali",
+    "es": "Ciencias naturales",
+    "fr": "Sciences naturelles",
+    "de": "Naturwissenschaften",
+    "pt": "Ciências naturais"
+   },
+   "children": [
+    {
+     "key": "physics",
+     "names": {
+      "en": "Physics",
+      "it": "Fisica",
+      "es": "Física",
+      "fr": "Physique",
+      "de": "Physik",
+      "pt": "Física"
+     }
+    },
+    {
+     "key": "chemistry",
+     "names": {
+      "en": "Chemistry",
+      "it": "Chimica",
+      "es": "Química",
+      "fr": "Chimie",
+      "de": "Chemie",
+      "pt": "Química"
+     }
+    },
+    {
+     "key": "astronomy",
+     "names": {
+      "en": "Astronomy",
+      "it": "Astronomia",
+      "es": "Astronomía",
+      "fr": "Astronomie",
+      "de": "Astronomie",
+      "pt": "Astronomia"
+     }
+    },
+    {
+     "key": "biology",
+     "names": {
+      "en": "Biology",
+      "it": "Biologia",
+      "es": "Biología",
+      "fr": "Biologie",
+      "de": "Biologie",
+      "pt": "Biologia"
+     }
+    },
+    {
+     "key": "geology",
+     "names": {
+      "en": "Geology",
+      "it": "Geologia",
+      "es": "Geología",
+      "fr": "Géologie",
+      "de": "Geologie",
+      "pt": "Geologia"
+     }
+    }
+   ]
+  },
+  {
+   "key": "social-sciences",
+   "names": {
+    "en": "Social sciences",
+    "it": "Scienze sociali",
+    "es": "Ciencias sociales",
+    "fr": "Sciences sociales",
+    "de": "Sozialwissenschaften",
+    "pt": "Ciências sociais"
+   },
+   "children": [
+    {
+     "key": "anthropology",
+     "names": {
+      "en": "Anthropology",
+      "it": "Antropologia",
+      "es": "Antropología",
+      "fr": "Anthropologie",
+      "de": "Anthropologie",
+      "pt": "Antropologia"
+     }
+    },
+    {
+     "key": "archeology",
+     "names": {
+      "en": "Archeology",
+      "it": "Archeologia",
+      "es": "Arqueología",
+      "fr": "Archéologie",
+      "de": "Archäologie",
+      "pt": "Arqueologia"
+     }
+    },
+    {
+     "key": "economics",
+     "names": {
+      "en": "Economics",
+      "it": "Economia (scienza)",
+      "es": "Economía",
+      "fr": "Économie",
+      "de": "Wirtschaftswissenschaft",
+      "pt": "Economia"
+     }
+    },
+    {
+     "key": "geography",
+     "names": {
+      "en": "Geography",
+      "it": "Geografia",
+      "es": "Geografía",
+      "fr": "Géographie",
+      "de": "Geographie",
+      "pt": "Geografia"
+     }
+    },
+    {
+     "key": "linguistics",
+     "names": {
+      "en": "Linguistics",
+      "it": "Linguistica",
+      "es": "Lingüística",
+      "fr": "Linguistique",
+      "de": "Linguistik",
+      "pt": "Linguística"
+     }
+    },
+    {
+     "key": "political-science",
+     "names": {
+      "en": "Political science",
+      "it": "Politica (Scienza)",
+      "es": "Ciencia política",
+      "fr": "Science politique",
+      "de": "Politikwissenschaft",
+      "pt": "Ciência política"
+     }
+    },
+    {
+     "key": "psychology",
+     "names": {
+      "en": "Psychology",
+      "it": "Psicologia",
+      "es": "Psicología",
+      "fr": "Psychologie",
+      "de": "Psychologie",
+      "pt": "Psicologia"
+     }
+    },
+    {
+     "key": "medicine",
+     "names": {
+      "en": "Medicinal science",
+      "it": "Medicina",
+      "es": "Medicina",
+      "fr": "Médecine",
+      "de": "Medizin",
+      "pt": "Medicina"
+     }
+    }
+   ]
+  },
+  {
+   "key": "popular-culture",
+   "names": {
+    "en": "Popular culture",
+    "it": "Cultura popolare",
+    "es": "Cultura popular",
+    "fr": "Culture populaire",
+    "de": "Populärkultur",
+    "pt": "Cultura popular"
+   },
+   "children": [
+    {
+     "key": "culinary-arts",
+     "names": {
+      "en": "Culinary arts",
+      "it": "Arti culinarie",
+      "es": "Artes culinarias",
+      "fr": "Arts culinaires",
+      "de": "Kochkunst",
+      "pt": "Artes culinárias"
+     }
+    },
+    {
+     "key": "cultural-traditions",
+     "names": {
+      "en": "Cultural traditions",
+      "it": "Tradizioni culturali",
+      "es": "Tradiciones culturales",
+      "fr": "Traditions culturelles",
+      "de": "Kulturelle Traditionen",
+      "pt": "Tradições culturais"
+     }
+    },
+    {
+     "key": "christian-roots",
+     "names": {
+      "en": "Christian roots of Europe",
+      "it": "Radici cristiane dell'Europa",
+      "es": "Raíces cristianas de Europa",
+      "fr": "Racines chrétiennes de l'Europe",
+      "de": "Christliche Wurzeln Europas",
+      "pt": "Raízes cristãs da Europa"
+     }
+    },
+    {
+     "key": "flags",
+     "names": {
+      "en": "Flags",
+      "it": "Bandiere",
+      "es": "Banderas",
+      "fr": "Drapeaux",
+      "de": "Flaggen",
+      "pt": "Bandeiras"
+     }
+    }
+   ]
+  }
+ ],
+ "themes": [
+  {
+   "key": "love",
+   "names": {
+    "en": "Love",
+    "it": "Amore",
+    "es": "Amor",
+    "fr": "Amour",
+    "de": "Liebe",
+    "pt": "Amor"
+   }
+  },
+  {
+   "key": "forgiveness",
+   "names": {
+    "en": "Forgiveness",
+    "it": "Perdono",
+    "es": "Perdón",
+    "fr": "Pardon",
+    "de": "Vergebung",
+    "pt": "Perdão"
+   }
+  },
+  {
+   "key": "faith",
+   "names": {
+    "en": "Faith",
+    "it": "Fede",
+    "es": "Fe",
+    "fr": "Foi",
+    "de": "Glaube",
+    "pt": "Fé"
+   }
+  },
+  {
+   "key": "hope",
+   "names": {
+    "en": "Hope",
+    "it": "Speranza",
+    "es": "Esperanza",
+    "fr": "Espérance",
+    "de": "Hoffnung",
+    "pt": "Esperança"
+   }
+  },
+  {
+   "key": "virtue",
+   "names": {
+    "en": "Virtue",
+    "it": "Virtù",
+    "es": "Virtud",
+    "fr": "Vertu",
+    "de": "Tugend",
+    "pt": "Virtude"
+   }
+  },
+  {
+   "key": "redemption",
+   "names": {
+    "en": "Redemption",
+    "it": "Redenzione",
+    "es": "Redención",
+    "fr": "Rédemption",
+    "de": "Erlösung",
+    "pt": "Redenção"
+   }
+  },
+  {
+   "key": "conversion",
+   "names": {
+    "en": "Conversion",
+    "it": "Conversione",
+    "es": "Conversión",
+    "fr": "Conversion",
+    "de": "Bekehrung",
+    "pt": "Conversão"
+   }
+  },
+  {
+   "key": "repentance",
+   "names": {
+    "en": "Repentance",
+    "it": "Pentimento",
+    "es": "Arrepentimiento",
+    "fr": "Repentir",
+    "de": "Reue",
+    "pt": "Arrependimento"
+   }
+  },
+  {
+   "key": "conscience",
+   "names": {
+    "en": "Conscience",
+    "it": "Coscienza",
+    "es": "Conciencia",
+    "fr": "Conscience",
+    "de": "Gewissen",
+    "pt": "Consciência"
+   }
+  },
+  {
+   "key": "family",
+   "names": {
+    "en": "Family",
+    "it": "Famiglia",
+    "es": "Familia",
+    "fr": "Famille",
+    "de": "Familie",
+    "pt": "Família"
+   }
+  }
+ ]
+}
