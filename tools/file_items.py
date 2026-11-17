@@ -24,7 +24,7 @@ from sync.wiki import SyncError, WikiClient
 from tools import jev
 from tools.migrate_categories import _line_regex
 
-MODULE_CALL = re.compile(r"\{\{\s*SV[ _](?:infobox(?:[ _](?:work|person))?|categories)\s*(\|[^{}]*)?\}\}")
+MODULE_CALL = re.compile(r"\{\{\s*SV[ _](?:infobox(?:[ _](?:work|person))?|categories)\s*(\|(?:[^{}]|\{\{[^{}]*\}\})*)?\}\}")
 
 
 class PageFacts(NamedTuple):
@@ -84,7 +84,10 @@ def rewrite(text: str, remove: list, namespaces, has_module: bool) -> str:
                      key=lambda m: m.start())
     if not matches:
         return text
-    sortkey = next((m.group(2)[1:].strip() for m in matches if m.group(2) and m.group(2)[1:].strip()), None)
+    # the first sort key; a blank one ([[Category:X| ]], first in the category) survives as &#32;,
+    # which Module:SV/Infobox turns back into a space (template parameters are trimmed)
+    raw = next((m.group(2)[1:] for m in matches if m.group(2) and m.group(2)[1:]), None)
+    sortkey = (raw.strip() or "&#32;") if raw else None
     marker = "\x00SVCAT\x00"
     out, pos = [], 0
     for i, m in enumerate(matches):
@@ -200,6 +203,7 @@ def run(repo, clients: dict, data, types, props: dict, apply: bool, only_item: s
     node_item.update(_node_items(data))
     names_of = {n.key: n.names for n in nodes(data)}
     groups, unconnected = {}, []
+    namespaces_of = {}
     for lang, client in clients.items():
         titles = client.articles()
         linked = repo.items_for(lang, titles)  # only the repository answers wbgetentities
@@ -215,9 +219,18 @@ def run(repo, clients: dict, data, types, props: dict, apply: bool, only_item: s
         pages, namespaces = [], {}
         for lang, title in groups[item]:
             client = clients[lang]
-            revid, text = client.revision(title)
+            rev = client.revision(title)
+            if rev is None:  # deleted since it was listed
+                failed.append((lang, title, "page missing"))
+                out(f"{item}: FAILED {lang}:{title}: page missing")
+                continue
+            revid, text = rev
             pages.append(PageFacts(lang, title, revid, text, client.page_categories(title)))
-            namespaces[lang] = client.category_namespaces()
+            if lang not in namespaces_of:
+                namespaces_of[lang] = client.category_namespaces()
+            namespaces[lang] = namespaces_of[lang]
+        if not pages:
+            continue
         existing = {key: repo.item_values(item, props[key]) for key in ("sv_field", "sv_theme")}
         instance = repo.item_values(item, props["instance_of"])
         layout = layout_for(instance, types)
@@ -265,7 +278,12 @@ def run(repo, clients: dict, data, types, props: dict, apply: bool, only_item: s
             keep = {names_of[k][lang] for k in themes | fields if k == plan.field or k in themes}
             if plan.field:
                 keep.add(names_of[plan.field][lang])
-            lost = sorted(keep - clients[lang].preview_categories(title, text))
+            try:
+                lost = sorted(keep - clients[lang].preview_categories(title, text))
+            except SyncError as exc:
+                failed.append((lang, title, str(exc)))
+                out(f"{item}: FAILED {lang}:{title}: preview: {exc}")
+                continue
             if lost:
                 unsafe.append((lang, title, lost))
                 out(f"{item}: UNSAFE {lang}:{title} would lose {', '.join(lost)}; not saved")

@@ -123,7 +123,9 @@ class WikiClient:
         if createonly:
             params["createonly"] = "1"
         if baserevid is not None:
-            # refuse the save if the page changed since it was read (editconflict), never create it
+            # guard against a change since the page was read, and never create it. MediaWiki first tries a
+            # three-way merge: a change elsewhere on the page merges and is kept (no editconflict); only
+            # overlapping changes are refused. The caller's preview ran on the unmerged text.
             params["baserevid"] = baserevid
             params["nocreate"] = "1"
         result = self._dig(self._call("POST", token=self._token("csrf"), **params), "edit")

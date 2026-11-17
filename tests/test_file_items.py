@@ -385,3 +385,54 @@ def test_recorded_decision_names_the_item():
     recorded = []
     run(repo, clients, jev=Jev("television", "applied"), recorded=recorded)
     assert recorded[0].node == "Q1"
+
+
+def test_rewrite_keeps_a_one_space_sortkey():
+    out = rewrite("Intro.\n[[Category:Film| ]]", ["Film"], ["Category"], has_module=False)
+    assert out == "Intro.\n{{SV categories|sortkey=&#32;}}"
+
+
+def test_module_call_with_a_nested_template_is_detected():
+    assert fi.calls_module("{{SV categories|sortkey={{PAGENAME}}}}")
+    assert fi.calls_module("{{SV infobox|name={{lang|it|Pinocchio}}|year=1883}}")
+
+
+def test_rewrite_into_a_nested_call_does_not_add_a_second_call():
+    text = "{{SV infobox|name={{PAGENAME}}}}\nIntro.\n[[Category:Film|Zed]]"
+    out = rewrite(text, ["Film"], ["Category"], has_module=fi.calls_module(text))
+    assert out.count("{{SV ") == 1 and "|sortkey=Zed}}" in out
+
+
+def test_page_deleted_mid_run_is_reported_and_the_run_continues():
+    repo, clients = setup({"en": dict(FILM_EN, **{"Gone": ("Q2", 5, "[[Category:Music]]", set())})})
+    clients["en"].revision = lambda t, orig=clients["en"].revision: None if t == "Gone" else orig(t)
+    report = run(repo, clients)
+    assert ("en", "Gone", "page missing") in report.failed and report.edited == 1
+
+
+def test_preview_error_is_reported_and_the_run_continues():
+    repo, clients = setup({"en": dict(FILM_EN, **{"Other": ("Q2", 5, "[[Category:Music]]", set())})})
+    orig = clients["en"].preview_categories
+
+    def preview(title, text):
+        if title == "Film page":
+            raise SyncError("en: internal_api_error: boom")
+        return orig(title, text)
+    clients["en"].preview_categories = preview
+    report = run(repo, clients)
+    assert report.failed and report.failed[0][:2] == ("en", "Film page") and report.edited == 1
+
+
+def test_connected_page_without_tree_category_gets_only_the_module_call():
+    repo, clients = setup({"en": {"Plain": ("Q3", 5, "Intro.", set())}})
+    report = run(repo, clients)
+    assert [c for c in repo.calls if c[0] == "claim"] == []
+    assert clients["en"].pages["Plain"][2] == "Intro.\n\n{{SV categories}}" and report.edited == 1
+
+
+def test_namespaces_read_once_per_wiki():
+    repo, clients = setup({"en": dict(FILM_EN, **{"Other": ("Q2", 5, "[[Category:Music]]", set())})})
+    count = []
+    clients["en"].category_namespaces = lambda: count.append(1) or ["Category"]
+    run(repo, clients)
+    assert len(count) == 1

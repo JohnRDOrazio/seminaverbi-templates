@@ -299,3 +299,7 @@ def test_auto_human_is_person():
 
 def test_auto_group_layout():
     assert '<table class="sv-infobox sv-infobox-group">' in auto(["Q2404"])
+
+
+def test_sortkey_space_entity_becomes_a_space():
+    assert "[[Category:Musica| ]]" in categories(sortkey="&#32;")

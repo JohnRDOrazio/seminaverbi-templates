@@ -189,6 +189,7 @@ function p._categories(entity, lang, sortkey)
 	local data = mw.loadData('Module:SV/Data')
 	local fieldItems, themeItems = treeItems(data)
 	local out, seen, tracked = {}, {}, {}
+	sortkey = sortkey and (sortkey:gsub('&#32;', ' ')) -- a blank sort key, which template parameters cannot carry
 	local suffix = sortkey and sortkey ~= '' and ('|' .. sortkey) or ''
 	local function track(key)
 		if not tracked[key] then
