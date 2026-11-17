@@ -63,7 +63,7 @@ def _name_pattern(name: str) -> str:
 
 def _line_regex(name: str, namespaces) -> re.Pattern:
     ns = "|".join(re.escape(n) for n in sorted(namespaces, key=len, reverse=True))
-    return re.compile(r"\[\[\s*(?:" + ns + r")\s*:\s*" + _name_pattern(name) + r"\s*(\|[^\]]*)?\]\]", re.IGNORECASE)
+    return re.compile(r"\[\[\s*(" + ns + r")\s*:\s*" + _name_pattern(name) + r"\s*(\|[^\]]*)?\]\]", re.IGNORECASE)
 
 
 def refile_text(text: str, old_name: str, new_name: str, namespaces) -> tuple[str, bool]:
@@ -74,7 +74,7 @@ def refile_text(text: str, old_name: str, new_name: str, namespaces) -> tuple[st
     if _line_regex(new_name, namespaces).search(text):
         # already in the new category: drop the old line instead of duplicating it
         return re.sub(old_re.pattern + r"\n?", "", text, flags=re.IGNORECASE), True
-    return old_re.sub(lambda m: f"[[Category:{new_name}{m.group(1) or ''}]]", text), True
+    return old_re.sub(lambda m: f"[[{m.group(1)}:{new_name}{m.group(2) or ''}]]", text), True
 
 
 def _cat(name: str) -> str:

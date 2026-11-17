@@ -96,7 +96,8 @@ def run(fake, mapping, jev=None, dry_run=False):
 ])
 def test_refile_forms(line):
     text, changed = mig.refile_text(f"Intro.\n{line}\n", "Literary arts", "Literature", ["Category", "Categoria"])
-    assert changed and text == "Intro.\n[[Category:Literature]]\n"
+    prefix = "Categoria" if "Categoria" in line else "category" if "[[category" in line else "Category"
+    assert changed and text == f"Intro.\n[[{prefix}:Literature]]\n"  # the page's own namespace spelling is kept
 
 
 def test_refile_keeps_sortkey():
@@ -244,4 +245,4 @@ def test_template_keeps_localized_prefix_matching():
                                   "Template:Libro": "|romanzo=[[Categoria:Romanzo (Letteratura)]]", "Hobbit": "{{Libro}}"},
                 members={"Category:Romanzo (Letteratura)": [("Hobbit", 0)]})
     run(fake, {"Romanzo (Letteratura)": "novels"})
-    assert fake.pages["Template:Libro"] == "|romanzo=[[Category:Novels-it]]"
+    assert fake.pages["Template:Libro"] == "|romanzo=[[Categoria:Novels-it]]"
