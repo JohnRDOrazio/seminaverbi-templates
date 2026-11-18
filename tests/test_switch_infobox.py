@@ -935,11 +935,17 @@ def test_a_wiki_error_in_the_person_check_blocks_only_that_page():
     repo.entity("Q200")["claims"][P["instance_of"]] = []
     res = resolver("it", repo=repo, wikidata=wd)
 
-    def down(item):
-        raise si.SyncError("502 Bad Gateway")
-    res.wikidata_item = down
-    plan = si.plan_page(bio_page(), claims_of(repo.entity("Q200")), MAPPING, res)
-    assert plan.blocked and "502" in plan.blocked and plan.writes == []
+    def http_502():
+        response = requests.Response()
+        response.status_code = 502
+        return requests.HTTPError("502 Server Error: Bad Gateway", response=response)
+    # an API error, an HTTP error status and a timeout alike
+    for error in (si.SyncError("502 Bad Gateway"), http_502(), requests.Timeout("502: read timed out")):
+        def down(item, error=error):
+            raise error
+        res.wikidata_item = down
+        plan = si.plan_page(bio_page(), claims_of(repo.entity("Q200")), MAPPING, res)
+        assert plan.blocked and "502" in plan.blocked and plan.writes == []
 
 
 def test_the_demonym_search_runs_once_per_adjective():

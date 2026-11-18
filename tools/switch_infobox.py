@@ -650,7 +650,8 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
         # hit), so the item must be a person, by its local type or else its Wikidata item (connect_items' filter)
         try:
             why = _not_a_person(page.item, item_layout, mapping, resolver)
-        except SyncError as exc:  # the check needs the wikis: an error there fails this page only
+        except (SyncError, requests.RequestException) as exc:  # the check needs the wikis: an error there
+            # (an API answer, an HTTP error status, a timeout) fails this page only
             why = f"could not be checked for a person ({exc})"
         if why:
             return plan(item_layout or "person",
