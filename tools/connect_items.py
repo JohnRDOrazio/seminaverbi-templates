@@ -23,7 +23,8 @@ Without --apply nothing is written. With --apply, import rows need the server's 
 from its `IMPORT <wd> = <local> (mapped|created)` lines. Every newly linked item is then filed
 (tools.file_items for that item; a filing failure is reported as file-failed and the run goes on). Author
 decisions: --wd "TITLE=QID" forces the Wikidata item, --create "TITLE=description" makes a new local item
-(label: the title without its "(…)"; description in the wiki's language); write "it:TITLE…" when the title
+(label: the title without its "(…)"; description in the wiki's language; a title that contains "=" is
+written "TITLE::description", which splits at the first "::" instead of the first "="); write "it:TITLE…" when the title
 is unconnected on more than one wiki.
 Credentials (with --apply): SV_EDITOR_USER / SV_EDITOR_PASSWORD (a bot password).
 """
@@ -176,8 +177,10 @@ def _search_text(title: str) -> str:
     return re.sub(r"\s*\([^)]*\)\s*$", "", title) or title
 
 
-def gather(clients: dict, repo) -> tuple[list, list]:
-    """(unconnected articles with their text, items connected to any article other than the main page)."""
+def gather(clients: dict, repo, langs=None) -> tuple[list, list]:
+    """(unconnected articles with their text, items connected to any article other than the main page).
+    Every wiki's connected items count (a translation joins across all of them), but only the wikis in
+    `langs` (default: all) have their unconnected articles fetched."""
     articles, connected = [], []
     for lang, client in clients.items():
         titles = client.articles()
@@ -186,6 +189,8 @@ def gather(clients: dict, repo) -> tuple[list, list]:
         for title in titles:
             if title in linked:
                 connected.append(linked[title])
+                continue
+            if langs is not None and lang not in langs:
                 continue
             rev = client.revision(title)
             articles.append(Article(lang, title, rev[1] if rev else "", title == main, client.first_comment(title)))
@@ -234,19 +239,25 @@ def plan(articles: list, repo, wikidata, existing: dict, conf: dict | None = Non
             rows[n] = Connect(a.lang, a.title, "create", None, None, "author: create")
         else:
             todo.append(n)
-    hits = {}
+    # one batched lookup per Wikipedia: the pages' own titles, their interlanguage links and import summaries
+    wanted = {}
     for n in todo:
         a = articles[n]
-        if (a.lang, a.title) not in forced:
-            hits.setdefault(f"{a.lang}wiki", []).append(a.title)
-    hits = {site: wikidata.by_sitelink(site, titles) for site, titles in hits.items()}
+        if (a.lang, a.title) in forced:
+            continue
+        pairs = [(f"{a.lang}wiki", a.title), *_interlanguage(a.text)]
+        pairs += [p for p in [summary_page(a.comment)] if p]
+        for site, title in pairs:
+            wanted.setdefault(site, []).append(title)
+    hits = {site: wikidata.by_sitelink(site, list(dict.fromkeys(titles))) for site, titles in wanted.items()}
+    asked = {(site, title) for site, titles in wanted.items() for title in titles}
     wikidata.prefetch(sorted({q for found in hits.values() for q in found.values()}))
     for n in todo:
-        rows[n] = _plan_one(articles[n], repo, wikidata, existing, conf, forced, hits)
+        rows[n] = _plan_one(articles[n], repo, wikidata, existing, conf, forced, hits, asked)
     return _one_page_per_item(rows)
 
 
-def _plan_one(a: Article, repo, wikidata, existing, conf, forced, hits) -> Connect:
+def _plan_one(a: Article, repo, wikidata, existing, conf, forced, hits, asked=frozenset()) -> Connect:
     kind = page_kind(a.lang, a.text, conf)
     allowed = conf["kinds"].get(kind) if kind else None
     site = f"{a.lang}wiki"
@@ -257,11 +268,12 @@ def _plan_one(a: Article, repo, wikidata, existing, conf, forced, hits) -> Conne
     wd, source, dropped = forced.get((a.lang, a.title)), "author", []
     resolved = getattr(wikidata, "resolved", {})
 
-    def by_link(pairs, known=None):
-        """{QID: source} for Wikipedia pages (site, title); `known`: lookups already made in one batch."""
+    def by_link(pairs):
+        """{QID: source} for Wikipedia pages (site, title); lookups already made in the batch are reused."""
         found = {}
         for link_site, link_title in pairs:
-            answers = known if known is not None else wikidata.by_sitelink(link_site, [link_title])
+            answers = hits.get(link_site, {}) if (link_site, link_title) in asked \
+                else wikidata.by_sitelink(link_site, [link_title])
             q = answers.get(link_title)
             if q:
                 target = resolved.get((link_site, link_title))
@@ -269,7 +281,7 @@ def _plan_one(a: Article, repo, wikidata, existing, conf, forced, hits) -> Conne
         return found
 
     sources = [
-        lambda: by_link([(site, a.title)], hits.get(site, {})),
+        lambda: by_link([(site, a.title)]),
         lambda: {q: f"interlanguage link {src}" for q, src in by_link(_interlanguage(a.text)).items()},
         lambda: {q: f"import summary {src}" for q, src in by_link([p for p in [summary_page(a.comment)] if p]).items()},
         lambda: {q: "the page's {{Interprogetto}}/{{Collegamenti esterni}}" for q in _template_qids(a.text)},
@@ -306,7 +318,11 @@ def _plan_one(a: Article, repo, wikidata, existing, conf, forced, hits) -> Conne
     if wd in existing:
         local, sv = existing[wd]
     else:
-        local = _local_copy(repo, entity)
+        mismatches = []
+        local = _local_copy(repo, entity, wikidata, mismatches)
+        if mismatches and not local:
+            return row("author", wd, None, "the mirror's copy is not trusted: " + "; ".join(mismatches)
+                       + f" (its sitelinks belong to other Wikidata items than {wd}); confirm with --wd")
         sv = {s: t for s, t in repo.sitelinks([local]).get(local, {}).items() if s in LANGS} if local else {}
     if local and sv.get(a.lang) and sv[a.lang] != a.title:
         return row("author", wd, local, f"{local} is already linked to {a.lang}:{sv[a.lang]}")
@@ -419,6 +435,9 @@ def run(rows: list, repo, apply: bool, import_log: str | None = None, create=(),
                     fail(r, f"import {r.wd}: not in the import log")
                     continue
             elif r.action == "create" and (r.lang, r.title) in create:
+                now = repo.items_for(r.lang, [r.title]).get(r.title)
+                if now:  # linked since the plan (as _link checks before it writes)
+                    raise SyncError(f"{r.lang}:{r.title} is now linked to {now}")
                 local = repo.new_item({r.lang: _search_text(r.title)}, {r.lang: create[r.lang, r.title]},
                                       {r.lang: r.title}, tags=TAG, summary=SUMMARY)
                 out(f"{r.lang}:{r.title}: created {local}")
@@ -438,8 +457,9 @@ def run(rows: list, repo, apply: bool, import_log: str | None = None, create=(),
 
 
 def decisions(specs: list, articles: list, kind: str) -> dict:
-    """CLI author decisions -> {(lang, title): QID} (kind "qid", TITLE=QID) or {(lang, title): description}
-    (kind "description", TITLE=description)."""
+    """CLI author decisions -> {(lang, title): QID} (kind "qid", TITLE=QID, split at the last "=") or
+    {(lang, title): description} (kind "description": TITLE::description if the spec has "::", else
+    TITLE=description split at the first "=")."""
     unconnected = {(a.lang, a.title) for a in articles}
     out = {}
     for spec in specs:
@@ -448,7 +468,8 @@ def decisions(specs: list, articles: list, kind: str) -> dict:
             if not sep or not key or not QID.match(qid):
                 raise ValueError(f"expected TITLE=QID, got {spec!r}")
         else:
-            key, sep, qid = spec.partition("=")
+            # "TITLE::description" when the title holds a "="; else "TITLE=description" (first "=")
+            key, sep, qid = spec.partition("::" if "::" in spec else "=")
             qid = qid.strip()
             if not sep or not key or not qid:
                 raise ValueError(f"expected TITLE=description (the new item's description), got {spec!r}")
@@ -466,7 +487,8 @@ def main(argv=None, repo=None, clients=None, wikidata=None, classify=None, out=p
                         help="the author's Wikidata item for an article (repeatable; LANG:TITLE=QID)")
     parser.add_argument("--create", action="append", default=[], metavar="TITLE=DESCRIPTION",
                         help="create a new local item for an article, with its description in the wiki's "
-                             "language (repeatable; LANG:TITLE=DESCRIPTION)")
+                             "language (repeatable; LANG:TITLE=DESCRIPTION, split at the first '='; "
+                             "LANG:TITLE::DESCRIPTION for a title containing '=')")
     parser.add_argument("--tools-dir", default=os.environ.get("SV_TOOLS_DIR", "<tools-dir>"),
                         help="server directory holding EnrichItems.php (for the printed command)")
     args = parser.parse_args(argv)
@@ -489,7 +511,7 @@ def main(argv=None, repo=None, clients=None, wikidata=None, classify=None, out=p
                 for client in clients.values():
                     client.login(user, password)
         wikidata = wikidata or WikidataClient()
-        articles, connected = gather(clients, repo)  # every wiki: a translation joins across all of them
+        articles, connected = gather(clients, repo, langs)  # all wikis' items, only --wiki's page texts
         articles = [a for a in articles if a.lang in langs]
         try:
             forced = decisions(args.wd, articles, "qid")
@@ -517,7 +539,8 @@ def _filer(repo, clients, classify, out):
         holder = {}
 
         def classify(text):
-            holder.setdefault("client", jev.make_client())
+            if "client" not in holder:
+                holder["client"] = jev.make_client()
             return jev.classify(holder["client"], text, data)
 
     def file_item(item):

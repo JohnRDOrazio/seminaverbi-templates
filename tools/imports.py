@@ -28,14 +28,38 @@ def enrich_command(items: list, tools_dir: str) -> str:
             + " ".join(f"--item {q}" for q in items))
 
 
-def local_copy(repo, entity: dict) -> str | None:
-    """The local item mirroring a Wikidata item: the one carrying one of its Wikipedia sitelinks."""
+def local_copy(repo, entity: dict, wikidata=None, mismatches: list | None = None) -> str | None:
+    """The local item mirroring a Wikidata item: the one carrying one of its Wikipedia sitelinks.
+
+    The mirror's sitelinks can be stale (a Wikipedia page that moved to another Wikidata item since the
+    import). With `wikidata`, a candidate is trusted only if none of its other Wikipedia sitelinks now belongs
+    to a different Wikidata item; a rejected candidate is described in `mismatches` and the search goes on."""
+    qid = entity.get("id")
     for site in WIKIPEDIA:
         title = entity.get("sitelinks", {}).get(site, {}).get("title")
+        if not title:
+            continue
+        candidate = repo.items_for(site, [title]).get(title)
+        if not candidate:
+            continue
+        clash = _sitelink_clash(repo, wikidata, candidate, qid) if wikidata and qid else None
+        if clash:
+            if mismatches is not None:
+                mismatches.append(f"{candidate} carries {clash}")
+            continue
+        return candidate
+    return None
+
+
+def _sitelink_clash(repo, wikidata, candidate: str, qid: str) -> str | None:
+    """"site:Title (Qn)" for a Wikipedia sitelink of the local item that Wikidata gives to another item."""
+    links = repo.sitelinks([candidate]).get(candidate, {})
+    for site in WIKIPEDIA:
+        title = links.get(site)
         if title:
-            found = repo.items_for(site, [title])
-            if found.get(title):
-                return found[title]
+            owner = wikidata.by_sitelink(site, [title]).get(title)
+            if owner and owner != qid:
+                return f"{site}:{title} ({owner})"
     return None
 
 

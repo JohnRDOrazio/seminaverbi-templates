@@ -411,3 +411,78 @@ def test_filing_failure_is_reported_and_the_run_continues(capsys):
     assert [c[1] for c in repo.calls] == ["Q1", "Q2"] and filed == ["Q2"]
     out = capsys.readouterr().out
     assert "en:A: FILE-FAILED Q1: Jev unavailable" in out and "linked 2; file-failed 1; failed 0" in out
+
+
+def test_jev_client_is_made_once_and_only_when_used(monkeypatch):
+    from tools import file_items, jev
+    made, got = [], {}
+    monkeypatch.setattr(jev, "make_client", lambda: made.append(1) or object())
+    monkeypatch.setattr(jev, "classify", lambda client, text, data: "classified")
+    monkeypatch.setattr(file_items, "run", lambda *a, **kw: got.update(classify=kw["classify"]) or
+                        type("R", (), {"exit_code": 0})())
+    file_item = ci._filer(Repo(), {}, None, print)
+    file_item("Q1")
+    assert made == []  # no client until a page is classified
+    assert got["classify"]("a") == "classified" and got["classify"]("b") == "classified"
+    assert made == [1]
+
+
+def test_create_refuses_a_title_linked_since_the_plan(capsys):
+    repo = Repo({"Q9": {"it": "Nek"}})
+    rows = [Connect("it", "Nek", "create", None, None, "")]
+    assert ci.run(rows, repo, apply=True, create={("it", "Nek"): "cantautore"}) == 1
+    assert repo.calls == [] and "it:Nek: FAILED it:Nek is now linked to Q9" in capsys.readouterr().out
+
+
+def test_gather_fetches_text_only_for_the_wikis_used():
+    repo = Repo()
+    fetched = []
+
+    class Counting(Client):
+        def revision(self, title):
+            fetched.append((self.lang, title))
+            return super().revision(title)
+    clients = {"en": Counting("en", repo, {"A": "x"}), "it": Counting("it", repo, {"B": "y"})}
+    articles, _ = ci.gather(clients, repo, ["it"])
+    assert fetched == [("it", "B")] and [a.title for a in articles] == ["B"]
+    fetched.clear()
+    articles, _ = ci.gather(clients, repo)
+    assert sorted(fetched) == [("en", "A"), ("it", "B")]
+
+
+def test_create_spec_may_use_an_explicit_separator():
+    articles = [Article("it", "Nek", ""), Article("en", "1+1=2", "")]
+    assert ci.decisions(["it:Nek=cantautore"], articles, "description") == {("it", "Nek"): "cantautore"}
+    assert ci.decisions(["en:1+1=2::an equation, a=b"], articles, "description") == {
+        ("en", "1+1=2"): "an equation, a=b"}
+    assert ci.decisions(["it:Nek::x=y"], articles, "description") == {("it", "Nek"): "x=y"}
+    with pytest.raises(ValueError, match="description"):
+        ci.decisions(["en:1+1=2::"], articles, "description")
+
+
+def test_interlanguage_lookups_are_batched():
+    class Counting(Wikidata):
+        def __init__(self, **kw):
+            super().__init__(**kw)
+            self.calls = []
+
+        def by_sitelink(self, site, titles):
+            self.calls.append((site, list(titles)))
+            return super().by_sitelink(site, titles)
+    wd = Counting(links={("enwiki", f"E{n}"): f"Q{n}" for n in range(1, 4)},
+                  entities={f"Q{n}": ent(f"Q{n}", p31=["Q11424"]) for n in range(1, 4)})
+    arts = [Article("it", f"I{n}", FILM + f"\n[[en:E{n}]]") for n in range(1, 4)]
+    rows = plan(arts, Repo(), wd)
+    assert [(r.title, r.wd) for r in rows] == [("I1", "Q1"), ("I2", "Q2"), ("I3", "Q3")]
+    assert sorted(wd.calls) == [("enwiki", ["E1", "E2", "E3"]), ("itwiki", ["I1", "I2", "I3"])]
+
+
+def test_local_copy_whose_other_sitelink_moved_is_flagged_not_trusted():
+    # the mirror's Q47700 was copied from Q1; "Foo" has since moved to Q2 on Wikidata, "Fu" has not
+    wd = Wikidata(links={("enwiki", "Foo"): "Q2", ("itwiki", "Fu"): "Q1"},
+                  entities={"Q2": ent("Q2", sitelinks={"enwiki": "Foo"})})
+    repo = Repo({"Q47700": {"enwiki": "Foo", "itwiki": "Fu"}})
+    (row,) = plan([Article("en", "Foo", "Text.")], repo, wd)
+    assert row.action == "author" and row.wd == "Q2"
+    assert "Q47700" in row.reason and "itwiki:Fu" in row.reason and "Q1" in row.reason
+    assert repo.calls == []
