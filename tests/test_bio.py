@@ -734,3 +734,38 @@ def test_a_subclass_path_through_a_shared_ancestor_is_found_at_any_branch_order(
     ents = dict(PLACES, **{S: cls(S, A), A: cls(A, C), C: cls(C, D), D: cls(D, BUILDING),
                            BRIXTON: place(BRIXTON, "Edificio", [S], [LONDON])})
     assert bowie_at(BRIXTON, NEW_YORK, ents).startswith("David Bowie (Edificio, 8 gennaio 1947")
+
+
+def test_the_place_climb_properties_are_imported_from_wikidata():
+    # the climb reads instance of, located in and subclass of: the importer must copy their Wikidata sources
+    # (local P2016 = P31, P294 = P131, P1709 = P279 in wbs_entity_mapping)
+    import json
+    from lua_env import ROOT
+    wb = json.loads((ROOT / "config" / "wikibase.json").read_text())
+    assert (wb["instance_of"], wb["located_in"], wb["subclass_of"]) == ("P2016", "P294", "P1709")
+    imported = set((ROOT / "server" / "properties.txt").read_text().split())
+    assert {"P31", "P131", "P279"} <= imported
+
+
+def test_main_puts_the_full_stop_before_a_citation_inside_closing_markup():
+    e = env("it")
+    main = lambda rest: e.call("Module:SV/Bio", "main", e.frame({}, {"rest": rest}))
+    head = "Nek (Sassuolo, 6 gennaio 1972) è un cantautore italiano "
+    marker = "\x7f'\"`UNIQ--ref-00000001-QINU`\"'\x7f"
+    # the prose keeps its formatting; the stop goes after it and before the citation
+    assert main("''autore<ref>T.</ref>''") == head + "''autore''.<ref>T.</ref>"
+    assert main("''autore" + marker + "''") == head + "''autore''." + marker
+    # punctuation already inside: no stop added, the citation still last
+    assert main("''autore!<ref>T.</ref>''") == head + "''autore!''<ref>T.</ref>"
+    # a citation followed by more prose stays in place
+    assert main("''autore<ref>T.</ref> di canzoni''") == head + "''autore<ref>T.</ref> di canzoni''."
+
+
+def test_main_without_citations_is_linear():
+    # a long free text with no <ref: the closing-reference search must not rescan from every position
+    import time
+    e = env("it")
+    rest = "parola " * 20000
+    t = time.perf_counter()
+    e.call("Module:SV/Bio", "main", e.frame({}, {"rest": rest}))
+    assert time.perf_counter() - t < 1.0

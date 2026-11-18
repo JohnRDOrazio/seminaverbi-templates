@@ -441,34 +441,41 @@ function p.main(frame)
 		end
 	end
 	local out = p._sentence(entity, Util.lang(), text)
-	-- citations at the very end of the free text come after the full stop, as Bio places them
-	local cites = ''
+	-- From the end of the sentence, peel off citations (a <ref>, a self-closing <ref/>, or the strip marker a
+	-- parsed <ref> becomes) and closing markup (runs of apostrophes, </tag>), in whatever order they come. The
+	-- full stop goes after the prose and its formatting and before the citations, as Bio places it;
+	-- punctuation already ending the prose (inside its formatting) ends the sentence. Citations followed by
+	-- more prose stay where they are.
+	local closers, cites = '', ''
 	while true do
-		local body, cite = out:match('^(.-)(%s*\127[^\127]*\127)$')  -- a parsed <ref>: a strip marker
+		local body, piece = out:match('^(.-)(%s*\127[^\127]*\127)$')
 		if not body then
-			body, cite = out:match('^(.-)(%s*<ref[^>]-/>)$')
+			body, piece = out:match('^(.-)(%s*<ref[^>]-/>)$')
 		end
 		if not body then
-			local at = out:match('.*()<ref[%s>]')
+			-- (anchored: one scan finds the last <ref, not one scan per position)
+			local at = out:match('^.*()<ref[%s>]')
 			if at and out:sub(at):match('^<ref[^>]*>.-</ref>%s*$') and not out:sub(at + 4):find('<ref', 1, true) then
-				body, cite = out:sub(1, at - 1), out:sub(at)
+				body, piece = out:sub(1, at - 1), out:sub(at)
 			end
 		end
-		if not body then
-			break
+		if body then
+			cites = piece .. cites
+		else
+			body, piece = out:match("^(.-)(''+)$")
+			if not body then
+				body, piece = out:match('^(.-)(</%w+>)$')
+			end
+			if not body then
+				break
+			end
+			closers = piece .. closers
 		end
-		out, cites = body, cite .. cites
+		out = body
 	end
-	-- punctuation inside closing markup (''…!'', </small>) ends the sentence already
-	local tail = out
-	repeat
-		local before = tail
-		tail = tail:gsub("''+$", ''):gsub('</%w+>$', ''):gsub('%s+$', '')
-	until tail == before
-	if not (tail:match('[%.!?]$') or endsWith(tail, '…')) then
-		out = out .. '.'
-	end
-	return out .. cites .. (args.ref or '')
+	local prose = out:gsub('%s+$', '')
+	local stop = (prose:match('[%.!?]$') or endsWith(prose, '…')) and '' or '.'
+	return out .. closers .. stop .. cites .. (args.ref or '')
 end
 
 return p
