@@ -636,13 +636,9 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
         conf = templates[name]
         layout = conf["layout"]
         param, by_value = SUBKINDS.get((lang, name), (None, {}))
-        # parameter names in any case: the mapping's keys and editors' spellings differ (Genere / genere)
-        named = _named(box)
-        by_case = {p.casefold(): row for p, row in conf["params"].items()}
-        sub = next((v for p, v in named.items() if param and p.casefold() == param.casefold()), None)
-        if sub is not None:
-            layout = by_value.get(mwparserfromhell.parse(sub).strip_code().strip().lower(), layout)
-        raws += [(by_case[p.casefold()], p, v) for p, v in named.items() if p.casefold() in by_case and v.strip()]
+        if param and box.has(param):
+            layout = by_value.get(box.get(param).value.strip_code().strip().lower(), layout)
+        raws += [(conf["params"][p], p, v) for p, v in _named(box).items() if p in conf["params"] and v.strip()]
     else:
         layout = "person"
     instance_of = [dv["value"]["id"] for dv in item_claims.get(props["instance_of"], []) if dv]
