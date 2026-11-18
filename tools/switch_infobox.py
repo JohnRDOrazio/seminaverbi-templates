@@ -1109,6 +1109,17 @@ def _apply(repo, client, plan: PagePlan, mapping: dict, tree: dict, mapped: dict
         out(f"{where}: FAILED relies on {', '.join(lacking)} for statements that were not written")
         return "failed"
     present = {prop for prop, _, _ in plan.writes if prop in current}
+    if any(prop not in present for prop, _, _ in plan.writes):
+        # the statements are the planned revision's facts: an edit since then may have changed them, and a
+        # statement once written makes its row look covered on the next run (the save checks again)
+        try:
+            now = client.revision(plan.title)
+        except (SyncError, requests.RequestException) as exc:
+            out(f"{where}: FAILED reading the page before writing its statements: {exc}")
+            return "failed"
+        if now is None or now[0] != plan.revid:
+            out(f"{where}: FAILED changed since it was read; no statement written; run again")
+            return "failed"
     for prop, dv, shown in plan.writes:
         if prop in present:
             continue

@@ -959,6 +959,23 @@ def test_the_demonym_search_runs_once_per_adjective():
     assert calls == ["italiano"]
 
 
+def test_a_page_changed_after_planning_writes_no_statement(capsys):
+    repo, client = film_world()
+    read = client.revision
+    calls = []
+
+    def edited_after_the_plan(title):
+        calls.append(title)
+        if len(calls) > 1:  # an editor saved the page after it was planned
+            client.revid[title] = 11
+        return read(title)
+    client.revision = edited_after_the_plan
+    assert si.run(repo, {"en": client}, Wikidata(), MAPPING, {"en": set()}, apply=True, out=print) == 1
+    out = capsys.readouterr().out
+    assert repo.added == [] and client.edits == []
+    assert "changed since it was read" in out
+
+
 def test_bio_gate_compares_birth_and_death_facts_in_their_places():
     old = ("<p>Anna (<a>Roma</a>, 7 marzo 1908 – <a>Milano</a>, 26 settembre 1973), è stata un'<a>attrice</a> "
            "<a>italiana</a>.</p>")
