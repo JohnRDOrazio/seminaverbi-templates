@@ -10,7 +10,11 @@ ROOT = Path(__file__).resolve().parent.parent
 _PRELUDE = r"""
 local py = ...
 local cache = {}
-mw = { text = {}, ustring = string, wikibase = {}, language = {}, title = {} }
+mw = { text = {}, ustring = {}, wikibase = {}, language = {}, title = {} }
+-- mw.ustring is byte-based here except for the case and substring functions, which are
+-- Unicode-aware as in Scribunto (so tests catch ASCII-only %l / lower checks).
+for k, v in pairs(string) do mw.ustring[k] = v end
+mw.ustring.lower, mw.ustring.upper, mw.ustring.sub = py.ulower, py.uupper, py.usub
 function mw.text.trim(s) return (tostring(s):gsub('^%s+', ''):gsub('%s+$', '')) end
 local function load(name)
     if cache[name] == nil then
@@ -74,6 +78,9 @@ class LuaEnv:
             "lang": lang,
             "page_title": page_title,
             "page_entity": page_entity,
+            "ulower": lambda x: x.lower(),
+            "uupper": lambda x: x.upper(),
+            "usub": lambda x, i, j=-1: x[(i - 1 if i > 0 else max(len(x) + i, 0)):(len(x) + j + 1 if j < 0 else j)],
             "data": self._load_data,
             "source": self._source,
             "entity": lambda i: table(self.entities[i], recursive=True) if i in self.entities else None,

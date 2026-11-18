@@ -286,6 +286,9 @@ def test_demonym_fr():
 def test_demonym_de():
     assert nationality("de", ["italienisch", "Italiener"]) == "italienischer"
     assert nationality("de", ["italienisch"], True) == "italienische"
+    # a non-ASCII initial is still lowercase
+    assert nationality("de", ["österreichisch"]) == "österreichischer"
+    assert nationality("de", ["Österreichisch"]) is None
     # a noun (Italiener) is not an adjective
     assert nationality("de", ["Italiener", "Italienerin"]) is None
 

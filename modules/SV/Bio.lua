@@ -141,7 +141,8 @@ end
 -- A German demonym usable as an adjective: lowercase (after any hyphen) and ending in -sch.
 local function germanAdjective(w)
 	local last = w:match('([^-]*)$')
-	return endsWith(w, 'sch') and last:sub(1, 1):match('%l') ~= nil
+	local first = mw.ustring.sub(last, 1, 1)
+	return endsWith(w, 'sch') and first ~= '' and mw.ustring.lower(first) == first and mw.ustring.upper(first) ~= first
 end
 
 -- The nationality adjective agreeing with the person, from the country's demonym values in lang,
