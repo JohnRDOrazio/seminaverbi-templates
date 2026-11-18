@@ -177,13 +177,20 @@ function p._render(kind, args, ctx)
 		-- A tag returned as a string is shown as text; it has to go through extensionTag.
 		ctx.frame:extensionTag('templatestyles', '', { src = 'SV infobox/styles.css' }),
 		'<table class="sv-infobox sv-infobox-' .. infoboxType .. '">',
-		'<caption>' .. caption .. '</caption>',
+		'<caption><span class="sv-infobox-kind">' .. Util.msg('infobox_kind_' .. infoboxType, lang)
+			.. '</span>' .. caption .. '</caption>',
 	}
 	if image then
 		out[#out + 1] = '<tr><td colspan="2" class="sv-infobox-image">' .. image .. '</td></tr>'
 	end
 	for _, r in ipairs(rows) do
 		out[#out + 1] = r
+	end
+	if entity and id then
+		-- Where the facts come from: the item on the repository wiki (en), reached by interwiki elsewhere.
+		local target = (lang == 'en' and '' or 'seminaverbi:') .. 'Item:' .. id
+		out[#out + 1] = '<tr><td colspan="2" class="sv-infobox-source">'
+			.. Util.msg('infobox_source', lang, '[[' .. target .. '|' .. id .. ']]') .. '</td></tr>'
 	end
 	out[#out + 1] = '</table>'
 	if not entity or fromItem == 0 then

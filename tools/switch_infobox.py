@@ -809,9 +809,12 @@ def infobox_rows(rendered: str) -> list[str]:
         return []
     body, out = m.group(1), []
     caption = re.search(r"<caption>(.*?)</caption>", body, re.S)
-    if caption:
-        out.append(f"caption: {_text(caption.group(1))}")
+    if caption:  # without the layout's name shown above the title
+        label = re.sub(r'<span class="sv-infobox-kind">.*?</span>', "", caption.group(1), flags=re.S)
+        out.append(f"caption: {_text(label)}")
     for tr in re.findall(r"<tr>(.*?)</tr>", body, re.S):
+        if "sv-infobox-source" in tr:
+            continue  # the footer naming the item, not a fact
         if "sv-infobox-image" in tr:
             f = re.search(r'href="[^"]*?File:([^"?&]+)"', tr)
             out.append(f"image: {unquote(f.group(1)).replace('_', ' ') if f else '?'}")

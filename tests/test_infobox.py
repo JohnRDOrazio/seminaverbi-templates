@@ -353,3 +353,32 @@ def test_julian_before_reform_or_coarse_shown_as_stored():
     assert row("data di pubblicazione", "1685") in julian_row("+1685-00-00T00:00:00Z", 9)
     # a Gregorian value is never converted
     assert row("data di pubblicazione", "j F Y|1685-03-21") in julian_row("+1685-03-21T00:00:00Z", model=GREGORIAN)
+
+
+def test_caption_names_the_layout_in_the_wiki_language():
+    assert '<caption><span class="sv-infobox-kind">Libro</span>Il Signore degli Anelli</caption>' in render()
+    assert '<span class="sv-infobox-kind">Book</span>' in render(lang="en")
+
+
+def test_footer_links_the_item_on_the_repository():
+    out = render()
+    assert ('<tr><td colspan="2" class="sv-infobox-source">Dati dall\'elemento '
+            '[[seminaverbi:Item:Q4178|Q4178]]</td></tr>') in out
+    assert "[[Item:Q4178|Q4178]]" in render(lang="en")
+
+
+def test_no_footer_without_an_item():
+    assert "sv-infobox-source" not in render(page_entity=None)
+
+
+def test_every_layout_has_a_kind_label_and_an_accent():
+    import json
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent
+    css = (root / "templates/SV infobox/styles.css").read_text(encoding="utf-8")
+    for layout in json.loads((root / "config/infobox.json").read_text(encoding="utf-8")):
+        assert f".sv-infobox-{layout} " in css or f".sv-infobox-{layout}," in css, layout
+        for lang in ("en", "it", "es", "fr", "de", "pt"):
+            strings = json.loads((root / f"i18n/{lang}.json").read_text(encoding="utf-8"))
+            assert strings.get(f"infobox_kind_{layout}"), (lang, layout)
+            assert "$1" in strings.get("infobox_source", ""), lang

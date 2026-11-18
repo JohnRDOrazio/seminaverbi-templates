@@ -627,6 +627,13 @@ def test_rendered_rows_read_as_text():
     assert si.infobox_rows(rendered) == ["caption: B", "cast: A, B"]
 
 
+def test_rendered_rows_skip_the_kind_label_and_the_source_footer():
+    rendered = ('<table class="sv-infobox sv-infobox-film"><caption><span class="sv-infobox-kind">Film</span>B'
+                '</caption><tbody><tr><th>cast</th><td>A</td></tr><tr><td colspan="2" class="sv-infobox-source">'
+                'Dati dall\'elemento <a href="/x">Q1</a></td></tr></tbody></table>')
+    assert si.infobox_rows(rendered) == ["caption: B", "cast: A"]
+
+
 def test_a_fact_another_page_of_the_item_writes_covers_the_row(capsys):
     # en and it share the item: the date en converts covers it's range "2015 – 2018" in the same run
     repo, en = film_world()

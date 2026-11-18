@@ -1,29 +1,200 @@
+/* SV infobox: a card with a band in the accent colour of its group of layouts
+   (music, film & TV, literature & theatre, visual arts, people, other works). */
 .sv-infobox {
 	float: right;
 	clear: right;
 	width: 22em;
 	margin: 0 0 1em 1em;
-	border: 1px solid #a2a9b1;
-	background: #f8f9fa;
+	border: 1px solid #c8ccd1;
+	border-top: 0;
+	background: #fff;
 	color: #202122;
 	font-size: 88%;
 	line-height: 1.5;
 	border-collapse: collapse;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 .sv-infobox caption {
+	padding: 0.45em 0.6em 0.5em;
+	background: #4a5563;
+	color: #fff;
 	font-size: 125%;
 	font-weight: bold;
-	padding: 0.2em;
+	line-height: 1.3;
+	text-align: center;
+	border-radius: 3px 3px 0 0;
+}
+.sv-infobox-kind {
+	display: block;
+	margin-bottom: 0.15em;
+	font-size: 64%;
+	font-weight: normal;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	opacity: 0.85;
 }
 .sv-infobox th,
 .sv-infobox td {
-	padding: 0.2em 0.4em;
+	padding: 0.35em 0.6em;
 	vertical-align: top;
 	text-align: left;
+	border-top: 1px solid #eaecf0;
+}
+.sv-infobox th {
+	width: 38%;
+	font-weight: 600;
+	background: #eef0f3;
 }
 .sv-infobox-image,
 .sv-infobox-original {
 	text-align: center;
+}
+.sv-infobox td.sv-infobox-image {
+	padding: 0.6em;
+	border-top: 0;
+}
+.sv-infobox td.sv-infobox-original {
+	font-style: italic;
+	background: #f8f9fa;
+}
+.sv-infobox td.sv-infobox-source {
+	padding: 0.3em 0.6em;
+	font-size: 85%;
+	text-align: right;
+	color: #54595d;
+	background: #f8f9fa;
+}
+
+.sv-infobox-album caption,
+.sv-infobox-song caption,
+.sv-infobox-group caption {
+	background: #6b3a75;
+}
+.sv-infobox-album th,
+.sv-infobox-song th,
+.sv-infobox-group th {
+	background: #f4ecf6;
+}
+
+.sv-infobox-film caption,
+.sv-infobox-tv caption {
+	background: #2f5d87;
+}
+.sv-infobox-film th,
+.sv-infobox-tv th {
+	background: #eaf1f7;
+}
+
+.sv-infobox-book caption,
+.sv-infobox-play caption {
+	background: #7f2735;
+}
+.sv-infobox-book th,
+.sv-infobox-play th {
+	background: #f7ebed;
+}
+
+.sv-infobox-artwork caption {
+	background: #8a6414;
+}
+.sv-infobox-artwork th {
+	background: #f8f1e1;
+}
+
+.sv-infobox-person caption {
+	background: #3f6b4b;
+}
+.sv-infobox-person th {
+	background: #ebf3ed;
+}
+
+.sv-infobox-work caption {
+	background: #4a5563;
+}
+.sv-infobox-work th {
+	background: #eef0f3;
+}
+
+/* Dark mode: the night theme, and the automatic theme on a dark system. */
+html.skin-theme-clientpref-night .sv-infobox {
+	background: #101418;
+	color: #eaecf0;
+	border-color: #3a3f45;
+}
+html.skin-theme-clientpref-night .sv-infobox caption {
+	color: #fff;
+}
+html.skin-theme-clientpref-night .sv-infobox th,
+html.skin-theme-clientpref-night .sv-infobox td {
+	border-top-color: #2a2f35;
+}
+html.skin-theme-clientpref-night .sv-infobox td.sv-infobox-original,
+html.skin-theme-clientpref-night .sv-infobox td.sv-infobox-source {
+	background: #181c21;
+	color: #a2a9b1;
+}
+html.skin-theme-clientpref-night .sv-infobox-album th,
+html.skin-theme-clientpref-night .sv-infobox-song th,
+html.skin-theme-clientpref-night .sv-infobox-group th {
+	background: #2e2431;
+}
+html.skin-theme-clientpref-night .sv-infobox-film th,
+html.skin-theme-clientpref-night .sv-infobox-tv th {
+	background: #1f2a35;
+}
+html.skin-theme-clientpref-night .sv-infobox-book th,
+html.skin-theme-clientpref-night .sv-infobox-play th {
+	background: #33221f;
+}
+html.skin-theme-clientpref-night .sv-infobox-artwork th {
+	background: #332b1c;
+}
+html.skin-theme-clientpref-night .sv-infobox-person th {
+	background: #1f2e23;
+}
+html.skin-theme-clientpref-night .sv-infobox-work th {
+	background: #25292e;
+}
+@media screen and (prefers-color-scheme: dark) {
+	html.skin-theme-clientpref-os .sv-infobox {
+		background: #101418;
+		color: #eaecf0;
+		border-color: #3a3f45;
+	}
+	html.skin-theme-clientpref-os .sv-infobox caption {
+		color: #fff;
+	}
+	html.skin-theme-clientpref-os .sv-infobox th,
+	html.skin-theme-clientpref-os .sv-infobox td {
+		border-top-color: #2a2f35;
+	}
+	html.skin-theme-clientpref-os .sv-infobox td.sv-infobox-original,
+	html.skin-theme-clientpref-os .sv-infobox td.sv-infobox-source {
+		background: #181c21;
+		color: #a2a9b1;
+	}
+	html.skin-theme-clientpref-os .sv-infobox-album th,
+	html.skin-theme-clientpref-os .sv-infobox-song th,
+	html.skin-theme-clientpref-os .sv-infobox-group th {
+		background: #2e2431;
+	}
+	html.skin-theme-clientpref-os .sv-infobox-film th,
+	html.skin-theme-clientpref-os .sv-infobox-tv th {
+		background: #1f2a35;
+	}
+	html.skin-theme-clientpref-os .sv-infobox-book th,
+	html.skin-theme-clientpref-os .sv-infobox-play th {
+		background: #33221f;
+	}
+	html.skin-theme-clientpref-os .sv-infobox-artwork th {
+		background: #332b1c;
+	}
+	html.skin-theme-clientpref-os .sv-infobox-person th {
+		background: #1f2e23;
+	}
+	html.skin-theme-clientpref-os .sv-infobox-work th {
+		background: #25292e;
+	}
 }
 @media screen and (max-width: 640px) {
 	.sv-infobox {
