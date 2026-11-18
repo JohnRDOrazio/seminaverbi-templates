@@ -23,18 +23,43 @@ local function langCode(code)
 	return code:lower()
 end
 
+-- lang/dir attributes for a language tag, '' when there is none or it is malformed.
+local function langAttrs(code)
+	return code and (' lang="' .. code .. '" dir="' .. (RTL[code:match('^%a+')] and 'rtl' or 'ltr') .. '"') or ''
+end
+
+-- The name of a language in the wiki's language, shown in small text below its version of the quote
+-- (MediaWiki's own localized names, so every wiki gets them in its language); nothing when unknown.
+local function langLabel(code, wikiLang)
+	local name = code and mw.language.fetchLanguageName(code, wikiLang) or ''
+	if name == '' then
+		return nil
+	end
+	return '<div class="sv-quote-lang">' .. Util.escape(name) .. '</div>'
+end
+
 function p.quote(frame)
 	local args = Args.get(frame)
+	local wikiLang = Util.lang()
 	if not args.text then
-		return '<strong class="error">' .. Util.msg('quote_missing_text', Util.lang()) .. '</strong>'
+		return '<strong class="error">' .. Util.msg('quote_missing_text', wikiLang) .. '</strong>'
 	end
-	local out = { '<blockquote class="sv-quote">' }
+	local out = {
+		-- A tag returned as a string is shown as text; it has to go through extensionTag.
+		frame:extensionTag('templatestyles', '', { src = 'SV quote/styles.css' }),
+		'<blockquote class="sv-quote">',
+	}
+	-- with an original, each version is labelled with its language
+	local textCode = langCode(args.text_lang)
 	if args.original then
 		local code = langCode(args.original_lang)
-		local attrs = code and (' lang="' .. code .. '" dir="' .. (RTL[code:match('^%a+')] and 'rtl' or 'ltr') .. '"') or ''
-		out[#out + 1] = '<div class="sv-quote-original"' .. attrs .. '>' .. args.original .. '</div>'
+		out[#out + 1] = '<div class="sv-quote-original"' .. langAttrs(code) .. '>' .. args.original .. '</div>'
+		out[#out + 1] = langLabel(code, wikiLang)  -- nil (no label) appends nothing
 	end
-	out[#out + 1] = '<div class="sv-quote-text">' .. args.text .. '</div>'
+	out[#out + 1] = '<div class="sv-quote-text"' .. langAttrs(textCode) .. '>' .. args.text .. '</div>'
+	if args.original then
+		out[#out + 1] = langLabel(textCode or wikiLang, wikiLang)
+	end
 	local credit = {}
 	if args.author then credit[#credit + 1] = args.author end
 	if args.source then credit[#credit + 1] = args.source end

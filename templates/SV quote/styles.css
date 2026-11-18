@@ -1,0 +1,17 @@
+/* SV quote: the language of each version, in small text below it. */
+.sv-quote-lang {
+	margin: 0.1em 0 0.6em;
+	font-size: 80%;
+	font-style: normal;
+	color: #54595d;
+}
+@media screen {
+	html.skin-theme-clientpref-night .sv-quote-lang {
+		color: #a2a9b1;
+	}
+}
+@media screen and (prefers-color-scheme: dark) {
+	html.skin-theme-clientpref-os .sv-quote-lang {
+		color: #a2a9b1;
+	}
+}

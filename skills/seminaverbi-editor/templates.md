@@ -166,6 +166,7 @@ Aliases: it: `SV citazione`, es: `SV cita textual`, fr: `SV citation`, de: `SV Z
 | `source` | the work or document; may be a link |
 | `original` | the quotation in its original language |
 | `original_lang` | language code of original (it, la, grc…) |
+| `text_lang` | language code of text when it is not the wiki's language; with original, each version is labelled below with its language, named in the wiki's language |
 
 ## SV references
 
