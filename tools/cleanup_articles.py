@@ -640,28 +640,35 @@ def _page(client, lang, title, conf, apply, tree, report, out) -> None:
         report.failed.append((lang, title, f"save: {exc}; check the page"))
         out(f"FAILED {where}: save: {exc}; check the page")
         return
-    if status == "unsafe":
-        report.unsafe.append((lang, title, status.detail))
-        return
-    if status == "failed":
-        report.failed.append((lang, title, status.detail))
+    if status != "saved":
+        (report.unsafe if status == "unsafe" else report.failed).append((lang, title, status.detail))
+        if status.saved and status.revid:  # saved, then a check failed: was a concurrent edit merged?
+            _verify(client, lang, title, status.revid, new, report, out)
         return
     if not status.revid:
         out(f"  {where}: the edit made no new revision (the page already had this text?); not counted")
         return
+    if _verify(client, lang, title, status.revid, new, report, out):
+        report.saved += 1
+        out(f"  SAVED {where} (rev {status.revid})")
+
+
+def _verify(client, lang, title, revid, new, report, out) -> bool:
+    """The text of the saved revision `revid` is `new`. A mismatch (a concurrent edit merged into the save)
+    stops the run's further writes."""
+    where = f"{lang}:{title}"
     try:
-        saved = client.revision_text(status.revid)
+        saved = client.revision_text(revid)
     except PAGE_ERRORS as exc:
         report.failed.append((lang, title, f"saved, but not verified: {exc}"))
         out(f"FAILED {where}: saved, but not verified: {exc}")
-        return
+        return False
     if saved != new:
-        report.failed.append((lang, title, f"saved text (rev {status.revid}) differs from the text sent; check it"))
-        out(f"FAILED {where}: saved text (rev {status.revid}) differs from the text sent; check it")
+        report.failed.append((lang, title, f"saved text (rev {revid}) differs from the text sent; check it"))
+        out(f"FAILED {where}: saved text (rev {revid}) differs from the text sent; check it")
         report.stopped = True
-        return
-    report.saved += 1
-    out(f"  SAVED {where} (rev {status.revid})")
+        return False
+    return True
 
 
 def main(argv=None, clients=None, out=print) -> int:

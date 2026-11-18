@@ -433,6 +433,14 @@ def test_a_saved_text_that_differs_stops_the_remaining_writes():
     assert "stopped" in lines
 
 
+def test_a_merged_save_that_lost_a_tree_category_stops_the_remaining_writes():
+    en = Client("en", {"X": (10, PAGE), "Y": (20, PAGE)})
+    en.mangle = lambda text: text.replace("[[Category:Film]]", "")
+    report, lines = run({"en": en})
+    assert len(en.edits) == 1 and report.saved == 0 and report.unsafe
+    assert "stopped" in lines
+
+
 def test_lost_tree_category_is_unsafe():
     en = Client("en", {"X": (10, PAGE)})
     en.mangle = lambda text: text.replace("[[Category:Film]]", "")
