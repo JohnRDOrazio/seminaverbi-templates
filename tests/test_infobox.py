@@ -1,20 +1,5 @@
+from claims import item, mono, text, time
 from lua_env import LuaEnv, tag
-
-
-def item(qid):
-    return {"mainsnak": {"snaktype": "value", "datavalue": {"type": "wikibase-entityid", "value": {"id": qid}}}}
-
-
-def time(iso, precision):
-    return {"mainsnak": {"snaktype": "value", "datavalue": {"type": "time", "value": {"time": iso, "precision": precision}}}}
-
-
-def text(value):
-    return {"mainsnak": {"snaktype": "value", "datavalue": {"type": "string", "value": value}}}
-
-
-def mono(t, lang):
-    return {"mainsnak": {"snaktype": "value", "datavalue": {"type": "monolingualtext", "value": {"text": t, "language": lang}}}}
 
 
 LOTR = {

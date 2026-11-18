@@ -1,5 +1,5 @@
+from claims import item, mono, novalue, somevalue, time
 from lua_env import LuaEnv
-from test_infobox import item, mono, time
 
 # Scribunto's formatDate, for the formats Module:SV/Util uses: j, F, Y and "quoted" literals.
 _FORMAT_DATE = r"""
@@ -364,14 +364,6 @@ def test_en_article_by_sound():
 def test_demonym_lone_feminine_pt():
     assert nationality("pt", ["alemã"]) is None
     assert nationality("pt", ["alemã"], True) is None
-
-
-def novalue():
-    return {"mainsnak": {"snaktype": "novalue"}}
-
-
-def somevalue():
-    return {"mainsnak": {"snaktype": "somevalue"}}
 
 
 def test_novalue_death_means_living():
