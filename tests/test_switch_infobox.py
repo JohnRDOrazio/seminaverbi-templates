@@ -343,7 +343,7 @@ def test_bio_becomes_sv_bio_with_free_text():
     assert written[P["country_of_citizenship"]] == item_dv("Q32")
     assert plan.new_text == ("{{SV infobox}}\n{{SV bio|name=Fabrizio Cristiano De André|note=noto come '''Fabrizio De "
                              "André'''|rest=, autore di [[La buona novella]]|ref=<ref>Anagrafe.</ref>}}\nTesto.")
-    assert set(plan.bio.facts) == {"Genova", "18 febbraio 1940", "cantautore", "italiano"}
+    assert plan.bio.lacks == {"death_date", "death_place"}
 
 
 def test_bio_facts_on_the_item_are_not_written():
@@ -548,3 +548,102 @@ def test_missing_image_is_dropped_not_blocking(capsys):
     si.run(repo, {"en": client}, Wikidata(), MAPPING, {"en": set()}, apply=True, out=print)
     assert "image Bloodshot poster.jpg: missing in every repository, dropped" in capsys.readouterr().out
     assert len(client.edits) == 1
+
+
+def test_a_row_the_shown_layout_lacks_is_still_written():
+    # Infobox film on an item typed as a TV series: the tv layout has no director row, the fact stays
+    repo, client = film_world()
+    repo.entity("Q100")["claims"][P["instance_of"]] = [statement(item_dv("Q6022"))]
+    plan = si.plan_page(page(FILM_TEXT), claims_of(repo.entity("Q100")), MAPPING, resolver(repo=repo, client=client))
+    assert plan.layout == "tv"
+    assert (P["director"], item_dv("Q501")) in [(p, dv) for p, dv, _ in plan.writes]
+    assert "director" not in plan.preview
+
+
+def test_a_row_the_shown_layout_lacks_is_unresolved_when_unconvertible():
+    repo, client = film_world()
+    repo.entity("Q100")["claims"][P["instance_of"]] = [statement(item_dv("Q6022"))]
+    text = FILM_TEXT.replace("[[Dave Wilson (director)|Dave Wilson]]", "Dave Wilson")
+    plan = si.plan_page(page(text), claims_of(repo.entity("Q100")), MAPPING, resolver(repo=repo, client=client))
+    assert ("director", "Dave Wilson") in plan.unresolved and plan.blocked
+
+
+def test_superscript_digits_are_not_a_date():
+    assert isinstance(si.convert("time", "{{Start date|²}}", "en", resolver()), Unresolved)
+    assert isinstance(si.convert("time", "{{Start date|2008|²}}", "en", resolver()), Unresolved)
+
+
+TV = """{{Infobox television
+| name = Fringe
+| first_aired = %s
+| released = %s
+}}
+Text."""
+
+
+def tv_plan(first, released):
+    repo = Repo([entity("Q100", ["Q6022"], {"en": "Fringe"})], {("en", "Fringe"): "Q100"})
+    return si.plan_page(page(TV % (first, released), title="Fringe", label="Fringe"),
+                        claims_of(repo.entity("Q100")), MAPPING, resolver(repo=repo))
+
+
+def test_second_value_of_a_single_row_is_tried_and_duplicates_reported(capsys):
+    plan = tv_plan("circa 2008", "{{Start date|2008|9|9}}")
+    assert plan.unresolved == [] and plan.blocked is None
+    assert [dv["value"]["time"] for _, dv, _ in plan.writes] == ["+2008-09-09T00:00:00Z"]
+    plan = tv_plan("2008", "2009")
+    assert [dv["value"]["time"] for _, dv, _ in plan.writes] == ["+2008-00-00T00:00:00Z"]
+    assert plan.duplicates == [("publication_date", "2009")]
+    si._report(plan, {}, print)
+    assert "duplicate value for publication_date, not written: 2009" in capsys.readouterr().out
+    assert tv_plan("2008", "{{Start date|2008}}").duplicates == []  # the same date twice
+    assert tv_plan("circa 2008", "about 2009").unresolved == [("publication_date", "circa 2008")]
+
+
+OLD_F = ("<p><b>Anna Magnani</b> (<a>Roma</a>, 7 marzo 1908 – <a>Roma</a>, 26 settembre 1973), è stata "
+         "un'<a>attrice</a> <a>italiana</a>.</p>")
+
+
+def test_bio_gate_compares_both_ways_with_feminine_forms():
+    lacks = set()
+    same = "<p>Anna Magnani (<a>Roma</a>, 7 marzo 1908 – <a>Roma</a>, 26 settembre 1973) è stata un'attrice italiana</p>"
+    assert si.compare_sentences(OLD_F, same, lacks) == ([], [], [])
+    # a feminine nationality the old sentence states and the new one lacks blocks
+    other = same.replace("italiana", "francese")
+    missing, extra, _ = si.compare_sentences(OLD_F, other, lacks)
+    assert missing == ["italiana"] and extra == ["francese"]
+    # an occupation the old sentence did not state is not an addition: Bio had occupations
+    more = same.replace("un'attrice italiana", "un'attrice e cantante italiana")
+    assert si.compare_sentences(OLD_F, more, lacks)[1] == ["cantante"]
+
+
+def test_bio_gate_reports_what_bio_could_not_state_as_additions():
+    old = "<p><b>Anna</b> (<a>Roma</a>, 7 marzo 1908), è un'<a>attrice</a> <a>italiana</a>.</p>"
+    new = ("<p>Anna (<a>Roma</a>, 7 marzo 1908 – <a>Milano</a>, 26 settembre 1973) è stata un'attrice "
+           "italiana</p>")
+    assert si.compare_sentences(old, new, {"death_date", "death_place"}) == ([], [], ["Milano", "26 settembre 1973"])
+    # Bio had a death place: a different one cannot be an addition
+    assert si.compare_sentences(old, new, {"death_date"})[1] == ["Milano"]
+
+
+def test_bio_with_sesso_f_passes_the_gate_on_matching_feminine_sentences(capsys):
+    text = BIO.replace("|Sesso = M", "|Sesso = F").replace("cantautore", "attrice")
+    repo, wd = bio_world()
+    repo.links["it", "Attrice"] = "Q33"
+    old = ("<p><b>F</b> (<a>Genova</a>, 18 febbraio 1940), è stata un'<a>attrice</a> <a>italiana</a>"
+           ", autore di <a>La buona novella</a>.</p>")
+
+    def render(new):
+        return lambda title, t: old if t.startswith("{{Bio") else (f"<p>{new}</p>" if t.startswith("{{SV bio")
+                                                                  else "")
+    good = ("F (<a>Genova</a>, 18 febbraio 1940) è stata un'attrice italiana, autore di "
+            "<a>La buona novella</a>")
+    client = Client("it", repo, {"Fabrizio De André": text}, render=render(good))
+    si.run(repo, {"it": client}, wd, MAPPING, {"it": set()}, apply=True, out=print)
+    assert len(client.edits) == 1
+    repo, wd = bio_world()
+    repo.links["it", "Attrice"] = "Q33"
+    client = Client("it", repo, {"Fabrizio De André": text}, render=render(good.replace("italiana", "italiano")))
+    si.run(repo, {"it": client}, wd, MAPPING, {"it": set()}, apply=True, out=print)
+    out = capsys.readouterr().out
+    assert client.edits == [] and "BLOCKED" in out and "old:" in out and "new:" in out

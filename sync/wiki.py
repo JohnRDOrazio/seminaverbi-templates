@@ -331,17 +331,14 @@ class WikiClient:
         return self._dig(entities, item)
 
     def image_source(self, name: str) -> str | None:
-        """Where the file this wiki shows as File:`name` lives: "commons" (Wikimedia Commons, also when a
-        foreign wiki's repository passes it on), "other" (local, en/it Wikipedia), or None (no such file)."""
+        """Where the file this wiki shows as File:`name` lives: "commons" (the wikimediacommons repository),
+        "other" (local, the farm's own "shared" store, en/it Wikipedia), or None (no such file)."""
         data = self._call("GET", action="query", prop="imageinfo", titles=f"File:{name}", iiprop="url")
         page = self._dig(data, "query", "pages", 0)
         repository = page.get("imagerepository")
         if not repository:
             return None
-        description = (page.get("imageinfo") or [{}])[0].get("descriptionurl", "")
-        if repository in ("shared", "wikimediacommons") or "//commons.wikimedia.org/" in description:
-            return "commons"
-        return "other"
+        return "commons" if repository == "wikimediacommons" else "other"
 
     def render(self, title: str, text: str) -> str:
         """The HTML `text` gives as page `title` (action=parse, pre-save transform applied), without saving."""

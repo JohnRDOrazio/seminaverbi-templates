@@ -10,16 +10,19 @@ property and kind). Values are converted only when unambiguous:
          Wikidata (a disambiguation or list page is refused); a name without a link is never resolved
   time   {{Film date}}, {{Start date}} and the like, ISO dates, "17 November 1999", "17 novembre 1999",
          "November 17, 1999", "November 1999", a bare year
-  image  a file a repository of the wiki holds: on Commons a statement, elsewhere (a non-free poster on
-         en.wikipedia) it stays on the call as image=; also when the statement is refused
+  image  a file a repository of the wiki holds: in the wikimediacommons repository a statement, elsewhere
+         (the farm's shared store, en/it.wikipedia) it stays on the call as image=; also when refused
   title  the original title; one equal to the item's label or the page title is the caption already
 
-A row the item already has is not written. A page is switched only when every mapped row with a value is
+A row the item already has is not written; a row the shown layout lacks is still written (the fact is
+the item's). For a one-value row the first parameter that converts wins; a differing further value is
+reported, not written. A file no repository holds is dropped and reported. A page is switched only when every mapped row with a value is
 covered (or the author accepts the loss with --accept-loss TITLE, "it:TITLE" when the title is on both
 wikis); a page with two Wikipedia infoboxes is left to the author. it.wiki's {{Bio}} becomes {{SV bio}}
 with its free text (note=, rest=, ref=; name= when Nome Cognome is not the item's label), after its facts
 (places, dates, occupations, sex, citizenship) are moved to the item; the old and the new opening
-sentences, both rendered, must state the same places, dates, occupations and nationality. A page with
+sentences, both rendered, must state the same facts both ways (link texts, dates, predicate words; what
+the new one adds where Bio had no parameter is reported as an addition, anything else blocks). A page with
 {{Bio}} and no infobox gets {{SV infobox}} too. {{SV categories}} goes away (its sortkey= moves to
 {{SV infobox}}). Pages already calling {{SV infobox}} are left alone.
 
@@ -100,7 +103,8 @@ class Page(NamedTuple):
 class BioPlan(NamedTuple):
     old: str        # the {{Bio|…}} call
     call: str       # the {{SV bio|…}} call replacing it
-    facts: list     # place names, date strings, occupations, nationality: what both sentences must state
+    lacks: set      # what Bio could not state (birth_date, birth_place, death_date, death_place, occupation,
+                    # nationality): the new sentence may add these
 
 
 class PagePlan(NamedTuple):
@@ -120,6 +124,7 @@ class PagePlan(NamedTuple):
     text: str
     covered: list = []      # props with a value on the old box that the item has already
     missing_images: list = []  # files the old box names that no repository of the wiki holds: dropped
+    duplicates: list = []   # (row, raw): a further value for a one-value row, differing from the one written
 
     @property
     def imports(self) -> list:
@@ -332,7 +337,7 @@ def _convert_time(raw: str) -> Value | Unresolved:
         ymd = values[:3]
         while ymd and not ymd[-1]:
             ymd.pop()
-        if not ymd or not all(v.isdigit() for v in ymd):
+        if not ymd or not all(v.isdecimal() and v.isascii() for v in ymd):
             return Unresolved(f"not an unambiguous date: {raw}")
         numbers = [int(v) for v in ymd] + [None] * (3 - len(ymd))
         return _time_value(numbers[0], numbers[1], numbers[2], raw)
@@ -480,7 +485,6 @@ def plan_bio(bio, bio_conf: dict, label: str | None) -> tuple[list, list, BioPla
         slot = bio_conf["free"].get(p)
         if slot and v.strip():
             free["ref" if _is_refs_only(v) else slot].append(v.strip())
-    facts = []
     bio_raws = []
     for key, params in _bio_params(bio_conf["facts"]).items():
         if key in ("birth_date", "death_date"):
@@ -489,7 +493,6 @@ def plan_bio(bio, bio_conf: dict, label: str | None) -> tuple[list, list, BioPla
             if year:
                 date = f"{day} {year}".strip()
                 bio_raws.append((key, "+".join(p for p in params if args.get(p)), date))
-                facts.append(date.replace("º", "").replace("°", ""))
             elif day:
                 bio_raws.append((key, "+".join(p for p in params if args.get(p)), day))
         elif key in ("birth_place", "death_place"):
@@ -498,12 +501,10 @@ def plan_bio(bio, bio_conf: dict, label: str | None) -> tuple[list, list, BioPla
             shown = next((args[p] for p in params if p.endswith("Alt") and args.get(p)), "") or args.get(base, "")
             if link:
                 bio_raws.append((key, base, f"[[{link}|{shown}]]" if shown and shown != link else f"[[{link}]]"))
-                facts.append(mwparserfromhell.parse(shown or link).strip_code().strip())
         elif key == "occupation":
             for p in params:
                 if args.get(p):
                     bio_raws.append((key, p, f"[[{args[p]}]]"))
-                    facts.append(args[p])
         elif key == "image":
             p = next((p for p in params if args.get(p)), None)
             if p:
@@ -519,13 +520,14 @@ def plan_bio(bio, bio_conf: dict, label: str | None) -> tuple[list, list, BioPla
             chosen += [p for p in params if p not in ("Cittadinanza", "Nazionalità") and args.get(p)]
             for p in chosen:
                 extra.append((key, p, args[p]))
-            if args.get("Nazionalità"):
-                facts.append(args["Nazionalità"])
     given = " ".join(args[p] for p in ("Nome", "Cognome") if args.get(p) and bio_conf["facts"].get(p) == "given_name")
     bio_params = {"name": given if given and given != label else ""}
     bio_params.update({slot: " ".join(values) for slot, values in free.items()})
     bio_params["note"] = re.sub(r"^\s*,\s*", "", bio_params["note"])
-    bio_plan = BioPlan(str(bio), call("SV bio", bio_params), facts)
+    stated = {key for key, _, _ in bio_raws} | {key for key, _, _ in extra}
+    lacks = {k for k in ("birth_date", "birth_place", "death_date", "death_place", "occupation", "nationality")
+             if k not in stated}
+    bio_plan = BioPlan(str(bio), call("SV bio", bio_params), lacks)
     return bio_raws, extra, bio_plan
 
 
@@ -547,7 +549,7 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
     def plan(layout, **kw):
         base = dict(lang=lang, title=page.title, item=page.item, revid=page.revid, layout=layout, writes=[],
                     unresolved=[], new_text=None, bio=None, blocked=None, params={}, preview={}, dropped=[],
-                    text=page.text, covered=[], missing_images=[])
+                    text=page.text, covered=[], missing_images=[], duplicates=[])
         base.update(kw)
         return PagePlan(**base)
 
@@ -574,8 +576,10 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
     item_layout = next((mapping["types"]["types"][q] for q in instance_of if q in mapping["types"]["types"]), None)
     # a known item type is the layout (the old box may be wider: it.wiki's {{Artista musicale}} boxes bands
     # too); an unknown one leaves the old box's layout, given as type= unless it is the default
-    layout = item_layout or layout
+    box_layout, layout = layout, item_layout or layout
     rows = {r["key"]: r for r in mapping["layouts"][layout]}
+    # a fact the old box shows belongs on the item even when the layout shown has no row for it
+    box_rows = {r["key"]: r for r in mapping["layouts"][box_layout]}
     person_rows = {r["key"]: r for r in mapping["layouts"]["person"]}
 
     extra, bio_plan = [], None  # extra: (key, param, raw) Bio facts with no infobox row (sex, citizenship)
@@ -585,7 +589,7 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
         have = {key for key, _, _ in raws}
         raws += [r for r in bio_raws if r[0] not in have]
 
-    writes, unresolved, preview, params, covered, missing = [], [], {}, {}, [], []
+    writes, unresolved, preview, params, covered, missing, duplicates = [], [], {}, {}, [], [], []
 
     def add(prop, dvs, shown):
         for dv in dvs:
@@ -595,18 +599,19 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
     by_row = {}
     for key, param, raw in raws:
         by_row.setdefault(key, []).append((param, raw))
-    order = [k for k in rows] + [k for k in person_rows if k not in rows]
+    order = list(dict.fromkeys([*rows, *box_rows, *person_rows]))
     for key in sorted(by_row, key=lambda k: order.index(k) if k in order else len(order)):
-        row = rows.get(key) or person_rows.get(key)
-        if row is None:
+        row = rows.get(key) or box_rows.get(key) or person_rows.get(key)
+        if row is None or row["prop"] not in props:
+            unresolved += [(key, clean(raw)) for _, raw in by_row[key][:1]]
             continue
         prop = props[row["prop"]]
         if prop in item_claims:
             covered.append(prop)
             continue
-        values = by_row[key] if row["kind"] == "item" else by_row[key][:1]
-        converted = []
-        for param, raw in values:
+        single = row["kind"] != "item"
+        converted, failed_raw = [], None
+        for param, raw in by_row[key]:
             if row["kind"] == "monolingual":
                 text, _ = title_text(clean(raw))
                 if text and text.casefold() in {(page.label or "").casefold(), _bare_title(page.title).casefold()}:
@@ -619,10 +624,20 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
             else:
                 value = convert(row["kind"], raw, lang, resolver)
             if isinstance(value, Unresolved):
-                unresolved.append((key, clean(raw)))
-                converted = None
-                break
+                if not single:
+                    unresolved.append((key, clean(raw)))
+                    converted = None
+                    break
+                failed_raw = failed_raw or clean(raw)
+                continue
+            if single and converted:
+                # the first value that converts wins; another one is reported when it differs
+                if value.datavalues != converted[0].datavalues or value.keep != converted[0].keep:
+                    duplicates.append((key, clean(raw)))
+                continue
             converted.append(value)
+        if single and not converted and failed_raw is not None:
+            unresolved.append((key, failed_raw))
         if not converted:
             continue
         for value in converted:
@@ -661,7 +676,7 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
     new_text = swap(page.text, set(templates), bio_name, call("SV infobox", params), bio_plan and bio_plan.call)
     return plan(layout, writes=writes, unresolved=unresolved, new_text=new_text, bio=bio_plan, blocked=blocked,
                 params=params, preview=preview, dropped=dropped, covered=list(dict.fromkeys(covered)),
-                missing_images=list(dict.fromkeys(missing)))
+                missing_images=list(dict.fromkeys(missing)), duplicates=duplicates)
 
 
 def _bio_params(facts: dict) -> dict:
@@ -709,36 +724,94 @@ def infobox_rows(rendered: str) -> list[str]:
     return out
 
 
+def _paragraph(rendered: str) -> str:
+    """The first paragraph's HTML, without references and styles."""
+    m = re.search(r"<p>(.*?)</p>", rendered, re.S)
+    p = m.group(1) if m else rendered
+    return re.sub(r"<(style|script)\b.*?</\1>|<sup\b[^>]*\breference\b.*?</sup>", "", p, flags=re.S)
+
+
 def sentence(rendered: str) -> str:
     """The first paragraph of rendered HTML as plain text."""
-    m = re.search(r"<p>(.*?)</p>", rendered, re.S)
-    return _text(m.group(1) if m else rendered)
+    return _text(_paragraph(rendered))
 
 
 def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", s.replace("º", "").replace("°", "")).strip().casefold()
 
 
-def bio_mismatch(old: str, new: str, facts: list) -> list:
-    """The facts the old sentence states and the new one does not."""
-    def states(text, fact):
-        return re.search(r"(?<!\w)" + re.escape(_norm(fact)) + r"(?!\w)", _norm(text)) is not None
-    return [f for f in facts if f and states(old, f) and not states(new, f)]
+DATE = re.compile(r"\d{1,2} (?:%s) \d{3,4}|(?<!\w)\d{3,4}(?!\w)" % "|".join(m for ms in MONTHS.values() for m in ms),
+                  re.I)
+# words of a predicate that state no fact: copulas, articles, conjunctions (all six languages)
+PREDICATE_STOP = {"stato", "stata", "una", "uno", "del", "della", "dei", "degli", "delle", "per", "and", "the",
+                  "was", "born", "died", "est", "était", "fut", "une", "des", "ist", "war", "ein", "eine", "der",
+                  "die", "das", "und", "foi", "fue", "uma", "los", "las"}
+
+
+def _clean_text(s: str) -> str:
+    return re.sub(r"\s+", " ", s.replace("º", "").replace("°", "")).strip()
+
+
+def _facts(rendered: str) -> tuple[str, list, str, set]:
+    """(plain text, facts, life-span text, link texts) of a rendered opening sentence. Facts: the link
+    texts, the date strings and the words after the life span (occupations, nationality)."""
+    p = _paragraph(rendered)
+    text = _clean_text(_text(p))
+    links = [_clean_text(_text(x)) for x in re.findall(r"<a\b[^>]*>(.*?)</a>", p, re.S)]
+    facts = [f for f in dict.fromkeys(links + [_clean_text(d) for d in DATE.findall(text)]) if f]
+    span, predicate = "", text
+    for m in re.finditer(r"\(([^()]*)\)", text):
+        if any(_states(m.group(1), f) for f in facts):
+            span, predicate = m.group(1), text[m.end():]
+            break
+    words = [w for w in re.findall(r"[^\W\d_]{3,}", predicate) if w.casefold() not in PREDICATE_STOP]
+    facts += [w for w in words if not any(w.casefold() in _norm(f).split() for f in facts)]
+    return text, list(dict.fromkeys(facts)), span, set(links)
+
+
+def _states(text: str, fact: str) -> bool:
+    return re.search(r"(?<!\w)" + re.escape(_norm(fact)) + r"(?!\w)", _norm(text)) is not None
+
+
+def compare_sentences(old_html: str, new_html: str, lacks: set) -> tuple[list, list, list]:
+    """(facts of the old sentence the new one lacks, facts of the new sentence the old one lacks that Bio
+    could have stated, facts the new one adds that Bio could not state). Facts: link texts, date strings
+    and predicate words, each looked for in the other sentence's text; a fact whose place in the sentence
+    cannot be told is never an addition."""
+    old_text, old_facts, _, _ = _facts(old_html)
+    new_text, new_facts, span, links = _facts(new_html)
+    missing = [f for f in old_facts if not _states(new_text, f)]
+    extra, additions = [], []
+    parts = re.split(r"\s[–-]\s", span) if span else []
+    for f in new_facts:
+        if _states(old_text, f):
+            continue
+        part = next((i for i, piece in enumerate(parts) if _states(piece, f)), None)
+        if part is not None:
+            end = ("birth", "death")[part] if len(parts) == 2 else "birth" if len(parts) == 1 else None
+            kind = "date" if DATE.fullmatch(f) else "place" if f in links else None
+            ok = end is not None and kind is not None and f"{end}_{kind}" in lacks
+        else:
+            ok = {"occupation", "nationality"} <= lacks
+        (additions if ok else extra).append(f)
+    return missing, extra, additions
 
 
 class BioCheck(NamedTuple):
     old: str
     new: str
-    missing: list   # facts the old sentence states and the new one does not
-    absent: bool    # {{SV bio}} is not on the wiki yet
+    missing: list    # facts the old sentence states and the new one does not
+    extra: list      # facts the new sentence states, the old one does not, though Bio could have
+    additions: list  # facts the new sentence adds that Bio had no parameter for
+    absent: bool     # {{SV bio}} is not on the wiki yet
 
 
 def check_bio(client, plan: PagePlan) -> BioCheck:
-    old = sentence(client.render(plan.title, plan.bio.old))
+    old_html = client.render(plan.title, plan.bio.old)
     rendered = client.render(plan.title, plan.bio.call)
-    new = sentence(rendered)
     absent = re.search(r'href="[^"]*SV_bio[^"]*redlink=1', rendered) is not None
-    return BioCheck(old, new, bio_mismatch(old, new, plan.bio.facts), absent)
+    missing, extra, additions = compare_sentences(old_html, rendered, plan.bio.lacks)
+    return BioCheck(sentence(old_html), sentence(rendered), missing, extra, additions, absent)
 
 
 # --- execution ---
@@ -892,11 +965,13 @@ def _apply(repo, client, plan: PagePlan, mapping: dict, tree: dict, mapped: dict
         if check.absent:
             out(f"{where}: BLOCKED {{{{SV bio}}}} is not on {plan.lang} yet (deploy the templates first)")
             return "blocked"
-        if check.missing:
-            out(f"{where}: BLOCKED the new opening sentence does not state {', '.join(check.missing)}")
+        if check.missing or check.extra:
+            out(f"{where}: BLOCKED the opening sentences differ: {_differences(check)}")
             out(f"  old: {check.old}")
             out(f"  new: {check.new}")
             return "blocked"
+        if check.additions:
+            out(f"{where}: the new opening sentence adds {', '.join(check.additions)} (Bio had no parameter)")
     keep = tree.get(plan.lang, set()) & client.page_categories(plan.title)
     status = guarded_save(client, plan.title, text, plan.revid, keep, _summary(plan.lang), out)
     if status == "saved":
@@ -912,6 +987,8 @@ def _report(plan: PagePlan, names: dict, out) -> None:
         out(f"  write {prop} {names.get(prop, '?')} = {shown}{note}")
     if plan.params.get("image"):
         out(f"  image kept on the call: {plan.params['image']}")
+    for key, raw in plan.duplicates:
+        out(f"  duplicate value for {key}, not written: {raw}")
     for name in plan.missing_images:
         out(f"  image {name}: missing in every repository, dropped")
     for key, raw in plan.dropped:
@@ -937,26 +1014,36 @@ def _show_preview(client, plan: PagePlan, mapping: dict, out) -> None:
             out(f"    {row}")
     if plan.bio:
         try:
-            old, new, missing, absent = check_bio(client, plan)
+            check = check_bio(client, plan)
         except SyncError as exc:
             out(f"  sentences failed: {exc}")
             return
-        out(f"  old sentence: {old}")
-        out(f"  new sentence: {new}")
-        if absent:
+        out(f"  old sentence: {check.old}")
+        out(f"  new sentence: {check.new}")
+        if check.absent:
             out(f"  sentence check: not possible, {{{{SV bio}}}} is not on {plan.lang} yet "
                 "(deploy the templates first)")
             return
         bio_props = {mapping["props"][k] for k in ("birth_date", "birth_place", "death_date", "death_place",
                                                      "occupation", "country_of_citizenship", "sex_or_gender")}
         pending = [w for w in plan.writes if w[0] in bio_props]
-        if not missing:
+        if check.additions:
+            out(f"  sentence check: additions Bio had no parameter for: {', '.join(check.additions)}")
+        if not check.missing and not check.extra:
             out("  sentence check: same facts")
         elif pending:
-            out(f"  sentence check: provisional, {len(pending)} statements not on the item yet; "
-                f"not stated now: {', '.join(missing)}")
+            out(f"  sentence check: provisional, {len(pending)} statements not on the item yet; {_differences(check)}")
         else:
-            out(f"  sentence check: MISMATCH, the new sentence does not state {', '.join(missing)}")
+            out(f"  sentence check: MISMATCH, {_differences(check)}")
+
+
+def _differences(check: BioCheck) -> str:
+    parts = []
+    if check.missing:
+        parts.append(f"the new sentence does not state {', '.join(check.missing)}")
+    if check.extra:
+        parts.append(f"the old sentence does not state {', '.join(check.extra)}")
+    return "; ".join(parts)
 
 
 def tree_names(data) -> dict:

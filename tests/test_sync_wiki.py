@@ -450,10 +450,14 @@ def test_first_revision_comment():
 def test_image_source_tells_commons_from_other_repositories():
     def source(page):
         return WikiClient("it", session=Recorder({"query": {"pages": [page]}})).image_source("X.jpg")
-    # a Commons file passed on by the enwiki foreign repository still lives on Commons
-    assert source({"imagerepository": "enwiki", "imageinfo": [
-        {"descriptionurl": "https://commons.wikimedia.org/wiki/File:X.jpg"}]}) == "commons"
     assert source({"imagerepository": "wikimediacommons", "imageinfo": [{}]}) == "commons"
+    # "shared" is the farm's own store (en.seminaverbi.bibleget.io/w/images), not Commons
+    assert source({"imagerepository": "shared", "imageinfo": [
+        {"descriptionurl": "https://en.seminaverbi.bibleget.io/wiki/File:X.jpg"}]}) == "other"
+    # ruling: only the wikimediacommons repository counts, whatever the description page
+    assert source({"imagerepository": "enwiki", "imageinfo": [
+        {"descriptionurl": "https://commons.wikimedia.org/wiki/File:X.jpg"}]}) == "other"
+    assert source({"imagerepository": "itwiki", "imageinfo": [{}]}) == "other"
     assert source({"imagerepository": "enwiki", "imageinfo": [
         {"descriptionurl": "https://en.wikipedia.org/wiki/File:X.jpg"}]}) == "other"
     assert source({"imagerepository": "local", "imageinfo": [{}]}) == "other"
