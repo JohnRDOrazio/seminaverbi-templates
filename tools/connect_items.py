@@ -62,6 +62,11 @@ INTERLANGUAGE = re.compile(r"^(%s)\s*:\s*(.+)$" % "|".join(LANGS))
 SUMMARY_REF = re.compile(r"(?<![\w:])(?:\[\[\s*:?\s*)?(?:wikipedia|w)\s*:\s*(?:(%s)\s*:\s*)?"
                          r"([^\[\]|#\n]+?)\s*(?:\|[^\]]*)?(?:\]\]|$)" % "|".join(LANGS), re.I)
 QID = re.compile(r"^Q\d+$")
+# what may precede the page in a whole-page import summary: "Imported from", "Importata da",
+# "3 revisions imported from" (Special:Import), … in the wikis' languages; anything else (a section, a
+# table "imported from" a page) does not name the article's own subject
+IMPORT_PREFIX = re.compile(r"(?:\d+\s+\w+\s+)?(?:import|imported|importat[aoie]|importad[ao]s?|import[ée]e?s?|"
+                           r"importiert)\s+(?:from|da|de|desde|depuis|aus|von)\s*:?", re.I)
 
 
 class Article(NamedTuple):
@@ -141,13 +146,13 @@ def describe(entity: dict, qid: str, lang: str) -> str:
 
 def summary_page(comment: str) -> tuple[str, str] | None:
     """(site, title) of the one Wikipedia page an import summary names, else None: the summary must name
-    exactly one page, and say nothing but that it was imported."""
+    exactly one page, and be the bare page or a whole-page import of it (IMPORT_PREFIX, then the page)."""
     refs = list(SUMMARY_REF.finditer(comment or ""))
     if len(refs) != 1:
         return None
     m = refs[0]
-    rest = (comment[:m.start()] + comment[m.end():]).strip()
-    if rest and ("[[" in rest or not re.search(r"import", rest, re.I)):
+    before, after = comment[:m.start()].strip(), comment[m.end():].strip()
+    if after not in ("", ".") or (before and not IMPORT_PREFIX.fullmatch(before)):
         return None
     title = m.group(2).strip().replace("_", " ")
     return (f"{(m.group(1) or 'en').lower()}wiki", title[:1].upper() + title[1:]) if title else None

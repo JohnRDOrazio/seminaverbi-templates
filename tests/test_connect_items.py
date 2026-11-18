@@ -376,6 +376,22 @@ def test_import_summary_naming_a_wikipedia_page_gives_the_item():
         assert ci.summary_page(vague) is None
 
 
+def test_import_summary_must_be_a_whole_page_import():
+    # whole-page imports, as people and Special:Import write them
+    for whole, page in (("Imported from wikipedia:it:Il miglio verde (film)", ("itwiki", "Il miglio verde (film)")),
+                        ("Importata da [[wikipedia:Pulp Fiction]]", ("enwiki", "Pulp Fiction")),
+                        ("1 revision imported from [[:wikipedia:Pulp Fiction]]", ("enwiki", "Pulp Fiction")),
+                        ("3 revisioni importate da [[w:it:Nek]].", ("itwiki", "Nek")),
+                        ("Import from w:Pulp Fiction", ("enwiki", "Pulp Fiction"))):
+        assert ci.summary_page(whole) == page, whole
+    # a summary that took only part of a page does not name the article's subject
+    for partial in ("Imported a comparison from [[wikipedia:Unrelated film]]",
+                    "Imported the plot section from [[wikipedia:Unrelated film]]",
+                    "Added a table, imported from [[wikipedia:Unrelated film]]",
+                    "Imported from [[wikipedia:Unrelated film]] (cast list only)"):
+        assert ci.summary_page(partial) is None, partial
+
+
 def test_body_wikidata_link_is_not_the_pages_item():
     wd = Wikidata(entities=GREEN_MILE)
     (row,) = plan([Article("it", "Il Miglio Verde (film)", FILM + "\nVedi [[d:Q208263]].")], Repo(), wd)
