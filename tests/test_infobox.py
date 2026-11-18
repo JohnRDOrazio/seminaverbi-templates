@@ -461,3 +461,12 @@ def test_female_form_markup_is_shown_literally():
         "Q50": {"labels": {"it": "cantautore"}, "sitelinks": {"itwiki": "Cantautore"},
                 "claims": {"P1451": [mono("canta]]utrice", "it")]}}})
     assert "[[wikipedia:it:Cantautore|canta&#93;&#93;utrice]]" in out
+
+
+def test_a_composition_has_its_own_layout_with_the_composer():
+    import json
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent
+    rows = json.loads((root / "config/infobox.json").read_text(encoding="utf-8"))["composition"]
+    assert [r["prop"] for r in rows] == ["image", "title", "composer", "lyrics_by", "publication_date", "genre"]
+    assert '<table class="sv-infobox sv-infobox-composition">' in render(type="composition")
