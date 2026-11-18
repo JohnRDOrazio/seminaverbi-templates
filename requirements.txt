@@ -1,5 +1,5 @@
-requests
-pytest
-lupa
+requests==2.34.2
+pytest==9.2.0
+lupa==2.8
 typesafe-sdk==0.7.5
-mwparserfromhell
+mwparserfromhell==0.7.2
