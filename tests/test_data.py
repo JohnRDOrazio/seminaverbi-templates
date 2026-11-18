@@ -64,3 +64,73 @@ def test_infobox_types_resolve():
     assert set(types["fit"]) <= set(layouts)
     assert {k for ks in types["fit"].values() for k in ks} <= keys
     assert {"work", "group"} <= set(layouts)
+
+
+SURVEY = {
+    "en": ["Infobox song", "Infobox television", "Infobox film", "Infobox album", "Infobox person",
+           "Infobox musical artist", "Infobox stage production", "Infobox saint", "Infobox food",
+           "Infobox musical composition", "Infobox scientist", "Infobox comics species and title",
+           "Infobox software", "Infobox file format", "Infobox television episode", "Infobox book series"],
+    "it": ["Album", "Artista musicale", "Brano musicale", "FictionTV", "Film", "Personaggio", "Libro",
+           "Dramma", "Opera d'arte"],
+}
+
+
+def test_infobox_import_resolves():
+    imp = json.loads((ROOT / "config" / "infobox_import.json").read_text(encoding="utf-8"))
+    layouts = json.loads((ROOT / "config" / "infobox.json").read_text(encoding="utf-8"))
+    rows = {name: {r["key"] for r in rs} for name, rs in layouts.items()}
+    for lang, names in SURVEY.items():
+        for name in names:
+            assert name in imp["templates"][lang], f"{lang}:{name}"
+    for lang, tpls in imp["templates"].items():
+        for name, spec in tpls.items():
+            assert spec["layout"] in layouts, f"{lang}:{name}"
+            assert set(spec["params"].values()) <= rows[spec["layout"]], f"{lang}:{name}"
+    assert {"Film date", "Album ratings", "Album reviews", "Bandiera"} <= set(imp["helpers"])
+    assert set(imp["kinds"]) <= set(layouts)
+    assert all(q.startswith("Q") for qs in imp["kinds"].values() for q in qs)
+    bio = imp["bio"]["it"]
+    assert bio["template"] == "Bio"
+    assert set(bio["facts"].values()) <= rows["person"] | {"given_name", "nationality", "sex_or_gender"}
+    assert set(bio["free"].values()) <= {"note", "rest", "ref"}
+
+
+def test_bio_property_ids_present():
+    w = json.loads((ROOT / "config" / "wikibase.json").read_text(encoding="utf-8"))
+    for k in ("sex_or_gender", "country_of_citizenship", "female_form", "demonym"):
+        assert w[k].startswith("P") and w[k][1:].isdigit(), k
+    for k in ("male", "female"):
+        assert w[k].startswith("Q") and w[k][1:].isdigit(), k
+
+
+BIO_PARAMS = """Titolo Nome Cognome Pseudonimo PostPseudonimo PostCognome PostCognomeVirgola ForzaOrdinamento
+PreData Sesso LuogoNascita LuogoNascitaLink LuogoNascitaAlt GiornoMeseNascita AnnoNascita NoteNascita
+LuogoMorte LuogoMorteLink LuogoMorteAlt GiornoMeseMorte AnnoMorte NoteMorte PreAttività Epoca Epoca2
+Attività Attività2 Attività3 AttivitàAltre Nazionalità NazionalitàNaturalizzato Cittadinanza
+PostNazionalità Categorie FineIncipit Punto Immagine Didascalia Didascalia2 DimImmagine CognomePrima
+Debug""".split()
+
+
+def test_bio_params_all_accounted_for():
+    bio = json.loads((ROOT / "config" / "infobox_import.json").read_text(encoding="utf-8"))["bio"]["it"]
+    known = set(bio["facts"]) | set(bio["free"]) | set(bio["ignored"])
+    assert not set(BIO_PARAMS) - known
+    assert bio["facts"]["Sesso"] == "sex_or_gender"
+    assert all(isinstance(v, str) and v for v in bio["ignored"].values())
+    f, fr, ig = set(bio["facts"]), set(bio["free"]), set(bio["ignored"])
+    assert not f & fr and not f & ig and not fr & ig
+
+
+def test_import_helpers_and_kinds():
+    imp = json.loads((ROOT / "config" / "infobox_import.json").read_text(encoding="utf-8"))
+    assert {"Start date", "Birth date", "Birth date and age", "Death date", "Death date and age",
+            "Film date"} <= set(imp["helpers"])
+    assert {"Q207628", "Q105543609"} <= set(imp["kinds"]["song"])
+    assert {"Q7397", "Q235557"} <= set(imp["kinds"]["work"])
+
+
+def test_import_kinds_easter_and_matrix():
+    kinds = json.loads((ROOT / "config" / "infobox_import.json").read_text(encoding="utf-8"))["kinds"]
+    assert {"Q163886", "Q267726"} <= set(kinds["work"])
+    assert "Q13014087" in kinds["film"] and "Q196600" not in kinds["film"]

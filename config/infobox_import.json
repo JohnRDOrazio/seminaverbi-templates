@@ -1,0 +1,412 @@
+{
+ "templates": {
+  "en": {
+   "Infobox song": {
+    "layout": "song",
+    "params": {
+     "image": "image",
+     "name": "title",
+     "title": "title",
+     "artist": "performer",
+     "composer": "composer",
+     "lyricist": "lyrics_by",
+     "released": "publication_date",
+     "genre": "genre"
+    }
+   },
+   "Infobox musical composition": {
+    "layout": "song",
+    "params": {
+     "image": "image",
+     "name": "title",
+     "title": "title",
+     "composer": "composer",
+     "published": "publication_date",
+     "genre": "genre"
+    }
+   },
+   "Infobox album": {
+    "layout": "album",
+    "params": {
+     "image": "image",
+     "name": "title",
+     "artist": "performer",
+     "released": "publication_date",
+     "genre": "genre",
+     "label": "record_label"
+    }
+   },
+   "Infobox film": {
+    "layout": "film",
+    "params": {
+     "image": "image",
+     "name": "title",
+     "director": "director",
+     "directors": "director",
+     "writer": "screenwriter",
+     "writers": "screenwriter",
+     "screenplay": "screenwriter",
+     "starring": "cast",
+     "released": "publication_date",
+     "language": "original_language_film",
+     "country": "country_of_origin"
+    }
+   },
+   "Infobox television": {
+    "layout": "tv",
+    "params": {
+     "image": "image",
+     "name": "title",
+     "creator": "creator",
+     "starring": "cast",
+     "language": "original_language_film",
+     "country": "country_of_origin",
+     "genre": "genre",
+     "first_aired": "publication_date",
+     "released": "publication_date"
+    }
+   },
+   "Infobox television episode": {
+    "layout": "tv",
+    "params": {
+     "image": "image",
+     "title": "title",
+     "airdate": "publication_date",
+     "release_date": "publication_date"
+    }
+   },
+   "Infobox person": {
+    "layout": "person",
+    "params": {
+     "occupation": "occupation",
+     "image": "image",
+     "birth_date": "birth_date",
+     "birth_place": "birth_place",
+     "death_date": "death_date",
+     "death_place": "death_place"
+    }
+   },
+   "Infobox musical artist": {
+    "layout": "person",
+    "params": {
+     "occupation": "occupation",
+     "occupations": "occupation",
+     "image": "image",
+     "birth_date": "birth_date",
+     "birth_place": "birth_place",
+     "death_date": "death_date",
+     "death_place": "death_place"
+    }
+   },
+   "Infobox saint": {
+    "layout": "person",
+    "params": {
+     "image": "image",
+     "birth_date": "birth_date",
+     "birth_place": "birth_place",
+     "death_date": "death_date",
+     "death_place": "death_place"
+    }
+   },
+   "Infobox scientist": {
+    "layout": "person",
+    "params": {
+     "image": "image",
+     "birth_date": "birth_date",
+     "birth_place": "birth_place",
+     "death_date": "death_date",
+     "death_place": "death_place"
+    }
+   },
+   "Infobox stage production": {
+    "layout": "play",
+    "params": {
+     "image": "image",
+     "name": "title",
+     "genre": "genre",
+     "premiere": "publication_date"
+    }
+   },
+   "Infobox food": {
+    "layout": "work",
+    "params": {
+     "image": "image",
+     "name": "title",
+     "creator": "creator",
+     "creators": "creator",
+     "country": "country_of_origin"
+    }
+   },
+   "Infobox software": {
+    "layout": "work",
+    "params": {
+     "name": "title",
+     "title": "title",
+     "developer": "creator",
+     "author": "creator",
+     "released": "publication_date",
+     "genre": "genre"
+    }
+   },
+   "Infobox file format": {
+    "layout": "work",
+    "params": {
+     "name": "title",
+     "developer": "creator",
+     "released": "publication_date",
+     "genre": "genre"
+    }
+   },
+   "Infobox comics species and title": {
+    "layout": "work",
+    "params": {
+     "image": "image",
+     "title": "title",
+     "name": "title",
+     "creators": "creator",
+     "genre": "genre"
+    }
+   },
+   "Infobox book series": {
+    "layout": "book",
+    "params": {
+     "image": "image",
+     "name": "title",
+     "author": "author",
+     "language": "original_language_work",
+     "country": "country_of_origin",
+     "genre": "genre",
+     "pub_date": "publication_date",
+     "followed_by": "followed_by",
+     "preceded_by": "follows",
+     "followed by": "followed_by",
+     "preceded by": "follows"
+    }
+   }
+  },
+  "it": {
+   "Album": {
+    "layout": "album",
+    "params": {
+     "immagine": "image",
+     "titolo": "title",
+     "artista": "performer",
+     "anno": "publication_date",
+     "genere": "genre",
+     "etichetta": "record_label"
+    }
+   },
+   "Artista musicale": {
+    "layout": "person",
+    "params": {
+     "immagine": "image"
+    }
+   },
+   "Brano musicale": {
+    "layout": "song",
+    "params": {
+     "immagine": "image",
+     "titolo": "title",
+     "artista": "performer",
+     "autore": "composer",
+     "anno": "publication_date",
+     "genere": "genre"
+    }
+   },
+   "FictionTV": {
+    "layout": "tv",
+    "params": {
+     "immagine": "image",
+     "titolo originale": "title",
+     "ideatore": "creator",
+     "attori": "cast",
+     "lingua originale": "original_language_film",
+     "anno prima visione": "publication_date",
+     "inizio prima visione": "publication_date"
+    }
+   },
+   "Film": {
+    "layout": "film",
+    "params": {
+     "immagine": "image",
+     "titolo originale": "title",
+     "regista": "director",
+     "sceneggiatore": "screenwriter",
+     "attori": "cast",
+     "anno uscita": "publication_date",
+     "lingua originale": "original_language_film",
+     "paese": "country_of_origin"
+    }
+   },
+   "Personaggio": {
+    "layout": "work",
+    "params": {
+     "immagine": "image",
+     "nome": "title",
+     "autore 2": "creator",
+     "prima apparizione": "publication_date"
+    }
+   },
+   "Libro": {
+    "layout": "book",
+    "params": {
+     "immagine": "image",
+     "titolo": "title",
+     "autore": "author",
+     "lingua": "original_language_work",
+     "genere": "genre",
+     "preceduto": "follows",
+     "seguito": "followed_by"
+    }
+   },
+   "Dramma": {
+    "layout": "play",
+    "params": {
+     "Immagine": "image",
+     "Titolooriginale": "title",
+     "Genere": "genre",
+     "Linguaoriginale": "original_language_work",
+     "Primapubblicazione": "publication_date"
+    }
+   },
+   "Opera d'arte": {
+    "layout": "artwork",
+    "params": {
+     "immagine": "image",
+     "titolo": "title",
+     "artista": "creator",
+     "data": "inception"
+    }
+   }
+  }
+ },
+ "helpers": [
+  "Film date",
+  "Start date",
+  "Start date and age",
+  "End date",
+  "Birth date",
+  "Birth date and age",
+  "Birth-date",
+  "Death date",
+  "Death date and age",
+  "Death-date",
+  "Release date",
+  "Album ratings",
+  "Album reviews",
+  "Bandiera",
+  "Plainlist",
+  "Flatlist",
+  "Unbulleted list",
+  "Hlist",
+  "Nowrap"
+ ],
+ "kinds": {
+  "song": [
+   "Q7366",
+   "Q134556",
+   "Q207628",
+   "Q105543609"
+  ],
+  "album": [
+   "Q482994"
+  ],
+  "film": [
+   "Q11424",
+   "Q24856",
+   "Q13014087"
+  ],
+  "tv": [
+   "Q5398426",
+   "Q21191270",
+   "Q21664088"
+  ],
+  "book": [
+   "Q7725634",
+   "Q571",
+   "Q8261",
+   "Q277759"
+  ],
+  "person": [
+   "Q5"
+  ],
+  "group": [
+   "Q215380",
+   "Q5741069"
+  ],
+  "play": [
+   "Q25379"
+  ],
+  "artwork": [
+   "Q838948",
+   "Q3305213",
+   "Q1278452",
+   "Q11801536"
+  ],
+  "work": [
+   "Q17537576",
+   "Q2095",
+   "Q7397",
+   "Q235557",
+   "Q717040",
+   "Q167270",
+   "Q431289",
+   "Q163886",
+   "Q267726",
+   "Q10647926"
+  ]
+ },
+ "bio": {
+  "it": {
+   "template": "Bio",
+   "facts": {
+    "Nome": "given_name",
+    "Nazionalità": "nationality",
+    "LuogoNascita": "birth_place",
+    "GiornoMeseNascita": "birth_date",
+    "AnnoNascita": "birth_date",
+    "LuogoMorte": "death_place",
+    "GiornoMeseMorte": "death_date",
+    "AnnoMorte": "death_date",
+    "Attività": "occupation",
+    "Attività2": "occupation",
+    "Attività3": "occupation",
+    "Immagine": "image",
+    "Cognome": "given_name",
+    "Sesso": "sex_or_gender",
+    "LuogoNascitaLink": "birth_place",
+    "LuogoNascitaAlt": "birth_place",
+    "LuogoMorteLink": "death_place",
+    "LuogoMorteAlt": "death_place",
+    "Cittadinanza": "nationality",
+    "NazionalitàNaturalizzato": "nationality"
+   },
+   "free": {
+    "AttivitàAltre": "rest",
+    "PostNazionalità": "rest",
+    "PostCognomeVirgola": "note",
+    "PostCognome": "note",
+    "PostPseudonimo": "note",
+    "NoteNascita": "note",
+    "NoteMorte": "note",
+    "PreData": "note",
+    "PreAttività": "rest",
+    "FineIncipit": "rest",
+    "Titolo": "note",
+    "Pseudonimo": "note"
+   },
+   "ignored": {
+    "ForzaOrdinamento": "sort key only",
+    "Epoca": "century tag used for categories, not a statement",
+    "Epoca2": "second century tag, categories only",
+    "Categorie": "suppresses automatic categories",
+    "Punto": "formatting flag",
+    "DimImmagine": "image size, presentation only",
+    "CognomePrima": "name-order flag",
+    "Debug": "module debug flag",
+    "Didascalia": "image caption, not part of the sentence (SV infobox shows no caption)",
+    "Didascalia2": "box under the image (awards), not part of the sentence"
+   }
+  }
+ }
+}

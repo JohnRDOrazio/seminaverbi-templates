@@ -1,20 +1,5 @@
+from claims import item, mono, text, time
 from lua_env import LuaEnv, tag
-
-
-def item(qid):
-    return {"mainsnak": {"snaktype": "value", "datavalue": {"type": "wikibase-entityid", "value": {"id": qid}}}}
-
-
-def time(iso, precision):
-    return {"mainsnak": {"snaktype": "value", "datavalue": {"type": "time", "value": {"time": iso, "precision": precision}}}}
-
-
-def text(value):
-    return {"mainsnak": {"snaktype": "value", "datavalue": {"type": "string", "value": value}}}
-
-
-def mono(t, lang):
-    return {"mainsnak": {"snaktype": "value", "datavalue": {"type": "monolingualtext", "value": {"text": t, "language": lang}}}}
 
 
 LOTR = {
@@ -109,6 +94,27 @@ def test_person():
     assert row("birth_place", "[[wikipedia:en:Eisenach|Eisenach]]") in out
 
 
+def test_person_place_climbs_to_the_town():
+    # Q3467 neighborhood, Q7267 street: classes in the place rows' "climb" list
+    person = {"Q2": {"labels": {"en": "Bowie"}, "claims": {"P818": [item("Q40")], "P915": [item("Q42")]}},
+              "Q40": {"labels": {"en": "Brixton"}, "claims": {"P2016": [item("Q3467")], "P294": [item("Q41")]}},
+              "Q41": {"labels": {"en": "London"}, "sitelinks": {"enwiki": "London"}},
+              "Q42": {"labels": {"en": "Lafayette Street"}, "claims": {"P2016": [item("Q7267")]}}}
+    out = render(kind="person", lang="en", page_entity="Q2", entities=person)
+    assert row("birth_place", "[[wikipedia:en:London|London]]") in out
+    # no located-in statement: the place as stored
+    assert row("death_place", "Lafayette Street") in out
+
+
+def test_two_places_climbing_to_one_town_show_it_once():
+    person = {"Q2": {"labels": {"en": "X"}, "claims": {"P818": [item("Q40"), item("Q43")]}},
+              "Q40": {"labels": {"en": "Brixton"}, "claims": {"P2016": [item("Q3467")], "P294": [item("Q41")]}},
+              "Q43": {"labels": {"en": "Soho"}, "claims": {"P2016": [item("Q3467")], "P294": [item("Q41")]}},
+              "Q41": {"labels": {"en": "London"}, "sitelinks": {"enwiki": "London"}}}
+    out = render(kind="person", lang="en", page_entity="Q2", entities=person)
+    assert row("birth_place", "[[wikipedia:en:London|London]]") in out
+
+
 def test_values_are_escaped():
     evil = {"Q5": {"labels": {"en": 'A <b>"x"'}, "claims": {"P3990": [item("Q6")]}}, "Q6": {"labels": {"en": "<i>y"}}}
     out = render(lang="en", page_entity="Q5", entities=evil)
@@ -175,6 +181,15 @@ def test_decade_century_millennium():
     assert row(label, "14th century") in out
     out, label = date_row("+2000-00-00T00:00:00Z", 6)
     assert row(label, "II millennio") in out
+
+
+def test_day_format_per_language():
+    out, label = date_row("+1954-07-29T00:00:00Z", 11, lang="de")
+    assert row(label, "j. F Y|1954-07-29") in out
+    out, label = date_row("+1954-07-29T00:00:00Z", 11, lang="es")
+    assert row(label, 'j "de" F "de" Y|1954-07-29') in out
+    out, label = date_row("+1954-07-00T00:00:00Z", 10, lang="es")
+    assert row(label, 'F "de" Y|1954-07-01') in out
 
 
 def test_bc_century():
@@ -305,3 +320,99 @@ def test_auto_group_layout():
 
 def test_sortkey_space_entity_becomes_a_space():
     assert "[[Category:Musica| ]]" in categories(sortkey="&#32;")
+
+
+def test_person_occupation_capped_at_three():
+    # David Bowie's item has 22 occupations: the row shows the first three, in item order
+    jobs = {f"Q{n}": {"labels": {"en": f"job{n}"}} for n in range(300, 305)}
+    person = {"Q2": {"labels": {"en": "Bowie"}, "claims": {"P63": [item(q) for q in jobs]}}, **jobs}
+    out = render(kind="person", lang="en", page_entity="Q2", entities=person)
+    assert row("occupation", "job300, job301, job302") in out
+    assert "job303" not in out
+
+
+JULIAN = "http://www.wikidata.org/entity/Q1985786"
+GREGORIAN = "http://www.wikidata.org/entity/Q1985727"
+
+
+def cal_time(iso, precision, model):
+    statement = time(iso, precision)
+    statement["mainsnak"]["datavalue"]["value"]["calendarmodel"] = model
+    return statement
+
+
+def julian_row(iso, precision=11, model=JULIAN):
+    out = render(entities=with_claims(P4788=[cal_time(iso, precision, model)]))
+    return out
+
+
+def test_julian_day_after_reform_shown_gregorian():
+    # Bach's preferred birth date on the local item: +1685-03-21 in the Julian calendar = 31 March 1685
+    assert row("data di pubblicazione", "j F Y|1685-03-31") in julian_row("+1685-03-21T00:00:00Z")
+    # from the stored Julian date 1582-10-15 on, and a month rollover across a Julian-only leap day
+    assert row("data di pubblicazione", "j F Y|1582-10-25") in julian_row("+1582-10-15T00:00:00Z")
+    assert row("data di pubblicazione", "j F Y|1700-03-11") in julian_row("+1700-02-29T00:00:00Z")
+    assert row("data di pubblicazione", "j F Y|1918-01-14") in julian_row("+1918-01-01T00:00:00Z")
+
+
+def test_julian_before_reform_or_coarse_shown_as_stored():
+    assert row("data di pubblicazione", "j F Y|1300-03-12") in julian_row("+1300-03-12T00:00:00Z")
+    assert row("data di pubblicazione", "j F Y|1582-10-14") in julian_row("+1582-10-14T00:00:00Z")
+    assert row("data di pubblicazione", "F Y|1685-03-01") in julian_row("+1685-03-00T00:00:00Z", 10)
+    assert row("data di pubblicazione", "1685") in julian_row("+1685-00-00T00:00:00Z", 9)
+    # a Gregorian value is never converted
+    assert row("data di pubblicazione", "j F Y|1685-03-21") in julian_row("+1685-03-21T00:00:00Z", model=GREGORIAN)
+
+
+def test_caption_names_the_layout_in_the_wiki_language():
+    assert '<caption><span class="sv-infobox-kind">Libro</span>Il Signore degli Anelli</caption>' in render()
+    assert '<span class="sv-infobox-kind">Book</span>' in render(lang="en")
+
+
+def test_footer_links_the_item_on_the_repository():
+    out = render()
+    assert ('<tr><td colspan="2" class="sv-infobox-source">Dati dall\'elemento '
+            '[[seminaverbi:Item:Q4178|Q4178]]</td></tr>') in out
+    assert "[[Item:Q4178|Q4178]]" in render(lang="en")
+
+
+def test_no_footer_without_an_item():
+    assert "sv-infobox-source" not in render(page_entity=None)
+
+
+def test_every_layout_has_a_kind_label_and_an_accent():
+    import json
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent
+    css = (root / "templates/SV infobox/styles.css").read_text(encoding="utf-8")
+    for layout in json.loads((root / "config/infobox.json").read_text(encoding="utf-8")):
+        assert f".sv-infobox-{layout} " in css or f".sv-infobox-{layout}," in css, layout
+        for lang in ("en", "it", "es", "fr", "de", "pt"):
+            strings = json.loads((root / f"i18n/{lang}.json").read_text(encoding="utf-8"))
+            assert strings.get(f"infobox_kind_{layout}"), (lang, layout)
+            assert "$1" in strings.get("infobox_source", ""), lang
+
+
+def test_an_unknown_or_wrong_case_type_shows_no_message_key():
+    out = render(type="Romanzo")
+    assert "infobox_kind_" not in out and '<table class="sv-infobox sv-infobox-book">' in out
+    assert '<table class="sv-infobox sv-infobox-film">' in render(type="Film")
+
+
+def _luminance(hex_colour):
+    channels = [int(hex_colour[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    lin = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in channels]
+    return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
+
+
+def test_white_on_every_band_colour_meets_wcag_aa_and_the_kind_label_is_not_dimmed():
+    import re
+    from pathlib import Path
+    css = (Path(__file__).resolve().parent.parent / "templates/SV infobox/styles.css").read_text(encoding="utf-8")
+    kind = re.search(r"\.sv-infobox-kind\s*\{([^}]*)\}", css).group(1)
+    # opacity lowers the white label's contrast on the band; hierarchy comes from size and spacing
+    assert "opacity" not in kind
+    bands = set(re.findall(r"caption\s*\{[^}]*?background:\s*(#[0-9a-fA-F]{6})", css))
+    assert len(bands) >= 6
+    for band in bands:
+        assert 1.05 / (_luminance(band) + 0.05) >= 4.5, band

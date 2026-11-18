@@ -395,3 +395,99 @@ def test_revision_categories_parses_that_revision():
     assert WikiClient("it", session=s).revision_categories(42) == {"Arti dello spettacolo"}
     params = s.calls[0][1]
     assert params["action"] == "parse" and params["oldid"] == 42 and params["prop"] == "categories"
+
+
+def test_add_claim_params():
+    s = Recorder(CSRF, {"success": 1, "claim": {"id": "Q5$y"}})
+    datavalue = {"type": "time", "value": {"time": "+1947-01-08T00:00:00Z", "precision": 11}}
+    WikiClient("en", session=s).add_claim("Q5", "P4712", datavalue, tags="seminaverbi-mcp", summary="s")
+    params = s.calls[-1][1]
+    assert (params["action"], params["entity"], params["property"], params["snaktype"]) == (
+        "wbcreateclaim", "Q5", "P4712", "value")
+    assert params["value"] == '{"time": "+1947-01-08T00:00:00Z", "precision": 11}'
+    assert params["bot"] == "1" and params["tags"] == "seminaverbi-mcp" and params["summary"] == "s"
+    s = Recorder(CSRF, {"error": {"code": "invalid-snak", "info": "bad"}})
+    with pytest.raises(SyncError):
+        WikiClient("en", session=s).add_claim("Q5", "P4712", datavalue)
+
+
+def test_sitelinks_of_items_batched():
+    ids = [f"Q{n}" for n in range(1, 61)]
+    first = {"entities": {"Q1": {"id": "Q1", "sitelinks": {"en": {"site": "en", "title": "A"},
+                                                           "enwiki": {"site": "enwiki", "title": "A (x)"}}}}}
+    s = Recorder(first, {"entities": {"Q60": {"id": "Q60", "missing": ""}}})
+    assert WikiClient("en", session=s).sitelinks(ids) == {"Q1": {"en": "A", "enwiki": "A (x)"}}
+    assert len(s.calls) == 2 and s.calls[0][1]["ids"].count("|") == 49 and s.calls[0][1]["props"] == "sitelinks"
+
+
+def test_set_sitelink_sends_the_base_revision():
+    s = Recorder(CSRF, {"success": 1})
+    WikiClient("en", session=s).set_sitelink("Q42", "it", "X", baserevid=1234)
+    assert s.calls[-1][1]["baserevid"] == 1234
+    s = Recorder(CSRF, {"success": 1})
+    WikiClient("en", session=s).set_sitelink("Q42", "it", "X")
+    assert "baserevid" not in s.calls[-1][1]
+
+
+def test_item_sitelinks_gives_the_revision_with_the_links():
+    s = Recorder({"entities": {"Q42": {"id": "Q42", "lastrevid": 77,
+                                       "sitelinks": {"it": {"site": "it", "title": "X"}}}}})
+    assert WikiClient("en", session=s).item_sitelinks("Q42") == (77, {"it": "X"})
+    assert s.calls[0][1]["props"] == "info|sitelinks" and s.calls[0][1]["ids"] == "Q42"
+
+
+def test_main_page_from_siteinfo():
+    s = Recorder({"query": {"general": {"mainpage": "Página principal"}}})
+    assert WikiClient("es", session=s).main_page() == "Página principal"
+    assert s.calls[0][1]["meta"] == "siteinfo"
+
+
+def test_sitelink_and_new_item_carry_a_summary():
+    s = Recorder(CSRF, {"success": 1})
+    WikiClient("en", session=s).set_sitelink("Q42", "it", "X", tags="seminaverbi-mcp", summary="Connect")
+    assert s.calls[-1][1]["summary"] == "Connect"
+    s = Recorder(CSRF, {"entity": {"id": "Q43"}})
+    assert WikiClient("en", session=s).new_item({"it": "X"}, {"it": "d"}, {"it": "X"}, summary="Connect") == "Q43"
+    assert s.calls[-1][1]["summary"] == "Connect"
+    s = Recorder(CSRF, {"success": 1})
+    WikiClient("en", session=s).set_sitelink("Q42", "it", "X")
+    assert "summary" not in s.calls[-1][1]
+
+
+def test_first_revision_comment():
+    s = Recorder({"query": {"pages": [{"title": "X", "revisions": [{"comment": "Imported"}]}]}})
+    assert WikiClient("it", session=s).first_comment("X") == "Imported"
+    p = s.calls[0][1]
+    assert (p["rvdir"], p["rvlimit"], p["rvprop"]) == ("newer", "1", "comment")
+    s = Recorder({"query": {"pages": [{"title": "X", "missing": True}]}})
+    assert WikiClient("it", session=s).first_comment("X") == ""
+
+
+def test_image_source_tells_commons_from_other_repositories():
+    def source(page):
+        return WikiClient("it", session=Recorder({"query": {"pages": [page]}})).image_source("X.jpg")
+    # Commons by the description page's host, whichever repository relays the file
+    assert source({"imagerepository": "enwiki", "imageinfo": [
+        {"descriptionurl": "https://commons.wikimedia.org/wiki/File:X.jpg"}]}) == "commons"
+    assert source({"imagerepository": "wikimediacommons", "imageinfo": [
+        {"descriptionurl": "https://commons.wikimedia.org/wiki/File:X.jpg"}]}) == "commons"
+    # "shared" is the farm's own store (en.seminaverbi.bibleget.io/w/images), not Commons
+    assert source({"imagerepository": "shared", "imageinfo": [
+        {"descriptionurl": "https://en.seminaverbi.bibleget.io/wiki/File:X.jpg"}]}) == "other"
+    assert source({"imagerepository": "itwiki", "imageinfo": [
+        {"descriptionurl": "https://it.wikipedia.org/wiki/File:X.jpg"}]}) == "other"
+    # a look-alike host is not Commons
+    assert source({"imagerepository": "enwiki", "imageinfo": [
+        {"descriptionurl": "https://commons.wikimedia.org.evil.example/wiki/File:X.jpg"}]}) == "other"
+    assert source({"imagerepository": "wikimediacommons", "imageinfo": [{}]}) == "other"
+    assert source({"imagerepository": "enwiki", "imageinfo": [
+        {"descriptionurl": "https://en.wikipedia.org/wiki/File:X.jpg"}]}) == "other"
+    assert source({"imagerepository": "local", "imageinfo": [{}]}) == "other"
+    assert source({"missing": True, "imagerepository": ""}) is None
+
+
+def test_render_parses_with_pst():
+    s = Recorder({"parse": {"text": "<p>x</p>"}})
+    assert WikiClient("en", session=s).render("T", "{{X}}") == "<p>x</p>"
+    params = s.calls[-1][1]
+    assert (params["action"], params["title"], params["text"], params["pst"]) == ("parse", "T", "{{X}}", "1")

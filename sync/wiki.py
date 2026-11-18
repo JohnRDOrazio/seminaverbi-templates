@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import time
 from typing import NamedTuple
+from urllib.parse import urlsplit
 
 import requests
 
@@ -243,16 +244,30 @@ class WikiClient:
         entities = self._dig(self._call("GET", action="wbgetentities", ids=item, props="sitelinks"), "entities")
         return self._dig(entities, item).get("sitelinks", {}).get(site, {}).get("title")
 
-    def set_sitelink(self, item: str, site: str, title: str, tags: str | None = None) -> None:
+    def item_sitelinks(self, item: str) -> tuple[int | None, dict[str, str]]:
+        """(latest revision, {site: title}) of `item`: the revision to pass as set_sitelink's baserevid."""
+        entities = self._dig(self._call("GET", action="wbgetentities", ids=item, props="info|sitelinks"),
+                             "entities")
+        entity = self._dig(entities, item)
+        links = {site: link["title"] for site, link in entity.get("sitelinks", {}).items()}
+        return entity.get("lastrevid"), links
+
+    def set_sitelink(self, item: str, site: str, title: str, tags: str | None = None,
+                     summary: str | None = None, baserevid: int | None = None) -> None:
         params = dict(action="wbsetsitelink", id=item, linksite=site, linktitle=title, bot="1")
         if tags:
             params["tags"] = tags
+        if summary:
+            params["summary"] = summary
+        if baserevid is not None:
+            # Wikibase refuses the write (editconflict) if the item changed since that revision was read
+            params["baserevid"] = baserevid
         data = self._call("POST", token=self._token("csrf"), **params)
         if not data.get("success"):
             raise SyncError(f"{self.lang}: linking {site}:{title} to {item} failed: {data}")
 
     def new_item(self, labels: dict[str, str], descriptions: dict[str, str], sitelinks: dict[str, str],
-                 tags: str | None = None) -> str:
+                 tags: str | None = None, summary: str | None = None) -> str:
         entity = {
             "labels": {lang: {"language": lang, "value": v} for lang, v in labels.items()},
             "descriptions": {lang: {"language": lang, "value": v} for lang, v in descriptions.items()},
@@ -261,6 +276,8 @@ class WikiClient:
         params = dict(action="wbeditentity", new="item", data=json.dumps(entity, ensure_ascii=False), bot="1")
         if tags:
             params["tags"] = tags
+        if summary:
+            params["summary"] = summary
         return self._dig(self._call("POST", token=self._token("csrf"), **params), "entity", "id")
 
     def new_property(self, labels: dict[str, str], descriptions: dict[str, str], datatype: str,
@@ -307,6 +324,42 @@ class WikiClient:
         if not data.get("success"):
             raise SyncError(f"{self.lang}: adding {prop}={value} to {item} failed: {data}")
 
+    def add_claim(self, item: str, prop: str, datavalue: dict, tags: str | None = None,
+                  summary: str | None = None) -> None:
+        """A statement of any datatype: `datavalue` is a Wikibase datavalue ({"type": …, "value": …})."""
+        params = dict(action="wbcreateclaim", entity=item, property=prop, snaktype="value", bot="1",
+                      value=json.dumps(datavalue["value"], ensure_ascii=False))
+        if tags:
+            params["tags"] = tags
+        if summary:
+            params["summary"] = summary
+        data = self._call("POST", token=self._token("csrf"), **params)
+        if not data.get("success"):
+            raise SyncError(f"{self.lang}: adding {prop} to {item} failed: {data}")
+
+    def entity(self, item: str) -> dict:
+        """The item's claims and labels (wbgetentities)."""
+        entities = self._dig(self._call("GET", action="wbgetentities", ids=item, props="claims|labels"), "entities")
+        return self._dig(entities, item)
+
+    def image_source(self, name: str) -> str | None:
+        """Where the file this wiki shows as File:`name` lives: "commons" when its description page is on
+        commons.wikimedia.org (the wikis relay Commons through their enwiki/itwiki foreign repositories),
+        "other" (local, the farm's own "shared" store, a file local to en/it Wikipedia), or None (no file)."""
+        data = self._call("GET", action="query", prop="imageinfo", titles=f"File:{name}", iiprop="url")
+        page = self._dig(data, "query", "pages", 0)
+        repository = page.get("imagerepository")
+        if not repository:
+            return None
+        description = (page.get("imageinfo") or [{}])[0].get("descriptionurl", "")
+        return "commons" if urlsplit(description).hostname == "commons.wikimedia.org" else "other"
+
+    def render(self, title: str, text: str) -> str:
+        """The HTML `text` gives as page `title` (action=parse, pre-save transform applied), without saving."""
+        data = self._call("POST", action="parse", title=title, text=text, prop="text", pst="1",
+                          contentmodel="wikitext", disablelimitreport="1")
+        return self._dig(data, "parse", "text")
+
     def revision(self, title: str) -> tuple[int, str] | None:
         """(latest revid, wikitext) of `title`, or None when the page does not exist."""
         data = self._call("GET", action="query", prop="revisions", titles=title, rvprop="ids|content",
@@ -316,6 +369,13 @@ class WikiClient:
             return None
         rev = self._dig(page, "revisions", 0)
         return rev["revid"], self._dig(rev, "slots", "main", "content")
+
+    def first_comment(self, title: str) -> str:
+        """Edit summary of the page's first revision ("" when the page is missing)."""
+        data = self._call("GET", action="query", prop="revisions", titles=title, rvdir="newer", rvlimit="1",
+                          rvprop="comment")
+        page = self._dig(data, "query", "pages", 0)
+        return (page.get("revisions") or [{}])[0].get("comment", "")
 
     def preview_categories(self, title: str, text: str) -> set[str]:
         """Categories `text` would give page `title` (bare names), without saving."""
@@ -360,6 +420,22 @@ class WikiClient:
                 if key.startswith("Q") and "missing" not in entity:
                     out[entity["sitelinks"][site]["title"]] = key
         return out
+
+    def sitelinks(self, items: list[str]) -> dict[str, dict[str, str]]:
+        """item -> {site: title} for the given items (50 per request); items without sitelinks are left out."""
+        out = {}
+        for i in range(0, len(items), 50):
+            entities = self._dig(self._call("GET", action="wbgetentities", ids="|".join(items[i:i + 50]),
+                                            props="sitelinks"), "entities")
+            for key, entity in entities.items():
+                links = {site: link["title"] for site, link in entity.get("sitelinks", {}).items()}
+                if links and "missing" not in entity:
+                    out[key] = links
+        return out
+
+    def main_page(self) -> str:
+        data = self._call("GET", action="query", meta="siteinfo", siprop="general")
+        return self._dig(data, "query", "general", "mainpage")
 
     def label(self, item: str, lang: str = "en") -> str | None:
         entities = self._dig(self._call("GET", action="wbgetentities", ids=item, props="labels",

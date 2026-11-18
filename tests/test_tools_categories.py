@@ -29,6 +29,7 @@ class Fake:
         self.lang, self.pages, self.article_cats = lang, dict(pages or {}), set(article_cats)
         self.items = items if items is not None else {}
         self.edits, self.sitelinks, self.new_items, self.fail_edit = [], [], [], set()
+        self.summaries = []
 
     def category_namespaces(self):
         return ["Category", "Catégorie"]
@@ -54,11 +55,13 @@ class Fake:
     def sitelink(self, item, site):
         return self.items.get(item, {}).get(site)
 
-    def set_sitelink(self, item, site, title, tags=None):
+    def set_sitelink(self, item, site, title, tags=None, summary=None):
+        self.summaries.append(summary)
         self.sitelinks.append((item, site, title, tags))
         self.items[item][site] = title
 
-    def new_item(self, labels, descriptions, sitelinks, tags=None):
+    def new_item(self, labels, descriptions, sitelinks, tags=None, summary=None):
+        self.summaries.append(summary)
         item = f"Q{100 + len(self.items)}"
         self.new_items.append((item, labels, descriptions, sitelinks, tags))
         self.items[item] = dict(sitelinks)
@@ -138,6 +141,16 @@ def test_create_new_item_when_none():
     labels, descriptions, tags = made["Category:Music-fr"]
     assert labels == names("Music") and tags == "seminaverbi-mcp"
     assert descriptions["en"] == "Semina Verbi category" and set(descriptions) == set(LANGS)
+
+
+def test_item_writes_carry_edit_summaries():
+    items = {"Q10": {"en": "Category:Music"}}
+    fr = Fake("fr", {k: v for k, v in ALL_FR.items() if k != "Category:Music-fr"}, items)
+    repo = Fake("en", items=items)
+    cat.create("fr", DATA, fr, repo, dry_run=False)
+    assert repo.sitelinks and repo.new_items  # a sitelink to an existing item, and new items
+    assert repo.summaries and all(s for s in repo.summaries)
+    assert cat.LINK_SUMMARY in repo.summaries and cat.ITEM_SUMMARY in repo.summaries
 
 
 def test_create_conflict():

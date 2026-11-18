@@ -38,13 +38,25 @@ Aliases: it: `SV lavori in corso`, es: `SV en desarrollo`, fr: `SV en travaux`, 
 | `user` | who is working on it |
 | `date` | since when |
 
+## SV bio
+
+The opening sentence of a biography, written from the page's Wikibase item in the wiki's language: name, birth and death places and dates, occupation and nationality agreeing with the person's sex or gender. Adds no categories; missing facts are left out.
+
+| parameter | meaning |
+|---|---|
+| `item` | a Wikibase item ID to use instead of the page's own item (needed when the page is not connected to one) |
+| `name` | the name to show instead of the item's label (e.g. a fuller form) |
+| `note` | free text after the name, e.g. "pseudonimo di Filippo Neviani" |
+| `rest` | free text continuing the sentence after the occupation (starts with a comma or a word) |
+| `ref` | references, appended verbatim at the end |
+
 ## SV categories
 
 Files the page under its Wikibase item's SV field and SV Gospel theme categories, in the wiki's language. Use it on pages without an SV infobox; every SV infobox outputs the same categories.
 
 | parameter | meaning |
 |---|---|
-| `item` | a Wikibase item ID, when the page is not connected to one |
+| `item` | a Wikibase item ID to use instead of the page's own item (needed when the page is not connected to one) |
 | `sortkey` | sort key for the categories (e.g. the title without its article) |
 
 ## SV category tree
@@ -98,7 +110,7 @@ The SeminaVerbi infobox: layout from the item's instance of, rows from its state
 | parameter | meaning |
 |---|---|
 | `type` | layout when the item's type is missing or ambiguous: book, film, tv, album, song, play, artwork, person, group, work |
-| `item` | a Wikibase item ID, when the page is not connected to one |
+| `item` | a Wikibase item ID to use instead of the page's own item (needed when the page is not connected to one) |
 | `name` | caption; defaults to the item's label |
 | `sortkey` | sort key for the item's categories |
 
@@ -110,7 +122,7 @@ Aliases: it: `SV infobox persona`, es: `SV ficha persona`, fr: `SV infobox perso
 
 | parameter | meaning |
 |---|---|
-| `item` | a Wikibase item ID, when the page is not connected to one |
+| `item` | a Wikibase item ID to use instead of the page's own item (needed when the page is not connected to one) |
 | `name` | caption; defaults to the item's label |
 | `sortkey` | sort key for the item's categories |
 
@@ -125,7 +137,7 @@ Aliases: it: `SV infobox opera`, es: `SV ficha obra`, fr: `SV infobox œuvre`, d
 | parameter | meaning |
 |---|---|
 | `type` | book (default), film, tv, album, song, play, artwork |
-| `item` | a Wikibase item ID, when the page is not connected to one |
+| `item` | a Wikibase item ID to use instead of the page's own item (needed when the page is not connected to one) |
 | `name` | caption; defaults to the item's label |
 | `sortkey` | sort key for the item's categories |
 

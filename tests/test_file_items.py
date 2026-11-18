@@ -524,3 +524,12 @@ def test_verification_reads_the_saved_revision():
     en.revision_categories = lambda revid: seen.append(revid) or en.page_categories("Film page")
     run(repo, clients)
     assert seen == [777]
+
+
+def test_only_pages_limits_the_saves_but_not_the_facts():
+    # connect_items --only en:Film page: the item's it article gives its facts but is not saved
+    repo, clients = setup({"en": FILM_EN, "it": FILM_IT})
+    fi.run(repo, clients, DATA, TYPES, PROPS, apply=True, only_item="Q1", only_pages={("en", "Film page")},
+           record=lambda d: None)
+    assert repo.statements["Q1"]["P10769"] == ["Q_faith", "Q_love"]  # it's Love still counts
+    assert ("edit", "en", "Film page") in repo.calls and ("edit", "it", "Pagina film") not in repo.calls

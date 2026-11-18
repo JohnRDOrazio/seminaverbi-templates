@@ -207,8 +207,9 @@ def _summary(lang: str) -> str:
 
 
 def run(repo, clients: dict, data, types, props: dict, apply: bool, only_item: str | None = None,
-        classify=None, record=None, out=print, fields: dict | None = None) -> Report:
-    """`fields`: item -> field key the author decided; it replaces the pages' field and skips Jev."""
+        classify=None, record=None, out=print, fields: dict | None = None, only_pages: set | None = None) -> Report:
+    """`fields`: item -> field key the author decided; it replaces the pages' field and skips Jev.
+    `only_pages`: (lang, title) the run may save; the item's other articles still give their facts."""
     author_fields = fields or {}
     node_item = {n.key: None for n in nodes(data)}
     node_item.update(_node_items(data))
@@ -284,43 +285,71 @@ def run(repo, clients: dict, data, types, props: dict, apply: bool, only_item: s
             continue
         by_lang = {p.lang: p for p in pages}
         for lang, (title, text, revid) in plan.edits.items():
+            if only_pages is not None and (lang, title) not in only_pages:
+                continue
             page = by_lang[lang]
             fields, themes = tree_keys(lang, page.categories, data)
             keep = {names_of[k][lang] for k in themes | fields if k == plan.field or k in themes}
             if plan.field:
                 keep.add(names_of[plan.field][lang])
-            try:
-                lost = sorted(keep - clients[lang].preview_categories(title, text))
-            except SyncError as exc:
-                failed.append((lang, title, str(exc)))
-                out(f"{item}: FAILED {lang}:{title}: preview: {exc}")
-                continue
-            if lost:
-                unsafe.append((lang, title, lost))
-                out(f"{item}: UNSAFE {lang}:{title} would lose {', '.join(lost)}; not saved")
-                continue
-            now = clients[lang].revision(title)
-            if now is None or now[0] != revid:
-                # MediaWiki would merge a change elsewhere on the page into text nobody previewed
-                failed.append((lang, title, "changed since it was read; run again"))
-                out(f"{item}: FAILED {lang}:{title}: changed since it was read; run again")
-                continue
-            try:
-                result = clients[lang].edit(title, text, _summary(lang), tags=TAG, baserevid=revid) or {}
-                edited += 1
-                # MediaWiki may have merged a concurrent edit (its oldrevid does not tell): verify every save,
-                # on the revision it created when the API names it
-                saved = result.get("newrevid")
-                now = clients[lang].revision_categories(saved) if saved else clients[lang].page_categories(title)
-                lost = sorted(keep - now)
-                if lost:
-                    unsafe.append((lang, title, lost))
-                    out(f"{item}: UNSAFE {lang}:{title} saved without {', '.join(lost)} (a concurrent edit "
-                        f"merged?); check the page")
-            except SyncError as exc:
-                failed.append((lang, title, str(exc)))
-                out(f"{item}: FAILED {lang}:{title}: {exc}")
+            status = guarded_save(clients[lang], title, text, revid, keep, _summary(lang),
+                                  lambda message: out(f"{item}: {message}"))
+            edited += status.saved
+            if status == "unsafe":
+                unsafe.append((lang, title, status.detail))
+            elif status == "failed":
+                failed.append((lang, title, status.detail))
     return Report(planned, added, edited, stopped, unsafe, failed, unconnected)
+
+
+class SaveStatus(str):
+    """"saved", "unsafe" or "failed"; `detail`: the lost tree categories (unsafe) or the error (failed);
+    `saved`: an edit was made (an unsafe page may have been saved: a merge found after the save)."""
+    detail = None
+    saved = False
+
+    @classmethod
+    def of(cls, status: str, detail=None, saved: bool = False) -> "SaveStatus":
+        out = cls(status)
+        out.detail, out.saved = detail, saved
+        return out
+
+
+def guarded_save(client, title: str, text: str, revid: int, keep: set, summary: str, out=print) -> SaveStatus:
+    """Saves `text` over revision `revid` of `title` only if its preview keeps every category of `keep`
+    and nobody changed the page since `revid`; then verifies the saved revision. Messages go to `out`."""
+    lang = client.lang
+    try:
+        lost = sorted(keep - client.preview_categories(title, text))
+    except SyncError as exc:
+        out(f"FAILED {lang}:{title}: preview: {exc}")
+        return SaveStatus.of("failed", str(exc))
+    if lost:
+        out(f"UNSAFE {lang}:{title} would lose {', '.join(lost)}; not saved")
+        return SaveStatus.of("unsafe", lost)
+    now = client.revision(title)
+    if now is None or now[0] != revid:
+        # MediaWiki would merge a change elsewhere on the page into text nobody previewed
+        out(f"FAILED {lang}:{title}: changed since it was read; run again")
+        return SaveStatus.of("failed", "changed since it was read; run again")
+    try:
+        result = client.edit(title, text, summary, tags=TAG, baserevid=revid) or {}
+    except SyncError as exc:
+        out(f"FAILED {lang}:{title}: {exc}")
+        return SaveStatus.of("failed", str(exc))
+    try:
+        # MediaWiki may have merged a concurrent edit (its oldrevid does not tell): verify every save,
+        # on the revision it created when the API names it
+        saved = result.get("newrevid")
+        now = client.revision_categories(saved) if saved else client.page_categories(title)
+    except SyncError as exc:
+        out(f"FAILED {lang}:{title}: {exc}")
+        return SaveStatus.of("failed", str(exc), saved=True)
+    lost = sorted(keep - now)
+    if lost:
+        out(f"UNSAFE {lang}:{title} saved without {', '.join(lost)} (a concurrent edit merged?); check the page")
+        return SaveStatus.of("unsafe", lost, saved=True)
+    return SaveStatus.of("saved", saved=True)
 
 
 def _node_items(data) -> dict:
