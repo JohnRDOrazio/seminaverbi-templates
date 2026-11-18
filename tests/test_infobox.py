@@ -416,3 +416,48 @@ def test_white_on_every_band_colour_meets_wcag_aa_and_the_kind_label_is_not_dimm
     assert len(bands) >= 6
     for band in bands:
         assert 1.05 / (_luminance(band) + 0.05) >= 4.5, band
+
+
+def occupation_person(gender=None, lang="it"):
+    claims = {"P63": [item("Q50")]}
+    if gender:
+        claims["P1018"] = [item(gender)]
+    return render(kind="person", lang=lang, page_entity="Q2", entities={
+        "Q2": {"labels": {"it": "X", "en": "X"}, "claims": claims},
+        "Q50": {"labels": {"it": "cantautore", "en": "singer-songwriter"},
+                "sitelinks": {"itwiki": "Cantautore", "enwiki": "Singer-songwriter"},
+                "claims": {"P1451": [mono("cantautrice", "it")]}},
+        "Q99": {"labels": {"it": "non binario"}}})
+
+
+def test_occupation_takes_the_female_form_for_a_woman():
+    assert "[[wikipedia:it:Cantautore|cantautrice]]" in occupation_person("Q247")
+
+
+def test_occupation_keeps_the_label_for_a_man_or_no_stated_gender():
+    assert "[[wikipedia:it:Cantautore|cantautore]]" in occupation_person("Q246")
+    assert "[[wikipedia:it:Cantautore|cantautore]]" in occupation_person()
+
+
+def test_occupation_without_a_shared_form_falls_back_to_the_label():
+    # the infobox is a data row, not a sentence: it still names the occupation
+    assert "[[wikipedia:it:Cantautore|cantautore]]" in occupation_person("Q99")
+
+
+def test_english_occupation_without_female_form_keeps_the_label():
+    assert "[[wikipedia:en:Singer-songwriter|singer-songwriter]]" in occupation_person("Q247", lang="en")
+
+
+def test_female_form_is_used_when_the_occupation_has_no_label():
+    out = render(kind="person", lang="it", page_entity="Q2", entities={
+        "Q2": {"labels": {"it": "X"}, "claims": {"P63": [item("Q50")], "P1018": [item("Q247")]}},
+        "Q50": {"sitelinks": {"itwiki": "Cantautore"}, "claims": {"P1451": [mono("cantautrice", "it")]}}})
+    assert "[[wikipedia:it:Cantautore|cantautrice]]" in out
+
+
+def test_female_form_markup_is_shown_literally():
+    out = render(kind="person", lang="it", page_entity="Q2", entities={
+        "Q2": {"labels": {"it": "X"}, "claims": {"P63": [item("Q50")], "P1018": [item("Q247")]}},
+        "Q50": {"labels": {"it": "cantautore"}, "sitelinks": {"itwiki": "Cantautore"},
+                "claims": {"P1451": [mono("canta]]utrice", "it")]}}})
+    assert "[[wikipedia:it:Cantautore|canta&#93;&#93;utrice]]" in out

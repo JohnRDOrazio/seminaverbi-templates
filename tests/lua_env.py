@@ -16,6 +16,10 @@ mw = { text = {}, ustring = {}, wikibase = {}, language = {}, title = {} }
 for k, v in pairs(string) do mw.ustring[k] = v end
 mw.ustring.lower, mw.ustring.upper, mw.ustring.sub = py.ulower, py.uupper, py.usub
 function mw.text.trim(s) return (tostring(s):gsub('^%s+', ''):gsub('%s+$', '')) end
+-- as MediaWiki's: the characters that could start markup become numeric entities
+function mw.text.nowiki(s)
+    return (tostring(s):gsub('["&\'<=>%[%]{|}]', function(c) return '&#' .. c:byte() .. ';' end))
+end
 local function load(name)
     if cache[name] == nil then
         if name == 'Module:SV/Data' then
