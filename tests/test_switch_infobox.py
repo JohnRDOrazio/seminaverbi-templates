@@ -1,4 +1,5 @@
 import pytest
+import requests
 
 from sync.wiki import SyncError
 from tools import switch_infobox as si
@@ -233,6 +234,72 @@ def test_image_refused_stays_on_the_call(capsys):
     title, text, summary = client.edits[0]
     assert text.startswith("{{SV infobox|image=Bloodshot poster.jpg}}")
     assert summary == "Switch to the SV infobox; facts on the item"
+
+
+class FlakyRepo(Repo):
+    """add_claim answers HTTP 502 (or times out) `failures` times for `prop`, then works."""
+
+    def __init__(self, *a, prop=None, failures=0, error="502", **kw):
+        super().__init__(*a, **kw)
+        self.prop, self.failures, self.error, self.calls = prop, failures, error, 0
+
+    def add_claim(self, item, prop, datavalue, tags=None, summary=None):
+        if prop == self.prop and self.failures:
+            self.failures -= 1
+            self.calls += 1
+            if self.error == "timeout":
+                raise requests.Timeout("read timed out")
+            response = requests.Response()
+            response.status_code = int(self.error)
+            raise requests.HTTPError(f"{self.error} Server Error: Bad Gateway", response=response)
+        super().add_claim(item, prop, datavalue, tags, summary)
+
+
+def flaky_world(**kw):
+    repo = FlakyRepo([entity("Q100", [FILM], {"en": "Bloodshot"})],
+                     {("en", "Dave Wilson (director)"): "Q501", ("en", "Bloodshot (film)"): "Q100"}, **kw)
+    client = Client("en", repo, {"Bloodshot (film)": FILM_TEXT}, images={"Bloodshot poster.jpg": "commons"})
+    return repo, client
+
+
+def test_a_transient_server_error_is_retried(capsys, monkeypatch):
+    waits = []
+    monkeypatch.setattr(si, "_sleep", waits.append)
+    for error in ("502", "503", "timeout"):
+        repo, client = flaky_world(prop=P["image"], failures=2, error=error)
+        assert si.run(repo, {"en": client}, Wikidata(), MAPPING, {"en": set()}, apply=True, out=print) == 0
+        assert (("Q100", P["image"], {"type": "string", "value": "Bloodshot poster.jpg"})) in repo.added
+        assert client.edits[0][1].startswith("{{SV infobox}}")  # a statement, not image= on the call
+    assert waits[:2] == [2, 4]
+
+
+def test_a_timed_out_write_that_was_saved_is_not_written_again(monkeypatch):
+    monkeypatch.setattr(si, "_sleep", lambda s: None)
+    repo, client = flaky_world()
+    real = repo.add_claim
+
+    def saved_then_timeout(item, prop, datavalue, tags=None, summary=None):
+        real(item, prop, datavalue, tags, summary)
+        if prop == P["image"] and len([p for _, p, _ in repo.added if p == prop]) == 1:
+            raise requests.Timeout("read timed out")
+    repo.add_claim = saved_then_timeout
+    assert si.run(repo, {"en": client}, Wikidata(), MAPPING, {"en": set()}, apply=True, out=lambda *a: None) == 0
+    assert [p for _, p, _ in repo.added].count(P["image"]) == 1 and len(client.edits) == 1
+
+
+def test_a_persistent_server_error_fails_the_page_instead_of_keeping_the_image(capsys, monkeypatch):
+    monkeypatch.setattr(si, "_sleep", lambda s: None)
+    repo, client = flaky_world(prop=P["image"], failures=99)
+    assert si.run(repo, {"en": client}, Wikidata(), MAPPING, {"en": set()}, apply=True, out=print) == 1
+    out = capsys.readouterr().out
+    assert client.edits == [] and repo.calls == si.WRITE_TRIES
+    assert "FAILED writing" in out and "kept as image=" not in out
+    # another page of the run still goes ahead
+    repo, client = flaky_world(prop=P["director"], failures=99)
+    client.pages["Other"], client.revid["Other"] = "{{Infobox film\n| name = Other\n}}\nText.", 10
+    repo.links["en", "Other"] = "Q101"
+    assert si.run(repo, {"en": client}, Wikidata(), MAPPING, {"en": set()}, apply=True, out=print) == 1
+    assert [t for t, _, _ in client.edits] == ["Other"]
 
 
 def test_row_already_on_the_item_is_not_written():

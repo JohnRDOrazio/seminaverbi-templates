@@ -44,6 +44,7 @@ import json
 import os
 import re
 import sys
+import time
 import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -51,6 +52,7 @@ from typing import NamedTuple
 from urllib.parse import unquote
 
 import mwparserfromhell
+import requests
 
 from sync.categories import load, nodes
 from sync.pages import LANGS
@@ -1017,6 +1019,41 @@ def run(repo, clients: dict, wikidata, mapping: dict, tree: dict, apply: bool, a
     return 1 if failed or unsafe else 0
 
 
+WRITE_TRIES = 4             # a statement write: the first try and three retries
+TRANSIENT_STATUS = {502, 503, 504}
+_sleep = time.sleep
+
+
+class Transient(Exception):
+    """The server kept failing (502/503/504, timeout, dropped connection): no answer about the write."""
+
+
+def _transient(exc: Exception) -> bool:
+    if isinstance(exc, (requests.Timeout, requests.ConnectionError)):
+        return True
+    response = getattr(exc, "response", None)
+    return isinstance(exc, requests.HTTPError) and getattr(response, "status_code", None) in TRANSIENT_STATUS
+
+
+def _add_claim(repo, item: str, prop: str, dv: dict) -> None:
+    """repo.add_claim, retried with backoff (2, 4, 8 s) while the server fails transiently; Transient when
+    it never answers. An API answer (SyncError, e.g. a refusal) is raised at once."""
+    for attempt in range(WRITE_TRIES):
+        try:
+            # a write that timed out may have been saved all the same: never write it twice
+            if attempt and any((v or {}).get("value") == dv.get("value")
+                               for v in item_claims(repo.entity(item)).get(prop, [])):
+                return
+            repo.add_claim(item, prop, dv, tags=TAG, summary=_summary("en"))
+            return
+        except requests.RequestException as exc:
+            if not _transient(exc):
+                raise
+            if attempt == WRITE_TRIES - 1:
+                raise Transient(f"{exc} (after {WRITE_TRIES} tries)") from exc
+            _sleep(2 ** (attempt + 1))
+
+
 def _apply(repo, client, plan: PagePlan, mapping: dict, tree: dict, mapped: dict, out, relies=None) -> str:
     where = f"{plan.lang}:{plan.title}"
     image_prop = mapping["props"]["image"]
@@ -1032,7 +1069,11 @@ def _apply(repo, client, plan: PagePlan, mapping: dict, tree: dict, mapped: dict
         if prop in present:
             continue
         try:
-            repo.add_claim(plan.item, prop, _with_imports(dv, mapped), tags=TAG, summary=_summary("en"))
+            _add_claim(repo, plan.item, prop, _with_imports(dv, mapped))
+        except Transient as exc:
+            # the server did not answer: nothing is known about the file, so nothing is guessed
+            out(f"{where}: FAILED writing {prop} = {shown}: {exc}")
+            return "failed"
         except SyncError as exc:
             if prop == image_prop:
                 # Commons-only property refusing the file: it stays on the call
