@@ -1209,3 +1209,9 @@ def test_a_timed_out_image_resumed_beside_an_unknown_value_keeps_its_file_name(c
     si.run(repo, {"en": client}, Wikidata(), MAPPING, {"en": set()}, apply=True, out=print, progress=progress)
     saved = client.edits[-1][1] if client.edits else ""
     assert "{{SV infobox|image=Bloodshot poster.jpg}}" in saved and "earlier run" not in saved
+
+
+def test_a_reference_only_pseudonym_is_not_the_name():
+    # Pseudonimo holding only a citation: no pseudonym; the citation goes to ref= once
+    text = "{{Bio|Nome = Filippo|Cognome = Neviani|Pseudonimo = <ref>T.</ref>|Sesso = M}}"
+    assert _bio_call(text, "Filippo Neviani") == "{{SV bio|ref=<ref>T.</ref>}}"
