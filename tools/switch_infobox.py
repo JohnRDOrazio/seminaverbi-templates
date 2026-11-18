@@ -24,7 +24,8 @@ with its free text (note=, rest=, ref=; name= when Nome Cognome is not the item'
 sentences, both rendered, must state the same facts both ways (link texts, dates, predicate words; what
 the new one adds where Bio had no parameter is reported as an addition, anything else blocks). A page with
 {{Bio}} and no infobox gets {{SV infobox}} too. {{SV categories}} goes away (its sortkey= moves to
-{{SV infobox}}). Pages already calling {{SV infobox}} for their own item are left alone; a section's
+{{SV infobox}}). Pages already calling {{SV infobox}} for their own item are left alone (one still carrying a
+Wikipedia infobox or {{Bio}} is reported for the author); a section's
 {{SV infobox|item=…}} renders another work and does not count.
 
 The dry run prints per page the statements to write, the unresolved rows, the future infobox rendered
@@ -590,15 +591,14 @@ def plan_bio(bio, bio_conf: dict, label: str | None) -> tuple[list, list, BioPla
 
 
 def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accept_loss: bool = False):
-    """What switching `page` takes; None when it has no Wikipedia infobox or {{Bio}}, or calls {{SV infobox}}
-    already. `item_claims`: prop -> datavalues the item has (item_claims())."""
+    """What switching `page` takes; None when it has no Wikipedia infobox or {{Bio}}; blocked for the author
+    when it calls {{SV infobox}} already and has one too. `item_claims`: prop -> datavalues the item has (item_claims())."""
     lang, props = page.lang, mapping["props"]
     templates = mapping["templates"].get(lang, {})
     bio_conf = mapping["bio"].get(lang)
     bio_name = bio_conf["template"] if bio_conf else None
     found = _templates(page.text)
-    if any(_own_sv_infobox(t, name, page.item) for t, name in found):
-        return None
+    own_sv = any(_own_sv_infobox(t, name, page.item) for t, name in found)
     boxes = _outermost([t for t, name in found if name in templates])
     bios = [t for t, name in found if bio_name and name == bio_name]
     if not boxes and not bios:
@@ -611,6 +611,11 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
         base.update(kw)
         return PagePlan(**base)
 
+    if own_sv:
+        # both boxes would show: which facts the Wikipedia one adds is for the author to decide
+        names = ", ".join(dict.fromkeys(_template_name(str(t.name)) for t in [*boxes, *bios]))
+        return plan("person" if not boxes else templates[_template_name(str(boxes[0].name))]["layout"],
+                    blocked=f"{{{{SV infobox}}}} already on the page, and {names} too: for the author")
     if len(boxes) > 1:
         names = ", ".join(_template_name(str(t.name)) for t in boxes)
         return plan("work", blocked=f"two Wikipedia infoboxes ({names}): for the author")
@@ -946,9 +951,6 @@ def run(repo, clients: dict, wikidata, mapping: dict, tree: dict, apply: bool, a
         rev = client.revision(title)
         if rev is None:
             continue
-        if has_sv_infobox(rev[1], item):
-            counts["already SV"] += 1
-            continue
         entity = repo.entity(item)
         label = entity.get("labels", {}).get(lang, {}).get("value")
         if lang not in resolvers:  # one per wiki, built when first needed
@@ -959,7 +961,7 @@ def run(repo, clients: dict, wikidata, mapping: dict, tree: dict, apply: bool, a
         plan = plan_page(Page(lang, title, item, rev[0], rev[1], label), {**claims, **{p: [None] for p in coming}},
                          mapping, resolver, accept_loss=(lang, title) in accept)
         if plan is None:
-            counts["no infobox"] += 1
+            counts["already SV" if has_sv_infobox(rev[1], item) else "no infobox"] += 1
             continue
         plans.append(plan)
         relies[lang, title] = {p: coming[p] for p in plan.covered if p in coming}

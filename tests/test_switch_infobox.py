@@ -352,9 +352,24 @@ def test_two_infoboxes_block_the_page():
 
 
 def test_page_with_sv_infobox_is_left_alone():
-    text = "{{SV infobox}}\n{{Infobox film|director=[[A]]}}\nText."
-    assert si.plan_page(page(text), {}, MAPPING, resolver()) is None
+    assert si.plan_page(page("{{SV infobox}}\nText."), {}, MAPPING, resolver()) is None
     assert si.plan_page(page("Just text.\n{{SV categories}}"), {}, MAPPING, resolver()) is None
+
+
+def test_page_with_sv_infobox_and_a_wikipedia_box_is_reported_for_the_author(capsys):
+    text = "{{SV infobox}}\n{{Infobox film|director=[[A]]}}\nText."
+    plan = si.plan_page(page(text), {}, MAPPING, resolver())
+    assert plan is not None and plan.new_text is None and plan.writes == []
+    assert plan.blocked == "{{SV infobox}} already on the page, and Infobox film too: for the author"
+    repo, client = film_world()
+    client.pages["Bloodshot (film)"] = text
+    assert si.run(repo, {"en": client}, Wikidata(), MAPPING, {"en": set()}, apply=True, out=print) == 0
+    out = capsys.readouterr().out
+    assert client.edits == [] and repo.added == []
+    assert "blocked: en:Bloodshot (film): {{SV infobox}} already on the page" in out
+    # {{Bio}} next to an {{SV infobox}} too
+    bio = si.plan_page(si.Page("it", "F", "Q200", 10, "{{SV infobox}}\n" + BIO, "F"), {}, MAPPING, resolver("it"))
+    assert bio.blocked == "{{SV infobox}} already on the page, and Bio too: for the author"
 
 
 def test_sv_infobox_of_another_item_does_not_count_as_the_pages_own():
@@ -373,7 +388,8 @@ def test_sv_infobox_naming_the_pages_own_item_is_the_pages_box():
     for own in ("Q100", "q100", " Q100 "):
         text = f"{{{{SV infobox|item={own}}}}}\n{{{{Infobox film|name=Bloodshot}}}}\nText."
         assert si.has_sv_infobox(text, "Q100")
-        assert si.plan_page(page(text, item="Q100"), {}, MAPPING, resolver()) is None
+        plan = si.plan_page(page(text, item="Q100"), {}, MAPPING, resolver())
+        assert plan.new_text is None and "already on the page" in plan.blocked
     assert not si.has_sv_infobox("{{SV infobox|item=Q1000}}\nText.", "Q100")
 
 
