@@ -122,6 +122,12 @@ def test_new_article_sequence_works_with_connect_items():
         assert "`--only TITLE`" in text and "only that article" in text
 
 
+def test_infobox_check_allows_the_image_exception():
+    skill = flat((SKILL / "SKILL.md").read_text(encoding="utf-8"))
+    assert "the article calls bare `{{SV infobox}}` or `{{SV categories}}`," not in skill
+    assert "`{{SV infobox|image=…}}` for the non-free image exception" in skill
+
+
 def test_infobox_item_parameter_is_worded_alike_in_skill_and_templates_docs():
     skill = flat((SKILL / "SKILL.md").read_text(encoding="utf-8"))
     assert f"`item` ({ITEM_PARAM}," in skill

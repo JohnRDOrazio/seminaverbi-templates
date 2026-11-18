@@ -29,8 +29,10 @@ templates or `Module:SV/…` on a wiki: they are overwritten by the sync. Change
    - every template it reports is an `SV …` template from `templates.md`, or one that already exists on
      that wiki (check with `get-page` on `Template:<name>` if unsure); never introduce Wikipedia templates;
    - no link to `w:`/`wikipedia:` without a language on a non-English wiki (see `links.md`);
-   - the article calls bare `{{SV infobox}}` or `{{SV categories}}`, and has no `[[Category:…]]` line for a
-     tree category (field and themes come from the item, below); any other category you write is in
+   - the article calls `{{SV infobox}}` with no fact parameters (only the optional ones listed under
+     Wikibase, such as `{{SV infobox|image=…}}` for the non-free image exception) or `{{SV categories}}`,
+     and has no `[[Category:…]]` line for a tree category (field and themes come from the item, below);
+     any other category you write is in
      `categories.md`; the SV templates' own maintenance and tracking categories (`{{SV WIP}}`,
      `{{SV cathopedia}}`, the infobox's tracking categories…) are fine;
    - every Gospel theme on the item is argued in the text (see Categories);
