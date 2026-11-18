@@ -53,7 +53,7 @@ the page had by hand.
 | it: Guerre Stellari | Lucas on Anakin's birth rests on a fan transcript; Italian dub lines are own translations; title capitalises "Stellari" | find an official source; check the dub; consider moving to "Guerre stellari" | open |
 | Song titles | Songs carry "(song)" on en, "(brano musicale)" on it. en: Holy Mother, Presence of the Lord, Hear Me Lord, Baba Yetu → "(song)"; Legend (Tchaikovsky) → Legend (Tchaikovsky song). it: My Sweet Lord, What Is Life, Awaiting On You All, Hear Me Lord, The Prayer, I.N.R.I. (Lucio Dalla) → "(brano musicale)". Wedding Song (There Is Love) kept | done |
 | Page moves | Sitelinks do not follow page moves on the farm (set by hand after each move; the moved page needs a purge) | investigate the Wikibase client/repo setup | open |
-| en: Liturgy of St. John Chrysostom (Tchaikovsky) | Uses `{{SV infobox\|type=song}}` on a choral work | set the right type | open |
-| en: Holy Mother (song) | Red link `[[Hold me Lord]]` | point it at Hear Me Lord (song) | open |
-| en: Presence of the Lord (song) | Typo "This if the first song" | fix | open |
+| en: Liturgy of St. John Chrysostom (Tchaikovsky) | Uses `{{SV infobox\|type=song}}` on a choral work | `type=composition` (PR #13), then switch the page | open |
+| en: Holy Mother (song) | Red link `[[Hold me Lord]]` | it is Clapton's "Hold Me Lord" (*Another Ticket*, 1981), not Harrison's Hear Me Lord: unlinked, with the album (rev 30465) | done |
+| en: Presence of the Lord (song) | Typo "This if the first song" | fixed (rev 30466) | done |
 
