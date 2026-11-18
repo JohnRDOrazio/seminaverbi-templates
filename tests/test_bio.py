@@ -387,3 +387,27 @@ def test_unlabelled_place_left_out():
     ents = dict(BASE, **{SASSUOLO: {"labels": {"fr": "Sassuolo"}}})
     assert bio(entities=ents) == "Nek (6 gennaio 1972) è un cantautore italiano"
     assert bio("en", entities=with_nek(P4712=None) | {SASSUOLO: {}}) == "Nek is an Italian singer-songwriter"
+
+
+def test_occupations_capped_like_the_infobox():
+    # Bach's item has 11 occupations: the sentence names the first three, in item order
+    jobs = {f"Q{n}": {"labels": {"it": f"mestiere{n}"}} for n in range(300, 305)}
+    ents = dict(BASE, **jobs, **{NEK: nek(gender=None, P63=[item(q) for q in jobs])})
+    assert bio(entities=ents) == \
+        "Nek (Sassuolo, 6 gennaio 1972) è mestiere300, mestiere301 e mestiere302 italiano"
+
+
+def test_occupation_cap_is_the_infobox_config_value():
+    import json
+    from lua_env import ROOT
+    person = json.loads((ROOT / "config" / "infobox.json").read_text())["person"]
+    assert [f.get("max") for f in person if f["key"] == "occupation"] == [3]
+
+
+def test_bach_julian_birth_date_shown_gregorian():
+    # the local Bach item: 1685-03-21 (Julian) [preferred]; 1685-03-31 (Gregorian)
+    julian = dict(time("+1685-03-21T00:00:00Z", 11), rank="preferred")
+    julian["mainsnak"]["datavalue"]["value"]["calendarmodel"] = "http://www.wikidata.org/entity/Q1985786"
+    gregorian = time("+1685-03-31T00:00:00Z", 11)
+    gregorian["mainsnak"]["datavalue"]["value"]["calendarmodel"] = "http://www.wikidata.org/entity/Q1985727"
+    assert bio("en", entities=with_nek(P4712=[julian, gregorian], P818=None)).startswith("Nek (born 31 March 1685)")

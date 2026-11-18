@@ -218,13 +218,23 @@ local function monolingual(entity, propId, lang)
 end
 
 -- "un cantautore italiano" / "an Italian singer-songwriter", or nil when there is no occupation.
+-- The most occupations shown: the person infobox's occupation row cap (config/infobox.json).
+local function occupationMax()
+	for _, f in ipairs(mw.loadData('Module:SV/Data').infobox.person or {}) do
+		if f.key == 'occupation' then
+			return f.max
+		end
+	end
+end
+
 local function predicate(entity, lang, wb, gender)
 	local female = gender == 'female'
 	local agree = gender ~= nil
 	local words = {}
+	local max = occupationMax()
 	for _, v in ipairs(Util.best(entity, wb.occupation)) do
 		local label = v.id and mw.wikibase.getLabelByLang(v.id, lang)
-		if label then
+		if label and not (max and #words >= max) then
 			local word = label
 			if female then
 				local form = monolingual(mw.wikibase.getEntity(v.id), wb.female_form, lang)[1]

@@ -314,3 +314,45 @@ def test_auto_group_layout():
 
 def test_sortkey_space_entity_becomes_a_space():
     assert "[[Category:Musica| ]]" in categories(sortkey="&#32;")
+
+
+def test_person_occupation_capped_at_three():
+    # David Bowie's item has 22 occupations: the row shows the first three, in item order
+    jobs = {f"Q{n}": {"labels": {"en": f"job{n}"}} for n in range(300, 305)}
+    person = {"Q2": {"labels": {"en": "Bowie"}, "claims": {"P63": [item(q) for q in jobs]}}, **jobs}
+    out = render(kind="person", lang="en", page_entity="Q2", entities=person)
+    assert row("occupation", "job300, job301, job302") in out
+    assert "job303" not in out
+
+
+JULIAN = "http://www.wikidata.org/entity/Q1985786"
+GREGORIAN = "http://www.wikidata.org/entity/Q1985727"
+
+
+def cal_time(iso, precision, model):
+    statement = time(iso, precision)
+    statement["mainsnak"]["datavalue"]["value"]["calendarmodel"] = model
+    return statement
+
+
+def julian_row(iso, precision=11, model=JULIAN):
+    out = render(entities=with_claims(P4788=[cal_time(iso, precision, model)]))
+    return out
+
+
+def test_julian_day_after_reform_shown_gregorian():
+    # Bach's preferred birth date on the local item: +1685-03-21 in the Julian calendar = 31 March 1685
+    assert row("data di pubblicazione", "j F Y|1685-03-31") in julian_row("+1685-03-21T00:00:00Z")
+    # from the stored Julian date 1582-10-15 on, and a month rollover across a Julian-only leap day
+    assert row("data di pubblicazione", "j F Y|1582-10-25") in julian_row("+1582-10-15T00:00:00Z")
+    assert row("data di pubblicazione", "j F Y|1700-03-11") in julian_row("+1700-02-29T00:00:00Z")
+    assert row("data di pubblicazione", "j F Y|1918-01-14") in julian_row("+1918-01-01T00:00:00Z")
+
+
+def test_julian_before_reform_or_coarse_shown_as_stored():
+    assert row("data di pubblicazione", "j F Y|1300-03-12") in julian_row("+1300-03-12T00:00:00Z")
+    assert row("data di pubblicazione", "j F Y|1582-10-14") in julian_row("+1582-10-14T00:00:00Z")
+    assert row("data di pubblicazione", "F Y|1685-03-01") in julian_row("+1685-03-00T00:00:00Z", 10)
+    assert row("data di pubblicazione", "1685") in julian_row("+1685-00-00T00:00:00Z", 9)
+    # a Gregorian value is never converted
+    assert row("data di pubblicazione", "j F Y|1685-03-21") in julian_row("+1685-03-21T00:00:00Z", model=GREGORIAN)

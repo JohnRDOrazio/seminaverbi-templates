@@ -82,7 +82,27 @@ local function coarseDate(y, precision, code)
 		roman(n), tostring(n), ordinalEn(n), roman(n) .. (n == 1 and 'er' or 'e'))
 end
 
--- A Wikibase time value at its precision, in the content language.
+local JULIAN = 'http://www.wikidata.org/entity/Q1985786'
+
+-- The Gregorian date of a Julian calendar date, through the Julian day number.
+local function julianToGregorian(y, m, d)
+	local a = math.floor((14 - m) / 12)
+	local yy, mm = y + 4800 - a, m + 12 * a - 3
+	local jdn = d + math.floor((153 * mm + 2) / 5) + 365 * yy + math.floor(yy / 4) - 32083
+	local b = jdn + 32044
+	local c = math.floor((4 * b + 3) / 146097)
+	local e = b - math.floor(146097 * c / 4)
+	local f = math.floor((4 * e + 3) / 1461)
+	local g = e - math.floor(1461 * f / 4)
+	local h = math.floor((5 * g + 2) / 153)
+	local day = g - math.floor((153 * h + 2) / 5) + 1
+	local month = h + 3 - 12 * math.floor(h / 10)
+	return 100 * c + f - 4800 + math.floor(h / 10), month, day
+end
+
+-- A Wikibase time value at its precision, in the content language. A Julian calendar day stored as
+-- 1582-10-15 or later is shown as its Gregorian date, as reference works do (Bach: Julian 21 March
+-- 1685 = 31 March 1685); earlier dates, and coarser precisions, are shown as stored.
 function p.formatTime(value)
 	local sign, year, month, day = value.time:match('^([+-])(%d+)-(%d%d)-(%d%d)')
 	if not year then
@@ -90,6 +110,11 @@ function p.formatTime(value)
 	end
 	local y = tonumber(year)
 	local precision = tonumber(value.precision) or 9
+	if value.calendarmodel == JULIAN and sign == '+' and precision >= 11
+		and y * 10000 + tonumber(month) * 100 + tonumber(day) >= 15821015 then
+		local gy, gm, gd = julianToGregorian(y, tonumber(month), tonumber(day))
+		y, year, month, day = gy, string.format('%04d', gy), string.format('%02d', gm), string.format('%02d', gd)
+	end
 	local lang = mw.language.getContentLanguage()
 	local code = lang:getCode()
 	local coarse = precision >= 6 and precision <= 8 and y >= 1
