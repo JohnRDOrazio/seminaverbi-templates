@@ -10,8 +10,8 @@ property and kind). Values are converted only when unambiguous:
          Wikidata (a disambiguation or list page is refused); a name without a link is never resolved
   time   {{Film date}}, {{Start date}} and the like, ISO dates, "17 November 1999", "17 novembre 1999",
          "November 17, 1999", "November 1999", a bare year
-  image  a file a repository of the wiki holds: in the wikimediacommons repository a statement, elsewhere
-         (the farm's shared store, en/it.wikipedia) it stays on the call as image=; also when refused
+  image  a file a repository of the wiki holds: with its description page on Commons a statement, else
+         (the farm's shared store, local to en/it.wikipedia) it stays on the call as image=; also when refused
   title  the original title; one equal to the item's label or the page title is the caption already
 
 A row the item already has is not written; a row the shown layout lacks is still written (the fact is

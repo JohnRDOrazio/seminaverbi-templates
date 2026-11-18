@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import time
 from typing import NamedTuple
+from urllib.parse import urlsplit
 
 import requests
 
@@ -331,14 +332,16 @@ class WikiClient:
         return self._dig(entities, item)
 
     def image_source(self, name: str) -> str | None:
-        """Where the file this wiki shows as File:`name` lives: "commons" (the wikimediacommons repository),
-        "other" (local, the farm's own "shared" store, en/it Wikipedia), or None (no such file)."""
+        """Where the file this wiki shows as File:`name` lives: "commons" when its description page is on
+        commons.wikimedia.org (the wikis relay Commons through their enwiki/itwiki foreign repositories),
+        "other" (local, the farm's own "shared" store, a file local to en/it Wikipedia), or None (no file)."""
         data = self._call("GET", action="query", prop="imageinfo", titles=f"File:{name}", iiprop="url")
         page = self._dig(data, "query", "pages", 0)
         repository = page.get("imagerepository")
         if not repository:
             return None
-        return "commons" if repository == "wikimediacommons" else "other"
+        description = (page.get("imageinfo") or [{}])[0].get("descriptionurl", "")
+        return "commons" if urlsplit(description).hostname == "commons.wikimedia.org" else "other"
 
     def render(self, title: str, text: str) -> str:
         """The HTML `text` gives as page `title` (action=parse, pre-save transform applied), without saving."""

@@ -450,14 +450,20 @@ def test_first_revision_comment():
 def test_image_source_tells_commons_from_other_repositories():
     def source(page):
         return WikiClient("it", session=Recorder({"query": {"pages": [page]}})).image_source("X.jpg")
-    assert source({"imagerepository": "wikimediacommons", "imageinfo": [{}]}) == "commons"
+    # Commons by the description page's host, whichever repository relays the file
+    assert source({"imagerepository": "enwiki", "imageinfo": [
+        {"descriptionurl": "https://commons.wikimedia.org/wiki/File:X.jpg"}]}) == "commons"
+    assert source({"imagerepository": "wikimediacommons", "imageinfo": [
+        {"descriptionurl": "https://commons.wikimedia.org/wiki/File:X.jpg"}]}) == "commons"
     # "shared" is the farm's own store (en.seminaverbi.bibleget.io/w/images), not Commons
     assert source({"imagerepository": "shared", "imageinfo": [
         {"descriptionurl": "https://en.seminaverbi.bibleget.io/wiki/File:X.jpg"}]}) == "other"
-    # ruling: only the wikimediacommons repository counts, whatever the description page
+    assert source({"imagerepository": "itwiki", "imageinfo": [
+        {"descriptionurl": "https://it.wikipedia.org/wiki/File:X.jpg"}]}) == "other"
+    # a look-alike host is not Commons
     assert source({"imagerepository": "enwiki", "imageinfo": [
-        {"descriptionurl": "https://commons.wikimedia.org/wiki/File:X.jpg"}]}) == "other"
-    assert source({"imagerepository": "itwiki", "imageinfo": [{}]}) == "other"
+        {"descriptionurl": "https://commons.wikimedia.org.evil.example/wiki/File:X.jpg"}]}) == "other"
+    assert source({"imagerepository": "wikimediacommons", "imageinfo": [{}]}) == "other"
     assert source({"imagerepository": "enwiki", "imageinfo": [
         {"descriptionurl": "https://en.wikipedia.org/wiki/File:X.jpg"}]}) == "other"
     assert source({"imagerepository": "local", "imageinfo": [{}]}) == "other"
