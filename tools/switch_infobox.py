@@ -607,7 +607,7 @@ DEFAULT_PROGRESS = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" 
 
 class Progress:
     """The statement write sets a page started on an item and has not finished: "item|prop" -> {"page",
-    "values" (every value the page writes or saw for the property), "written"}. A set is recorded before its
+    "datavalues" (every value the page writes or saw for the property), "written"}. A set is recorded before its
     first write and removed once all its values are on the item, so a property with a record was written in
     part by this tool, and one without was on the item before. With a path it outlives the run (an
     interrupted run leaves its records for the next one)."""
@@ -632,8 +632,8 @@ class Progress:
         """prop -> record for `item`."""
         return {k.split("|", 1)[1]: v for k, v in self.sets.items() if k.split("|", 1)[0] == item}
 
-    def start(self, item: str, prop: str, page: str, values: list) -> None:
-        self.sets.setdefault(f"{item}|{prop}", {"page": page, "values": values, "written": []})
+    def start(self, item: str, prop: str, page: str, datavalues: list) -> None:
+        self.sets.setdefault(f"{item}|{prop}", {"page": page, "datavalues": datavalues, "written": []})
         self._save()
 
     def wrote(self, item: str, prop: str, value) -> None:
@@ -765,7 +765,9 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
                 value = convert(row["kind"], raw, lang, resolver)
             if isinstance(value, Unresolved):
                 if not single:
-                    if have is None:  # a row the item has is not blocked by a value that does not convert
+                    # a row the item has is not blocked by a value that does not convert, unless this page's
+                    # write set for it is unfinished: then the row is not known to be complete
+                    if have is None or (unfinished or {}).get(prop):
                         unresolved.append((key, clean(raw)))
                     converted = None
                     break
@@ -803,7 +805,7 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
             preview[key] = ", ".join(v.shown for v in converted)
     for key, param, raw in extra:
         prop = props["sex_or_gender" if key == "sex_or_gender" else "country_of_citizenship"]
-        if prop in item_claims:
+        if prop in item_claims and not (unfinished or {}).get(prop):
             covered.append(prop)
             continue
         if key == "sex_or_gender":
@@ -814,8 +816,18 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
             value = value if isinstance(value, Unresolved) else Value([value], raw)
         if isinstance(value, Unresolved):
             unresolved.append((key, raw))
-        else:
-            add(prop, value.datavalues, value.shown)
+        else:  # (resuming an unfinished set: only what the item lacks)
+            on_item = [(h or {}).get("value") for h in item_claims.get(prop, [])]
+            add(prop, [dv for dv in value.datavalues if dv.get("value") not in on_item], value.shown)
+
+    # an unfinished write set of this page is finished from its record, whatever the box converts to now
+    for prop, record in (unfinished or {}).items():
+        on_item = [(h or {}).get("value") for h in item_claims.get(prop, [])]
+        rest = [dv for dv in record["datavalues"] if dv.get("value") not in on_item]
+        if rest:
+            covered = [c for c in covered if c != prop]
+            had.setdefault(prop, item_claims.get(prop, []))
+            add(prop, rest, "(an earlier run's unfinished write)")
 
     if item_layout is None and layout != layout_for([], mapping["types"]):
         params = {"type": layout, **params}
@@ -1074,7 +1086,8 @@ def run(repo, clients: dict, wikidata, mapping: dict, tree: dict, apply: bool, a
         here = f"{lang}:{title}"
         sets = progress.of_item(item)
         for prop, record in sets.items():  # a set whose values all reached the item (the run stopped after)
-            if all(v in [(c or {}).get("value") for c in claims.get(prop, [])] for v in record["values"]):
+            if all(dv.get("value") in [(c or {}).get("value") for c in claims.get(prop, [])]
+                   for dv in record["datavalues"]):
                 progress.finish(item, prop)
         sets = progress.of_item(item)
         coming = {prop: where for prop, where in pending.get(item, {}).items() if prop not in claims}
@@ -1198,11 +1211,12 @@ def _apply(repo, client, plan: PagePlan, mapping: dict, tree: dict, mapped: dict
         return "failed"
     # a property the item has now is left as it is, unless each of its values is one the plan writes or saw
     # (a multi-value row written in part): then only the values it lacks are written
-    ours = {}
+    full = {}  # prop -> every datavalue the plan writes or saw: the write set recorded in progress
     for prop, dv, _ in plan.writes:
-        ours.setdefault(prop, []).append(_with_imports(dv, mapped).get("value"))
+        full.setdefault(prop, []).append(_with_imports(dv, mapped))
     for prop, dvs in plan.had.items():
-        ours.setdefault(prop, []).extend((dv or {}).get("value") for dv in dvs)
+        full.setdefault(prop, []).extend(dv for dv in dvs if dv)
+    ours = {prop: [dv.get("value") for dv in dvs] for prop, dvs in full.items()}
 
     def values(prop):
         return [(v or {}).get("value") for v in current.get(prop, [])]
@@ -1222,7 +1236,7 @@ def _apply(repo, client, plan: PagePlan, mapping: dict, tree: dict, mapped: dict
             return "failed"
     started = list(dict.fromkeys(prop for prop, _, _ in todo))
     for prop in started:  # the whole write set, recorded before its first value
-        progress.start(plan.item, prop, where, ours[prop])
+        progress.start(plan.item, prop, where, full[prop])
     for prop, dv, shown in todo:
         try:
             _add_claim(repo, plan.item, prop, _with_imports(dv, mapped))

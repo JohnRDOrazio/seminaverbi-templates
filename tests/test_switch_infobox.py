@@ -1080,3 +1080,28 @@ def test_bio_gate_compares_birth_and_death_facts_in_their_places():
             "italiana</p>")
     assert si.compare_sentences(born, died, {"death_date", "death_place"}) == ([], [], ["Roma", "26 settembre 1973"])
     assert si.compare_sentences(born, died, {"death_date"})[1] == ["Roma"]
+
+
+def test_a_bio_citizenship_written_in_part_is_resumed_not_covered():
+    # Cittadinanza and NazionalitàNaturalizzato give two P27 writes; the run stopped after the first
+    repo, wd = bio_world()
+    citizen = P["country_of_citizenship"]
+    repo.entity("Q200")["claims"][citizen] = [statement(item_dv("Q32"))]
+    record = {"page": "it:Fabrizio De André", "datavalues": [item_dv("Q32"), item_dv("Q33")], "written": []}
+    plan = si.plan_page(bio_page(), claims_of(repo.entity("Q200")), MAPPING, resolver("it", repo=repo, wikidata=wd),
+                        unfinished={citizen: record})
+    assert citizen not in plan.covered
+    assert [dv for prop, dv, _ in plan.writes if prop == citizen] == [item_dv("Q33")]
+
+
+def test_a_value_that_no_longer_resolves_blocks_a_row_left_unfinished():
+    text, repo, client, _ = _two_director_film()
+    repo.entity("Q100")["claims"][P["director"]] = [statement(item_dv("Q501"))]
+    del repo.links["en", "Jane Roe"]  # B does not resolve any more
+    record = {"page": "en:Bloodshot (film)", "datavalues": [item_dv("Q501"), item_dv("Q502")], "written": []}
+    plan = si.plan_page(page(text), claims_of(repo.entity("Q100")), MAPPING, resolver(repo=repo, client=client),
+                        unfinished={P["director"]: record})
+    assert plan.blocked and "director" in plan.blocked
+    # without the record the row was there before the migration: covered, not blocked
+    plan = si.plan_page(page(text), claims_of(repo.entity("Q100")), MAPPING, resolver(repo=repo, client=client))
+    assert plan.blocked is None and P["director"] in plan.covered
