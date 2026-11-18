@@ -241,7 +241,18 @@ def test_main_uses_page_item():
     e = env("it")
     frame = e.frame({}, {"note": NOTE})
     assert e.call("Module:SV/Bio", "main", frame) == \
-        "Nek, pseudonimo di Filippo Neviani (Sassuolo, 6 gennaio 1972), è un cantautore italiano"
+        "Nek, pseudonimo di Filippo Neviani (Sassuolo, 6 gennaio 1972), è un cantautore italiano."
+
+
+def test_main_ends_the_sentence_before_its_references():
+    # as it.wiki's Bio does: the full stop, then the references (punctuation before a footnote mark)
+    e = env("it")
+    out = e.call("Module:SV/Bio", "main", e.frame({}, {"rest": "e [[poeta]]", "ref": "<ref>x</ref>"}))
+    assert out == "Nek (Sassuolo, 6 gennaio 1972) è un cantautore italiano e [[poeta]].<ref>x</ref>"
+    # free text that already ends the sentence gets no second stop
+    for rest in ("attivo dal 1991.", "attivo dal 1991!", "attivo dal 1991…"):
+        out = e.call("Module:SV/Bio", "main", e.frame({}, {"rest": rest}))
+        assert out == "Nek (Sassuolo, 6 gennaio 1972) è un cantautore italiano " + rest
 
 
 # --- nationality: masculine form and agreement by language rules ---

@@ -428,11 +428,23 @@ function p._sentence(entity, lang, args)
 	return out
 end
 
+-- The sentence on the page ends as it.wiki's Bio ends it: a full stop (unless the free text already
+-- ends the sentence), then the references.
 function p.main(frame)
 	local args = Args.get(frame)
 	local id = args.item or mw.wikibase.getEntityIdForCurrentPage()
 	local entity = id and mw.wikibase.getEntity(id)
-	return p._sentence(entity, Util.lang(), args)
+	local text = {}
+	for k, v in pairs(args) do
+		if k ~= 'ref' then
+			text[k] = v
+		end
+	end
+	local out = p._sentence(entity, Util.lang(), text)
+	if not (out:match('[%.!?]$') or endsWith(out, '…')) then
+		out = out .. '.'
+	end
+	return out .. (args.ref or '')
 end
 
 return p
