@@ -294,6 +294,15 @@ def test_sv_infobox_of_another_item_does_not_count_as_the_pages_own():
     assert si.has_sv_infobox("{{SV infobox|type=song}}\nText.")
 
 
+def test_embedded_infobox_blocks_the_page():
+    # enwiki's |module={{Infobox musical artist|embed=yes|…}} inside Infobox person: its facts would be lost
+    text = ("{{Infobox person|name=X|module={{Infobox musical artist|embed=yes|genre=[[Rock music|Rock]]"
+            "|label=[[Apple Records]]}}}}\nText.")
+    plan = si.plan_page(page(text, title="X", label="X"), {}, MAPPING, resolver())
+    assert plan is not None and plan.new_text is None and plan.writes == []
+    assert plan.blocked == "embedded infobox (Infobox musical artist): for the author"
+
+
 def test_sv_categories_removed_when_sv_infobox_added():
     text = "{{Infobox film\n| name = Bloodshot\n}}\nText.\n{{SV categories|sortkey=Bloodshot 2020}}\n[[Category:Other]]"
     repo, client = film_world()

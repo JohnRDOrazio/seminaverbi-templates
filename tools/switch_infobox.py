@@ -565,6 +565,11 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
         return plan("work", blocked=f"two Wikipedia infoboxes ({names}): for the author")
     if len(bios) > 1:
         return plan("person", blocked=f"{len(bios)} {{{{{bio_name}}}}} calls: for the author")
+    # a mapped box inside another (enwiki |module={{Infobox musical artist|embed=yes|…}}): only the outer
+    # box's own parameters are read, so the inner box's facts would vanish with the switch
+    embedded = [name for t, name in found if name in templates and not any(t is b for b in boxes)]
+    if embedded:
+        return plan("work", blocked=f"embedded infobox ({', '.join(dict.fromkeys(embedded))}): for the author")
     box, bio = (boxes or [None])[0], (bios or [None])[0]
 
     # (row, param, raw) in the order the old templates give them
