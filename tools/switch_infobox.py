@@ -900,7 +900,9 @@ def run(repo, clients: dict, wikidata, mapping: dict, tree: dict, apply: bool, a
             continue
         entity = repo.entity(item)
         label = entity.get("labels", {}).get(lang, {}).get("value")
-        resolver = resolvers.setdefault(lang, Resolver(lang, repo, wikidata, client))
+        if lang not in resolvers:  # one per wiki, built when first needed
+            resolvers[lang] = Resolver(lang, repo, wikidata, client)
+        resolver = resolvers[lang]
         claims = item_claims(entity)
         coming = {prop: where for prop, where in pending.get(item, {}).items() if prop not in claims}
         plan = plan_page(Page(lang, title, item, rev[0], rev[1], label), {**claims, **{p: [None] for p in coming}},

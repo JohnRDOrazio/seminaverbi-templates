@@ -623,6 +623,21 @@ def test_dates_before_the_gregorian_reform_carry_the_julian_calendar_model():
     assert isinstance(si.convert("time", "29 February 1700", "en", resolver()), Unresolved)
 
 
+def test_one_resolver_is_built_per_wiki(monkeypatch):
+    built = []
+    real = si.Resolver
+
+    def counting(*args):
+        built.append(args[0])
+        return real(*args)
+    monkeypatch.setattr(si, "Resolver", counting)
+    repo, client = film_world()
+    client.pages["Other"], client.revid["Other"] = FILM_TEXT, 10
+    repo.links["en", "Other"] = "Q101"
+    si.run(repo, {"en": client}, Wikidata(), MAPPING, {"en": set()}, apply=False, out=lambda *a: None)
+    assert built == ["en"]
+
+
 TV = """{{Infobox television
 | name = Fringe
 | first_aired = %s
