@@ -711,3 +711,18 @@ def test_page_plans_do_not_share_their_default_lists():
     for field in ("covered", "missing_images", "duplicates", "unconvertible"):
         getattr(one, field).append("x")
         assert getattr(two, field) == [], field
+
+
+def test_main_reports_missing_credentials_but_does_not_hide_other_key_errors(capsys, monkeypatch):
+    monkeypatch.delenv("SV_EDITOR_USER", raising=False)
+    monkeypatch.delenv("SV_EDITOR_PASSWORD", raising=False)
+    monkeypatch.setattr(si, "WikiClient", lambda lang: pytest.fail("no client before the credentials"))
+    assert si.main(["--wiki", "en", "--apply"]) == 1
+    assert "SV_EDITOR_USER" in capsys.readouterr().err
+
+    def broken(*a, **kw):
+        raise KeyError("a bug")
+    monkeypatch.setattr(si, "run", broken)
+    repo, client = film_world()
+    with pytest.raises(KeyError):
+        si.main(["--wiki", "en"], repo=repo, clients={"en": client}, wikidata=Wikidata())

@@ -1105,12 +1105,15 @@ def main(argv=None, repo=None, clients=None, wikidata=None, out=print) -> int:
             import_log = Path(args.import_log).read_text(encoding="utf-8")
         except OSError as exc:
             parser.error(f"--import-log: {exc}")
+    user, password = os.environ.get("SV_EDITOR_USER"), os.environ.get("SV_EDITOR_PASSWORD")
+    if clients is None and args.apply and not (user and password):
+        print("ERROR: --apply needs SV_EDITOR_USER and SV_EDITOR_PASSWORD (a bot password)", file=sys.stderr)
+        return 1
     try:
         if clients is None:
             clients = {lang: WikiClient(lang) for lang in langs}
             repo = clients.get("en") or WikiClient("en")
             if args.apply:
-                user, password = os.environ["SV_EDITOR_USER"], os.environ["SV_EDITOR_PASSWORD"]
                 for client in {id(c): c for c in [*clients.values(), repo]}.values():
                     client.login(user, password)
         wikidata = wikidata or WikidataClient()
@@ -1125,7 +1128,7 @@ def main(argv=None, repo=None, clients=None, wikidata=None, out=print) -> int:
             pages = [p for p in pages if (p[0], p[1]) in only]
         return run(repo, clients, wikidata, load_mapping(), tree_names(load(ROOT)), args.apply, accept, pages,
                    import_log, out, args.tools_dir)
-    except (SyncError, KeyError, OSError) as exc:
+    except (SyncError, OSError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
