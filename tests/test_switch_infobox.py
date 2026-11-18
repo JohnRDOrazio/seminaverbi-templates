@@ -690,3 +690,15 @@ def test_every_unwritten_value_of_a_one_value_row_is_reported(capsys):
     # nothing converts: the row is unresolved with every value, not also reported as unconvertible
     plan = tv_plan("circa 2008", "about 2009")
     assert plan.unconvertible == [] and [raw for _, raw in plan.unresolved] == ["circa 2008", "about 2009"]
+
+
+def test_infobox_parameter_names_match_whatever_their_case():
+    # it.wiki's {{Dramma}} is mapped with capitalised keys; editors write them in either case
+    text = "{{Dramma\n| genere = [[Tragedia]]\n| PRIMAPUBBLICAZIONE = 1603\n}}\nTesto."
+    repo = Repo([entity("Q100", ["Q2031"], {"it": "Amleto"})], {("it", "Tragedia"): "Q40"})
+    plan = si.plan_page(page(text, "it", "Amleto", label="Amleto"), claims_of(repo.entity("Q100")), MAPPING,
+                        resolver("it", repo=repo))
+    assert plan.layout == "play" and plan.blocked is None
+    assert [(prop, dv) for prop, dv, _ in plan.writes] == [
+        (P["publication_date"], si._time_value(1603, None, None, "1603").datavalues[0]),
+        (P["genre"], item_dv("Q40"))]
