@@ -1,5 +1,5 @@
 """python -m tools.switch_infobox [--wiki en,it] [--page TITLE]… [--accept-loss TITLE]… [--apply]
-       [--import-log FILE]
+       [--import-log FILE] [--progress FILE]
 
 Switches the connected articles from their Wikipedia infobox to a bare {{SV infobox}}, after moving onto
 the article's item every fact the old infobox shows in an SV row that the item lacks (config/
@@ -35,6 +35,10 @@ Values resolving to a Wikidata item with no local copy need importing: the dry r
 without --import-log prints the EnrichItems command and stops (exit 3); with it, the local IDs come from
 its IMPORT lines. --apply writes the statements, then saves each page as tools.file_items does (base
 revision; the preview keeps every tree category; the saved revision verified).
+A property's statements are recorded in --progress (default ~/.local/state/seminaverbi/switch_progress.json)
+before the first is written and dropped once all are on the item: a run that stopped midway leaves the
+record, so the next run finishes that row (and no other page relies on it until then), while a property
+with no record was on the item before and stays as it is.
 Credentials (with --apply): SV_EDITOR_USER / SV_EDITOR_PASSWORD (a bot password).
 """
 from __future__ import annotations
@@ -48,6 +52,7 @@ import re
 import sys
 import time
 import unicodedata
+import dataclasses
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import NamedTuple
@@ -596,10 +601,57 @@ def plan_bio(bio, bio_conf: dict, label: str | None) -> tuple[list, list, BioPla
     return bio_raws, extra, bio_plan
 
 
-def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accept_loss: bool = False):
+DEFAULT_PROGRESS = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state")) / "seminaverbi" / \
+    "switch_progress.json"
+
+
+class Progress:
+    """The statement write sets a page started on an item and has not finished: "item|prop" -> {"page",
+    "values" (every value the page writes or saw for the property), "written"}. A set is recorded before its
+    first write and removed once all its values are on the item, so a property with a record was written in
+    part by this tool, and one without was on the item before. With a path it outlives the run (an
+    interrupted run leaves its records for the next one)."""
+
+    def __init__(self, path=None):
+        self.path = Path(path) if path else None
+        self.sets = {}
+        if self.path and self.path.exists():
+            self.sets = json.loads(self.path.read_text(encoding="utf-8"))
+
+    def _save(self):
+        if self.path:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = self.path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(self.sets, indent=1, sort_keys=True), encoding="utf-8")
+            os.replace(tmp, self.path)
+
+    def unfinished(self, item: str, prop: str) -> dict | None:
+        return self.sets.get(f"{item}|{prop}")
+
+    def of_item(self, item: str) -> dict:
+        """prop -> record for `item`."""
+        return {k.split("|", 1)[1]: v for k, v in self.sets.items() if k.split("|", 1)[0] == item}
+
+    def start(self, item: str, prop: str, page: str, values: list) -> None:
+        self.sets.setdefault(f"{item}|{prop}", {"page": page, "values": values, "written": []})
+        self._save()
+
+    def wrote(self, item: str, prop: str, value) -> None:
+        record = self.sets.get(f"{item}|{prop}")
+        if record is not None and value not in record["written"]:
+            record["written"].append(value)
+            self._save()
+
+    def finish(self, item: str, prop: str) -> None:
+        if self.sets.pop(f"{item}|{prop}", None) is not None:
+            self._save()
+
+
+def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accept_loss: bool = False,
+              unfinished: dict | None = None):
     """What switching `page` takes; None when it has no Wikipedia infobox or {{Bio}}; blocked for the author
     when it calls {{SV infobox}} already and has one too. `item_claims`: prop -> datavalues the item has
-    (item_claims())."""
+    (item_claims()); `unfinished`: prop -> this page's unfinished write set (Progress) on the item."""
     lang, props = page.lang, mapping["props"]
     templates = mapping["templates"].get(lang, {})
     bio_conf = mapping["bio"].get(lang)
@@ -732,13 +784,11 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
             # a value that does not convert is reported, not dropped silently
             unconvertible += [(key, raw) for raw in failed]
         if have is not None:
-            # a multi-value row the item has: its values all among the box's is what a run that wrote the row
-            # in part leaves, so the box's other values are written; a value of the item's that the box does
-            # not show means the item's property was complete before, and the item's facts stand
+            # a multi-value row the item has: written in part by this page (an unfinished write set) its other
+            # values are written; else the item's property was there before, and the item's facts stand
             known = [h.get("value") for h in have if h]
             lacking = [dv for v in converted or [] for dv in v.datavalues if dv.get("value") not in known]
-            box = [dv.get("value") for v in converted or [] for dv in v.datavalues]
-            if not lacking or len(known) < len(have) or any(k not in box for k in known):
+            if not (unfinished or {}).get(prop) or not lacking or len(known) < len(have):
                 covered.append(prop)
                 continue
             had[prop] = have
@@ -997,9 +1047,12 @@ def _with_imports(dv: dict, mapped: dict) -> dict:
 
 
 def run(repo, clients: dict, wikidata, mapping: dict, tree: dict, apply: bool, accept=(), pages=None,
-        import_log: str | None = None, out=print, tools_dir: str = "<tools-dir>") -> int:
+        import_log: str | None = None, out=print, tools_dir: str = "<tools-dir>", progress: Progress | None = None
+        ) -> int:
     """`tree`: lang -> the tree's category names (kept by every save); `pages`: (lang, title, item) to look
-    at (default: every connected article)."""
+    at (default: every connected article); `progress`: the unfinished write sets (main() keeps them in a
+    file; without one, a run knows only its own)."""
+    progress = Progress() if progress is None else progress
     accept = set(accept)
     pages = gather(clients, repo) if pages is None else pages
     names = {v: k for k, v in mapping["props"].items() if isinstance(v, str) and v.startswith("P")}
@@ -1018,12 +1071,24 @@ def run(repo, clients: dict, wikidata, mapping: dict, tree: dict, apply: bool, a
             resolvers[lang] = Resolver(lang, repo, wikidata, client)
         resolver = resolvers[lang]
         claims = item_claims(entity)
+        here = f"{lang}:{title}"
+        sets = progress.of_item(item)
+        for prop, record in sets.items():  # a set whose values all reached the item (the run stopped after)
+            if all(v in [(c or {}).get("value") for c in claims.get(prop, [])] for v in record["values"]):
+                progress.finish(item, prop)
+        sets = progress.of_item(item)
         coming = {prop: where for prop, where in pending.get(item, {}).items() if prop not in claims}
         plan = plan_page(Page(lang, title, item, rev[0], rev[1], label), {**claims, **{p: [None] for p in coming}},
-                         mapping, resolver, accept_loss=(lang, title) in accept)
+                         mapping, resolver, accept_loss=(lang, title) in accept,
+                         unfinished={p: r for p, r in sets.items() if r["page"] == here})
         if plan is None:
             counts["already SV" if has_sv_infobox(rev[1], item) else "no infobox"] += 1
             continue
+        others = sorted({p for p in [*plan.covered, *(w[0] for w in plan.writes)]
+                         if p in sets and sets[p]["page"] != here})
+        if others and not plan.blocked:
+            plan = dataclasses.replace(plan, blocked="; ".join(f"the item's {p} {names.get(p, '?')} was written in part for "
+                                     f"{sets[p]['page']}: switch that page first" for p in others))
         plans.append(plan)
         relies[lang, title] = {p: coming[p] for p in plan.covered if p in coming}
         if not plan.blocked:
@@ -1068,7 +1133,8 @@ def run(repo, clients: dict, wikidata, mapping: dict, tree: dict, apply: bool, a
             failed.append(where)
             out(f"{where}: FAILED {why}")
             continue
-        status = _apply(repo, clients[plan.lang], plan, mapping, tree, mapped, out, relies.get((plan.lang, plan.title)))
+        status = _apply(repo, clients[plan.lang], plan, mapping, tree, mapped, out, relies.get((plan.lang, plan.title)),
+                        progress)
         if status == "saved":
             saved += 1
         elif status == "blocked":
@@ -1117,15 +1183,18 @@ def _add_claim(repo, item: str, prop: str, dv: dict) -> None:
             _sleep(2 ** (attempt + 1))
 
 
-def _apply(repo, client, plan: PagePlan, mapping: dict, tree: dict, mapped: dict, out, relies=None) -> str:
+def _apply(repo, client, plan: PagePlan, mapping: dict, tree: dict, mapped: dict, out, relies=None,
+           progress: Progress | None = None) -> str:
     where = f"{plan.lang}:{plan.title}"
     image_prop = mapping["props"]["image"]
     params = dict(plan.params)
     # what the item has now: an earlier page of this run may have written a row, or failed to
     current = item_claims(repo.entity(plan.item))
-    lacking = sorted({w for p, w in (relies or {}).items() if p not in current})
+    progress = Progress() if progress is None else progress
+    # a row left to another page's statements: they must all be on the item, not only the property
+    lacking = sorted({w for p, w in (relies or {}).items() if p not in current or progress.unfinished(plan.item, p)})
     if lacking:
-        out(f"{where}: FAILED relies on {', '.join(lacking)} for statements that were not written")
+        out(f"{where}: FAILED relies on {', '.join(lacking)} for statements that were not all written")
         return "failed"
     # a property the item has now is left as it is, unless each of its values is one the plan writes or saw
     # (a multi-value row written in part): then only the values it lacks are written
@@ -1151,9 +1220,13 @@ def _apply(repo, client, plan: PagePlan, mapping: dict, tree: dict, mapped: dict
         if now is None or now[0] != plan.revid:
             out(f"{where}: FAILED changed since it was read; no statement written; run again")
             return "failed"
+    started = list(dict.fromkeys(prop for prop, _, _ in todo))
+    for prop in started:  # the whole write set, recorded before its first value
+        progress.start(plan.item, prop, where, ours[prop])
     for prop, dv, shown in todo:
         try:
             _add_claim(repo, plan.item, prop, _with_imports(dv, mapped))
+            progress.wrote(plan.item, prop, _with_imports(dv, mapped).get("value"))
         except Transient as exc:
             # the server did not answer: nothing is known about the file, so nothing is guessed
             out(f"{where}: FAILED writing {prop} = {shown}: {exc}")
@@ -1166,6 +1239,8 @@ def _apply(repo, client, plan: PagePlan, mapping: dict, tree: dict, mapped: dict
                 continue
             out(f"{where}: FAILED writing {prop} = {shown}: {exc}")
             return "failed"
+    for prop in started:
+        progress.finish(plan.item, prop)
     text = plan.new_text
     if params != plan.params:
         bio_name = (mapping["bio"].get(plan.lang) or {}).get("template")
@@ -1277,6 +1352,8 @@ def main(argv=None, repo=None, clients=None, wikidata=None, out=print) -> int:
                         help="switch this page with its unresolved rows dropped (repeatable; LANG:TITLE)")
     parser.add_argument("--apply", action="store_true")
     parser.add_argument("--import-log", metavar="FILE", help="output of the EnrichItems --import command")
+    parser.add_argument("--progress", metavar="FILE", default=str(DEFAULT_PROGRESS),
+                        help="where the unfinished statement write sets are kept between runs (default: %(default)s)")
     parser.add_argument("--tools-dir", default=os.environ.get("SV_TOOLS_DIR", "<tools-dir>"),
                         help="server directory holding EnrichItems.php (for the printed command)")
     args = parser.parse_args(argv)
@@ -1312,7 +1389,7 @@ def main(argv=None, repo=None, clients=None, wikidata=None, out=print) -> int:
         if only:
             pages = [p for p in pages if (p[0], p[1]) in only]
         return run(repo, clients, wikidata, load_mapping(), tree_names(load(ROOT)), args.apply, accept, pages,
-                   import_log, out, args.tools_dir)
+                   import_log, out, args.tools_dir, Progress(args.progress))
     except (SyncError, OSError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1

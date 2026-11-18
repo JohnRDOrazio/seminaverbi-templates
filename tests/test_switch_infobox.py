@@ -976,7 +976,7 @@ def test_a_page_changed_after_planning_writes_no_statement(capsys):
     assert "changed since it was read" in out
 
 
-def test_a_row_written_in_part_is_finished_on_the_next_run(capsys):
+def _two_director_film():
     text = FILM_TEXT.replace("Dave Wilson]]", "Dave Wilson]] and [[Jane Roe]]")
     repo, client = film_world()
     repo.links["en", "Jane Roe"] = "Q502"
@@ -988,24 +988,67 @@ def test_a_row_written_in_part_is_finished_on_the_next_run(capsys):
             raise SyncError("en: adding P57 failed: database locked")
         real(item, prop, datavalue, tags, summary)
     repo.add_claim = down_on_the_second_director
-    assert si.run(repo, {"en": client}, Wikidata(), MAPPING, {"en": set()}, apply=True, out=print) == 1
+    return text, repo, client, real
+
+
+def test_a_row_written_in_part_is_finished_on_the_next_run(capsys, tmp_path):
+    text, repo, client, real = _two_director_film()
+    journal = tmp_path / "progress.json"
+    assert si.run(repo, {"en": client}, Wikidata(), MAPPING, {"en": set()}, apply=True, out=print,
+                  progress=si.Progress(journal)) == 1
     assert client.edits == [] and repo.entity("Q100")["claims"][P["director"]] == [statement(item_dv("Q501"))]
-    # the next run sees director A on the item: it writes B, not A again, before the switch
+    # the unfinished write set outlives the run
+    assert si.Progress(journal).unfinished("Q100", P["director"])["page"] == "en:Bloodshot (film)"
+    # the next run (a new process, the same file) writes B, not A again, before the switch
     repo.add_claim = real
     capsys.readouterr()
-    assert si.run(repo, {"en": client}, Wikidata(), MAPPING, {"en": set()}, apply=True, out=print) == 0
+    assert si.run(repo, {"en": client}, Wikidata(), MAPPING, {"en": set()}, apply=True, out=print,
+                  progress=si.Progress(journal)) == 0
     assert [dv for _, p, dv in repo.added if p == P["director"]] == [item_dv("Q501"), item_dv("Q502")]
     assert len(client.edits) == 1
-    # a director the box does not show: the item's property was complete before, nothing is written
-    repo, client = film_world()
-    repo.links["en", "Jane Roe"] = "Q502"
+    assert si.Progress(journal).unfinished("Q100", P["director"]) is None
+
+
+def test_values_the_item_had_before_the_migration_stand():
+    # director A on the item with no unfinished write set: the item's property was there before, and it stays
+    # as it is (nothing added from the box)
+    text, repo, client, _ = _two_director_film()
+    repo.entity("Q100")["claims"][P["director"]] = [statement(item_dv("Q501"))]
+    plan = si.plan_page(page(text), claims_of(repo.entity("Q100")), MAPPING, resolver(repo=repo, client=client))
+    assert P["director"] not in [w[0] for w in plan.writes] and P["director"] in plan.covered
     repo.entity("Q100")["claims"][P["director"]] = [statement(item_dv("Q501")), statement(item_dv("Q42"))]
     plan = si.plan_page(page(text), claims_of(repo.entity("Q100")), MAPPING, resolver(repo=repo, client=client))
     assert P["director"] not in [w[0] for w in plan.writes] and P["director"] in plan.covered
-    # every value of the box on the item already: covered
-    repo.entity("Q100")["claims"][P["director"]] = [statement(item_dv("Q502")), statement(item_dv("Q501"))]
-    plan = si.plan_page(page(text), claims_of(repo.entity("Q100")), MAPPING, resolver(repo=repo, client=client))
-    assert P["director"] not in [w[0] for w in plan.writes] and P["director"] in plan.covered
+
+
+def test_a_page_relying_on_a_row_another_page_wrote_in_part_does_not_switch(capsys):
+    # two pages of one item: the second leaves the director row to the first, whose write stopped after A
+    text, repo, client, _ = _two_director_film()
+    # the date on the item already: director B is the last write, so only the director row is incomplete
+    repo.entity("Q100")["claims"][P["publication_date"]] = [statement(si._time_value(2020, 2, 21, "").datavalues[0])]
+    client.pages["Bloodshot (2020)"] = text
+    client.revid["Bloodshot (2020)"] = 10
+    pages = [("en", "Bloodshot (film)", "Q100"), ("en", "Bloodshot (2020)", "Q100")]
+    assert si.run(repo, {"en": client}, Wikidata(), MAPPING, {"en": set()}, apply=True, out=print, pages=pages,
+                  progress=si.Progress()) == 1
+    out = capsys.readouterr().out
+    assert client.edits == []
+    assert "en:Bloodshot (2020): FAILED relies on en:Bloodshot (film)" in out
+
+
+def test_a_later_run_blocks_a_page_on_a_row_another_page_left_unfinished(capsys):
+    text, repo, client, real = _two_director_film()
+    progress = si.Progress()
+    si.run(repo, {"en": client}, Wikidata(), MAPPING, {"en": set()}, apply=True, out=print, progress=progress)
+    repo.add_claim = real
+    client.pages["Bloodshot (2020)"] = text
+    client.revid["Bloodshot (2020)"] = 10
+    capsys.readouterr()
+    si.run(repo, {"en": client}, Wikidata(), MAPPING, {"en": set()}, apply=True, out=print,
+           pages=[("en", "Bloodshot (2020)", "Q100")], progress=progress)
+    out = capsys.readouterr().out
+    assert client.edits == []
+    assert "written in part for en:Bloodshot (film)" in out
 
 
 def test_a_row_on_the_item_whose_box_value_does_not_convert_stays_covered():
