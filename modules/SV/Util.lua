@@ -19,6 +19,17 @@ function p.msg(key, lang, ...)
 	end))
 end
 
+-- The row of an infobox layout (config/infobox.json) with this key, or nil. {{SV bio}} reads the
+-- person rows so the sentence and the infobox show the same facts.
+function p.layoutRow(layout, key)
+	for _, row in ipairs(mw.loadData('Module:SV/Data').infobox[layout] or {}) do
+		if row.key == key then
+			return row
+		end
+	end
+	return nil
+end
+
 function p.lang()
 	return mw.language.getContentLanguage():getCode()
 end

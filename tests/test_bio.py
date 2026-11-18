@@ -398,6 +398,13 @@ def test_occupation_cap_is_the_infobox_config_value():
     assert [f.get("max") for f in person if f["key"] == "occupation"] == [3]
 
 
+def test_layout_row_reads_the_infobox_config():
+    e = env("it")
+    assert e.call("Module:SV/Util", "layoutRow", "person", "occupation").max == 3
+    assert e.call("Module:SV/Util", "layoutRow", "person", "nope") is None
+    assert e.call("Module:SV/Util", "layoutRow", "nope", "occupation") is None
+
+
 def test_bach_julian_birth_date_shown_gregorian():
     # the local Bach item: 1685-03-21 (Julian) [preferred]; 1685-03-31 (Gregorian)
     julian = dict(time("+1685-03-21T00:00:00Z", 11), rank="preferred")
