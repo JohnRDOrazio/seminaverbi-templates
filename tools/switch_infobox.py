@@ -63,6 +63,8 @@ ROOT = Path(__file__).resolve().parent.parent
 TAG = "seminaverbi-mcp"
 MAIN_PAGE_ITEM = "Q4"
 GREGORIAN = "http://www.wikidata.org/entity/Q1985727"
+JULIAN = "http://www.wikidata.org/entity/Q1985786"
+GREGORIAN_REFORM = (1582, 10, 15)  # first Gregorian day
 SV_INFOBOXES = {"SV infobox", "SV infobox work", "SV infobox person"}
 SV_CATEGORIES = "SV categories"
 LIST_HELPERS = {"Plainlist", "Plain list", "Flatlist", "Flat list", "Unbulleted list", "Ubl", "Hlist", "Nowrap"}
@@ -313,13 +315,19 @@ def _convert_items(raw: str, resolver) -> Value | Unresolved:
 def _time_value(y: int, m: int | None, d: int | None, shown: str) -> Value | Unresolved:
     if not 1 <= y <= 9999 or (m is not None and not 1 <= m <= 12):
         return Unresolved(f"not a date: {shown}")
-    if d is not None and (m is None or not 1 <= d <= calendar.monthrange(y, m)[1]):
+    julian = (y, m or 0, d or 0) < GREGORIAN_REFORM
+    # a Julian year divisible by 4 is a leap year (29 February 1500)
+    last = 29 if julian and m == 2 and y % 4 == 0 else calendar.monthrange(y, m)[1] if m else 0
+    if d is not None and (m is None or not 1 <= d <= last):
         return Unresolved(f"not a date: {shown}")
     precision = 11 if d is not None else 10 if m is not None else 9
     iso = f"{y:04d}-{m or 0:02d}-{d or 0:02d}"
     shown = iso if precision == 11 else iso[:7] if precision == 10 else str(y)
+    # the date is stored as written, never converted: Wikipedia gives a date before the Gregorian reform in
+    # the Julian calendar (as Wikidata stores it), a later one in the Gregorian
+    model = JULIAN if julian else GREGORIAN
     return Value([{"type": "time", "value": {"time": f"+{iso}T00:00:00Z", "timezone": 0, "before": 0, "after": 0,
-                                             "precision": precision, "calendarmodel": GREGORIAN}}], shown)
+                                             "precision": precision, "calendarmodel": model}}], shown)
 
 
 def _month(name: str) -> int | None:

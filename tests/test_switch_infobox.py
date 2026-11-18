@@ -609,6 +609,20 @@ def test_non_ascii_digits_are_not_a_date():
     assert si.DATE.findall("nato nel ١٩٤٠") == []
 
 
+def test_dates_before_the_gregorian_reform_carry_the_julian_calendar_model():
+    # Wikipedia gives dates before 15 October 1582 in the Julian calendar, as Wikidata stores them
+    def model(raw):
+        return si.convert("time", raw, "en", resolver()).datavalues[0]["value"]["calendarmodel"]
+    julian, gregorian = "http://www.wikidata.org/entity/Q1985786", "http://www.wikidata.org/entity/Q1985727"
+    assert model("{{Birth date|1452|4|15}}") == julian
+    assert model("15 aprile 1452") == julian
+    assert model("1582-10-04") == julian and model("1500") == julian
+    assert model("1582-10-15") == gregorian and model("31 March 1685") == gregorian and model("1999") == gregorian
+    # a Julian-only leap day exists; a Gregorian one still does not
+    assert model("29 February 1500") == julian
+    assert isinstance(si.convert("time", "29 February 1700", "en", resolver()), Unresolved)
+
+
 TV = """{{Infobox television
 | name = Fringe
 | first_aired = %s
