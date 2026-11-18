@@ -115,45 +115,47 @@
 	background: #eef0f3;
 }
 
-/* Dark mode: the night theme, and the automatic theme on a dark system. */
-html.skin-theme-clientpref-night .sv-infobox {
-	background: #101418;
-	color: #eaecf0;
-	border-color: #3a3f45;
-}
-html.skin-theme-clientpref-night .sv-infobox caption {
-	color: #fff;
-}
-html.skin-theme-clientpref-night .sv-infobox th,
-html.skin-theme-clientpref-night .sv-infobox td {
-	border-top-color: #2a2f35;
-}
-html.skin-theme-clientpref-night .sv-infobox td.sv-infobox-original,
-html.skin-theme-clientpref-night .sv-infobox td.sv-infobox-source {
-	background: #181c21;
-	color: #a2a9b1;
-}
-html.skin-theme-clientpref-night .sv-infobox-album th,
-html.skin-theme-clientpref-night .sv-infobox-song th,
-html.skin-theme-clientpref-night .sv-infobox-group th {
-	background: #2e2431;
-}
-html.skin-theme-clientpref-night .sv-infobox-film th,
-html.skin-theme-clientpref-night .sv-infobox-tv th {
-	background: #1f2a35;
-}
-html.skin-theme-clientpref-night .sv-infobox-book th,
-html.skin-theme-clientpref-night .sv-infobox-play th {
-	background: #33221f;
-}
-html.skin-theme-clientpref-night .sv-infobox-artwork th {
-	background: #332b1c;
-}
-html.skin-theme-clientpref-night .sv-infobox-person th {
-	background: #1f2e23;
-}
-html.skin-theme-clientpref-night .sv-infobox-work th {
-	background: #25292e;
+/* Dark mode, on screen only: the night theme, and the automatic theme on a dark system. */
+@media screen {
+	html.skin-theme-clientpref-night .sv-infobox {
+		background: #101418;
+		color: #eaecf0;
+		border-color: #3a3f45;
+	}
+	html.skin-theme-clientpref-night .sv-infobox caption {
+		color: #fff;
+	}
+	html.skin-theme-clientpref-night .sv-infobox th,
+	html.skin-theme-clientpref-night .sv-infobox td {
+		border-top-color: #2a2f35;
+	}
+	html.skin-theme-clientpref-night .sv-infobox td.sv-infobox-original,
+	html.skin-theme-clientpref-night .sv-infobox td.sv-infobox-source {
+		background: #181c21;
+		color: #a2a9b1;
+	}
+	html.skin-theme-clientpref-night .sv-infobox-album th,
+	html.skin-theme-clientpref-night .sv-infobox-song th,
+	html.skin-theme-clientpref-night .sv-infobox-group th {
+		background: #2e2431;
+	}
+	html.skin-theme-clientpref-night .sv-infobox-film th,
+	html.skin-theme-clientpref-night .sv-infobox-tv th {
+		background: #1f2a35;
+	}
+	html.skin-theme-clientpref-night .sv-infobox-book th,
+	html.skin-theme-clientpref-night .sv-infobox-play th {
+		background: #33221f;
+	}
+	html.skin-theme-clientpref-night .sv-infobox-artwork th {
+		background: #332b1c;
+	}
+	html.skin-theme-clientpref-night .sv-infobox-person th {
+		background: #1f2e23;
+	}
+	html.skin-theme-clientpref-night .sv-infobox-work th {
+		background: #25292e;
+	}
 }
 @media screen and (prefers-color-scheme: dark) {
 	html.skin-theme-clientpref-os .sv-infobox {

@@ -106,6 +106,15 @@ def test_person_place_climbs_to_the_town():
     assert row("death_place", "Lafayette Street") in out
 
 
+def test_two_places_climbing_to_one_town_show_it_once():
+    person = {"Q2": {"labels": {"en": "X"}, "claims": {"P818": [item("Q40"), item("Q43")]}},
+              "Q40": {"labels": {"en": "Brixton"}, "claims": {"P2016": [item("Q3467")], "P294": [item("Q41")]}},
+              "Q43": {"labels": {"en": "Soho"}, "claims": {"P2016": [item("Q3467")], "P294": [item("Q41")]}},
+              "Q41": {"labels": {"en": "London"}, "sitelinks": {"enwiki": "London"}}}
+    out = render(kind="person", lang="en", page_entity="Q2", entities=person)
+    assert row("birth_place", "[[wikipedia:en:London|London]]") in out
+
+
 def test_values_are_escaped():
     evil = {"Q5": {"labels": {"en": 'A <b>"x"'}, "claims": {"P3990": [item("Q6")]}}, "Q6": {"labels": {"en": "<i>y"}}}
     out = render(lang="en", page_entity="Q5", entities=evil)

@@ -8,10 +8,15 @@ local p = {}
 local label, itemLink, formatTime = Util.label, Util.itemLink, Util.formatTime
 
 local function values(entity, field, lang)
-	local out = {}
+	local out, seen = {}, {}
 	for _, v in ipairs(Util.best(entity, field.propId)) do
 		if field.kind == 'item' then
-			out[#out + 1] = itemLink(Util.place(v.id, field.climb, lang), lang)
+			-- two places can climb to one town: show it once
+			local id = Util.place(v.id, field.climb, lang)
+			if not seen[id] then
+				seen[id] = true
+				out[#out + 1] = itemLink(id, lang)
+			end
 		elseif field.kind == 'time' then
 			out[#out + 1] = formatTime(v)
 		elseif field.kind == 'monolingual' then

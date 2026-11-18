@@ -363,7 +363,10 @@ class EnrichItems extends Maintenance {
 	 * @return string[] local item IDs
 	 */
 	private function localItems( array $imported = [] ): array {
-		$items = array_merge( (array)$this->getOption( 'item', [] ), $imported );
+		// The same normalisation validateArguments() checked: " q5" is Q5.
+		$given = array_map( static fn ( $id ) => strtoupper( trim( (string)$id ) ),
+			(array)$this->getOption( 'item', [] ) );
+		$items = array_merge( $given, $imported );
 		$wikis = $this->getOption( 'from-articles' );
 		if ( $wikis ) {
 			$provider = MediaWikiServices::getInstance()->getConnectionProvider();
