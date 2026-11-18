@@ -441,10 +441,34 @@ function p.main(frame)
 		end
 	end
 	local out = p._sentence(entity, Util.lang(), text)
-	if not (out:match('[%.!?]$') or endsWith(out, '…')) then
+	-- citations at the very end of the free text come after the full stop, as Bio places them
+	local cites = ''
+	while true do
+		local body, cite = out:match('^(.-)(%s*\127[^\127]*\127)$')  -- a parsed <ref>: a strip marker
+		if not body then
+			body, cite = out:match('^(.-)(%s*<ref[^>]-/>)$')
+		end
+		if not body then
+			local at = out:match('.*()<ref[%s>]')
+			if at and out:sub(at):match('^<ref[^>]*>.-</ref>%s*$') and not out:sub(at + 4):find('<ref', 1, true) then
+				body, cite = out:sub(1, at - 1), out:sub(at)
+			end
+		end
+		if not body then
+			break
+		end
+		out, cites = body, cite .. cites
+	end
+	-- punctuation inside closing markup (''…!'', </small>) ends the sentence already
+	local tail = out
+	repeat
+		local before = tail
+		tail = tail:gsub("''+$", ''):gsub('</%w+>$', ''):gsub('%s+$', '')
+	until tail == before
+	if not (tail:match('[%.!?]$') or endsWith(tail, '…')) then
 		out = out .. '.'
 	end
-	return out .. (args.ref or '')
+	return out .. cites .. (args.ref or '')
 end
 
 return p

@@ -555,7 +555,8 @@ def plan_bio(bio, bio_conf: dict, label: str | None) -> tuple[list, list, BioPla
     raw = {p: v.strip() for p, v in _named(bio).items()}
     # Bio writes "Titolo Nome Cognome", and with a pseudonym "Pseudonimo PostPseudonimo, pseudonimo di
     # Titolo Nome Cognome": these go into the name and the start of the note, not into the free text
-    pseudonym = raw.get("Pseudonimo", "")
+    # (a Pseudonimo holding only a citation is no pseudonym: the citation goes to ref=)
+    pseudonym = "" if _is_refs_only(raw.get("Pseudonimo", "")) else raw.get("Pseudonimo", "")
     head_params = {"Titolo", "Pseudonimo"} | ({"PostPseudonimo"} if pseudonym else set())
     for p, v in _named(bio).items():
         slot = bio_conf["free"].get(p)

@@ -687,3 +687,34 @@ def test_place_climb_is_capped_and_uses_the_best_rank():
     ents = dict(PLACES, **{BRIXTON: {"id": BRIXTON, "labels": {"it": "Brixton"},
                                      "claims": {"P2016": [item(NEIGHBOURHOOD, "deprecated")], "P294": [item(LONDON)]}}})
     assert bowie_at(BRIXTON, NEW_YORK, ents).startswith("David Bowie (Brixton, 8 gennaio 1947")
+
+
+def test_place_of_a_subclass_of_a_climb_class_climbs():
+    # (St Columba's Hospital) instance of hospital building, a subclass of building: still climbs
+    hospital_building = "Q49001"
+    ents = dict(PLACES, **{
+        hospital_building: {"id": hospital_building, "labels": {"it": "edificio ospedaliero"},
+                            "claims": {"P1709": [item(BUILDING)]}},
+        BRIXTON: place(BRIXTON, "St Columba's Hospital", [hospital_building], [LONDON])})
+    assert bowie_at(BRIXTON, NEW_YORK, ents).startswith("David Bowie (Londra, 8 gennaio 1947")
+    # a class whose ancestors are not in the list (comune → settlement) stays put
+    ents = dict(PLACES, **{"Q49002": {"id": "Q49002", "labels": {}, "claims": {"P1709": [item("Q49003")]}},
+                           BRIXTON: place(BRIXTON, "Brixton", ["Q49002"], [LONDON])})
+    assert bowie_at(BRIXTON, NEW_YORK, ents).startswith("David Bowie (Brixton, 8 gennaio 1947")
+
+
+def test_main_puts_the_full_stop_inside_closing_markup_and_before_trailing_citations():
+    e = env("it")
+    main = lambda rest: e.call("Module:SV/Bio", "main", e.frame({}, {"rest": rest}))
+    head = "Nek (Sassuolo, 6 gennaio 1972) è un cantautore italiano "
+    # punctuation inside closing markup ends the sentence already
+    assert main("attivo dal ''1991!''") == head + "attivo dal ''1991!''"
+    assert main("attivo dal '''1991'''") == head + "attivo dal '''1991'''."
+    # a citation at the end of rest= comes after the full stop, as Bio places it
+    assert main("autore<ref>T.</ref>") == head + "autore.<ref>T.</ref>"
+    assert main("autore<ref name=\"a\"/>") == head + "autore.<ref name=\"a\"/>"
+    # (a parsed <ref> reaches Lua as a strip marker)
+    marker = "\x7f'\"`UNIQ--ref-00000001-QINU`\"'\x7f"
+    assert main("autore" + marker) == head + "autore." + marker
+    # a citation earlier in the text stays where it is
+    assert main("autore<ref>T.</ref> di canzoni") == head + "autore<ref>T.</ref> di canzoni."

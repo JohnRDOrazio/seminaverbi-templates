@@ -207,11 +207,27 @@ function p.place(id, climb, lang)
 	for _, class in ipairs(climb) do
 		fine[class] = true
 	end
+	-- a class in the list, or a subclass of one (hospital building -> building), a few levels up
+	local function isFineClass(class, depth)
+		if fine[class] ~= nil then
+			return fine[class]
+		end
+		fine[class] = false  -- (no loops)
+		if depth > 0 and wb.subclass_of then
+			for _, parent in ipairs(p.itemIds(mw.wikibase.getEntity(class), wb.subclass_of)) do
+				if isFineClass(parent, depth - 1) then
+					fine[class] = true
+					break
+				end
+			end
+		end
+		return fine[class]
+	end
 	for _ = 1, CLIMB_STEPS do
 		local entity = mw.wikibase.getEntity(id)
 		local isFine = false
 		for _, class in ipairs(p.itemIds(entity, wb.instance_of)) do
-			isFine = isFine or fine[class] == true
+			isFine = isFine or isFineClass(class, 3)
 		end
 		local parent = isFine and p.best(entity, wb.located_in)[1]
 		if not (parent and parent.id and p.label(parent.id, lang)) then

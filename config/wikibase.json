@@ -20,6 +20,7 @@
   "inception": "P4732",
   "instance_of": "P2016",
   "located_in": "P294",
+  "subclass_of": "P1709",
   "lyrics_by": "P5825",
   "male": "Q246",
   "occupation": "P63",
