@@ -922,3 +922,32 @@ def test_main_reports_missing_credentials_but_does_not_hide_other_key_errors(cap
     repo, client = film_world()
     with pytest.raises(KeyError):
         si.main(["--wiki", "en"], repo=repo, clients={"en": client}, wikidata=Wikidata())
+
+
+def test_bio_gate_keeps_numerals_and_without_as_facts():
+    old = "<p>Juan (<a>Madrid</a>, 1 enero 1950) es un <a>ciclista</a> español, dos veces campeón sin rival</p>"
+    new = "<p>Juan (<a>Madrid</a>, 1 enero 1950) es un <a>ciclista</a> español, veces campeón rival</p>"
+    assert sorted(si.compare_sentences(old, new, set())[0]) == ["dos", "sin"]
+
+
+def test_a_wiki_error_in_the_person_check_blocks_only_that_page():
+    repo, wd = bio_world()
+    repo.entity("Q200")["claims"][P["instance_of"]] = []
+    res = resolver("it", repo=repo, wikidata=wd)
+
+    def down(item):
+        raise si.SyncError("502 Bad Gateway")
+    res.wikidata_item = down
+    plan = si.plan_page(bio_page(), claims_of(repo.entity("Q200")), MAPPING, res)
+    assert plan.blocked and "502" in plan.blocked and plan.writes == []
+
+
+def test_the_demonym_search_runs_once_per_adjective():
+    wd = Wikidata(hits={("italiano", "it"): ["Q38"]},
+                  entities={"Q38": wd_entity("Q38", {"itwiki": "Italia"}, demonyms=[("it", "italiano")])})
+    calls = []
+    search = wd.search
+    wd.search = lambda text, lang: calls.append(text) or search(text, lang)
+    res = si.Resolver("it", Repo(links={("itwiki", "Italia"): "Q32"}), wd, None)
+    assert res.country("italiano", "Q1") == res.country("italiano", "Q2") == item_dv("Q32")
+    assert calls == ["italiano"]

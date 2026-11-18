@@ -194,7 +194,7 @@ class Resolver:
 
     def __init__(self, lang: str, repo, wikidata, client):
         self.lang, self.repo, self.wikidata, self.client = lang, repo, wikidata, client
-        self._items, self._images, self._countries = {}, {}, {}
+        self._items, self._images, self._countries, self._by_demonym = {}, {}, {}, {}
 
     def item(self, title: str):
         """A local item datavalue, an import placeholder, or Unresolved."""
@@ -266,9 +266,11 @@ class Resolver:
                 self.wikidata.prefetch(citizenships)
                 found = [q for q in dict.fromkeys(citizenships) if self._demonym(q, adjective)]
             if len(found) != 1:
-                hits = self.wikidata.search(adjective, self.lang)
-                self.wikidata.prefetch(hits)
-                found = [q for q in dict.fromkeys(hits) if self._demonym(q, adjective)]
+                if adjective not in self._by_demonym:  # the search does not depend on the person
+                    hits = self.wikidata.search(adjective, self.lang)
+                    self.wikidata.prefetch(hits)
+                    self._by_demonym[adjective] = [q for q in dict.fromkeys(hits) if self._demonym(q, adjective)]
+                found = self._by_demonym[adjective]
             if len(found) != 1:
                 self._countries[key] = Unresolved(
                     f"nationality {adjective!r}: {len(found)} Wikidata items with that demonym")
@@ -646,7 +648,10 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
     if box is None:
         # only {{Bio}}: no Wikipedia box vouches for the item's kind (connect_items may have taken a bare title
         # hit), so the item must be a person, by its local type or else its Wikidata item (connect_items' filter)
-        why = _not_a_person(page.item, item_layout, mapping, resolver)
+        try:
+            why = _not_a_person(page.item, item_layout, mapping, resolver)
+        except SyncError as exc:  # the check needs the wikis: an error there fails this page only
+            why = f"could not be checked for a person ({exc})"
         if why:
             return plan(item_layout or "person",
                         blocked=f"{{{{{bio_name}}}}} on a page whose item {why}: for the author")
@@ -859,11 +864,12 @@ PREDICATE_STOP = {_fold(w) for w in (
     "nello", "nella", "nei", "negli", "nelle", "al", "allo", "alla", "ai", "agli", "alle", "sul", "sullo",
     "sulla", "sui", "sugli", "sulle", "col", "coi", "con", "per", "tra", "fra", "for", "with", "from", "into",
     "dans", "avec", "pour", "sur", "par", "aux", "von", "vom", "mit", "aus", "bei", "für", "zum", "zur", "nach",
-    "por", "para", "sin", "entre", "desde", "com", "pelo", "pela", "pelos", "pelas", "dos", "nos", "nas", "num",
+    "por", "para", "entre", "desde", "com", "pelo", "pela", "pelos", "pelas", "nos", "nas", "num",
     "numa",
     # conjunctions
-    "and", "nonché", "nonche", "oppure", "anche", "oder", "sowie", "que", "che", "mais", "but", "pero", "mas",
+    "and", "nonché", "nonche", "oppure", "anche", "oder", "sowie", "que", "che", "mais", "but", "pero",
 )}
+# not here: es "dos" (two), "sin" (without), "más" (more, folding to "mas"): they state facts
 
 
 def _clean_text(s: str) -> str:
