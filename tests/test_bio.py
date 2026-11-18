@@ -241,7 +241,18 @@ def test_main_uses_page_item():
     e = env("it")
     frame = e.frame({}, {"note": NOTE})
     assert e.call("Module:SV/Bio", "main", frame) == \
-        "Nek, pseudonimo di Filippo Neviani (Sassuolo, 6 gennaio 1972), è un cantautore italiano"
+        "Nek, pseudonimo di Filippo Neviani (Sassuolo, 6 gennaio 1972), è un cantautore italiano."
+
+
+def test_main_ends_the_sentence_before_its_references():
+    # as it.wiki's Bio does: the full stop, then the references (punctuation before a footnote mark)
+    e = env("it")
+    out = e.call("Module:SV/Bio", "main", e.frame({}, {"rest": "e [[poeta]]", "ref": "<ref>x</ref>"}))
+    assert out == "Nek (Sassuolo, 6 gennaio 1972) è un cantautore italiano e [[poeta]].<ref>x</ref>"
+    # free text that already ends the sentence gets no second stop
+    for rest in ("attivo dal 1991.", "attivo dal 1991!", "attivo dal 1991…"):
+        out = e.call("Module:SV/Bio", "main", e.frame({}, {"rest": rest}))
+        assert out == "Nek (Sassuolo, 6 gennaio 1972) è un cantautore italiano " + rest
 
 
 # --- nationality: masculine form and agreement by language rules ---
@@ -596,6 +607,9 @@ def test_other_gender_only_forms_shared_by_both():
 # --- places at Wikidata's finest grain climb to the town (config/infobox.json "climb") ---
 
 NEIGHBOURHOOD, STREET = "Q3467", "Q7267"  # local items "neighborhood", "street"
+# local copies of Wikidata Q2755753, Q211690, Q408804, Q41176, Q1134686, Q253019, Q2983893
+AREA_OF_LONDON, LONDON_BOROUGH, NYC_BOROUGH, BUILDING = "Q48779", "Q48855", "Q48789", "Q167"
+FRAZIONE, ORTSTEIL, QUARTER = "Q48762", "Q48763", "Q48764"
 BRIXTON, LAFAYETTE, MANHATTAN, EMILIA = "Q40", "Q42", "Q43", "Q44"
 
 
@@ -629,6 +643,11 @@ def test_place_classes_configured_on_both_place_rows():
     climb = rows["birth_place"]["climb"]
     assert climb == rows["death_place"]["climb"]
     assert {NEIGHBOURHOOD, STREET} <= set(climb)
+    # the classes of the farm's fine-grained birth/death places (area of London, London borough, borough of
+    # New York City, building) and the subdivisions an article never names (frazione, Ortsteil, quarter)
+    assert {AREA_OF_LONDON, LONDON_BOROUGH, NYC_BOROUGH, BUILDING, FRAZIONE, ORTSTEIL, QUARTER} <= set(climb)
+    # never a town's class: comune, city, town, big city
+    assert not {"Q4221", "Q7625", "Q48769", "Q48766"} & set(climb)
     assert all(q.startswith("Q") and q[1:].isdigit() for q in climb)
 
 
@@ -668,3 +687,85 @@ def test_place_climb_is_capped_and_uses_the_best_rank():
     ents = dict(PLACES, **{BRIXTON: {"id": BRIXTON, "labels": {"it": "Brixton"},
                                      "claims": {"P2016": [item(NEIGHBOURHOOD, "deprecated")], "P294": [item(LONDON)]}}})
     assert bowie_at(BRIXTON, NEW_YORK, ents).startswith("David Bowie (Brixton, 8 gennaio 1947")
+
+
+def test_place_of_a_subclass_of_a_climb_class_climbs():
+    # (St Columba's Hospital) instance of hospital building, a subclass of building: still climbs
+    hospital_building = "Q49001"
+    ents = dict(PLACES, **{
+        hospital_building: {"id": hospital_building, "labels": {"it": "edificio ospedaliero"},
+                            "claims": {"P1709": [item(BUILDING)]}},
+        BRIXTON: place(BRIXTON, "St Columba's Hospital", [hospital_building], [LONDON])})
+    assert bowie_at(BRIXTON, NEW_YORK, ents).startswith("David Bowie (Londra, 8 gennaio 1947")
+    # a class whose ancestors are not in the list (comune → settlement) stays put
+    ents = dict(PLACES, **{"Q49002": {"id": "Q49002", "labels": {}, "claims": {"P1709": [item("Q49003")]}},
+                           BRIXTON: place(BRIXTON, "Brixton", ["Q49002"], [LONDON])})
+    assert bowie_at(BRIXTON, NEW_YORK, ents).startswith("David Bowie (Brixton, 8 gennaio 1947")
+
+
+def test_main_puts_the_full_stop_inside_closing_markup_and_before_trailing_citations():
+    e = env("it")
+    main = lambda rest: e.call("Module:SV/Bio", "main", e.frame({}, {"rest": rest}))
+    head = "Nek (Sassuolo, 6 gennaio 1972) è un cantautore italiano "
+    # punctuation inside closing markup ends the sentence already
+    assert main("attivo dal ''1991!''") == head + "attivo dal ''1991!''"
+    assert main("attivo dal '''1991'''") == head + "attivo dal '''1991'''."
+    # a citation at the end of rest= comes after the full stop, as Bio places it
+    assert main("autore<ref>T.</ref>") == head + "autore.<ref>T.</ref>"
+    assert main("autore<ref name=\"a\"/>") == head + "autore.<ref name=\"a\"/>"
+    # (a parsed <ref> reaches Lua as a strip marker)
+    marker = "\x7f'\"`UNIQ--ref-00000001-QINU`\"'\x7f"
+    assert main("autore" + marker) == head + "autore." + marker
+    # a citation earlier in the text stays where it is
+    assert main("autore<ref>T.</ref> di canzoni") == head + "autore<ref>T.</ref> di canzoni."
+
+
+def test_a_subclass_path_through_a_shared_ancestor_is_found_at_any_branch_order():
+    # S -> A -> C -> D (too deep through A) and S -> B -> D -> building (three levels): S climbs, whichever
+    # parent is looked at first
+    S, A, B, C, D = "Q49101", "Q49102", "Q49103", "Q49104", "Q49105"
+    def cls(q, *parents):
+        return {"id": q, "labels": {}, "claims": {"P1709": [item(p) for p in parents]}}
+    for order in ((A, B), (B, A)):
+        ents = dict(PLACES, **{S: cls(S, *order), A: cls(A, C), C: cls(C, D), B: cls(B, D), D: cls(D, BUILDING),
+                               BRIXTON: place(BRIXTON, "Edificio", [S], [LONDON])})
+        assert bowie_at(BRIXTON, NEW_YORK, ents).startswith("David Bowie (Londra, 8 gennaio 1947"), order
+    # four levels up is beyond the walk
+    ents = dict(PLACES, **{S: cls(S, A), A: cls(A, C), C: cls(C, D), D: cls(D, BUILDING),
+                           BRIXTON: place(BRIXTON, "Edificio", [S], [LONDON])})
+    assert bowie_at(BRIXTON, NEW_YORK, ents).startswith("David Bowie (Edificio, 8 gennaio 1947")
+
+
+def test_the_place_climb_properties_are_imported_from_wikidata():
+    # the climb reads instance of, located in and subclass of: the importer must copy their Wikidata sources
+    # (local P2016 = P31, P294 = P131, P1709 = P279 in wbs_entity_mapping)
+    import json
+    from lua_env import ROOT
+    wb = json.loads((ROOT / "config" / "wikibase.json").read_text())
+    assert (wb["instance_of"], wb["located_in"], wb["subclass_of"]) == ("P2016", "P294", "P1709")
+    imported = set((ROOT / "server" / "properties.txt").read_text().split())
+    assert {"P31", "P131", "P279"} <= imported
+
+
+def test_main_puts_the_full_stop_before_a_citation_inside_closing_markup():
+    e = env("it")
+    main = lambda rest: e.call("Module:SV/Bio", "main", e.frame({}, {"rest": rest}))
+    head = "Nek (Sassuolo, 6 gennaio 1972) è un cantautore italiano "
+    marker = "\x7f'\"`UNIQ--ref-00000001-QINU`\"'\x7f"
+    # the prose keeps its formatting; the stop goes after it and before the citation
+    assert main("''autore<ref>T.</ref>''") == head + "''autore''.<ref>T.</ref>"
+    assert main("''autore" + marker + "''") == head + "''autore''." + marker
+    # punctuation already inside: no stop added, the citation still last
+    assert main("''autore!<ref>T.</ref>''") == head + "''autore!''<ref>T.</ref>"
+    # a citation followed by more prose stays in place
+    assert main("''autore<ref>T.</ref> di canzoni''") == head + "''autore<ref>T.</ref> di canzoni''."
+
+
+def test_main_without_citations_is_linear():
+    # a long free text with no <ref: the closing-reference search must not rescan from every position
+    import time
+    e = env("it")
+    rest = "parola " * 20000
+    t = time.perf_counter()
+    e.call("Module:SV/Bio", "main", e.frame({}, {"rest": rest}))
+    assert time.perf_counter() - t < 1.0

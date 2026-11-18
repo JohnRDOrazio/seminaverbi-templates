@@ -465,6 +465,35 @@ def test_bio_becomes_sv_bio_with_free_text():
     assert plan.bio.lacks == {"death_date", "death_place"}
 
 
+def _bio_call(text, label):
+    import mwparserfromhell
+    bio = mwparserfromhell.parse(text).filter_templates()[0]
+    return si.plan_bio(bio, MAPPING["bio"]["it"], label)[2].call
+
+
+def test_a_pseudonym_is_the_name_and_the_real_name_follows_as_bio_writes_it():
+    # Bio: "Nek, pseudonimo di Filippo Neviani<ref/> (Sassuolo, …)"; the reference goes to ref=
+    nek = "{{Bio|Nome = Filippo|Cognome = Neviani|Pseudonimo = Nek|PostCognome = <ref>T.</ref>|Sesso = M}}"
+    assert _bio_call(nek, "Nek") == "{{SV bio|note=pseudonimo di Filippo Neviani|ref=<ref>T.</ref>}}"
+    # Bio: "David Bowie (AFI: …)<ref/>, pseudonimo di David Robert Jones (Londra, …)"
+    bowie = ("{{Bio|Nome = David Robert|Cognome = Jones|Pseudonimo = David Bowie"
+             "|PostPseudonimo = ({{IPA|/b/|en}})<ref>B.</ref>|Sesso = M}}")
+    assert _bio_call(bowie, "David Bowie") == \
+        "{{SV bio|name=David Bowie ({{IPA|/b/|en}})<ref>B.</ref>|note=pseudonimo di David Robert Jones}}"
+    # a pseudonym other than the label is still the name
+    assert _bio_call(nek, "Filippo Neviani") == \
+        "{{SV bio|name=Nek|note=pseudonimo di Filippo Neviani|ref=<ref>T.</ref>}}"
+
+
+def test_a_title_comes_before_the_name():
+    # Bio: "Sir Pieter Paul Rubens (…)"
+    rubens = "{{Bio|Titolo = Sir|Nome = Pieter Paul|Cognome = Rubens|PreData = /r/|Sesso = M}}"
+    assert _bio_call(rubens, "Pieter Paul Rubens") == "{{SV bio|name=Sir Pieter Paul Rubens|note=/r/}}"
+    # with a pseudonym the title goes with the real name: "X, pseudonimo di Sir Y Z"
+    both = "{{Bio|Titolo = Sir|Nome = Y|Cognome = Z|Pseudonimo = X|Sesso = M}}"
+    assert _bio_call(both, "X") == "{{SV bio|note=pseudonimo di Sir Y Z}}"
+
+
 def test_a_bio_page_without_an_infobox_needs_a_person_item():
     # no Wikipedia box tells the kind: the item must be a person before {{Bio}} facts go onto it
     def plan_for(instance_of, wd_p31=None):
@@ -1180,3 +1209,9 @@ def test_a_timed_out_image_resumed_beside_an_unknown_value_keeps_its_file_name(c
     si.run(repo, {"en": client}, Wikidata(), MAPPING, {"en": set()}, apply=True, out=print, progress=progress)
     saved = client.edits[-1][1] if client.edits else ""
     assert "{{SV infobox|image=Bloodshot poster.jpg}}" in saved and "earlier run" not in saved
+
+
+def test_a_reference_only_pseudonym_is_not_the_name():
+    # Pseudonimo holding only a citation: no pseudonym; the citation goes to ref= once
+    text = "{{Bio|Nome = Filippo|Cognome = Neviani|Pseudonimo = <ref>T.</ref>|Sesso = M}}"
+    assert _bio_call(text, "Filippo Neviani") == "{{SV bio|ref=<ref>T.</ref>}}"

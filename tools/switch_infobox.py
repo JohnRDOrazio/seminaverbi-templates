@@ -20,7 +20,8 @@ layout lacks is still written (the fact is the item's). For a one-value row the 
 reported, not written. A file no repository holds is dropped and reported. A page is switched only when every mapped row with a value is
 covered (or the author accepts the loss with --accept-loss TITLE, "it:TITLE" when the title is on both
 wikis); a page with two Wikipedia infoboxes is left to the author. it.wiki's {{Bio}} becomes {{SV bio}}
-with its free text (note=, rest=, ref=; name= when Nome Cognome is not the item's label), after its facts
+with its free text (note=, rest=, ref=; name= when the name Bio shows, Titolo Nome Cognome or the Pseudonimo with
+"pseudonimo di Nome Cognome" opening note=, is not the item's label), after its facts
 (places, dates, occupations, sex, citizenship) are moved to the item; the old and the new opening
 sentences, both rendered, must state the same facts both ways (link texts, dates, predicate words; what
 the new one adds where Bio had no parameter is reported as an addition, anything else blocks). A page with
@@ -551,9 +552,15 @@ def plan_bio(bio, bio_conf: dict, label: str | None) -> tuple[list, list, BioPla
     extra = []
     args = {k: clean(v) for k, v in _named(bio).items()}
     free = {"note": [], "rest": [], "ref": []}
+    raw = {p: v.strip() for p, v in _named(bio).items()}
+    # Bio writes "Titolo Nome Cognome", and with a pseudonym "Pseudonimo PostPseudonimo, pseudonimo di
+    # Titolo Nome Cognome": these go into the name and the start of the note, not into the free text
+    # (a Pseudonimo holding only a citation is no pseudonym: the citation goes to ref=)
+    pseudonym = "" if _is_refs_only(raw.get("Pseudonimo", "")) else raw.get("Pseudonimo", "")
+    head_params = {"Titolo", "Pseudonimo"} | ({"PostPseudonimo"} if pseudonym else set())
     for p, v in _named(bio).items():
         slot = bio_conf["free"].get(p)
-        if slot and v.strip():
+        if slot and v.strip() and not (p in head_params and not _is_refs_only(v)):
             free["ref" if _is_refs_only(v) else slot].append(v.strip())
     bio_raws = []
     for key, params in _bio_params(bio_conf["facts"]).items():
@@ -591,7 +598,15 @@ def plan_bio(bio, bio_conf: dict, label: str | None) -> tuple[list, list, BioPla
             for p in chosen:
                 extra.append((key, p, args[p]))
     given = " ".join(args[p] for p in ("Nome", "Cognome") if args.get(p) and bio_conf["facts"].get(p) == "given_name")
-    bio_params = {"name": given if given and given != label else ""}
+    real = " ".join(x for x in (raw.get("Titolo", ""), given) if x and not _is_refs_only(x))
+    if pseudonym:
+        post = raw.get("PostPseudonimo", "")
+        head = f"{pseudonym} {post}".strip() if post and not _is_refs_only(post) else pseudonym
+        if real:
+            free["note"].insert(0, f"pseudonimo di {real}")
+    else:
+        head = real
+    bio_params = {"name": head if head and head != label else ""}
     bio_params.update({slot: " ".join(values) for slot, values in free.items()})
     bio_params["note"] = re.sub(r"^\s*,\s*", "", bio_params["note"])
     stated = {key for key, _, _ in bio_raws} | {key for key, _, _ in extra}

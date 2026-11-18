@@ -428,11 +428,54 @@ function p._sentence(entity, lang, args)
 	return out
 end
 
+-- The sentence on the page ends as it.wiki's Bio ends it: a full stop (unless the free text already
+-- ends the sentence), then the references.
 function p.main(frame)
 	local args = Args.get(frame)
 	local id = args.item or mw.wikibase.getEntityIdForCurrentPage()
 	local entity = id and mw.wikibase.getEntity(id)
-	return p._sentence(entity, Util.lang(), args)
+	local text = {}
+	for k, v in pairs(args) do
+		if k ~= 'ref' then
+			text[k] = v
+		end
+	end
+	local out = p._sentence(entity, Util.lang(), text)
+	-- From the end of the sentence, peel off citations (a <ref>, a self-closing <ref/>, or the strip marker a
+	-- parsed <ref> becomes) and closing markup (runs of apostrophes, </tag>), in whatever order they come. The
+	-- full stop goes after the prose and its formatting and before the citations, as Bio places it;
+	-- punctuation already ending the prose (inside its formatting) ends the sentence. Citations followed by
+	-- more prose stay where they are.
+	local closers, cites = '', ''
+	while true do
+		local body, piece = out:match('^(.-)(%s*\127[^\127]*\127)$')
+		if not body then
+			body, piece = out:match('^(.-)(%s*<ref[^>]-/>)$')
+		end
+		if not body then
+			-- (anchored: one scan finds the last <ref, not one scan per position)
+			local at = out:match('^.*()<ref[%s>]')
+			if at and out:sub(at):match('^<ref[^>]*>.-</ref>%s*$') and not out:sub(at + 4):find('<ref', 1, true) then
+				body, piece = out:sub(1, at - 1), out:sub(at)
+			end
+		end
+		if body then
+			cites = piece .. cites
+		else
+			body, piece = out:match("^(.-)(''+)$")
+			if not body then
+				body, piece = out:match('^(.-)(</%w+>)$')
+			end
+			if not body then
+				break
+			end
+			closers = piece .. closers
+		end
+		out = body
+	end
+	local prose = out:gsub('%s+$', '')
+	local stop = (prose:match('[%.!?]$') or endsWith(prose, '…')) and '' or '.'
+	return out .. closers .. stop .. cites .. (args.ref or '')
 end
 
 return p
