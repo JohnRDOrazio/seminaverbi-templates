@@ -109,7 +109,7 @@ The SeminaVerbi infobox: layout from the item's instance of, rows from its state
 
 | parameter | meaning |
 |---|---|
-| `type` | layout when the item's type is missing or ambiguous: book, film, tv, album, song, play, artwork, person, group, work |
+| `type` | layout when the item's type is missing or ambiguous: book, film, tv, album, song, composition, play, artwork, person, group, work |
 | `item` | a Wikibase item ID to use instead of the page's own item (needed when the page is not connected to one) |
 | `name` | caption; defaults to the item's label |
 | `sortkey` | sort key for the item's categories |
@@ -136,7 +136,7 @@ Aliases: it: `SV infobox opera`, es: `SV ficha obra`, fr: `SV infobox œuvre`, d
 
 | parameter | meaning |
 |---|---|
-| `type` | book (default), film, tv, album, song, play, artwork |
+| `type` | book (default), film, tv, album, song, composition, play, artwork |
 | `item` | a Wikibase item ID to use instead of the page's own item (needed when the page is not connected to one) |
 | `name` | caption; defaults to the item's label |
 | `sortkey` | sort key for the item's categories |

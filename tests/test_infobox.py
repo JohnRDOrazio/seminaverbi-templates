@@ -469,4 +469,6 @@ def test_a_composition_has_its_own_layout_with_the_composer():
     root = Path(__file__).resolve().parent.parent
     rows = json.loads((root / "config/infobox.json").read_text(encoding="utf-8"))["composition"]
     assert [r["prop"] for r in rows] == ["image", "title", "composer", "lyrics_by", "publication_date", "genre"]
-    assert '<table class="sv-infobox sv-infobox-composition">' in render(type="composition")
+    out = render(type="composition", composer="[[Tchaikovsky]]")
+    assert '<table class="sv-infobox sv-infobox-composition">' in out
+    assert row("composer", "[[Tchaikovsky]]") in out and "performer" not in out
