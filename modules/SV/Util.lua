@@ -40,9 +40,9 @@ function p.label(id, lang)
 end
 
 -- A link to an item: its page on this wiki, else its Wikipedia article in lang, else its label.
--- text, when given, replaces the label as the link text (unescaped: the caller's word).
+-- text, when given, replaces the label as the link text; it is shown literally, markup and all.
 function p.itemLink(id, lang, text)
-	text = p.escape(text or p.label(id, lang) or id)
+	text = text and mw.text.nowiki(text) or p.escape(p.label(id, lang) or id)
 	local localTitle = mw.wikibase.getSitelink(id)
 	if localTitle then
 		return '[[' .. localTitle .. '|' .. text .. ']]'

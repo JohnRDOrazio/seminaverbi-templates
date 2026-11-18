@@ -317,6 +317,7 @@ end
 -- 'male', 'female', 'other' (a stated gender that is neither) or nil (none stated). The label is the
 -- masculine: it serves a man, and anyone with no stated gender as the language's default; a woman
 -- gets the female form, a stated other gender only a form shared by both. English does not inflect.
+-- label may be nil (an item with no label in lang or en): only a woman's form can then be named.
 function p._occupationWord(id, label, lang, wb, gender)
 	if gender == 'male' or gender == nil then
 		return label
@@ -328,7 +329,7 @@ function p._occupationWord(id, label, lang, wb, gender)
 	if gender == 'female' and form then
 		return form
 	end
-	if form == label or epicene(lang, label) then
+	if label and (form == label or epicene(lang, label)) then
 		return label
 	end
 	return nil

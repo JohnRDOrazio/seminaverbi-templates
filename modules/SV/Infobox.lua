@@ -19,11 +19,8 @@ local function values(entity, field, lang, wb)
 			local id = Util.place(v.id, field.climb, lang)
 			if not seen[id] then
 				seen[id] = true
-				local word
-				if gender then
-					local lbl = label(id, lang)
-					word = lbl and Bio._occupationWord(id, lbl, lang, wb, gender)
-				end
+				-- a woman's form needs no label: an occupation with only P1451 still gets it
+				local word = gender and Bio._occupationWord(id, label(id, lang), lang, wb, gender)
 				out[#out + 1] = itemLink(id, lang, word)
 			end
 		elseif field.kind == 'time' then

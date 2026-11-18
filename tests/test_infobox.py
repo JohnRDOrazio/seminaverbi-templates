@@ -446,3 +446,18 @@ def test_occupation_without_a_shared_form_falls_back_to_the_label():
 
 def test_english_occupation_without_female_form_keeps_the_label():
     assert "[[wikipedia:en:Singer-songwriter|singer-songwriter]]" in occupation_person("Q247", lang="en")
+
+
+def test_female_form_is_used_when_the_occupation_has_no_label():
+    out = render(kind="person", lang="it", page_entity="Q2", entities={
+        "Q2": {"labels": {"it": "X"}, "claims": {"P63": [item("Q50")], "P1018": [item("Q247")]}},
+        "Q50": {"sitelinks": {"itwiki": "Cantautore"}, "claims": {"P1451": [mono("cantautrice", "it")]}}})
+    assert "[[wikipedia:it:Cantautore|cantautrice]]" in out
+
+
+def test_female_form_markup_is_shown_literally():
+    out = render(kind="person", lang="it", page_entity="Q2", entities={
+        "Q2": {"labels": {"it": "X"}, "claims": {"P63": [item("Q50")], "P1018": [item("Q247")]}},
+        "Q50": {"labels": {"it": "cantautore"}, "sitelinks": {"itwiki": "Cantautore"},
+                "claims": {"P1451": [mono("canta]]utrice", "it")]}}})
+    assert "[[wikipedia:it:Cantautore|canta&#93;&#93;utrice]]" in out
