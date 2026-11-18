@@ -42,6 +42,17 @@ not prints `(would create)`, and, as nothing is created, a not-yet-mapped item i
 `q5` is `Q5`) stops the run before anything is written, after printing `IMPORT <id> FAILED invalid ID`
 (the echoed text is sanitised and capped at 40 characters).
 
+**Birth and death places.** The person infobox and `{{SV bio}}` climb a fine-grained place (a street, a
+neighbourhood, a building) to its town through *instance of* (P31), *located in* (P131) and *subclass of*
+(P279), all three in `properties.txt`. When people bring new places, import the places with their classes
+and those classes' ancestors, so a class not in the `climb` lists of `config/infobox.json` can still reach
+one (hospital building → public building → building):
+
+```
+$MW_INSTALL_PATH/maintenance/run --wiki en <tools-dir>/EnrichItems.php --item <place items> --follow P31,P131 --dry-run
+$MW_INSTALL_PATH/maintenance/run --wiki en <tools-dir>/EnrichItems.php --item <their class items> --follow P279 --dry-run
+```
+
 `properties.txt` lists Wikidata property IDs; each is mapped to the local property through
 WikibaseImport's mapping table.
 
