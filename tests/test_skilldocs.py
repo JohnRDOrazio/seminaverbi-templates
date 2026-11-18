@@ -134,3 +134,15 @@ def test_infobox_item_parameter_is_worded_alike_in_skill_and_templates_docs():
     templates = (SKILL / "templates.md").read_text(encoding="utf-8")
     assert templates.count(f"| `item` | {ITEM_PARAM} (needed when the page is not connected to one) |") >= 3
     assert "when the page is not connected to one |" not in templates  # the old, narrower wording
+
+
+def test_skill_points_to_the_cleanup_tool():
+    import json as _json
+    skill = flat((SKILL / "SKILL.md").read_text(encoding="utf-8"))
+    for needle in ("`.venv/bin/python -m tools.cleanup_articles --wiki <code> --page TITLE`",
+                   "runeditor.py tools.cleanup_articles … --apply", "`config/cleanup.json`"):
+        assert needle in skill, needle
+    conf = _json.loads((ROOT / "config" / "cleanup.json").read_text(encoding="utf-8"))
+    # the targets are the SV templates' English names, as templates.md asks
+    docs = load("config/templates.json")
+    assert conf["bible_quote"]["target"] in docs and conf["references"]["target"] in docs

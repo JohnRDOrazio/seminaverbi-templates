@@ -1,0 +1,46 @@
+{
+  "_doc": "tools.cleanup_articles: the old templates it converts or removes on the articles. Template names compare with the first letter in any case and underscores as spaces. Per-wiki lists add to the \"*\" list.",
+  "bible_quote": {
+    "target": "SV Bible quote",
+    "inline_values": ["", "0", "1", "true", "false"],
+    "wikis": {
+      "en": {
+        "templates": ["Bible quote"],
+        "params": {"ref": "ref", "version": "version", "inline": "inline"}
+      },
+      "it": {
+        "templates": ["Citazione bibbia"],
+        "params": {"rif": "ref", "ref": "ref", "versione": "version", "version": "version", "inline": "inline"}
+      }
+    },
+    "report": ["Bibleverse"]
+  },
+  "references": {
+    "target": "SV references",
+    "templates": ["Reflist", "References"],
+    "keep_params": ["group"],
+    "drop_params": ["1", "colwidth"],
+    "keep_attributes": ["group"],
+    "drop_attributes": ["responsive"],
+    "headings": {
+      "en": ["References", "Notes", "Footnotes", "Citations", "Sources", "Notes and references"],
+      "it": ["Note", "Riferimenti", "Fonti", "References"],
+      "es": ["Referencias", "Notas"],
+      "fr": ["Références", "Notes", "Notes et références"],
+      "de": ["Einzelnachweise", "Anmerkungen"],
+      "pt": ["Referências", "Notas"]
+    }
+  },
+  "remove": {
+    "names": {
+      "*": ["Short description", "Use mdy dates", "Use dmy dates", "Use American English", "Use British English",
+            "Good article", "Featured article", "Pp", "Authority control", "Portal bar", "Portal", "Wikiquote",
+            "Commons category", "Official website", "IMDb title", "Netflix title", "Tv.com show", "Navboxes",
+            "Coord missing"],
+      "it": ["Portale", "S", "Stub"]
+    },
+    "prefixes": ["Pp-"],
+    "suffixes": ["stub"]
+  },
+  "tracking_words": ["error", "errori", "errores", "erreur", "fehler", "erro"]
+}
