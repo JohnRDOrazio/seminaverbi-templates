@@ -382,3 +382,9 @@ def test_every_layout_has_a_kind_label_and_an_accent():
             strings = json.loads((root / f"i18n/{lang}.json").read_text(encoding="utf-8"))
             assert strings.get(f"infobox_kind_{layout}"), (lang, layout)
             assert "$1" in strings.get("infobox_source", ""), lang
+
+
+def test_an_unknown_or_wrong_case_type_shows_no_message_key():
+    out = render(type="Romanzo")
+    assert "infobox_kind_" not in out and '<table class="sv-infobox sv-infobox-book">' in out
+    assert '<table class="sv-infobox sv-infobox-film">' in render(type="Film")

@@ -138,9 +138,11 @@ function p._render(kind, args, ctx)
 	elseif kind == 'auto' and not args.type then
 		infoboxType, unknownType = p.layoutFor(entity, data)
 	else
-		infoboxType = args.type or 'book'
+		-- A type= naming no layout (or in the wrong case) gets the book layout, as it always did.
+		local wanted = args.type and mw.ustring.lower(args.type)
+		infoboxType = (wanted and data.infobox[wanted]) and wanted or 'book'
 	end
-	local fields = data.infobox[infoboxType] or data.infobox.book
+	local fields = data.infobox[infoboxType]
 
 	local caption = args.name
 		or (entity and id and Util.escape(label(id, lang) or ''))
