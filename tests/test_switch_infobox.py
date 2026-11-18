@@ -287,11 +287,20 @@ def test_sv_infobox_of_another_item_does_not_count_as_the_pages_own():
     # a section's {{SV infobox|item=…}} renders another work; the page's own Wikipedia box still switches
     text = "{{Infobox film\n| name = Bloodshot\n}}\nText.\n== Sequel ==\n{{SV infobox|item=Q999}}\nMore."
     repo, client = film_world()
-    assert not si.has_sv_infobox(text)
+    assert not si.has_sv_infobox(text, "Q100")
     plan = si.plan_page(page(text), claims_of(repo.entity("Q100")), MAPPING, resolver(repo=repo, client=client))
     assert plan is not None and plan.blocked is None
     assert plan.new_text == "{{SV infobox}}\nText.\n== Sequel ==\n{{SV infobox|item=Q999}}\nMore."
-    assert si.has_sv_infobox("{{SV infobox|type=song}}\nText.")
+    assert si.has_sv_infobox("{{SV infobox|type=song}}\nText.", "Q100")
+
+
+def test_sv_infobox_naming_the_pages_own_item_is_the_pages_box():
+    # {{SV infobox|item=Q100}} on the page of Q100 is its own box: no second {{SV infobox}} is added
+    for own in ("Q100", "q100", " Q100 "):
+        text = f"{{{{SV infobox|item={own}}}}}\n{{{{Infobox film|name=Bloodshot}}}}\nText."
+        assert si.has_sv_infobox(text, "Q100")
+        assert si.plan_page(page(text, item="Q100"), {}, MAPPING, resolver()) is None
+    assert not si.has_sv_infobox("{{SV infobox|item=Q1000}}\nText.", "Q100")
 
 
 def test_embedded_infobox_blocks_the_page():

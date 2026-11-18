@@ -432,13 +432,18 @@ def _templates(text: str):
     return [(t, _template_name(str(t.name))) for t in mwparserfromhell.parse(text).filter_templates(recursive=True)]
 
 
-def _own_sv_infobox(template, name: str) -> bool:
-    """An {{SV infobox}} for the page's own item: one with `item=` renders another work (a section's box)."""
-    return name in SV_INFOBOXES and not (template.has("item") and str(template.get("item").value).strip())
+def _own_sv_infobox(template, name: str, item: str) -> bool:
+    """An {{SV infobox}} for the page's own item `item`: with no `item=`, or with `item=` naming that item
+    (case-insensitive); one naming another item renders another work (a section's box)."""
+    if name not in SV_INFOBOXES:
+        return False
+    named = str(template.get("item").value).strip() if template.has("item") else ""
+    return not named or named.upper() == (item or "").strip().upper()
 
 
-def has_sv_infobox(text: str) -> bool:
-    return any(_own_sv_infobox(t, name) for t, name in _templates(text))
+def has_sv_infobox(text: str, item: str) -> bool:
+    """Whether `text`, the page of local item `item`, calls {{SV infobox}} for its own item."""
+    return any(_own_sv_infobox(t, name, item) for t, name in _templates(text))
 
 
 def _outermost(found: list) -> list:
@@ -546,7 +551,7 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
     bio_conf = mapping["bio"].get(lang)
     bio_name = bio_conf["template"] if bio_conf else None
     found = _templates(page.text)
-    if any(_own_sv_infobox(t, name) for t, name in found):
+    if any(_own_sv_infobox(t, name, page.item) for t, name in found):
         return None
     boxes = _outermost([t for t, name in found if name in templates])
     bios = [t for t, name in found if bio_name and name == bio_name]
@@ -872,7 +877,7 @@ def run(repo, clients: dict, wikidata, mapping: dict, tree: dict, apply: bool, a
         rev = client.revision(title)
         if rev is None:
             continue
-        if has_sv_infobox(rev[1]):
+        if has_sv_infobox(rev[1], item):
             counts["already SV"] += 1
             continue
         entity = repo.entity(item)
