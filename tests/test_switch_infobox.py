@@ -659,6 +659,16 @@ def test_nationality_prefers_the_demonyms_of_the_persons_citizenships():
     assert isinstance(si.Resolver("it", repo, wd, None).country("americano"), Unresolved)
 
 
+def test_the_life_span_is_the_parenthesis_with_a_date():
+    html_ = ("<p>Fabrizio De André (detto <a>Faber</a>) (<a>Genova</a>, 18 febbraio 1940 – <a>Milano</a>, 11 gennaio "
+             "1999) è stato un <a>cantautore</a> italiano</p>")
+    _, facts, span, _ = si._facts(html_)
+    assert span == "Genova, 18 febbraio 1940 – Milano, 11 gennaio 1999"
+    assert "italiano" in facts and "detto" not in facts
+    # a link in a parenthesis without a date is no life span: no span at all
+    assert si._facts("<p>Faber (<a>Genova</a>) è un <a>cantautore</a></p>")[2] == ""
+
+
 def test_nationality_matches_a_whole_demonym_only():
     wd = Wikidata(hits={("italiano", "it"): ["Q1", "Q2", "Q38"]},
                   entities={"Q1": wd_entity("Q1", demonyms=[("it", "italoamericano")]),

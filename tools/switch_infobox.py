@@ -832,7 +832,7 @@ def _facts(rendered: str) -> tuple[str, list, str, set]:
     facts = [f for f in dict.fromkeys(links + [_clean_text(d) for d in DATE.findall(text)]) if f]
     span, predicate = "", text
     for m in re.finditer(r"\(([^()]*)\)", text):
-        if any(_states(m.group(1), f) for f in facts):
+        if DATE.search(m.group(1)):  # a life span gives a year; a parenthesis without one is no span
             span, predicate = m.group(1), text[m.end():]
             break
     words = [w for w in re.findall(r"[^\W\d_]{3,}", predicate) if w.casefold() not in PREDICATE_STOP]
