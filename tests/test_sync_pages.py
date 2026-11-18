@@ -49,3 +49,13 @@ def test_tracking_categories_are_hidden_on_every_wiki():
             text = pages["Category:" + msgs[key]]
             assert text.startswith("__HIDDENCAT__") and "{{SV managed}}" in text
             assert msgs["tracking_category_text"] in text
+
+
+def test_cathopedia_category_is_created_hidden_on_every_wiki():
+    import json
+    for lang in LANGS:
+        msgs = json.loads((ROOT / "i18n" / f"{lang}.json").read_text(encoding="utf-8"))
+        text = desired_pages(ROOT, lang, "x")["Category:" + msgs["cathopedia_category"]]
+        assert text.startswith("__HIDDENCAT__") and "{{SV managed}}" in text
+        assert msgs["cathopedia_category_text"] in text
+        assert msgs["tracking_category_text"] not in text

@@ -75,6 +75,8 @@ def desired_pages(root: Path, lang: str, sha: str) -> dict[str, str]:
     msgs = json.loads((root / "i18n" / f"{lang}.json").read_text(encoding="utf-8"))
     for key in TRACKING:
         pages["Category:" + msgs[key]] = f"__HIDDENCAT__\n{MANAGED}\n{msgs['tracking_category_text']}\n"
+    # not a fix-me category: it lists every page linking to Cathopedia, with its own description
+    pages["Category:" + msgs["cathopedia_category"]] = f"__HIDDENCAT__\n{MANAGED}\n{msgs['cathopedia_category_text']}\n"
     aliases = json.loads((root / "config" / "aliases.json").read_text(encoding="utf-8"))
     for alias, target in sorted(aliases.get(lang, {}).items()):
         pages[alias] = f"#REDIRECT [[{target}]]"
