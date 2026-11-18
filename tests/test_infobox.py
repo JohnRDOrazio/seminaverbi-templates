@@ -397,3 +397,22 @@ def test_an_unknown_or_wrong_case_type_shows_no_message_key():
     out = render(type="Romanzo")
     assert "infobox_kind_" not in out and '<table class="sv-infobox sv-infobox-book">' in out
     assert '<table class="sv-infobox sv-infobox-film">' in render(type="Film")
+
+
+def _luminance(hex_colour):
+    channels = [int(hex_colour[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    lin = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in channels]
+    return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
+
+
+def test_white_on_every_band_colour_meets_wcag_aa_and_the_kind_label_is_not_dimmed():
+    import re
+    from pathlib import Path
+    css = (Path(__file__).resolve().parent.parent / "templates/SV infobox/styles.css").read_text(encoding="utf-8")
+    kind = re.search(r"\.sv-infobox-kind\s*\{([^}]*)\}", css).group(1)
+    # opacity lowers the white label's contrast on the band; hierarchy comes from size and spacing
+    assert "opacity" not in kind
+    bands = set(re.findall(r"caption\s*\{[^}]*?background:\s*(#[0-9a-fA-F]{6})", css))
+    assert len(bands) >= 6
+    for band in bands:
+        assert 1.05 / (_luminance(band) + 0.05) >= 4.5, band
