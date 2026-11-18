@@ -17,5 +17,5 @@ Established (no task): Daredevil it — family; Fringe en/it — conscience ("Em
 family ("Father - son relationship"), forgiveness (the white tulip); Le due vie del destino - The Railway
 Man it — forgiveness ("Il Perdono").
 
-Note: The Railway Man's it page carries the forgiveness category by hand and is not yet connected to an
-item; it moves onto an item with the other 54 unconnected articles (stage 3).
+Note: The Railway Man's it page is now connected to Q48425 (2026-11-18), which carries the forgiveness theme
+the page had by hand.
