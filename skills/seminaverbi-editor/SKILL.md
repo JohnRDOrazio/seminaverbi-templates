@@ -98,12 +98,13 @@ ask the author instead of guessing.
   with `wikibase-search-entities` (local IDs differ from Wikidata IDs). If the subject is not there, it
   is imported from Wikidata on the server with `server/EnrichItems.php --import Q…` (see
   `server/README.md`), and `tools/connect_items.py` links the article to the item (`--wd TITLE=QID`, or
-  `--create "TITLE=description"` when Wikidata has no item). Only then write the page.
+  `--create "TITLE=description"` when Wikidata has no item; `TITLE::description` when the title contains `=`). Only then write the page.
 - **Facts belong on the item, never a Wikipedia infobox** in the article (no `{{Infobox …}}`, no
   copied infobox fields). Add or fix the statement on the item instead.
 - Write the infobox as bare `{{SV infobox}}`: it reads every fact from the page's item (the layout comes
-  from the item's "instance of"). Optional parameters: `type`, `item` (renders another item, e.g. a song
-  or album covered in a section of an artist's page), `name`, `sortkey`, `image=`.
+  from the item's "instance of"). Optional parameters: `type`, `item` (a Wikibase item ID to use instead of
+  the page's own item, e.g. a song or album covered in a section of an artist's page; needed when the page
+  is not connected to one), `name`, `sortkey`, `image=`.
 - **`image=` exception:** a non-free file that exists only on en.wikipedia or it.wikipedia (not on
   Commons, not in the farm's shared repository) cannot be put on the item, so its name stays on the call:
   `{{SV infobox|image=File name.jpg}}`. Every other image goes on the item.
