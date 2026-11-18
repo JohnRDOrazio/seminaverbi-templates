@@ -596,6 +596,9 @@ def test_other_gender_only_forms_shared_by_both():
 # --- places at Wikidata's finest grain climb to the town (config/infobox.json "climb") ---
 
 NEIGHBOURHOOD, STREET = "Q3467", "Q7267"  # local items "neighborhood", "street"
+# local copies of Wikidata Q2755753, Q211690, Q408804, Q41176, Q1134686, Q253019, Q2983893
+AREA_OF_LONDON, LONDON_BOROUGH, NYC_BOROUGH, BUILDING = "Q48779", "Q48855", "Q48789", "Q167"
+FRAZIONE, ORTSTEIL, QUARTER = "Q48762", "Q48763", "Q48764"
 BRIXTON, LAFAYETTE, MANHATTAN, EMILIA = "Q40", "Q42", "Q43", "Q44"
 
 
@@ -629,6 +632,11 @@ def test_place_classes_configured_on_both_place_rows():
     climb = rows["birth_place"]["climb"]
     assert climb == rows["death_place"]["climb"]
     assert {NEIGHBOURHOOD, STREET} <= set(climb)
+    # the classes of the farm's fine-grained birth/death places (area of London, London borough, borough of
+    # New York City, building) and the subdivisions an article never names (frazione, Ortsteil, quarter)
+    assert {AREA_OF_LONDON, LONDON_BOROUGH, NYC_BOROUGH, BUILDING, FRAZIONE, ORTSTEIL, QUARTER} <= set(climb)
+    # never a town's class: comune, city, town, big city
+    assert not {"Q4221", "Q7625", "Q48769", "Q48766"} & set(climb)
     assert all(q.startswith("Q") and q[1:].isdigit() for q in climb)
 
 
