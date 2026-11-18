@@ -491,3 +491,19 @@ def test_render_parses_with_pst():
     assert WikiClient("en", session=s).render("T", "{{X}}") == "<p>x</p>"
     params = s.calls[-1][1]
     assert (params["action"], params["title"], params["text"], params["pst"]) == ("parse", "T", "{{X}}", "1")
+
+
+def test_parse_asks_for_html_links_templates_and_categories():
+    body = {"parse": {"text": "<p>x</p>", "links": [{"ns": 0, "title": "A", "exists": False}], "templates": [],
+                      "categories": [{"category": "X", "hidden": True}]}}
+    s = Recorder(body)
+    assert WikiClient("en", session=s).parse("T", "[[A]]") == body["parse"]
+    params = s.calls[-1][1]
+    assert (params["action"], params["title"], params["text"], params["pst"]) == ("parse", "T", "[[A]]", "1")
+    assert set(params["prop"].split("|")) == {"text", "links", "templates", "categories"}
+
+
+def test_revision_text_reads_that_revision():
+    s = Recorder({"query": {"pages": [{"title": "X", "revisions": [{"slots": {"main": {"content": "t"}}}]}]}})
+    assert WikiClient("en", session=s).revision_text(42) == "t"
+    assert s.calls[-1][1]["revids"] == "42"

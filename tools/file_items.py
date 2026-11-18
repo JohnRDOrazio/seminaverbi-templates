@@ -304,14 +304,16 @@ def run(repo, clients: dict, data, types, props: dict, apply: bool, only_item: s
 
 class SaveStatus(str):
     """"saved", "unsafe" or "failed"; `detail`: the lost tree categories (unsafe) or the error (failed);
-    `saved`: an edit was made (an unsafe page may have been saved: a merge found after the save)."""
+    `saved`: an edit was made (an unsafe page may have been saved: a merge found after the save);
+    `revid`: the revision the save created, when the API named it."""
     detail = None
     saved = False
+    revid = None
 
     @classmethod
-    def of(cls, status: str, detail=None, saved: bool = False) -> "SaveStatus":
+    def of(cls, status: str, detail=None, saved: bool = False, revid: int | None = None) -> "SaveStatus":
         out = cls(status)
-        out.detail, out.saved = detail, saved
+        out.detail, out.saved, out.revid = detail, saved, revid
         return out
 
 
@@ -344,12 +346,12 @@ def guarded_save(client, title: str, text: str, revid: int, keep: set, summary: 
         now = client.revision_categories(saved) if saved else client.page_categories(title)
     except SyncError as exc:
         out(f"FAILED {lang}:{title}: {exc}")
-        return SaveStatus.of("failed", str(exc), saved=True)
+        return SaveStatus.of("failed", str(exc), saved=True, revid=saved)
     lost = sorted(keep - now)
     if lost:
         out(f"UNSAFE {lang}:{title} saved without {', '.join(lost)} (a concurrent edit merged?); check the page")
-        return SaveStatus.of("unsafe", lost, saved=True)
-    return SaveStatus.of("saved", saved=True)
+        return SaveStatus.of("unsafe", lost, saved=True, revid=saved)
+    return SaveStatus.of("saved", saved=True, revid=saved)
 
 
 def _node_items(data) -> dict:

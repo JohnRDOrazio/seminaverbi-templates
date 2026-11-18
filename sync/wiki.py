@@ -360,6 +360,21 @@ class WikiClient:
                           contentmodel="wikitext", disablelimitreport="1")
         return self._dig(data, "parse", "text")
 
+    def parse(self, title: str, text: str) -> dict:
+        """What `text` gives as page `title` without saving (action=parse, pre-save transform applied): the
+        HTML ("text"), the links and the templates used, each with "exists", and the categories ("hidden"
+        set on hidden ones)."""
+        data = self._call("POST", action="parse", title=title, text=text, prop="text|links|templates|categories",
+                          pst="1", contentmodel="wikitext", disablelimitreport="1")
+        return self._dig(data, "parse")
+
+    def revision_text(self, revid: int) -> str:
+        """The wikitext of one saved revision."""
+        data = self._call("GET", action="query", prop="revisions", revids=str(revid), rvprop="content",
+                          rvslots="main")
+        page = self._dig(data, "query", "pages", 0)
+        return self._dig(page, "revisions", 0, "slots", "main", "content")
+
     def revision(self, title: str) -> tuple[int, str] | None:
         """(latest revid, wikitext) of `title`, or None when the page does not exist."""
         data = self._call("GET", action="query", prop="revisions", titles=title, rvprop="ids|content",

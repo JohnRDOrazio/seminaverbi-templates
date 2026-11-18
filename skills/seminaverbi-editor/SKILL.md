@@ -121,6 +121,22 @@ ask the author instead of guessing.
   author asks in this session for another statement change: other statements feed the infoboxes and are
   filled from Wikidata by `EnrichItems.php`.
 
+## Old templates (cleanup tool)
+
+The mechanical part of tidying an article is done by a tool, never by hand: old Bible quote calls
+(`{{Bible quote}}`, `{{Citazione bibbia}}`) to `{{SV Bible quote}}`, Wikipedia's page-maintenance
+templates (short description, date formats, protection, stubs, portals, authority control,
+sister-project boxes; the list is `config/cleanup.json`) removed, and `{{Reflist}}` / `<references/>`
+to `{{SV references}}`. From the repository root:
+`.venv/bin/python -m tools.cleanup_articles --wiki <code> --page TITLE` prints the diff and what it left
+(list-defined references, a reference in another language's book names, a call to a missing template…);
+show it to the author. Its diff header names the revision it read: before rerunning as the bot with
+`--apply`, check with `get-page` that `latestRevisionId` is still that revision; if not, show the author the
+new change and run the dry run again
+(`.venv/bin/python ~/.config/seminaverbi/runeditor.py tools.cleanup_articles … --apply`). It refuses a page
+whose preview gains a red link, a missing template, an error or tracking category, or an error message.
+What it leaves is for you to fix by hand, with the edit routine above.
+
 ## Never
 
 - Delete, protect or move pages the author did not ask about (the bot lacks delete/protect rights anyway).
