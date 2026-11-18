@@ -45,15 +45,15 @@ the page had by hand.
 
 ## Decisions and moves (2026-11-18)
 
-| Article | Change | Status |
-|---------|--------|--------|
-| en: Carlo Acutis (Q48400) | Field Computer science → Saints (no holiness/Eucharist field node; holiness is a theme). Programming and the Eucharistic-miracles website were already covered. Canonization (7 Sept 2025) updated; unused refs commented out | done (item 30422, page 30423–30426) |
+| Article | Finding | Action | Status |
+|---------|---------|--------|--------|
+| en: Carlo Acutis (Q48400) | Field was Computer science; no holiness/Eucharist field node (holiness is a theme) | field → Saints; programming and the Eucharistic-miracles website were already covered; canonization (7 Sept 2025) updated; unused refs commented out | done (item 30422, page 30423–30426) |
 | en: Carlo Acutis | Still has Wikipedia leftovers and `[[wikipedia:Category:…]]` lines; no Gospel themes on the item (holiness supported by the text) | strip; file holiness | open |
-| it: Guerre Stellari (Q4102) | Rewritten: publisher's blurb removed, Gospel sections and discernment added; 8 argued themes filed (Sacrificio, Tentazione, Redenzione, Conversione, Misericordia, Carità, Famiglia, Peccato) | done (it 11246; item 30438–30449) |
+| it: Guerre Stellari (Q4102) | Publisher's blurb, no Gospel reading or discernment | rewritten with Gospel sections and discernment; 8 argued themes filed (Sacrificio, Tentazione, Redenzione, Conversione, Misericordia, Carità, Famiglia, Peccato) | done (it 11246; item 30438–30449) |
 | it: Guerre Stellari | Lucas on Anakin's birth rests on a fan transcript; Italian dub lines are own translations; title capitalises "Stellari" | find an official source; check the dub; consider moving to "Guerre stellari" | open |
-| Song titles | Songs carry "(song)" on en, "(brano musicale)" on it. en: Holy Mother, Presence of the Lord, Hear Me Lord, Baba Yetu → "(song)"; Legend (Tchaikovsky) → Legend (Tchaikovsky song). it: My Sweet Lord, What Is Life, Awaiting On You All, Hear Me Lord, The Prayer, I.N.R.I. (Lucio Dalla) → "(brano musicale)". Wedding Song (There Is Love) kept | done |
-| Page moves | Sitelinks do not follow page moves on the farm (set by hand after each move; the moved page needs a purge) | investigate the Wikibase client/repo setup | open |
+| Song titles | Songs carry "(song)" on en, "(brano musicale)" on it | en: Holy Mother, Presence of the Lord, Hear Me Lord, Baba Yetu → "(song)"; Legend (Tchaikovsky) → Legend (Tchaikovsky song). it: My Sweet Lord, What Is Life, Awaiting On You All, Hear Me Lord, The Prayer, I.N.R.I. (Lucio Dalla) → "(brano musicale)". Wedding Song (There Is Love) kept | done |
+| Page moves | Sitelinks did not follow page moves: Wikibase queues them as delayed jobs, and the Redis job queue had no chron service to release delayed jobs | `mw-jobchron.service` (Wikimedia redisJobChronService) installed; the 13 stuck move jobs ran; en also runs a DispatchChanges pass so item edits reach the wikis promptly | done (2026-11-18) |
 | en: Liturgy of St. John Chrysostom (Tchaikovsky) | Uses `{{SV infobox\|type=song}}` on a choral work | `type=composition` (PR #13), then switch the page | open |
-| en: Holy Mother (song) | Red link `[[Hold me Lord]]` | it is Clapton's "Hold Me Lord" (*Another Ticket*, 1981), not Harrison's Hear Me Lord: unlinked, with the album (rev 30465) | done |
-| en: Presence of the Lord (song) | Typo "This if the first song" | fixed (rev 30466) | done |
+| en: Holy Mother (song) | Red link `[[Hold me Lord]]` | it is Clapton's "Hold Me Lord" (*Another Ticket*, 1981), not Harrison's Hear Me Lord: unlinked, with the album | done (rev 30465) |
+| en: Presence of the Lord (song) | Typo "This if the first song" | fixed | done (rev 30466) |
 
