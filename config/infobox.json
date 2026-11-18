@@ -274,7 +274,13 @@
     {
       "key": "birth_place",
       "prop": "birth_place",
-      "kind": "item"
+      "kind": "item",
+      "climb": [
+        "Q3467",
+        "Q7267",
+        "Q1055",
+        "Q7268"
+      ]
     },
     {
       "key": "death_date",
@@ -284,7 +290,13 @@
     {
       "key": "death_place",
       "prop": "death_place",
-      "kind": "item"
+      "kind": "item",
+      "climb": [
+        "Q3467",
+        "Q7267",
+        "Q1055",
+        "Q7268"
+      ]
     },
     {
       "key": "occupation",

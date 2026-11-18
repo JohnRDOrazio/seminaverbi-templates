@@ -25,12 +25,14 @@ local function hasStatement(entity, propId)
 	return false
 end
 
--- "Place, date" (or the language's order) for one end of a life; nil when both are unknown.
-local function lifeEnd(entity, placeProp, dateProp, lang)
-	local place = firstValue(entity, placeProp)
-	local date = firstValue(entity, dateProp)
+-- "Place, date" (or the language's order) for one end of a life; nil when both are unknown. The
+-- keys name the person infobox rows (config/infobox.json): the place climbs as that row's does.
+local function lifeEnd(entity, wb, placeKey, dateKey, lang)
+	local place = firstValue(entity, wb[placeKey])
+	local date = firstValue(entity, wb[dateKey])
+	place = place and place.id and Util.place(place.id, (Util.layoutRow('person', placeKey) or {}).climb, lang)
 	-- a place with no label to show (in lang or English) is left out rather than shown as its ID
-	place = place and place.id and Util.label(place.id, lang) and Util.itemLink(place.id, lang)
+	place = place and Util.label(place, lang) and Util.itemLink(place, lang)
 	date = date and date.time and Util.formatTime(date)
 	if place and date then
 		return Util.msg('bio_place_date', lang, place, date)
@@ -383,8 +385,8 @@ function p._sentence(entity, lang, args)
 	end
 
 	local dead = hasStatement(entity, wb.death_date) or hasStatement(entity, wb.death_place)
-	local born = lifeEnd(entity, wb.birth_place, wb.birth_date, lang)
-	local died = dead and lifeEnd(entity, wb.death_place, wb.death_date, lang)
+	local born = lifeEnd(entity, wb, 'birth_place', 'birth_date', lang)
+	local died = dead and lifeEnd(entity, wb, 'death_place', 'death_date', lang)
 	local paren
 	if born and died then
 		paren = Util.msg('bio_paren_span', lang, born, died)

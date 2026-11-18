@@ -576,3 +576,80 @@ def test_other_gender_only_forms_shared_by_both():
     # English has no agreement
     assert bio("en", entities=with_nek(gender=OTHER)) == \
         "Nek (born 6 January 1972 in Sassuolo) is an Italian singer-songwriter"
+
+
+# --- places at Wikidata's finest grain climb to the town (config/infobox.json "climb") ---
+
+NEIGHBOURHOOD, STREET = "Q3467", "Q7267"  # local items "neighborhood", "street"
+BRIXTON, LAFAYETTE, MANHATTAN, EMILIA = "Q40", "Q42", "Q43", "Q44"
+
+
+def place(qid, label, instance_of=(), located_in=()):
+    claims = {}
+    if instance_of:
+        claims["P2016"] = [item(c) for c in instance_of]
+    if located_in:
+        claims["P294"] = [s if isinstance(s, dict) else item(s) for s in located_in]
+    return {"id": qid, "labels": {"it": label, "en": label}, "claims": claims}
+
+
+PLACES = dict(BASE, **{
+    BRIXTON: place(BRIXTON, "Brixton", [NEIGHBOURHOOD], [LONDON]),
+    LAFAYETTE: place(LAFAYETTE, "Lafayette Street", [STREET], [MANHATTAN]),
+    MANHATTAN: place(MANHATTAN, "Manhattan", [NEIGHBOURHOOD], [NEW_YORK]),
+    LONDON: place(LONDON, "Londra"),
+    NEW_YORK: place(NEW_YORK, "New York"),
+})
+
+
+def bowie_at(birth, death, entities=PLACES):
+    claims = dict(BASE[BOWIE]["claims"], P818=[item(birth)], P915=[item(death)])
+    return bio(page_entity=BOWIE, entities=dict(entities, **{BOWIE: dict(BASE[BOWIE], claims=claims)}))
+
+
+def test_place_classes_configured_on_both_place_rows():
+    import json
+    from lua_env import ROOT
+    rows = {r["key"]: r for r in json.loads((ROOT / "config" / "infobox.json").read_text())["person"]}
+    climb = rows["birth_place"]["climb"]
+    assert climb == rows["death_place"]["climb"]
+    assert {NEIGHBOURHOOD, STREET} <= set(climb)
+    assert all(q.startswith("Q") and q[1:].isdigit() for q in climb)
+
+
+def test_place_climbs_to_the_town():
+    # Brixton (neighbourhood) → London; Lafayette Street (street) → Manhattan (neighbourhood here) → New York
+    assert bowie_at(BRIXTON, LAFAYETTE) == \
+        "David Bowie (Londra, 8 gennaio 1947 – New York, 10 gennaio 2016) è stato un cantautore britannico"
+
+
+def test_place_climb_stops_where_data_ends():
+    # no located-in statement: the place as stored
+    ents = dict(PLACES, **{BRIXTON: place(BRIXTON, "Brixton", [NEIGHBOURHOOD])})
+    assert bowie_at(BRIXTON, NEW_YORK, ents).startswith("David Bowie (Brixton, 8 gennaio 1947 – New York,")
+    # Manhattan has no located-in: the climb keeps the last place reached, not the street
+    ents = dict(PLACES, **{MANHATTAN: place(MANHATTAN, "Manhattan", [NEIGHBOURHOOD])})
+    assert "– Manhattan, 10 gennaio 2016" in bowie_at(LONDON, LAFAYETTE, ents)
+    # a parent with no label to show is not climbed to
+    ents = dict(PLACES, **{LONDON: {"id": LONDON, "labels": {}, "claims": {}}})
+    assert bowie_at(BRIXTON, NEW_YORK, ents).startswith("David Bowie (Brixton, 8 gennaio 1947")
+
+
+def test_place_not_in_a_climb_class_is_kept():
+    # a town (comune) located in a region stays the town
+    ents = dict(PLACES, **{SASSUOLO: place(SASSUOLO, "Sassuolo", ["Q4221"], [EMILIA]),
+                           EMILIA: place(EMILIA, "Emilia-Romagna")})
+    assert bio(entities=ents) == "Nek (Sassuolo, 6 gennaio 1972) è un cantautore italiano"
+
+
+def test_place_climb_is_capped_and_uses_the_best_rank():
+    chain = {f"Q{n}": place(f"Q{n}", f"luogo{n}", [NEIGHBOURHOOD], [f"Q{n + 1}"]) for n in range(500, 510)}
+    assert bowie_at("Q500", NEW_YORK, dict(PLACES, **chain)).startswith("David Bowie (luogo504, 8 gennaio 1947")
+    # (Kensington) a preferred located-in wins over item order
+    ents = dict(PLACES, **{BRIXTON: place(BRIXTON, "Brixton", [NEIGHBOURHOOD],
+                                          [item(MANHATTAN), item(LONDON, "preferred")])})
+    assert bowie_at(BRIXTON, NEW_YORK, ents).startswith("David Bowie (Londra, 8 gennaio 1947")
+    # a deprecated class statement does not make the place climb
+    ents = dict(PLACES, **{BRIXTON: {"id": BRIXTON, "labels": {"it": "Brixton"},
+                                     "claims": {"P2016": [item(NEIGHBOURHOOD, "deprecated")], "P294": [item(LONDON)]}}})
+    assert bowie_at(BRIXTON, NEW_YORK, ents).startswith("David Bowie (Brixton, 8 gennaio 1947")

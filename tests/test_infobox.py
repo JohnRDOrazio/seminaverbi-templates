@@ -94,6 +94,18 @@ def test_person():
     assert row("birth_place", "[[wikipedia:en:Eisenach|Eisenach]]") in out
 
 
+def test_person_place_climbs_to_the_town():
+    # Q3467 neighborhood, Q7267 street: classes in the place rows' "climb" list
+    person = {"Q2": {"labels": {"en": "Bowie"}, "claims": {"P818": [item("Q40")], "P915": [item("Q42")]}},
+              "Q40": {"labels": {"en": "Brixton"}, "claims": {"P2016": [item("Q3467")], "P294": [item("Q41")]}},
+              "Q41": {"labels": {"en": "London"}, "sitelinks": {"enwiki": "London"}},
+              "Q42": {"labels": {"en": "Lafayette Street"}, "claims": {"P2016": [item("Q7267")]}}}
+    out = render(kind="person", lang="en", page_entity="Q2", entities=person)
+    assert row("birth_place", "[[wikipedia:en:London|London]]") in out
+    # no located-in statement: the place as stored
+    assert row("death_place", "Lafayette Street") in out
+
+
 def test_values_are_escaped():
     evil = {"Q5": {"labels": {"en": 'A <b>"x"'}, "claims": {"P3990": [item("Q6")]}}, "Q6": {"labels": {"en": "<i>y"}}}
     out = render(lang="en", page_entity="Q5", entities=evil)

@@ -19,6 +19,7 @@
   "image": "P725",
   "inception": "P4732",
   "instance_of": "P2016",
+  "located_in": "P294",
   "lyrics_by": "P5825",
   "male": "Q246",
   "occupation": "P63",

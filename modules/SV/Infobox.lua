@@ -11,7 +11,7 @@ local function values(entity, field, lang)
 	local out = {}
 	for _, v in ipairs(Util.best(entity, field.propId)) do
 		if field.kind == 'item' then
-			out[#out + 1] = itemLink(v.id, lang)
+			out[#out + 1] = itemLink(Util.place(v.id, field.climb, lang), lang)
 		elseif field.kind == 'time' then
 			out[#out + 1] = formatTime(v)
 		elseif field.kind == 'monolingual' then
@@ -66,17 +66,7 @@ local function treeItems(data)
 	return fields, themes
 end
 
-local function itemIds(entity, propId)
-	local out = {}
-	for _, statement in ipairs(entity and entity.claims and entity.claims[propId] or {}) do
-		local snak = statement.mainsnak
-		local dv = snak and snak.snaktype == 'value' and snak.datavalue
-		if dv and statement.rank ~= 'deprecated' then
-			out[#out + 1] = dv.value.id
-		end
-	end
-	return out
-end
+local itemIds = Util.itemIds
 
 -- [[Category:…]] for the item's SV field (one) and SV Gospel themes, in the wiki's language; anything
 -- unexpected goes to a tracking category instead of being dropped silently.
@@ -162,7 +152,7 @@ function p._render(kind, args, ctx)
 	local rows, image = {}, nil
 	local fromItem = 0
 	for _, f in ipairs(fields) do
-		local field = { key = f.key, kind = f.kind, max = f.max, propId = data.wikibase[f.prop] }
+		local field = { key = f.key, kind = f.kind, max = f.max, climb = f.climb, propId = data.wikibase[f.prop] }
 		local value = args[f.key]
 		if not value then
 			value = values(entity, field, lang)

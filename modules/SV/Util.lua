@@ -176,4 +176,50 @@ function p.best(entity, propId)
 	return out
 end
 
+-- The item IDs of every non-deprecated statement for propId, whatever its rank, in item order.
+function p.itemIds(entity, propId)
+	local out = {}
+	for _, statement in ipairs(entity and entity.claims and propId and entity.claims[propId] or {}) do
+		local snak = statement.mainsnak
+		local dv = snak and snak.snaktype == 'value' and snak.datavalue
+		if dv and dv.value and dv.value.id and statement.rank ~= 'deprecated' then
+			out[#out + 1] = dv.value.id
+		end
+	end
+	return out
+end
+
+-- The most steps a place climbs: Wikidata nests a street in a borough in a city.
+local CLIMB_STEPS = 4
+
+-- The place to show for a place item. Wikidata often records a birth or death place at its finest
+-- grain (Brixton, Lafayette Street) where reference works name the town (London, New York): while
+-- the place is an instance of one of the classes in climb (a place row's "climb" list in
+-- config/infobox.json), go up its best "located in the administrative territorial entity" value.
+-- The climb stops at a place of any other class, where the data ends, or before a place with no
+-- label to show; it returns the last place reached.
+function p.place(id, climb, lang)
+	if not (id and climb and climb[1]) then
+		return id
+	end
+	local wb = mw.loadData('Module:SV/Data').wikibase
+	local fine = {}
+	for _, class in ipairs(climb) do
+		fine[class] = true
+	end
+	for _ = 1, CLIMB_STEPS do
+		local entity = mw.wikibase.getEntity(id)
+		local isFine = false
+		for _, class in ipairs(p.itemIds(entity, wb.instance_of)) do
+			isFine = isFine or fine[class] == true
+		end
+		local parent = isFine and p.best(entity, wb.located_in)[1]
+		if not (parent and parent.id and p.label(parent.id, lang)) then
+			return id
+		end
+		id = parent.id
+	end
+	return id
+end
+
 return p
