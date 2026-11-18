@@ -82,3 +82,12 @@ def test_skill_files_on_the_item():
 def test_template_categories_are_allowed():
     for text in ((SKILL / "SKILL.md").read_text(encoding="utf-8"), render_categories(ROOT)):
         assert "maintenance and tracking categories" in text
+
+
+def test_skill_uses_sv_bio_and_bare_infobox():
+    text = (SKILL / "SKILL.md").read_text(encoding="utf-8")
+    for needle in ("{{SV bio}}", "bare `{{SV infobox}}`", "wikibase-search-entities", "Wikidata",
+                   "--import", "connect_items", "image=", "never a Wikipedia infobox"):
+        assert needle in text, needle
+    readme = (ROOT / "server" / "README.md").read_text(encoding="utf-8")
+    assert "connect_items" in readme

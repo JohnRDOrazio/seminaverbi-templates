@@ -29,7 +29,7 @@ templates or `Module:SV/…` on a wiki: they are overwritten by the sync. Change
    - every template it reports is an `SV …` template from `templates.md`, or one that already exists on
      that wiki (check with `get-page` on `Template:<name>` if unsure); never introduce Wikipedia templates;
    - no link to `w:`/`wikipedia:` without a language on a non-English wiki (see `links.md`);
-   - the article calls `{{SV infobox}}` or `{{SV categories}}`, and has no `[[Category:…]]` line for a
+   - the article calls bare `{{SV infobox}}` or `{{SV categories}}`, and has no `[[Category:…]]` line for a
      tree category (field and themes come from the item, below); any other category you write is in
      `categories.md`; the SV templates' own maintenance and tracking categories (`{{SV WIP}}`,
      `{{SV cathopedia}}`, the infobox's tracking categories…) are fine;
@@ -94,9 +94,22 @@ ask the author instead of guessing.
   `[[fr:…]]` lines in the text. Use `wikibase-get-entity` / `wikibase-edit-entity`.
 - The SeminaVerbi wikis' site IDs are `en`, `it`, `es`, `fr`, `de`, `pt`. Never `enwiki`, `itwiki`…:
   those are **Wikipedia**. The repository mirrors Wikidata items, Wikipedia sitelinks included.
-- **A new article first finds its subject's item:** `wikibase-search-entities` on en (the mirror holds
-  about 13k Wikidata items), then add the SeminaVerbi sitelink (`en`, `it`…) to it. Create an item only
-  when none exists.
+- **A new article is connected to its item before anything is written.** Search the local Wikibase on en
+  with `wikibase-search-entities` (local IDs differ from Wikidata IDs). If the subject is not there, it
+  is imported from Wikidata on the server with `server/EnrichItems.php --import Q…` (see
+  `server/README.md`), and `tools/connect_items.py` links the article to the item (`--wd TITLE=QID`, or
+  `--create "TITLE=description"` when Wikidata has no item). Only then write the page.
+- **Facts belong on the item, never a Wikipedia infobox** in the article (no `{{Infobox …}}`, no
+  copied infobox fields). Add or fix the statement on the item instead.
+- Write the infobox as bare `{{SV infobox}}`: it reads every fact from the page's item (the layout comes
+  from the item's "instance of"). Optional parameters: `type`, `item` (renders another item, e.g. a song
+  or album covered in a section of an artist's page), `name`, `sortkey`, `image=`.
+- **`image=` exception:** a non-free file that exists only on en.wikipedia or it.wikipedia (not on
+  Commons, not in the farm's shared repository) cannot be put on the item, so its name stays on the call:
+  `{{SV infobox|image=File name.jpg}}`. Every other image goes on the item.
+- **People:** open the article with `{{SV bio}}` on every wiki. It writes the opening sentence from the
+  item in the wiki's language and adds no categories (parameters in `templates.md`). It replaces
+  it.wiki's `{{Bio}}`.
 - On items, change only sitelinks, labels, descriptions, `SV field` and `SV Gospel theme`, unless the
   author asks in this session for another statement change: other statements feed the infoboxes and are
   filled from Wikidata by `EnrichItems.php`.
