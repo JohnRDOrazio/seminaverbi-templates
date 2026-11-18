@@ -43,7 +43,8 @@ import mwparserfromhell
 from sync.pages import LANGS
 from sync.wiki import SyncError, WikiClient
 from sync.wikidata import WikidataClient
-from tools.imports import WIKIPEDIA, import_command, local_copy as _local_copy, page_key, parse_import_log
+from tools.imports import (WIKIPEDIA, import_command, local_copy as _local_copy, page_key, parse_import_log,
+                           sitelink_clash)
 
 ROOT = Path(__file__).resolve().parent.parent
 TAG = "seminaverbi-mcp"
@@ -320,14 +321,22 @@ def _plan_one(a: Article, repo, wikidata, existing, conf, forced, hits, asked=fr
                                         f"({', '.join(found) or '-'}); --wd or --create")
         return row("create", reason=f"no Wikidata item; confirm with --create \"{a.lang}:{a.title}=DESCRIPTION\"")
     entity = wikidata.entity(wd)
+    mismatches, local = [], None
     if wd in existing:
-        local, sv = existing[wd]
-    else:
-        mismatches = []
+        # known() matched the item by one Wikipedia sitelink: its others must not belong to other items
+        clash = sitelink_clash(repo, wikidata, existing[wd][0], wd)
+        if clash:
+            mismatches.append(f"{existing[wd][0]} carries {clash}")
+        else:
+            local, sv = existing[wd]
+    if not local:
         local = _local_copy(repo, entity, wikidata, mismatches)
         if mismatches and not local:
-            return row("author", wd, None, "the mirror's copy is not trusted: " + "; ".join(mismatches)
-                       + f" (its sitelinks belong to other Wikidata items than {wd}); confirm with --wd")
+            # --wd reaches this same check, so only repairing the mirror settles it
+            return row("author", wd, None, "the mirror's copy is not trusted: " + "; ".join(dict.fromkeys(mismatches))
+                       + f" (sitelinks of other Wikidata items than {wd}); repair the mirror first: remove "
+                         "from that local item the Wikipedia sitelinks of the Wikidata item it does not "
+                         "mirror (its WikibaseImport mapping names the one it does), then rerun")
         sv = {s: t for s, t in repo.sitelinks([local]).get(local, {}).items() if s in LANGS} if local else {}
     if local and sv.get(a.lang) and sv[a.lang] != a.title:
         return row("author", wd, local, f"{local} is already linked to {a.lang}:{sv[a.lang]}")

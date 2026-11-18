@@ -504,6 +504,37 @@ def test_local_copy_whose_other_sitelink_moved_is_flagged_not_trusted():
     assert repo.calls == []
 
 
+def test_mirror_conflict_asks_for_the_mirror_repair_not_wd():
+    wd = Wikidata(links={("enwiki", "Foo"): "Q2", ("itwiki", "Fu"): "Q1"},
+                  entities={"Q2": ent("Q2", sitelinks={"enwiki": "Foo"})})
+    repo = Repo({"Q47700": {"enwiki": "Foo", "itwiki": "Fu"}})
+    (row,) = plan([Article("en", "Foo", "Text.")], repo, wd)
+    assert "--wd" not in row.reason  # --wd reaches the same check: it cannot settle the conflict
+    assert "remove" in row.reason and "Q47700" in row.reason
+
+
+def test_connected_mirror_with_a_moved_sitelink_is_not_joined():
+    # Q47700 already has a connected article (it:Fu), so known() lists it under Q2 from its enwiki link alone
+    wd = Wikidata(links={("enwiki", "Foo"): "Q2", ("itwiki", "Fu"): "Q1"},
+                  entities={"Q2": ent("Q2", sitelinks={"enwiki": "Foo"})})
+    repo = Repo({"Q47700": {"enwiki": "Foo", "itwiki": "Fu", "it": "Fu"}})
+    existing = ci.known(repo, wd, ["Q47700"])
+    assert existing["Q2"][0] == "Q47700"
+    (row,) = plan([Article("en", "Foo", "Text.")], repo, wd, existing)
+    assert row.action == "author" and row.wd == "Q2" and row.local is None
+    assert "Q47700" in row.reason and row.reason.count("itwiki:Fu") == 1
+    ci.run([row], repo, apply=True)
+    assert repo.calls == []
+
+
+def test_connected_mirror_with_consistent_sitelinks_still_joins():
+    wd = Wikidata(links={("enwiki", "Foo"): "Q2", ("itwiki", "Fu"): "Q2"},
+                  entities={"Q2": ent("Q2", sitelinks={"enwiki": "Foo", "itwiki": "Fu"})})
+    repo = Repo({"Q47700": {"enwiki": "Foo", "itwiki": "Fu", "it": "Fu"}})
+    (row,) = plan([Article("en", "Foo", "Text.")], repo, wd, ci.known(repo, wd, ["Q47700"]))
+    assert (row.action, row.local) == ("join", "Q47700")
+
+
 def test_kinds_are_the_narrow_classes_not_bread_or_franchise_in_general():
     kinds = ci.load_config()["kinds"]
     assert "Q7802" not in kinds["work"] and "Q196600" not in kinds["film"]  # bread / media franchise at large

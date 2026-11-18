@@ -42,7 +42,7 @@ def local_copy(repo, entity: dict, wikidata=None, mismatches: list | None = None
         candidate = repo.items_for(site, [title]).get(title)
         if not candidate:
             continue
-        clash = _sitelink_clash(repo, wikidata, candidate, qid) if wikidata and qid else None
+        clash = sitelink_clash(repo, wikidata, candidate, qid) if wikidata and qid else None
         if clash:
             if mismatches is not None:
                 mismatches.append(f"{candidate} carries {clash}")
@@ -51,7 +51,7 @@ def local_copy(repo, entity: dict, wikidata=None, mismatches: list | None = None
     return None
 
 
-def _sitelink_clash(repo, wikidata, candidate: str, qid: str) -> str | None:
+def sitelink_clash(repo, wikidata, candidate: str, qid: str) -> str | None:
     """"site:Title (Qn)" for a Wikipedia sitelink of the local item that Wikidata gives to another item."""
     links = repo.sitelinks([candidate]).get(candidate, {})
     for site in WIKIPEDIA:
