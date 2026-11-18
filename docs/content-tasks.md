@@ -24,14 +24,18 @@ the page had by hand.
 
 | Article | Finding | Proposed | Status |
 |---------|---------|----------|--------|
-| en, it: Daredevil; en, it: Fringe | No closing discernment section and no SV references section | add both, as the article standard requires | open |
-| en: Daredevil (TV series) | Old `{{Bible quote}}` template (and "Marc 8:27-28" for Mark); Wikipedia leftovers (short description, Reflist, navboxes): 2 citation errors, ~570 red links | convert to SV Bible quote; strip the leftovers | open |
-| it: Daredevil | The Cantalamessa quote alludes to Mt 5:45, Mk 1:11, Rom 8:15 / Gal 4:6 without Bible quote templates | quote them | open |
-| en, it: Fringe | Episode numbers outside the repentance section are off ("Peter" S2E15 → S2E16, "Brown Betty", the "Over There" parts, it "6:02 AM EST") | check against the episode list and correct | open |
+| en, it: Daredevil; en, it: Fringe | No closing discernment section and no SV references section | add both, as the article standard requires | done (Daredevil en 30346, it 11190; Fringe en 30358, it 11199) |
+| en: Daredevil (TV series) | Old `{{Bible quote}}` template (and "Marc 8:27-28" for Mark); Wikipedia leftovers (short description, Reflist, navboxes): 2 citation errors, ~570 red links | convert to SV Bible quote; strip the leftovers | done (en 30346–30352; Mark widened to 8:27-29) |
+| it: Daredevil | The Cantalamessa quote alludes to Mt 5:45, Mk 1:11, Rom 8:15 / Gal 4:6 without Bible quote templates | quote them | done (it 11187–11189) |
+| en, it: Fringe | Episode numbers outside the repentance section are off ("Peter" S2E15 → S2E16, "Brown Betty", the "Over There" parts, it "6:02 AM EST") | check against the episode list and correct | done (en 30353–30357, it 11191–11198; checked against Wikipedia's per-season lists, the errors came from the fan wiki's numbering) |
 | it: Il Signore degli Anelli (Q4178) | No Gospel themes filed; Jev rates 17 as argued | filed Jev's 17 "applied" themes (author: trust Jev); faith, sacrifice, freedom, community strengthened in the text | done (2026-11-18) |
 | it, en: Il Signore degli Anelli / The Lord of the Rings | Letter 181 (Lord's Prayer) and Letter 246 ("purgatory and reward") had come from secondary summaries | verify online: Letters 43, 142, 181, 210, 213, 246, 320 checked (Tolkien Estate, secondary quotations of the 2023 edition); 246's "purgatory and reward" confirmed verbatim; one unsupported claim removed | done (it rev 11174) |
 | it, en: Il Signore degli Anelli / The Lord of the Rings | Still to check in the printed *Letters*: the Lord's Prayer wording in 181; whether the printed draft of 246 has the purgatory sentence; Letter 191 (new) rests on secondary excerpts; prophet/priest/king paragraph needs a source; 1926/1931 dates for Tolkien and Lewis | check against the printed edition | open |
 | en: The Lord of the Rings | Still held the pasted Italian interview | translated from the corrected it article; all 17 themes argued | done (en rev 30331) |
 | it: Bob Dylan (Q7056) | No Gospel themes filed | filed Jev's 6 "applied" themes: faith, conversion, redemption, prayer, justice, prudence | done (2026-11-18) |
-| it: Bob Dylan (Q7056) | prudence: filed (Jev 0.81) but only touched in the discernment section | enrich: argue prudence with concrete moments; else remove | open |
-| it: Bob Dylan | The 1979 baptism rests on Ravasi alone; the 1997 New York Times quote is via Ventura (unchecked) | find a second source or soften | open |
+| it: Bob Dylan (Q7056) | prudence: filed (Jev 0.81) but only touched in the discernment section | enrich: argue prudence with concrete moments; else remove | done (it 11185–11186: CCC 1806, the Vineyard Bible course, *Man of Peace*, his reticence). Weakest of the six: no source speaks of prudence; remove if only source-stated themes are wanted |
+| it: Bob Dylan | The 1979 baptism rests on Ravasi alone; the 1997 New York Times quote is via Ventura (unchecked) | find a second source or soften | done (it 11183–11184: RNS 2016 as second source, wording softened, Pat Boone pool rumour denied; NYT wording verified against Pareles 1997) |
+| it: Daredevil; it: Fringe | Old `{{Citazione bibbia\|versione=CEI2008\|rif=…}}` calls remain (Daredevil: Ef 3,14-15, Lc 1,17, Ml 3,24, Col 3,18-21, Sal 46; Fringe: Is 7, Sal 51, Ez 33, Mt 18, Gen 11, Gen 6;7;8;9) | convert to `{{SV citazione bibbia}}` (check the multi-chapter Gen reference fits) | open |
+| en, it: Daredevil; en, it: Fringe | Older `[[wikipedia:…]]` / `[[w:…]]` links without a language prefix | rewrite as `w:en:` / `w:it:` per the link rules | open |
+| en, it: Fringe | No "See also" / "Voci correlate" section with `{{SV cathopedia}}` lines | add one | open |
+| en: Fringe (TV series) | "Articles with invalid date parameter in template" from the old `cite episode` / `cite web` refs | fix the dates | open |
