@@ -65,11 +65,13 @@
 }
 
 .sv-infobox-album caption,
+.sv-infobox-composition caption,
 .sv-infobox-song caption,
 .sv-infobox-group caption {
 	background: #6b3a75;
 }
 .sv-infobox-album th,
+.sv-infobox-composition th,
 .sv-infobox-song th,
 .sv-infobox-group th {
 	background: #f4ecf6;
@@ -134,6 +136,7 @@
 		color: #a2a9b1;
 	}
 	html.skin-theme-clientpref-night .sv-infobox-album th,
+	html.skin-theme-clientpref-night .sv-infobox-composition th,
 	html.skin-theme-clientpref-night .sv-infobox-song th,
 	html.skin-theme-clientpref-night .sv-infobox-group th {
 		background: #2e2431;
@@ -175,6 +178,7 @@
 		color: #a2a9b1;
 	}
 	html.skin-theme-clientpref-os .sv-infobox-album th,
+	html.skin-theme-clientpref-os .sv-infobox-composition th,
 	html.skin-theme-clientpref-os .sv-infobox-song th,
 	html.skin-theme-clientpref-os .sv-infobox-group th {
 		background: #2e2431;

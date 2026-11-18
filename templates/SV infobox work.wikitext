@@ -1,6 +1,6 @@
 <includeonly>{{#invoke:SV/Infobox|work}}</includeonly><noinclude>
 Infobox for a work, filled from the page's Wikibase item. Parameters (all optional):
-* <code>type</code>: <code>book</code> (default), <code>film</code>, <code>tv</code>, <code>album</code>, <code>song</code>, <code>play</code>, <code>artwork</code>.
+* <code>type</code>: <code>book</code> (default), <code>film</code>, <code>tv</code>, <code>album</code>, <code>song</code>, <code>composition</code>, <code>play</code>, <code>artwork</code>.
 * <code>item</code>: a Wikibase item ID, when the page is not connected to one.
 * <code>name</code>: caption; defaults to the item's label.
 * Any field name (<code>author</code>, <code>director</code>, <code>cast</code>, <code>publication_date</code>, <code>genre</code>, <code>image</code>, …) overrides the item's value.

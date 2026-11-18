@@ -109,7 +109,7 @@ The SeminaVerbi infobox: layout from the item's instance of, rows from its state
 
 | parameter | meaning |
 |---|---|
-| `type` | layout when the item's type is missing or ambiguous: book, film, tv, album, song, play, artwork, person, group, work |
+| `type` | layout when the item's type is missing or ambiguous: book, film, tv, album, song, composition, play, artwork, person, group, work |
 | `item` | a Wikibase item ID to use instead of the page's own item (needed when the page is not connected to one) |
 | `name` | caption; defaults to the item's label |
 | `sortkey` | sort key for the item's categories |
@@ -136,7 +136,7 @@ Aliases: it: `SV infobox opera`, es: `SV ficha obra`, fr: `SV infobox œuvre`, d
 
 | parameter | meaning |
 |---|---|
-| `type` | book (default), film, tv, album, song, play, artwork |
+| `type` | book (default), film, tv, album, song, composition, play, artwork |
 | `item` | a Wikibase item ID to use instead of the page's own item (needed when the page is not connected to one) |
 | `name` | caption; defaults to the item's label |
 | `sortkey` | sort key for the item's categories |
@@ -147,6 +147,7 @@ Fields per `type`:
 - `film`: image, title, director, screenwriter, cast, publication_date, original_language_film, country_of_origin, genre
 - `tv`: image, title, creator, cast, original_language_film, country_of_origin, genre, publication_date
 - `album`: image, title, performer, publication_date, genre, record_label
+- `composition`: image, title, composer, lyrics_by, publication_date, genre
 - `song`: image, title, performer, composer, lyrics_by, publication_date, genre
 - `play`: image, title, author, original_language_work, publication_date, genre
 - `artwork`: image, title, creator, inception

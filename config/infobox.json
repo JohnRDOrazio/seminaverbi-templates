@@ -169,6 +169,38 @@
       "kind": "item"
     }
   ],
+  "composition": [
+    {
+      "key": "image",
+      "prop": "image",
+      "kind": "image"
+    },
+    {
+      "key": "title",
+      "prop": "title",
+      "kind": "monolingual"
+    },
+    {
+      "key": "composer",
+      "prop": "composer",
+      "kind": "item"
+    },
+    {
+      "key": "lyrics_by",
+      "prop": "lyrics_by",
+      "kind": "item"
+    },
+    {
+      "key": "publication_date",
+      "prop": "publication_date",
+      "kind": "time"
+    },
+    {
+      "key": "genre",
+      "prop": "genre",
+      "kind": "item"
+    }
+  ],
   "song": [
     {
       "key": "image",

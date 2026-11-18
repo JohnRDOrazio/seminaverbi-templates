@@ -68,7 +68,7 @@
   "SV infobox": {
     "summary": "The SeminaVerbi infobox: layout from the item's instance of, rows from its statements, categories from its SV field / SV Gospel theme. Write just {{SV infobox}}; any row key overrides the item's value.",
     "params": {
-      "type": "layout when the item's type is missing or ambiguous: book, film, tv, album, song, play, artwork, person, group, work",
+      "type": "layout when the item's type is missing or ambiguous: book, film, tv, album, song, composition, play, artwork, person, group, work",
       "item": "a Wikibase item ID to use instead of the page's own item (needed when the page is not connected to one)",
       "name": "caption; defaults to the item's label",
       "sortkey": "sort key for the item's categories"
@@ -85,7 +85,7 @@
   "SV infobox work": {
     "summary": "Infobox for a work, filled from the page's Wikibase item. Any field of its type (see below) overrides the item's value.",
     "params": {
-      "type": "book (default), film, tv, album, song, play, artwork",
+      "type": "book (default), film, tv, album, song, composition, play, artwork",
       "item": "a Wikibase item ID to use instead of the page's own item (needed when the page is not connected to one)",
       "name": "caption; defaults to the item's label",
       "sortkey": "sort key for the item's categories"

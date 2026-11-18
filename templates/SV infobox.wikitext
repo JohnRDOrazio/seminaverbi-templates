@@ -1,5 +1,5 @@
 <includeonly>{{#invoke:SV/Infobox|auto}}</includeonly><noinclude>
 The SeminaVerbi infobox. It reads everything from the page's Wikibase item: the layout follows the item's "instance of" (film, TV series, person, musical group, book, play, album…, see <code>config/infobox_types.json</code> in the repository), the rows come from the item's statements in this wiki's language, and the item's <code>SV field</code> and <code>SV Gospel theme</code> statements become the page's categories. Write just <code><nowiki>{{SV infobox}}</nowiki></code>.
 
-Optional parameters: <code>type</code> (a layout, when the item's type is missing or ambiguous: book, film, tv, album, song, play, artwork, person, group, work), <code>item</code> (when the page is not connected to one), <code>name</code> (caption), <code>sortkey</code>, and any row's key to override the item's value.
+Optional parameters: <code>type</code> (a layout, when the item's type is missing or ambiguous: book, film, tv, album, song, composition, play, artwork, person, group, work), <code>item</code> (when the page is not connected to one), <code>name</code> (caption), <code>sortkey</code>, and any row's key to override the item's value.
 </noinclude>
