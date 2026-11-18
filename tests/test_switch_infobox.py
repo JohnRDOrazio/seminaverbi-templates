@@ -60,6 +60,13 @@ class Repo:
     def items_for(self, site, titles):
         return {t: self.links[site, t] for t in titles if (site, t) in self.links}
 
+    def sitelinks(self, items):
+        out = {}
+        for (site, title), item in self.links.items():
+            if item in items:
+                out.setdefault(item, {})[site] = title
+        return out
+
     def entity(self, item):
         return self.entities.setdefault(item, {"id": item, "labels": {}, "claims": {}})
 
@@ -636,6 +643,32 @@ def test_one_resolver_is_built_per_wiki(monkeypatch):
     repo.links["en", "Other"] = "Q101"
     si.run(repo, {"en": client}, Wikidata(), MAPPING, {"en": set()}, apply=False, out=lambda *a: None)
     assert built == ["en"]
+
+
+def test_nationality_prefers_the_demonyms_of_the_persons_citizenships():
+    # two countries answer to "americano" (United States, and a historical state): the person's own P27 decides
+    usa, other = wd_entity("Q30", {"itwiki": "Stati Uniti d'America"}, demonyms=[("it", "americano")]), \
+        wd_entity("Q999", demonyms=[("it", "Americano ")])
+    person = wd_entity("Q1", {"itwiki": "Mario"})
+    person["claims"]["P27"] = [statement(item_dv("Q30"))]
+    wd = Wikidata(links={("itwiki", "Mario"): "Q1"}, hits={("americano", "it"): ["Q999", "Q30"]},
+                  entities={"Q30": usa, "Q999": other, "Q1": person})
+    repo = Repo(links={("itwiki", "Mario"): "Q200", ("itwiki", "Stati Uniti d'America"): "Q60"})
+    assert si.Resolver("it", repo, wd, None).country("americano", "Q200") == item_dv("Q60")
+    # without the person's item the search alone is ambiguous: never guessed
+    assert isinstance(si.Resolver("it", repo, wd, None).country("americano"), Unresolved)
+
+
+def test_nationality_matches_a_whole_demonym_only():
+    wd = Wikidata(hits={("italiano", "it"): ["Q1", "Q2", "Q38"]},
+                  entities={"Q1": wd_entity("Q1", demonyms=[("it", "italoamericano")]),
+                            "Q2": wd_entity("Q2", demonyms=[("it", "italiano-americano"), ("en", "italiano")]),
+                            "Q38": wd_entity("Q38", {"itwiki": "Italia"}, demonyms=[("it", "Italiano")])})
+    repo = Repo(links={("itwiki", "Italia"): "Q32"})
+    assert si.Resolver("it", repo, wd, None).country("italiano") == item_dv("Q32")
+    # a demonym that only contains the word is no match
+    wd.ents["Q38"] = wd_entity("Q38", {"itwiki": "Italia"}, demonyms=[("it", "italiano antico")])
+    assert isinstance(si.Resolver("it", repo, wd, None).country("italiano"), Unresolved)
 
 
 TV = """{{Infobox television

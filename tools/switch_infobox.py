@@ -44,6 +44,7 @@ import json
 import os
 import re
 import sys
+import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import NamedTuple
@@ -57,7 +58,7 @@ from sync.wiki import SyncError, WikiClient
 from sync.wikidata import WikidataClient
 from tools.connect_items import SUBKINDS, _template_name, claim_ids
 from tools.file_items import guarded_save, layout_for
-from tools.imports import enrich_command, import_command, local_copy, page_key, parse_import_log
+from tools.imports import WIKIPEDIA, enrich_command, import_command, local_copy, page_key, parse_import_log
 
 ROOT = Path(__file__).resolve().parent.parent
 TAG = "seminaverbi-mcp"
@@ -229,22 +230,52 @@ class Resolver:
             self._images[name] = self.client.image_source(name)
         return self._images[name]
 
-    def country(self, adjective: str):
-        """The country whose Wikidata demonym (P1549) in this language is `adjective`, if exactly one."""
-        if adjective not in self._countries:
-            hits = self.wikidata.search(adjective, self.lang)
-            self.wikidata.prefetch(hits)
-            want = adjective.strip().casefold()
-            found = [q for q in hits if any(
-                (s.get("mainsnak", {}).get("datavalue") or {}).get("value", {}).get("language") == self.lang
-                and s["mainsnak"]["datavalue"]["value"].get("text", "").strip().casefold() == want
-                for s in self.wikidata.entity(q).get("claims", {}).get("P1549", []))]
+    def wikidata_item(self, item: str) -> str | None:
+        """The Wikidata item local `item` mirrors, through its Wikipedia sitelink (this wiki's first)."""
+        if ("wd", item) not in self._items:
+            links = self.repo.sitelinks([item]).get(item, {})
+            wd = None
+            for site in sorted((s for s in links if s in WIKIPEDIA), key=lambda s: s != f"{self.lang}wiki"):
+                wd = self.wikidata.by_sitelink(site, [links[site]]).get(links[site])
+                if wd:
+                    break
+            self._items["wd", item] = wd
+        return self._items["wd", item]
+
+    def _demonym(self, qid: str, adjective: str) -> bool:
+        """Whether a demonym (P1549) of `qid` in this language is `adjective`, as a whole value (case, Unicode
+        form and spacing aside): "italiano" is not "italoamericano" nor "italiano antico"."""
+        want = _words(adjective)
+        return any((s.get("mainsnak", {}).get("datavalue") or {}).get("value", {}).get("language") == self.lang
+                   and _words(s["mainsnak"]["datavalue"]["value"].get("text", "")) == want
+                   for s in self.wikidata.entity(qid).get("claims", {}).get("P1549", []))
+
+    def country(self, adjective: str, person: str | None = None):
+        """The country whose Wikidata demonym (P1549) in this language is `adjective`: among the citizenships
+        (P27) of the Wikidata item of local `person` when exactly one has it, else among the search hits if
+        exactly one has it."""
+        key = (adjective, person)
+        if key not in self._countries:
+            found = []
+            wd = self.wikidata_item(person) if person else None
+            if wd:
+                citizenships = claim_ids(self.wikidata.entity(wd), "P27")
+                self.wikidata.prefetch(citizenships)
+                found = [q for q in dict.fromkeys(citizenships) if self._demonym(q, adjective)]
             if len(found) != 1:
-                self._countries[adjective] = Unresolved(
+                hits = self.wikidata.search(adjective, self.lang)
+                self.wikidata.prefetch(hits)
+                found = [q for q in dict.fromkeys(hits) if self._demonym(q, adjective)]
+            if len(found) != 1:
+                self._countries[key] = Unresolved(
                     f"nationality {adjective!r}: {len(found)} Wikidata items with that demonym")
             else:
-                self._countries[adjective] = self._local_or_import(found[0], f"demonym {adjective!r}")
-        return self._countries[adjective]
+                self._countries[key] = self._local_or_import(found[0], f"demonym {adjective!r}")
+        return self._countries[key]
+
+
+def _words(s: str) -> str:
+    return " ".join(unicodedata.normalize("NFC", s).casefold().split())
 
 
 def _cap(title: str) -> str:
@@ -693,7 +724,7 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
             gender = {"M": props["male"], "F": props["female"]}.get(raw.strip().upper())
             value = Value([item_dv(gender)], raw.strip()) if gender else Unresolved(f"sex {raw!r}")
         else:
-            value = resolver.country(raw)
+            value = resolver.country(raw, page.item)
             value = value if isinstance(value, Unresolved) else Value([value], raw)
         if isinstance(value, Unresolved):
             unresolved.append((key, raw))
