@@ -340,6 +340,25 @@ def test_main_wires_the_cli(tmp_path, capsys):
         ci.main(["--create", "Nek"], repo=repo, clients=clients, wikidata=wd)
 
 
+def test_only_limits_the_plan_and_the_apply_to_the_named_articles(capsys):
+    repo = Repo()
+    wd = Wikidata(links={("enwiki", "Christmas tree"): "Q47128", ("itwiki", "Nek"): "Q45036"},
+                  entities={"Q47128": ent("Q47128"), "Q45036": ent("Q45036")})
+    repo.links["Q48100"] = {"enwiki": "Christmas tree"}  # the local copy of Q47128: a "local" row
+    repo.revs["Q48100"] = 1
+    clients = {"en": Client("en", repo, {"Christmas tree": "Text.", "New page": "Text."}),
+               "it": Client("it", repo, {"Nek": "x"})}
+    assert ci.main(["--apply", "--only", "en:New page", "--create", "en:New page=a new page"], repo=repo,
+                   clients=clients, wikidata=wd, file_item=lambda item: None) == 0
+    out = capsys.readouterr().out
+    assert "Christmas tree" not in out and "Nek" not in out  # the other matches are neither planned nor written
+    assert [c[0] for c in repo.calls] == ["new"] and repo.calls[0][4] == {"en": "New page"}
+    with pytest.raises(SystemExit):  # --only names an unconnected article
+        ci.main(["--only", "Nobody"], repo=repo, clients=clients, wikidata=wd)
+    with pytest.raises(SystemExit):  # a decision outside --only would be ignored: refused
+        ci.main(["--only", "Nek", "--wd", "en:Christmas tree=Q47128"], repo=repo, clients=clients, wikidata=wd)
+
+
 def test_created_label_drops_the_disambiguator():
     title = "Il Miglio Verde (film)"
     repo = Repo()

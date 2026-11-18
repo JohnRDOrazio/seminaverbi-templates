@@ -47,8 +47,10 @@ WikibaseImport's mapping table.
 
 ## Connecting a new article (import first, then link)
 
-An article is connected to its item before it is written. Search the local Wikibase (the MCP tool
+The item comes first, then the page, then the link. Search the local Wikibase (the MCP tool
 `wikibase-search-entities`; local IDs differ from Wikidata IDs). If the subject is missing, import it
-with `--import Q…` as above, then link the article with `python -m tools.connect_items`: `--wd TITLE=QID`
-for a Wikidata item (pass the import output with `--import-log FILE`), or `--create "TITLE=description"`
-when Wikidata has none. It reports only until `--apply` is given.
+with `--import Q…` as above. Save the page, then link it with `python -m tools.connect_items`, which
+sees only pages that exist: `--only TITLE` with `--wd TITLE=QID` for a Wikidata item (pass the import
+output with `--import-log FILE`), or `--create "TITLE=description"` when Wikidata has none. `--only TITLE`
+plans and applies only that article; without it `--apply` also links every other unconnected article the
+tool matched by itself. It reports only until `--apply` is given.

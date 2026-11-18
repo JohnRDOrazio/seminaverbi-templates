@@ -94,11 +94,15 @@ ask the author instead of guessing.
   `[[fr:…]]` lines in the text. Use `wikibase-get-entity` / `wikibase-edit-entity`.
 - The SeminaVerbi wikis' site IDs are `en`, `it`, `es`, `fr`, `de`, `pt`. Never `enwiki`, `itwiki`…:
   those are **Wikipedia**. The repository mirrors Wikidata items, Wikipedia sitelinks included.
-- **A new article is connected to its item before anything is written.** Search the local Wikibase on en
-  with `wikibase-search-entities` (local IDs differ from Wikidata IDs). If the subject is not there, it
-  is imported from Wikidata on the server with `server/EnrichItems.php --import Q…` (see
-  `server/README.md`), and `tools/connect_items.py` links the article to the item (`--wd TITLE=QID`, or
-  `--create "TITLE=description"` when Wikidata has no item; `TITLE::description` when the title contains `=`). Only then write the page.
+- **A new article: the item first, then the page, then the link.** Search the local Wikibase on en with
+  `wikibase-search-entities` (local IDs differ from Wikidata IDs). If the subject is not there, it is
+  imported from Wikidata on the server with `server/EnrichItems.php --import Q…` (see
+  `server/README.md`). Then save the page (its bare `{{SV infobox}}` fills in once the page is linked)
+  and link it right away with `tools/connect_items.py`, which sees only pages that exist:
+  `--wiki <code> --only TITLE` with `--wd TITLE=QID` (or `--create "TITLE=description"` when Wikidata
+  has no item; `TITLE::description` when the title contains `=`). `--only TITLE` plans and applies only
+  that article; without it `--apply` also links and files every other unconnected article the tool
+  matched by itself, on every wiki in `--wiki`. Show the author the dry run, then rerun with `--apply`.
 - **Facts belong on the item, never a Wikipedia infobox** in the article (no `{{Infobox …}}`, no
   copied infobox fields). Add or fix the statement on the item instead.
 - Write the infobox as bare `{{SV infobox}}`: it reads every fact from the page's item (the layout comes

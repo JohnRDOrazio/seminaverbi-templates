@@ -113,6 +113,15 @@ def test_skill_uses_sv_bio_and_bare_infobox():
     assert "## Connecting a new article" in readme and "`--dry-run` with `--import` writes nothing" in readme
 
 
+def test_new_article_sequence_works_with_connect_items():
+    skill = flat((SKILL / "SKILL.md").read_text(encoding="utf-8"))
+    readme = flat((ROOT / "server" / "README.md").read_text(encoding="utf-8"))
+    for text in (skill, readme):
+        # connect_items only sees pages that exist: the page is saved first, then linked, one article at a time
+        assert "connected to its item before" not in text and "Only then write the page" not in text
+        assert "`--only TITLE`" in text and "only that article" in text
+
+
 def test_infobox_item_parameter_is_worded_alike_in_skill_and_templates_docs():
     skill = flat((SKILL / "SKILL.md").read_text(encoding="utf-8"))
     assert f"`item` ({ITEM_PARAM}," in skill

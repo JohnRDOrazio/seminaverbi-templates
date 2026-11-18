@@ -1,5 +1,5 @@
-"""python -m tools.connect_items [--wiki en,it] [--apply] [--import-log FILE] [--wd TITLE=QID]…
-       [--create TITLE=DESCRIPTION]…
+"""python -m tools.connect_items [--wiki en,it] [--apply] [--import-log FILE] [--only TITLE]…
+       [--wd TITLE=QID]… [--create TITLE=DESCRIPTION]…
 
 Connects the articles that have no Wikibase item. For each one it finds the Wikidata item, from the first
 of: the article's title on the Wikipedia of the same language; the page's interlanguage links [[xx:Title]];
@@ -25,7 +25,9 @@ from its `IMPORT <wd> = <local> (mapped|created)` lines. Every newly linked item
 decisions: --wd "TITLE=QID" forces the Wikidata item, --create "TITLE=description" makes a new local item
 (label: the title without its "(…)"; description in the wiki's language; a title that contains "=" is
 written "TITLE::description", which splits at the first "::" instead of the first "="); write "it:TITLE…" when the title
-is unconnected on more than one wiki.
+is unconnected on more than one wiki. --only TITLE (repeatable) plans, and with --apply writes, only the
+named articles; without it every unconnected article of --wiki is planned and applied, so review the whole
+dry-run plan before --apply. With --only, --wd and --create must name articles among them.
 Credentials (with --apply): SV_EDITOR_USER / SV_EDITOR_PASSWORD (a bot password).
 """
 from __future__ import annotations
@@ -472,7 +474,7 @@ def run(rows: list, repo, apply: bool, import_log: str | None = None, create=(),
     return 1 if failed or file_failed else 0
 
 
-def decisions(specs: list, articles: list, kind: str) -> dict:
+def decisions(specs: list, articles: list, kind: str, what: str = "an unconnected article") -> dict:
     """CLI author decisions -> {(lang, title): QID} (kind "qid", TITLE=QID, split at the last "=") or
     {(lang, title): description} (kind "description": TITLE::description if the spec has "::", else
     TITLE=description split at the first "=")."""
@@ -489,7 +491,7 @@ def decisions(specs: list, articles: list, kind: str) -> dict:
             qid = qid.strip()
             if not sep or not key or not qid:
                 raise ValueError(f"expected TITLE=description (the new item's description), got {spec!r}")
-        lang, title = page_key(key, unconnected, "an unconnected article")
+        lang, title = page_key(key, unconnected, what)
         out[lang, title] = qid
     return out
 
@@ -499,6 +501,8 @@ def main(argv=None, repo=None, clients=None, wikidata=None, classify=None, out=p
     parser.add_argument("--wiki", default=",".join(LANGS))
     parser.add_argument("--apply", action="store_true")
     parser.add_argument("--import-log", metavar="FILE", help="output of the EnrichItems --import command")
+    parser.add_argument("--only", action="append", default=[], metavar="TITLE",
+                        help="plan and apply only this unconnected article (repeatable; LANG:TITLE)")
     parser.add_argument("--wd", action="append", default=[], metavar="TITLE=QID",
                         help="the author's Wikidata item for an article (repeatable; LANG:TITLE=QID)")
     parser.add_argument("--create", action="append", default=[], metavar="TITLE=DESCRIPTION",
@@ -529,9 +533,15 @@ def main(argv=None, repo=None, clients=None, wikidata=None, classify=None, out=p
         wikidata = wikidata or WikidataClient()
         articles, connected = gather(clients, repo, langs)  # all wikis' items, only --wiki's page texts
         articles = [a for a in articles if a.lang in langs]
+        what = "an unconnected article"
         try:
-            forced = decisions(args.wd, articles, "qid")
-            create = decisions(args.create, articles, "description")
+            if args.only:
+                pages = {(a.lang, a.title) for a in articles}
+                chosen = {page_key(key, pages, what) for key in args.only}
+                articles = [a for a in articles if (a.lang, a.title) in chosen]
+                what = "an unconnected article named by --only"
+            forced = decisions(args.wd, articles, "qid", what)
+            create = decisions(args.create, articles, "description", what)
         except ValueError as exc:
             parser.error(str(exc))
         rows = plan(articles, repo, wikidata, known(repo, wikidata, connected), forced=forced, create=create)
