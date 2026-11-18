@@ -233,6 +233,8 @@ def test_the_it_alias_counts_as_sv_references():
     "x\n==References==\n{{Reflist}}\n* {{Cite book|title=B}}\n",
     "x\n===References===\n{{Reflist}}\n",
     "x\n<div>{{Reflist}}</div>\n",
+    "==History==\n===Early years===\nText.<ref>a</ref>\n<references />\n===Later years===\nMore.\n",
+    "Text.<ref>a</ref>\n<references />\n===Later years===\nMore.\n",
 ])
 def test_reference_lists_that_cannot_convert_are_left_and_reported(text):
     out = clean(text)
@@ -421,6 +423,14 @@ def test_a_saved_text_that_differs_is_reported():
     en.mangle = lambda text: text + "\nmerged"
     report, _ = run({"en": en})
     assert report.failed and "differs" in report.failed[0][2] and report.exit_code == 1
+
+
+def test_a_saved_text_that_differs_stops_the_remaining_writes():
+    en = Client("en", {"X": (10, PAGE), "Y": (20, PAGE)})
+    en.mangle = lambda text: text + "\nmerged"
+    report, lines = run({"en": en})
+    assert len(en.edits) == 1 and report.saved == 0
+    assert "stopped" in lines
 
 
 def test_lost_tree_category_is_unsafe():

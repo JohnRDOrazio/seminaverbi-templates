@@ -444,8 +444,18 @@ def _references(code, lang: str, conf: dict, reported: list) -> str | None:
     if not alone:
         reported.append(f"references list left: {_short(node)} (text follows it in its section)")
         return None
+    following = _next_heading(code, node)
+    if following is not None and following.level > 2:
+        reported.append(f"references list left: {_short(node)} (a level-{following.level} heading follows it, "
+                        "which the new References heading would take over)")
+        return None
     code.nodes[_index(code.nodes, node)] = Text(call)
     return "converted"
+
+
+def _next_heading(code, node):
+    """The first heading after `node` among the top-level nodes, or None."""
+    return next((n for n in code.nodes[_index(code.nodes, node) + 1:] if isinstance(n, Heading)), None)
 
 
 def _drop_heading_through(code, heading, node) -> None:
@@ -527,6 +537,7 @@ class Report:
         self.pages = self.changed = self.saved = 0
         self.converted = self.removed = self.references = self.reported = 0
         self.refused, self.unsafe, self.failed = [], [], []  # (lang, title, detail)
+        self.stopped = False  # a saved text differed from the one sent: someone else is editing
 
     @property
     def exit_code(self) -> int:
@@ -568,6 +579,10 @@ def run(clients: dict, conf: dict, apply: bool, pages: set | None = None, tree: 
                 continue
             report.pages += 1
             _page(client, lang, title, conf, apply, tree.get(lang, set()), report, out)
+            if report.stopped:
+                out("stopped: a saved text differs from the one previewed (a concurrent edit was merged?); "
+                    "no further writes")
+                return report
     return report
 
 
@@ -643,6 +658,7 @@ def _page(client, lang, title, conf, apply, tree, report, out) -> None:
     if saved != new:
         report.failed.append((lang, title, f"saved text (rev {status.revid}) differs from the text sent; check it"))
         out(f"FAILED {where}: saved text (rev {status.revid}) differs from the text sent; check it")
+        report.stopped = True
         return
     report.saved += 1
     out(f"  SAVED {where} (rev {status.revid})")
