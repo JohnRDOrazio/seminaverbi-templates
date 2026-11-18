@@ -420,6 +420,22 @@ def test_sitelinks_of_items_batched():
     assert len(s.calls) == 2 and s.calls[0][1]["ids"].count("|") == 49 and s.calls[0][1]["props"] == "sitelinks"
 
 
+def test_set_sitelink_sends_the_base_revision():
+    s = Recorder(CSRF, {"success": 1})
+    WikiClient("en", session=s).set_sitelink("Q42", "it", "X", baserevid=1234)
+    assert s.calls[-1][1]["baserevid"] == 1234
+    s = Recorder(CSRF, {"success": 1})
+    WikiClient("en", session=s).set_sitelink("Q42", "it", "X")
+    assert "baserevid" not in s.calls[-1][1]
+
+
+def test_item_sitelinks_gives_the_revision_with_the_links():
+    s = Recorder({"entities": {"Q42": {"id": "Q42", "lastrevid": 77,
+                                       "sitelinks": {"it": {"site": "it", "title": "X"}}}}})
+    assert WikiClient("en", session=s).item_sitelinks("Q42") == (77, {"it": "X"})
+    assert s.calls[0][1]["props"] == "info|sitelinks" and s.calls[0][1]["ids"] == "Q42"
+
+
 def test_main_page_from_siteinfo():
     s = Recorder({"query": {"general": {"mainpage": "Página principal"}}})
     assert WikiClient("es", session=s).main_page() == "Página principal"

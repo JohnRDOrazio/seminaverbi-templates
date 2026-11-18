@@ -36,6 +36,10 @@ class Repo:
     def __init__(self, links=None):
         self.links = {item: dict(s) for item, s in (links or {}).items()}  # item -> {site: title}
         self.calls, self.next_id, self.summaries = [], 48000, []
+        self.revs = {item: 1 for item in self.links}  # item -> its latest revision
+
+    def item_sitelinks(self, item):
+        return self.revs.get(item), dict(self.links.get(item, {}))
 
     def items_for(self, site, titles):
         out = {}
@@ -47,10 +51,13 @@ class Repo:
     def sitelinks(self, items):
         return {i: dict(self.links[i]) for i in items if self.links.get(i)}
 
-    def set_sitelink(self, item, site, title, tags=None, summary=None):
+    def set_sitelink(self, item, site, title, tags=None, summary=None, baserevid=None):
+        if baserevid is not None and baserevid != self.revs.get(item):
+            raise ci.SyncError(f"en: editconflict: {item} changed")
         self.summaries.append(summary)
         self.calls.append(("sitelink", item, site, title))
         self.links.setdefault(item, {})[site] = title
+        self.revs[item] = self.revs.get(item, 0) + 1
 
     def new_item(self, labels, descriptions, sitelinks, tags=None, summary=None):
         self.summaries.append(summary)
@@ -58,6 +65,7 @@ class Repo:
         item = f"Q{self.next_id}"
         self.calls.append(("new", item, labels, descriptions, sitelinks))
         self.links[item] = dict(sitelinks)
+        self.revs[item] = 1
         return item
 
 
@@ -448,6 +456,21 @@ def test_create_refuses_a_title_linked_since_the_plan(capsys):
     rows = [Connect("it", "Nek", "create", None, None, "")]
     assert ci.run(rows, repo, apply=True, create={("it", "Nek"): "cantautore"}) == 1
     assert repo.calls == [] and "it:Nek: FAILED it:Nek is now linked to Q9" in capsys.readouterr().out
+
+
+def test_link_refuses_a_sitelink_set_by_someone_else_after_the_check(capsys):
+    class Racing(Repo):
+        def item_sitelinks(self, item):
+            state = super().item_sitelinks(item)
+            # another editor links it:Altro to Q9 between the check and the write
+            self.links[item]["it"] = "Altro"
+            self.revs[item] += 1
+            return state
+    repo = Racing({"Q9": {"en": "Nek"}})
+    rows = [Connect("it", "Nek", "join", "Q1", "Q9", "")]
+    assert ci.run(rows, repo, apply=True) == 1
+    assert repo.links["Q9"]["it"] == "Altro" and repo.calls == []
+    assert "it:Nek: FAILED" in capsys.readouterr().out
 
 
 def test_gather_fetches_text_only_for_the_wikis_used():

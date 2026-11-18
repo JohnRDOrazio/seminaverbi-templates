@@ -380,10 +380,12 @@ def _link(repo, item: str, lang: str, title: str) -> bool:
         return False
     if now:
         raise SyncError(f"{lang}:{title} is now linked to {now}")
-    current = repo.sitelinks([item]).get(item, {}).get(lang)
+    rev, links = repo.item_sitelinks(item)
+    current = links.get(lang)
     if current and current != title:
         raise SyncError(f"{item} is now linked to {lang}:{current}")
-    repo.set_sitelink(item, lang, title, tags=TAG, summary=SUMMARY)
+    # the revision read with the check: a link set on the item since then is refused, not overwritten
+    repo.set_sitelink(item, lang, title, tags=TAG, summary=SUMMARY, baserevid=rev)
     return True
 
 

@@ -244,13 +244,24 @@ class WikiClient:
         entities = self._dig(self._call("GET", action="wbgetentities", ids=item, props="sitelinks"), "entities")
         return self._dig(entities, item).get("sitelinks", {}).get(site, {}).get("title")
 
+    def item_sitelinks(self, item: str) -> tuple[int | None, dict[str, str]]:
+        """(latest revision, {site: title}) of `item`: the revision to pass as set_sitelink's baserevid."""
+        entities = self._dig(self._call("GET", action="wbgetentities", ids=item, props="info|sitelinks"),
+                             "entities")
+        entity = self._dig(entities, item)
+        links = {site: link["title"] for site, link in entity.get("sitelinks", {}).items()}
+        return entity.get("lastrevid"), links
+
     def set_sitelink(self, item: str, site: str, title: str, tags: str | None = None,
-                     summary: str | None = None) -> None:
+                     summary: str | None = None, baserevid: int | None = None) -> None:
         params = dict(action="wbsetsitelink", id=item, linksite=site, linktitle=title, bot="1")
         if tags:
             params["tags"] = tags
         if summary:
             params["summary"] = summary
+        if baserevid is not None:
+            # Wikibase refuses the write (editconflict) if the item changed since that revision was read
+            params["baserevid"] = baserevid
         data = self._call("POST", token=self._token("csrf"), **params)
         if not data.get("success"):
             raise SyncError(f"{self.lang}: linking {site}:{title} to {item} failed: {data}")
