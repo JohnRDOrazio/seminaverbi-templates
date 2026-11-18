@@ -167,8 +167,8 @@ def test_pt():
 
 
 def test_unknown_gender():
+    # no gender statement: the language's masculine default, without the article
     assert bio(entities=with_nek(gender=None)) == "Nek (Sassuolo, 6 gennaio 1972) è cantautore italiano"
-    assert bio(entities=with_nek(gender="Q999")) == "Nek (Sassuolo, 6 gennaio 1972) è cantautore italiano"
 
 
 def test_missing_birth_data():
@@ -208,10 +208,9 @@ def test_occupation_without_label_in_language_is_left_out():
     assert bio("es", entities=ents) == "Nek (Sassuolo, 6 de enero de 1972) es un cantautor italiano"
 
 
-def test_female_without_female_form_drops_agreement():
-    # fr has no female form of the occupation: no article, plain label, no guessed nationality
-    assert bio("fr", entities=with_nek(gender=FEMALE)) == \
-        "Nek (Sassuolo, 6 janvier 1972) est auteur-compositeur-interprète"
+def test_female_without_female_form_omits_the_occupation():
+    # fr has no female form of auteur-compositeur-interprète: the masculine label is never used for her
+    assert bio("fr", entities=with_nek(gender=FEMALE)) == "Nek (Sassuolo, 6 janvier 1972)"
 
 
 def test_place_link():
@@ -510,3 +509,70 @@ def test_citizenship_first_of_several_best_rank():
     assert bio(entities=ents) == "Nek (Sassuolo, 6 gennaio 1972) è un cantautore francese"
     ents = with_citizenships(item(FRANCE), item(ITALY))
     assert bio(entities=ents) == "Nek (Sassuolo, 6 gennaio 1972) è un cantautore francese"
+
+
+# --- gender agreement edge cases: never a wrong-gender form ---
+
+ATTORE, CANTANTE, ARTISTA, JOURNALISTE, LIRICO, USA, OTHER = "Q22", "Q23", "Q24", "Q25", "Q26", "Q33", "Q999"
+EDGE = dict(BASE, **{
+    ATTORE: {"labels": {"it": "attore", "de": "Schauspieler"}},
+    CANTANTE: {"labels": {"it": "cantante", "es": "cantante", "de": "Sänger"}},
+    ARTISTA: {"labels": {"it": "artista"}},
+    JOURNALISTE: {"labels": {"fr": "journaliste"}},
+    LIRICO: {"labels": {"it": "cantante lirico"}},
+    USA: {"labels": {"it": "Stati Uniti"}, "claims": {"P489": [
+        mono("statunitense", "it"), mono("statunitensi", "it"), mono("estadounidense", "es")]}},
+})
+
+
+def edge(lang="it", gender=FEMALE, jobs=(CANTANTE,), country=ITALY, dead=False):
+    claims = {"P63": [item(j) for j in jobs], "P1617": [item(country)]}
+    if dead:
+        claims["P4723"] = [time("+2016-01-10T00:00:00Z", 11)]
+    return bio(lang, entities=dict(EDGE, **{NEK: nek(gender=gender, **claims)}))
+
+
+IT_HEAD = "Nek (Sassuolo, 6 gennaio 1972)"
+
+
+def test_female_mixed_forms_keeps_only_the_feminine_ones():
+    # cantautore has a female form, attore (here) does not: "attore" is never said of her
+    assert edge(jobs=(SINGER, ATTORE)) == IT_HEAD + " è una cantautrice italiana"
+    assert edge(jobs=(ATTORE, SINGER)) == IT_HEAD + " è una cantautrice italiana"
+    assert edge(jobs=(ATTORE,)) == IT_HEAD
+
+
+def test_female_epicene_occupation_agrees():
+    # no female form, but a single word with an ending the same for women and men
+    assert edge() == IT_HEAD + " è una cantante italiana"
+    assert edge(jobs=(ARTISTA,)) == IT_HEAD + " è un'artista italiana"
+    assert edge(jobs=(SINGER, CANTANTE)) == IT_HEAD + " è una cantautrice e cantante italiana"
+    assert edge("es", country=USA) == "Nek (Sassuolo, 6 de enero de 1972) es una cantante estadounidense"
+    assert edge("fr", jobs=(JOURNALISTE,)) == "Nek (Sassuolo, 6 janvier 1972) est une journaliste italienne"
+    # a phrase may hold a masculine adjective (cantante lirico): omitted
+    assert edge(jobs=(LIRICO,)) == IT_HEAD
+    # German has no such ending: Sänger without Sängerin is omitted
+    assert edge("de") == "Nek (* 6. Januar 1972 in Sassuolo)"
+
+
+def test_female_dead_epicene_takes_feminine_copula():
+    assert edge(dead=True) == "Nek (Sassuolo, 6 gennaio 1972 – 10 gennaio 2016) è stata una cantante italiana"
+
+
+def test_male_and_unstated_gender_keep_the_label():
+    assert edge(gender=MALE, jobs=(ATTORE,)) == IT_HEAD + " è un attore italiano"
+    assert edge(gender=None, jobs=(ATTORE,)) == IT_HEAD + " è attore italiano"
+
+
+def test_other_gender_only_forms_shared_by_both():
+    # a gender item that is neither male nor female: no masculine default, only invariant words
+    assert edge(gender=OTHER, jobs=(SINGER,)) == IT_HEAD
+    assert edge(gender=OTHER, jobs=(ATTORE, CANTANTE)) == IT_HEAD + " è cantante"
+    assert edge(gender=OTHER, country=USA) == IT_HEAD + " è cantante statunitense"
+    assert edge("es", gender=OTHER, country=USA, dead=True) == \
+        "Nek (Sassuolo, 6 de enero de 1972 – 10 de enero de 2016) fue cantante estadounidense"
+    # Italian "è stato / è stata" agrees with the gender: nothing safe to say
+    assert edge(gender=OTHER, country=USA, dead=True) == "Nek (Sassuolo, 6 gennaio 1972 – 10 gennaio 2016)"
+    # English has no agreement
+    assert bio("en", entities=with_nek(gender=OTHER)) == \
+        "Nek (born 6 January 1972 in Sassuolo) is an Italian singer-songwriter"

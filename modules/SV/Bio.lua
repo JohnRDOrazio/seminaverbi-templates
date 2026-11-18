@@ -289,26 +289,55 @@ local function monolingual(entity, propId, lang)
 	return out
 end
 
--- "un cantautore italiano" / "an Italian singer-songwriter", or nil when there is no occupation.
+-- Endings of one-word occupation nouns that are the same for women and men (la cantante, la
+-- giornalista, la journaliste). A phrase may hold a masculine adjective (cantante lirico), so only a
+-- single word counts; German has no such ending.
+local EPICENE = { it = { 'ista', 'ante', 'ente', 'iatra' }, es = { 'ista', 'ante', 'ente' },
+	pt = { 'ista', 'ante', 'ente' }, fr = { 'iste', 'logue' } }
+
+local function epicene(lang, w)
+	if w:find('[%s%-]') then
+		return false
+	end
+	for _, ending in ipairs(EPICENE[lang] or {}) do
+		if endsWith(w, ending) then
+			return true
+		end
+	end
+	return false
+end
+
+-- An occupation's word for the person, or nil when the right form cannot be known. gender is
+-- 'male', 'female', 'other' (a stated gender that is neither) or nil (none stated). The label is the
+-- masculine: it serves a man, and anyone with no stated gender as the language's default; a woman
+-- gets the female form, a stated other gender only a form shared by both. English does not inflect.
+local function occupationWord(id, label, lang, wb, gender)
+	if gender == 'male' or gender == nil then
+		return label
+	end
+	local form = monolingual(mw.wikibase.getEntity(id), wb.female_form, lang)[1]
+	if lang == 'en' then
+		return gender == 'female' and form or label
+	end
+	if gender == 'female' and form then
+		return form
+	end
+	if form == label or epicene(lang, label) then
+		return label
+	end
+	return nil
+end
+
+-- "un cantautore italiano" / "an Italian singer-songwriter", or nil when no occupation can be named.
 -- At most as many occupations as the person infobox's occupation row shows.
 local function predicate(entity, lang, wb, gender)
 	local female = gender == 'female'
-	local agree = gender ~= nil
 	local words = {}
 	local max = (Util.layoutRow('person', 'occupation') or {}).max
 	for _, v in ipairs(Util.best(entity, wb.occupation)) do
 		local label = v.id and mw.wikibase.getLabelByLang(v.id, lang)
-		if label and not (max and #words >= max) then
-			local word = label
-			if female then
-				local form = monolingual(mw.wikibase.getEntity(v.id), wb.female_form, lang)[1]
-				if form then
-					word = form
-				elseif lang ~= 'en' then
-					-- no female form: the label would not agree with the article or the adjective
-					agree = false
-				end
-			end
+		local word = label and occupationWord(v.id, label, lang, wb, gender)
+		if word and not (max and #words >= max) then
 			words[#words + 1] = Util.escape(word)
 		end
 	end
@@ -316,14 +345,15 @@ local function predicate(entity, lang, wb, gender)
 	if not occupation then
 		return nil
 	end
-	local nationality
-	if agree or not female then
-		local country = firstValue(entity, wb.country_of_citizenship)
-		local forms = country and country.id
-			and monolingual(mw.wikibase.getEntity(country.id), wb.demonym, lang) or {}
-		nationality = p._demonym(lang, forms, female and agree)
-		nationality = nationality and Util.escape(nationality)
+	local country = firstValue(entity, wb.country_of_citizenship)
+	local forms = country and country.id
+		and monolingual(mw.wikibase.getEntity(country.id), wb.demonym, lang) or {}
+	local nationality = p._demonym(lang, forms, female)
+	if gender == 'other' and nationality ~= p._demonym(lang, forms, true) then
+		-- the adjective agrees with the gender: only an invariant one (statunitense) is safe
+		nationality = nil
 	end
+	nationality = nationality and Util.escape(nationality)
 	local phrase = occupation
 	if nationality then
 		if lang == 'en' or lang == 'de' then
@@ -332,8 +362,8 @@ local function predicate(entity, lang, wb, gender)
 			phrase = occupation .. ' ' .. nationality
 		end
 	end
-	-- English always takes the article: it has no agreement to get wrong
-	if agree or lang == 'en' then
+	-- the article agrees with a known gender; English has no agreement to get wrong
+	if gender == 'male' or female or lang == 'en' then
 		phrase = p._article(lang, phrase, female)
 	end
 	return phrase
@@ -370,9 +400,14 @@ function p._sentence(entity, lang, args)
 	end
 
 	local genderValue = firstValue(entity, wb.sex_or_gender)
-	local gender = genderValue and (genderValue.id == wb.male and 'male' or genderValue.id == wb.female and 'female')
+	local gender = genderValue and genderValue.id
+		and (genderValue.id == wb.male and 'male' or genderValue.id == wb.female and 'female' or 'other')
 		or nil
 	local phrase = entity and predicate(entity, lang, wb, gender)
+	if gender == 'other' and dead and Util.msg('bio_is_dead', lang) ~= Util.msg('bio_is_dead_f', lang) then
+		-- the past copula agrees with the gender (it: è stato / è stata): no form is safe
+		phrase = nil
+	end
 	local out = head
 	if phrase then
 		local copula = not dead and 'bio_is_living' or gender == 'female' and 'bio_is_dead_f' or 'bio_is_dead'
