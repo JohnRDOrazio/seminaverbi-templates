@@ -957,3 +957,26 @@ def test_the_demonym_search_runs_once_per_adjective():
     res = si.Resolver("it", Repo(links={("itwiki", "Italia"): "Q32"}), wd, None)
     assert res.country("italiano", "Q1") == res.country("italiano", "Q2") == item_dv("Q32")
     assert calls == ["italiano"]
+
+
+def test_bio_gate_compares_birth_and_death_facts_in_their_places():
+    old = ("<p>Anna (<a>Roma</a>, 7 marzo 1908 – <a>Milano</a>, 26 settembre 1973), è stata un'<a>attrice</a> "
+           "<a>italiana</a>.</p>")
+    swapped = ("<p>Anna (<a>Milano</a>, 26 settembre 1973 – <a>Roma</a>, 7 marzo 1908) è stata un'attrice "
+               "italiana</p>")
+    missing, extra, additions = si.compare_sentences(old, swapped, set())
+    assert sorted(missing) == ["26 settembre 1973", "7 marzo 1908", "Milano", "Roma"]
+    assert sorted(extra) == sorted(missing) and additions == []
+    # only the places swapped: the places block, the dates do not
+    places = ("<p>Anna (<a>Milano</a>, 7 marzo 1908 – <a>Roma</a>, 26 settembre 1973) è stata un'attrice "
+              "italiana</p>")
+    assert sorted(si.compare_sentences(old, places, set())[0]) == ["Milano", "Roma"]
+    # the same town at both ends is stated in both places
+    same = old.replace("Milano", "Roma")
+    assert si.compare_sentences(same, same.replace("<p>Anna", "<p>Anna Magnani"), set()) == ([], [], [])
+    # a death place Bio could not state may be the birth town: an addition
+    born = "<p>Anna (<a>Roma</a>, 7 marzo 1908), è un'<a>attrice</a> <a>italiana</a>.</p>"
+    died = ("<p>Anna (<a>Roma</a>, 7 marzo 1908 – <a>Roma</a>, 26 settembre 1973) è stata un'attrice "
+            "italiana</p>")
+    assert si.compare_sentences(born, died, {"death_date", "death_place"}) == ([], [], ["Roma", "26 settembre 1973"])
+    assert si.compare_sentences(born, died, {"death_date"})[1] == ["Roma"]

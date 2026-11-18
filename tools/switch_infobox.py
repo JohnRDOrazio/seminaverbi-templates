@@ -898,24 +898,37 @@ def _states(text: str, fact: str) -> bool:
     return re.search(r"(?<!\w)" + re.escape(_norm(fact)) + r"(?!\w)", _norm(text)) is not None
 
 
+def _span_parts(span: str) -> list:
+    return re.split(r"\s[–-]\s", span) if span else []
+
+
+def _ends(parts: list) -> dict:
+    """"birth"/"death" -> its part of the life span (one part: the birth); {} when that cannot be told."""
+    return dict(zip(("birth", "death"), parts)) if len(parts) in (1, 2) else {}
+
+
 def compare_sentences(old_html: str, new_html: str, lacks: set) -> tuple[list, list, list]:
     """(facts of the old sentence the new one lacks, facts of the new sentence the old one lacks that Bio
     could have stated, facts the new one adds that Bio could not state). Facts: link texts, date strings
-    and predicate words, each looked for in the other sentence's text; a fact whose place in the sentence
-    cannot be told is never an addition."""
-    old_text, old_facts, _, _ = _facts(old_html)
+    and predicate words, each looked for in the other sentence's text; one in the birth or death part of a
+    life span, in that same part of the other's (a birth town shown as the death town is not the same
+    fact); a fact whose place in the sentence cannot be told is never an addition."""
+    old_text, old_facts, old_span, _ = _facts(old_html)
     new_text, new_facts, span, links = _facts(new_html)
-    missing = [f for f in old_facts if not _states(new_text, f)]
+    old_ends, parts = _ends(_span_parts(old_span)), _span_parts(span)
+    new_ends = _ends(parts)
+
+    def misplaced(f, ends, other):  # the ends of `ends` stating f whose part in `other` does not
+        return [e for e, piece in ends.items() if _states(piece, f) and not _states(other.get(e, ""), f)]
+    missing = [f for f in old_facts if not _states(new_text, f) or misplaced(f, old_ends, new_ends)]
     extra, additions = [], []
-    parts = re.split(r"\s[–-]\s", span) if span else []
     for f in new_facts:
-        if _states(old_text, f):
+        wrong = misplaced(f, new_ends, old_ends)
+        if _states(old_text, f) and not wrong:
             continue
-        part = next((i for i, piece in enumerate(parts) if _states(piece, f)), None)
-        if part is not None:
-            end = ("birth", "death")[part] if len(parts) == 2 else "birth" if len(parts) == 1 else None
+        if any(_states(piece, f) for piece in parts):
             kind = "date" if DATE.fullmatch(f) else "place" if f in links else None
-            ok = end is not None and kind is not None and f"{end}_{kind}" in lacks
+            ok = kind is not None and bool(wrong) and all(f"{end}_{kind}" in lacks for end in wrong)
         else:
             ok = {"occupation", "nationality"} <= lacks
         (additions if ok else extra).append(f)
