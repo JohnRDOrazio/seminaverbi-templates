@@ -24,7 +24,8 @@ with its free text (note=, rest=, ref=; name= when Nome Cognome is not the item'
 sentences, both rendered, must state the same facts both ways (link texts, dates, predicate words; what
 the new one adds where Bio had no parameter is reported as an addition, anything else blocks). A page with
 {{Bio}} and no infobox gets {{SV infobox}} too. {{SV categories}} goes away (its sortkey= moves to
-{{SV infobox}}). Pages already calling {{SV infobox}} are left alone.
+{{SV infobox}}). Pages already calling {{SV infobox}} for their own item are left alone; a section's
+{{SV infobox|item=…}} renders another work and does not count.
 
 The dry run prints per page the statements to write, the unresolved rows, the future infobox rendered
 with action=parse (converted values passed as row parameters) and, for Bio pages, both sentences.
@@ -431,8 +432,13 @@ def _templates(text: str):
     return [(t, _template_name(str(t.name))) for t in mwparserfromhell.parse(text).filter_templates(recursive=True)]
 
 
+def _own_sv_infobox(template, name: str) -> bool:
+    """An {{SV infobox}} for the page's own item: one with `item=` renders another work (a section's box)."""
+    return name in SV_INFOBOXES and not (template.has("item") and str(template.get("item").value).strip())
+
+
 def has_sv_infobox(text: str) -> bool:
-    return any(name in SV_INFOBOXES for _, name in _templates(text))
+    return any(_own_sv_infobox(t, name) for t, name in _templates(text))
 
 
 def _outermost(found: list) -> list:
@@ -540,7 +546,7 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
     bio_conf = mapping["bio"].get(lang)
     bio_name = bio_conf["template"] if bio_conf else None
     found = _templates(page.text)
-    if any(name in SV_INFOBOXES for _, name in found):
+    if any(_own_sv_infobox(t, name) for t, name in found):
         return None
     boxes = _outermost([t for t, name in found if name in templates])
     bios = [t for t, name in found if bio_name and name == bio_name]

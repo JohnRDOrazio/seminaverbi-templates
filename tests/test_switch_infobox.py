@@ -283,6 +283,17 @@ def test_page_with_sv_infobox_is_left_alone():
     assert si.plan_page(page("Just text.\n{{SV categories}}"), {}, MAPPING, resolver()) is None
 
 
+def test_sv_infobox_of_another_item_does_not_count_as_the_pages_own():
+    # a section's {{SV infobox|item=…}} renders another work; the page's own Wikipedia box still switches
+    text = "{{Infobox film\n| name = Bloodshot\n}}\nText.\n== Sequel ==\n{{SV infobox|item=Q999}}\nMore."
+    repo, client = film_world()
+    assert not si.has_sv_infobox(text)
+    plan = si.plan_page(page(text), claims_of(repo.entity("Q100")), MAPPING, resolver(repo=repo, client=client))
+    assert plan is not None and plan.blocked is None
+    assert plan.new_text == "{{SV infobox}}\nText.\n== Sequel ==\n{{SV infobox|item=Q999}}\nMore."
+    assert si.has_sv_infobox("{{SV infobox|type=song}}\nText.")
+
+
 def test_sv_categories_removed_when_sv_infobox_added():
     text = "{{Infobox film\n| name = Bloodshot\n}}\nText.\n{{SV categories|sortkey=Bloodshot 2020}}\n[[Category:Other]]"
     repo, client = film_world()
