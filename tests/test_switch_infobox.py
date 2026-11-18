@@ -465,6 +465,30 @@ def test_bio_becomes_sv_bio_with_free_text():
     assert plan.bio.lacks == {"death_date", "death_place"}
 
 
+def test_a_bio_page_without_an_infobox_needs_a_person_item():
+    # no Wikipedia box tells the kind: the item must be a person before {{Bio}} facts go onto it
+    def plan_for(instance_of, wd_p31=None):
+        repo, wd = bio_world()
+        repo.entity("Q200")["claims"][P["instance_of"]] = [statement(item_dv(q)) for q in instance_of]
+        if wd_p31 is not None:
+            repo.links["itwiki", "Fabrizio De André"] = "Q200"
+            wd.links["itwiki", "Fabrizio De André"] = "Q1"
+            wd.ents["Q1"] = wd_entity("Q1", {"itwiki": "Fabrizio De André"}, p31=wd_p31)
+        return si.plan_page(bio_page(), claims_of(repo.entity("Q200")), MAPPING, resolver("it", repo=repo, wikidata=wd))
+    assert plan_for([PERSON]).blocked is None
+    assert plan_for([FILM]).blocked == "{{Bio}} on a page whose item is a film, not a person: for the author"
+    assert plan_for([FILM]).writes == []
+    assert plan_for([], wd_p31=["Q5"]).blocked is None  # the kind from Wikidata, as connect_items checks it
+    assert plan_for([], wd_p31=["Q11424"]).blocked == ("{{Bio}} on a page whose item (Wikidata Q1) is not a "
+                                                       "person: for the author")
+    assert plan_for([]).blocked == "{{Bio}} on a page whose item has no known kind: for the author"
+    # a Wikipedia infobox gives the kind: no extra check
+    repo, client = film_world()
+    repo.entity("Q100")["claims"][P["instance_of"]] = []
+    plan = si.plan_page(page(FILM_TEXT), claims_of(repo.entity("Q100")), MAPPING, resolver(repo=repo, client=client))
+    assert plan.blocked is None
+
+
 def test_bio_facts_on_the_item_are_not_written():
     repo, wd = bio_world(sex_or_gender=[item_dv("Q246")], birth_place=[item_dv("Q30")],
                          occupation=[item_dv("Q31")], country_of_citizenship=[item_dv("Q32")],

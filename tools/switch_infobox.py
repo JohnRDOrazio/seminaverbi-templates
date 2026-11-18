@@ -59,7 +59,7 @@ from sync.categories import load, nodes
 from sync.pages import LANGS
 from sync.wiki import SyncError, WikiClient
 from sync.wikidata import WikidataClient
-from tools.connect_items import SUBKINDS, _template_name, claim_ids
+from tools.connect_items import SUBKINDS, _template_name, claim_ids, passes
 from tools.file_items import guarded_save, layout_for
 from tools.imports import WIKIPEDIA, enrich_command, import_command, local_copy, page_key, parse_import_log
 
@@ -148,7 +148,7 @@ def load_mapping(root: Path = ROOT) -> dict:
     def conf(name):
         return json.loads((root / "config" / name).read_text(encoding="utf-8"))
     imp = conf("infobox_import.json")
-    return {"templates": imp["templates"], "bio": imp["bio"], "helpers": imp["helpers"],
+    return {"templates": imp["templates"], "bio": imp["bio"], "helpers": imp["helpers"], "kinds": imp["kinds"],
             "layouts": conf("infobox.json"), "props": conf("wikibase.json"), "types": conf("infobox_types.json")}
 
 
@@ -592,7 +592,8 @@ def plan_bio(bio, bio_conf: dict, label: str | None) -> tuple[list, list, BioPla
 
 def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accept_loss: bool = False):
     """What switching `page` takes; None when it has no Wikipedia infobox or {{Bio}}; blocked for the author
-    when it calls {{SV infobox}} already and has one too. `item_claims`: prop -> datavalues the item has (item_claims())."""
+    when it calls {{SV infobox}} already and has one too. `item_claims`: prop -> datavalues the item has
+    (item_claims())."""
     lang, props = page.lang, mapping["props"]
     templates = mapping["templates"].get(lang, {})
     bio_conf = mapping["bio"].get(lang)
@@ -646,6 +647,13 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
         layout = "person"
     instance_of = [dv["value"]["id"] for dv in item_claims.get(props["instance_of"], []) if dv]
     item_layout = next((mapping["types"]["types"][q] for q in instance_of if q in mapping["types"]["types"]), None)
+    if box is None:
+        # only {{Bio}}: no Wikipedia box vouches for the item's kind (connect_items may have taken a bare title
+        # hit), so the item must be a person, by its local type or else its Wikidata item (connect_items' filter)
+        why = _not_a_person(page.item, item_layout, mapping, resolver)
+        if why:
+            return plan(item_layout or "person",
+                        blocked=f"{{{{{bio_name}}}}} on a page whose item {why}: for the author")
     # a known item type is the layout (the old box may be wider: it.wiki's {{Artista musicale}} boxes bands
     # too); an unknown one leaves the old box's layout, given as type= unless it is the default
     box_layout, layout = layout, item_layout or layout
@@ -754,6 +762,21 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
                 params=params, preview=preview, dropped=dropped, covered=list(dict.fromkeys(covered)),
                 missing_images=list(dict.fromkeys(missing)), duplicates=duplicates,
                 unconvertible=unconvertible)
+
+
+def _not_a_person(item: str, item_layout: str | None, mapping: dict, resolver) -> str | None:
+    """Why local `item` is not known to be a person (None when it is): its local type, else the kind filter
+    of connect_items on its Wikidata item (P31, P279 or the item itself among the person classes)."""
+    if item_layout == "person":
+        return None
+    if item_layout is not None:
+        return f"is a {item_layout}, not a person"
+    wd = resolver.wikidata_item(item)
+    if wd is None:
+        return "has no known kind"
+    if passes(resolver.wikidata.entity(wd), wd, mapping["kinds"]["person"]):
+        return None
+    return f"(Wikidata {wd}) is not a person"
 
 
 def _bio_params(facts: dict) -> dict:
