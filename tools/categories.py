@@ -21,6 +21,8 @@ from sync.wiki import SyncError, WikiClient
 ROOT = Path(__file__).resolve().parent.parent
 TAG = "seminaverbi-mcp"
 SUMMARY = "Category from the seminaverbi-templates category tree"
+LINK_SUMMARY = "Link the category page to its item"
+ITEM_SUMMARY = "Create the item for a category page"
 ITEM_DESCRIPTION = {
     "en": "Semina Verbi category", "it": "categoria di Semina Verbi", "es": "categoría de Semina Verbi",
     "fr": "catégorie de Semina Verbi", "de": "Semina-Verbi-Kategorie", "pt": "categoria de Semina Verbi",
@@ -137,10 +139,11 @@ def create(lang: str, data: dict, client, repo, dry_run: bool, replace_missing: 
             elif dry_run:
                 linked.append((title, distinct[0] if distinct else "(new item)"))
             elif distinct:
-                repo.set_sitelink(distinct[0], _site(lang), title, tags=TAG)
+                repo.set_sitelink(distinct[0], _site(lang), title, tags=TAG, summary=LINK_SUMMARY)
                 linked.append((title, distinct[0]))
             else:
-                item = repo.new_item(dict(n.names), dict(ITEM_DESCRIPTION), {_site(lang): title}, tags=TAG)
+                item = repo.new_item(dict(n.names), dict(ITEM_DESCRIPTION), {_site(lang): title}, tags=TAG,
+                                     summary=ITEM_SUMMARY)
                 linked.append((title, item))
         except (SyncError, OSError) as exc:
             failed.append((title, str(exc)))
