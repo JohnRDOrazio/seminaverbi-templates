@@ -34,6 +34,7 @@ import json
 import os
 import re
 import sys
+from collections import Counter
 from pathlib import Path
 from typing import NamedTuple
 
@@ -55,8 +56,10 @@ TAG = "seminaverbi-mcp"
 BULLETS = {"*", "#", ":", ";"}
 CATEGORY_NS = {"category", "categoria", "categoría", "catégorie", "kategorie"}
 MAGIC = ("DEFAULTSORT:", "DISPLAYTITLE:")
-ERROR_MARK = re.compile(r'class="(?:[^"]*\s)?(?:error|bibleQuoteRefBroken)(?:\s[^"]*)?"')
+ERROR_ELEMENT = re.compile(r'<\w+[^>]*?\bclass="([^"]*)"[^>]*>([^<]*)')
+ERROR_CLASSES = ("error", "bibleQuoteRefBroken")
 BOOK = re.compile(r"\s*((?:[1-4]\s*)?[^\W\d_][^\d]*)")
+CONTINUATION = re.compile(r"\s*\d(?:[\d\s:,.\-–—]|(?<=\d)[a-c])*")  # "4", "13:10", "5:1-3,7a"
 
 
 def normal(name: str) -> str:
@@ -119,7 +122,8 @@ def _invisible(node) -> bool:
         return True
     if isinstance(node, Wikilink):
         title = str(node.title).strip()
-        return not title.startswith(":") and title.split(":", 1)[0].strip().casefold() in CATEGORY_NS
+        return (":" in title and not title.startswith(":")
+                and title.split(":", 1)[0].strip().casefold() in CATEGORY_NS)
     if isinstance(node, Template):
         name = str(node.name).strip()
         return name.upper().startswith(MAGIC) or normal(name) == "SV categories"
@@ -136,6 +140,8 @@ def _book_problem(ref: str, lang: str, conf: dict) -> str | None:
         if not m:
             if first:
                 return f"no book in ref {ref!r}"
+            if not CONTINUATION.fullmatch(segment):
+                return f"cannot read {segment.strip()!r} in ref {ref!r}"
             continue  # a chapter of the book before
         first = False
         book = m.group(1).strip().rstrip(".").strip()
@@ -375,6 +381,7 @@ def _context(code, node):
     alone_after = True
     for n in nodes[i + 1:]:
         if isinstance(n, Heading):
+            alone_after = heading is None or n.level <= heading.level
             break
         if not _invisible(n):
             alone_after = False
@@ -403,6 +410,9 @@ def _references(code, lang: str, conf: dict, reported: list) -> str | None:
         return None
     heading, direct, alone = _context(code, node)
     ref_headings = {h.casefold() for h in conf["references"]["headings"].get(lang, [])}
+    if sv and not any(n is sv[0] for n in code.nodes):
+        reported.append(f"references list left: {_short(node)} (the SV references call is inside other markup)")
+        return None
     if sv:
         if direct and alone:
             _drop_heading_through(code, heading, node)
@@ -410,6 +420,9 @@ def _references(code, lang: str, conf: dict, reported: list) -> str | None:
             _remove_line(code, node, True)
         return "removed"
     group = _group(node)
+    if group and re.search(r"[|{}\[\]]", group):
+        reported.append(f"references list left: {_short(node)} (group {group!r} cannot be one parameter)")
+        return None
     call = "{{" + conf["references"]["target"] + (f"|group={group}" if group else "") + "}}"
     if direct:
         if heading.level != 2:
@@ -427,6 +440,9 @@ def _references(code, lang: str, conf: dict, reported: list) -> str | None:
     if heading is not None and str(heading.title).strip().casefold() in ref_headings:
         reported.append(f"references list left: {_short(node)} (its section {str(heading.title).strip()!r} "
                         "holds more than the list)")
+        return None
+    if not alone:
+        reported.append(f"references list left: {_short(node)} (text follows it in its section)")
         return None
     code.nodes[_index(code.nodes, node)] = Text(call)
     return "converted"
@@ -469,7 +485,7 @@ class Checks(NamedTuple):
     red_links: frozenset
     missing_templates: frozenset
     tracking: frozenset    # hidden categories and error categories
-    error_marks: int       # error messages in the HTML (script, cite, Bible quote)
+    error_marks: Counter   # (class, text) of each error message in the HTML (script, cite, Bible quote)
 
 
 def checks(parsed: dict, conf: dict) -> Checks:
@@ -481,7 +497,12 @@ def checks(parsed: dict, conf: dict) -> Checks:
         name = c["category"].replace("_", " ")
         if c.get("hidden") or any(w in name.casefold() for w in words):
             tracking.add(name)
-    return Checks(red, missing, frozenset(tracking), len(ERROR_MARK.findall(parsed.get("text", ""))))
+    marks = Counter()
+    for classes, shown in ERROR_ELEMENT.findall(parsed.get("text", "")):
+        kind = next((c for c in ERROR_CLASSES if c in classes.split()), None)
+        if kind:
+            marks[kind, re.sub(r"\s+", " ", shown).strip()[:100]] += 1
+    return Checks(red, missing, frozenset(tracking), marks)
 
 
 def regressions(old: Checks, new: Checks) -> list:
@@ -492,8 +513,10 @@ def regressions(old: Checks, new: Checks) -> list:
         out.append("new missing templates: " + ", ".join(sorted(new.missing_templates - old.missing_templates)))
     if new.tracking - old.tracking:
         out.append("new error/tracking categories: " + ", ".join(sorted(new.tracking - old.tracking)))
-    if new.error_marks > old.error_marks:
-        out.append(f"error messages {old.error_marks} → {new.error_marks}")
+    added = new.error_marks - old.error_marks  # the messages the new text shows more often
+    if added:
+        out.append("new error messages: " + ", ".join(f"{kind} {text!r}" + (f" ×{n}" if n > 1 else "")
+                                                       for (kind, text), n in sorted(added.items())))
     return out
 
 
@@ -535,7 +558,12 @@ def run(clients: dict, conf: dict, apply: bool, pages: set | None = None, tree: 
     report = Report()
     for lang, client in clients.items():
         main_page = client.main_page()
-        for title in client.articles():
+        titles = client.articles()
+        if pages is not None:
+            for gone in sorted(t for lg, t in pages if lg == lang and t not in set(titles)):
+                report.failed.append((lang, gone, "no longer an article"))
+                out(f"FAILED {lang}:{gone}: no longer an article")
+        for title in titles:
             if title == main_page or (pages is not None and (lang, title) not in pages):
                 continue
             report.pages += 1
@@ -603,8 +631,11 @@ def _page(client, lang, title, conf, apply, tree, report, out) -> None:
     if status == "failed":
         report.failed.append((lang, title, status.detail))
         return
+    if not status.revid:
+        out(f"  {where}: the edit made no new revision (the page already had this text?); not counted")
+        return
     try:
-        saved = client.revision_text(status.revid) if status.revid else client.revision(title)[1]
+        saved = client.revision_text(status.revid)
     except PAGE_ERRORS as exc:
         report.failed.append((lang, title, f"saved, but not verified: {exc}"))
         out(f"FAILED {where}: saved, but not verified: {exc}")
@@ -645,6 +676,9 @@ def main(argv=None, clients=None, out=print) -> int:
                 only = {page_key(spec, pairs, "an article") for spec in args.page}
             except ValueError as exc:
                 parser.error(str(exc))
+            for lang, title in sorted(only):
+                if title == clients[lang].main_page():
+                    parser.error(f"{lang}:{title} is the main page, which the cleanup leaves alone")
         report = run(clients, load_config(), args.apply, only, tree_names(load(ROOT)), out)
     except (SyncError, OSError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)

@@ -130,7 +130,9 @@ sister-project boxes; the list is `config/cleanup.json`) removed, and `{{Reflist
 to `{{SV references}}`. From the repository root:
 `.venv/bin/python -m tools.cleanup_articles --wiki <code> --page TITLE` prints the diff and what it left
 (list-defined references, a reference in another language's book names, a call to a missing template…);
-show it to the author, then rerun as the bot with `--apply`
+show it to the author. Its diff header names the revision it read: before rerunning as the bot with
+`--apply`, check with `get-page` that `latestRevisionId` is still that revision; if not, show the author the
+new change and run the dry run again
 (`.venv/bin/python ~/.config/seminaverbi/runeditor.py tools.cleanup_articles … --apply`). It refuses a page
 whose preview gains a red link, a missing template, an error or tracking category, or an error message.
 What it leaves is for you to fix by hand, with the edit routine above.

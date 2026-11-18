@@ -264,7 +264,7 @@ def test_checks_count_what_can_break():
                                      ("Articles with short description", True)],
                          html='<span class="error mw-ext-cite-error">x</span><span class="bibleQuoteRefBroken">'),
                   CONF)
-    assert c.red_links == {"A", "C"} and c.missing_templates == {"X"} and c.error_marks == 2
+    assert c.red_links == {"A", "C"} and c.missing_templates == {"X"} and sum(c.error_marks.values()) == 2
     assert c.tracking == {"Pages with reference errors", "Articles with short description"}
 
 
@@ -479,3 +479,80 @@ def test_main_dry_run(capsys):
     assert ca.main(["--wiki", "en", "--page", "X"], clients={"en": en}) == 0
     out = capsys.readouterr().out
     assert "dry run" in out and en.edits == [] and en.parsed == ["X", "X"]
+
+
+# --- review findings (PR #11) ---
+
+def test_a_link_without_a_namespace_is_visible():
+    text = "Text.\n\n==Links==\n{{Portal|Film}}\n[[Category]]\n"
+    assert clean(text).text == "Text.\n\n==Links==\n[[Category]]\n"
+    text = "Text.\n\n==Links==\n{{Portal|Film}}\n[[:Category:Film]]\n"
+    assert clean(text).text == "Text.\n\n==Links==\n[[:Category:Film]]\n"
+
+
+@pytest.mark.parametrize("ref", ["John 3:16;2. Jean 1:1", "John 3:16;?1"])
+def test_a_segment_that_is_neither_a_book_nor_a_chapter_is_reported(ref):
+    call = "{{Bible quote|ref=" + ref + "}}"
+    out = clean(call)
+    assert out.text == call and out.converted == 0 and len(out.reported) == 1
+
+
+def test_a_list_before_a_subsection_keeps_its_heading():
+    text = "x<ref>a</ref>\n==Notes and references==\n{{Reflist}}\n===Primary sources===\n* A\n"
+    out = clean(text)
+    assert out.text == text and any("references" in r for r in out.reported)
+    text = "x<ref>a</ref>\n==Notes and references==\n{{Reflist}}\n===Primary sources===\n* A\n{{SV references}}\n"
+    assert clean(text).text == "x<ref>a</ref>\n==Notes and references==\n===Primary sources===\n* A\n{{SV references}}\n"
+
+
+def test_a_nested_sv_list_does_not_replace_a_top_level_one():
+    text = "x<ref group=a>n</ref>\n<references group=\"a\" />\n<includeonly>{{SV references|group=a}}</includeonly>\n"
+    out = clean(text)
+    assert out.text == text and out.references is None and out.reported
+
+
+@pytest.mark.parametrize("group", ["A|B", "{{x}}"])
+def test_a_group_that_cannot_be_one_parameter_is_reported(group):
+    text = f"x\n<references group=\"{group}\" />\n"
+    out = clean(text)
+    assert out.text == text and out.references is None and out.reported
+
+
+def test_a_list_with_prose_after_it_in_its_section_is_reported():
+    text = "==History==\nBefore.<ref>a</ref>\n<references />\nAfter.\n==Other==\n"
+    out = clean(text)
+    assert out.text == text and out.references is None and out.reported
+    # at the end of the lead, before the first heading, it converts
+    assert clean("Lead.<ref>a</ref>\n<references />\n==Other==\n").text == \
+        "Lead.<ref>a</ref>\n{{SV references}}\n==Other==\n"
+
+
+def test_a_different_error_is_a_regression_even_when_the_count_stays():
+    old = ca.checks(parsed(html='<strong class="error">Lua error: x</strong>'), CONF)
+    new = ca.checks(parsed(html='<span class="bibleQuoteRefBroken" data-ref="Jn">Jn</span>'), CONF)
+    assert ca.regressions(old, new)
+    assert ca.regressions(old, old) == []
+
+
+def test_an_edit_without_a_new_revision_is_not_counted_as_saved():
+    en = Client("en", {"X": (10, PAGE)})
+    real = en.edit
+
+    def nochange(title, text, summary, tags=None, createonly=False, baserevid=None):
+        real(title, text, summary, tags, createonly, baserevid)
+        return {"result": "Success", "nochange": True}
+    en.edit = nochange
+    report, text = run({"en": en})
+    assert report.saved == 0 and "no new revision" in text
+
+
+def test_main_rejects_the_main_page(capsys):
+    en = Client("en", {"Main Page": (1, PAGE), "X": (10, PAGE)})
+    with pytest.raises(SystemExit):
+        ca.main(["--wiki", "en", "--page", "Main Page"], clients={"en": en})
+
+
+def test_a_named_page_gone_from_the_articles_is_reported():
+    en = Client("en", {"X": (10, PAGE)})
+    report, _ = run({"en": en}, pages={("en", "X"), ("en", "Gone")})
+    assert report.failed == [("en", "Gone", "no longer an article")]
