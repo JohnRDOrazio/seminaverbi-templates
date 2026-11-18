@@ -2,20 +2,29 @@
 -- the wiki's language. Field lists and property IDs come from Module:SV/Data; parameters override.
 local Args = require('Module:SV/Args')
 local Util = require('Module:SV/Util')
+local Bio = require('Module:SV/Bio')
 
 local p = {}
 
 local label, itemLink, formatTime = Util.label, Util.itemLink, Util.formatTime
 
-local function values(entity, field, lang)
+local function values(entity, field, lang, wb)
 	local out, seen = {}, {}
+	-- an occupation agrees with the person's gender, as in {{SV bio}}; where no form is safe (a
+	-- stated gender that is neither, and no shared form) the row still names it, by its label
+	local gender = field.gendered and Bio._gender(entity, wb)
 	for _, v in ipairs(Util.best(entity, field.propId)) do
 		if field.kind == 'item' then
 			-- two places can climb to one town: show it once
 			local id = Util.place(v.id, field.climb, lang)
 			if not seen[id] then
 				seen[id] = true
-				out[#out + 1] = itemLink(id, lang)
+				local word
+				if gender then
+					local lbl = label(id, lang)
+					word = lbl and Bio._occupationWord(id, lbl, lang, wb, gender)
+				end
+				out[#out + 1] = itemLink(id, lang, word)
 			end
 		elseif field.kind == 'time' then
 			out[#out + 1] = formatTime(v)
@@ -159,10 +168,11 @@ function p._render(kind, args, ctx)
 	local rows, image = {}, nil
 	local fromItem = 0
 	for _, f in ipairs(fields) do
-		local field = { key = f.key, kind = f.kind, max = f.max, climb = f.climb, propId = data.wikibase[f.prop] }
+		local field = { key = f.key, kind = f.kind, max = f.max, climb = f.climb, propId = data.wikibase[f.prop],
+			gendered = infoboxType == 'person' and f.prop == 'occupation' }
 		local value = args[f.key]
 		if not value then
-			value = values(entity, field, lang)
+			value = values(entity, field, lang, data.wikibase)
 			if value then
 				fromItem = fromItem + 1
 			end

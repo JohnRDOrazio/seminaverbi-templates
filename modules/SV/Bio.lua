@@ -317,7 +317,7 @@ end
 -- 'male', 'female', 'other' (a stated gender that is neither) or nil (none stated). The label is the
 -- masculine: it serves a man, and anyone with no stated gender as the language's default; a woman
 -- gets the female form, a stated other gender only a form shared by both. English does not inflect.
-local function occupationWord(id, label, lang, wb, gender)
+function p._occupationWord(id, label, lang, wb, gender)
 	if gender == 'male' or gender == nil then
 		return label
 	end
@@ -342,7 +342,7 @@ local function predicate(entity, lang, wb, gender)
 	local max = (Util.layoutRow('person', 'occupation') or {}).max
 	for _, v in ipairs(Util.best(entity, wb.occupation)) do
 		local label = v.id and mw.wikibase.getLabelByLang(v.id, lang)
-		local word = label and occupationWord(v.id, label, lang, wb, gender)
+		local word = label and p._occupationWord(v.id, label, lang, wb, gender)
 		if word and not (max and #words >= max) then
 			words[#words + 1] = Util.escape(word)
 		end
@@ -375,6 +375,15 @@ local function predicate(entity, lang, wb, gender)
 	return phrase
 end
 
+-- 'male', 'female', 'other' (a stated gender that is neither) or nil (none stated).
+function p._gender(entity, wb)
+	local v = entity and firstValue(entity, wb.sex_or_gender)
+	if not (v and v.id) then
+		return nil
+	end
+	return v.id == wb.male and 'male' or v.id == wb.female and 'female' or 'other'
+end
+
 function p._sentence(entity, lang, args)
 	local wb = mw.loadData('Module:SV/Data').wikibase
 	args = args or {}
@@ -405,10 +414,7 @@ function p._sentence(entity, lang, args)
 		head = head .. ' ' .. paren
 	end
 
-	local genderValue = firstValue(entity, wb.sex_or_gender)
-	local gender = genderValue and genderValue.id
-		and (genderValue.id == wb.male and 'male' or genderValue.id == wb.female and 'female' or 'other')
-		or nil
+	local gender = p._gender(entity, wb)
 	local phrase = entity and predicate(entity, lang, wb, gender)
 	if gender == 'other' and dead and Util.msg('bio_is_dead', lang) ~= Util.msg('bio_is_dead_f', lang) then
 		-- the past copula agrees with the gender (it: è stato / è stata): no form is safe
