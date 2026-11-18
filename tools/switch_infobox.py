@@ -225,7 +225,7 @@ class Resolver:
         entity = self.wikidata.entity(wd)
         if set(claim_ids(entity, "P31")) & NOT_ARTICLES:
             return Unresolved(f"{where} is a disambiguation or list page ({wd})")
-        local = local_copy(self.repo, entity)
+        local = local_copy(self.repo, entity, wikidata=self.wikidata)
         return item_dv(local) if local else {"type": "wikibase-entityid", "import": wd}
 
     def image(self, name: str) -> str | None:
