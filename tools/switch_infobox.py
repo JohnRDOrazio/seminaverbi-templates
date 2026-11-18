@@ -119,6 +119,7 @@ class PagePlan(NamedTuple):
     dropped: list           # (row, raw) the author accepted to lose
     text: str
     covered: list = []      # props with a value on the old box that the item has already
+    missing_images: list = []  # files the old box names that no repository of the wiki holds: dropped
 
     @property
     def imports(self) -> list:
@@ -546,7 +547,7 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
     def plan(layout, **kw):
         base = dict(lang=lang, title=page.title, item=page.item, revid=page.revid, layout=layout, writes=[],
                     unresolved=[], new_text=None, bio=None, blocked=None, params={}, preview={}, dropped=[],
-                    text=page.text, covered=[])
+                    text=page.text, covered=[], missing_images=[])
         base.update(kw)
         return PagePlan(**base)
 
@@ -584,7 +585,7 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
         have = {key for key, _, _ in raws}
         raws += [r for r in bio_raws if r[0] not in have]
 
-    writes, unresolved, preview, params, covered = [], [], {}, {}, []
+    writes, unresolved, preview, params, covered, missing = [], [], {}, {}, [], []
 
     def add(prop, dvs, shown):
         for dv in dvs:
@@ -611,6 +612,10 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
                 if text and text.casefold() in {(page.label or "").casefold(), _bare_title(page.title).casefold()}:
                     continue  # the caption: the item's label or the page title
                 value = convert("monolingual", raw, None if "original" in param.lower() else lang, resolver)
+            elif row["kind"] == "image" and (name := _file_name(clean(raw))) and resolver.image(name) is None:
+                # a file in no repository the wiki sees shows as a broken link: no fact to keep
+                missing.append(name)
+                continue
             else:
                 value = convert(row["kind"], raw, lang, resolver)
             if isinstance(value, Unresolved):
@@ -655,7 +660,8 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
         blocked = "unresolved: " + "; ".join(f"{key} = {raw}" for key, raw in unresolved)
     new_text = swap(page.text, set(templates), bio_name, call("SV infobox", params), bio_plan and bio_plan.call)
     return plan(layout, writes=writes, unresolved=unresolved, new_text=new_text, bio=bio_plan, blocked=blocked,
-                params=params, preview=preview, dropped=dropped, covered=list(dict.fromkeys(covered)))
+                params=params, preview=preview, dropped=dropped, covered=list(dict.fromkeys(covered)),
+                missing_images=list(dict.fromkeys(missing)))
 
 
 def _bio_params(facts: dict) -> dict:
@@ -906,6 +912,8 @@ def _report(plan: PagePlan, names: dict, out) -> None:
         out(f"  write {prop} {names.get(prop, '?')} = {shown}{note}")
     if plan.params.get("image"):
         out(f"  image kept on the call: {plan.params['image']}")
+    for name in plan.missing_images:
+        out(f"  image {name}: missing in every repository, dropped")
     for key, raw in plan.dropped:
         out(f"  dropped {key}: {raw}")
     if not plan.dropped:

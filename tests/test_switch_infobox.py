@@ -216,10 +216,6 @@ def test_image_on_commons_written():
     plan = si.plan_page(page(FILM_TEXT), claims_of(repo.entity("Q100")), MAPPING, resolver(repo=repo, client=client))
     assert not [w for w in plan.writes if w[0] == P["image"]]
     assert plan.new_text.startswith("{{SV infobox|image=Bloodshot poster.jpg}}")
-    # a file no repository has is unresolved
-    client.images.clear()
-    plan = si.plan_page(page(FILM_TEXT), claims_of(repo.entity("Q100")), MAPPING, resolver(repo=repo, client=client))
-    assert [row for row, _ in plan.unresolved] == ["image"]
 
 
 def test_image_refused_stays_on_the_call(capsys):
@@ -539,3 +535,16 @@ def test_main_wires_the_cli(capsys):
     assert "dropped cast: Vin Diesel" in out and "(dry run: nothing written)" in out
     with pytest.raises(SystemExit):
         si.main(["--wiki", "en", "--accept-loss", "Nowhere"], repo=repo, clients={"en": client}, wikidata=Wikidata())
+
+
+def test_missing_image_is_dropped_not_blocking(capsys):
+    # a file no repository holds renders as a broken link: not a fact the old box shows
+    repo, client = film_world()
+    client.images.clear()
+    plan = si.plan_page(page(FILM_TEXT), claims_of(repo.entity("Q100")), MAPPING, resolver(repo=repo, client=client))
+    assert plan.unresolved == [] and plan.blocked is None
+    assert plan.missing_images == ["Bloodshot poster.jpg"]
+    assert P["image"] not in [w[0] for w in plan.writes] and "image=" not in plan.new_text
+    si.run(repo, {"en": client}, Wikidata(), MAPPING, {"en": set()}, apply=True, out=print)
+    assert "image Bloodshot poster.jpg: missing in every repository, dropped" in capsys.readouterr().out
+    assert len(client.edits) == 1
