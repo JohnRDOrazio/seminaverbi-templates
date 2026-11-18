@@ -349,17 +349,17 @@ def _convert_time(raw: str) -> Value | Unresolved:
         numbers = [int(v) for v in ymd] + [None] * (3 - len(ymd))
         return _time_value(numbers[0], numbers[1], numbers[2], raw)
     text = re.sub(r"\s+", " ", code.strip_code()).strip().replace("º", "").replace("°", "")
-    if m := re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})", text):
+    if m := re.fullmatch(r"([0-9]{4})-([0-9]{2})-([0-9]{2})", text):
         return _time_value(int(m[1]), int(m[2]), int(m[3]), text)
-    if m := re.fullmatch(r"(\d{4})-(\d{2})", text):
+    if m := re.fullmatch(r"([0-9]{4})-([0-9]{2})", text):
         return _time_value(int(m[1]), int(m[2]), None, text)
-    if (m := re.fullmatch(r"(\d{1,2}) (\w+) (\d{3,4})", text)) and _month(m[2]):
+    if (m := re.fullmatch(r"([0-9]{1,2}) (\w+) ([0-9]{3,4})", text)) and _month(m[2]):
         return _time_value(int(m[3]), _month(m[2]), int(m[1]), text)
-    if (m := re.fullmatch(r"(\w+) (\d{1,2}), (\d{3,4})", text)) and _month(m[1]):
+    if (m := re.fullmatch(r"(\w+) ([0-9]{1,2}), ([0-9]{3,4})", text)) and _month(m[1]):
         return _time_value(int(m[3]), _month(m[1]), int(m[2]), text)
-    if (m := re.fullmatch(r"(\w+) (\d{3,4})", text)) and _month(m[1]):
+    if (m := re.fullmatch(r"(\w+) ([0-9]{3,4})", text)) and _month(m[1]):
         return _time_value(int(m[2]), _month(m[1]), None, text)
-    if re.fullmatch(r"\d{3,4}", text):
+    if re.fullmatch(r"[0-9]{3,4}", text):
         return _time_value(int(text), None, None, text)
     return Unresolved(f"not an unambiguous date: {text or raw}")
 
@@ -771,8 +771,9 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", s.replace("º", "").replace("°", "")).strip().casefold()
 
 
-DATE = re.compile(r"\d{1,2} (?:%s) \d{3,4}|(?<!\w)\d{3,4}(?!\w)" % "|".join(m for ms in MONTHS.values() for m in ms),
-                  re.I)
+# ASCII digits only: \d takes any script's digits, which int() would read
+DATE = re.compile(r"[0-9]{1,2} (?:%s) [0-9]{3,4}|(?<!\w)[0-9]{3,4}(?!\w)"
+                  % "|".join(m for ms in MONTHS.values() for m in ms), re.I)
 # words of a predicate that state no fact: copulas, articles, conjunctions (all six languages)
 PREDICATE_STOP = {"stato", "stata", "una", "uno", "del", "della", "dei", "degli", "delle", "per", "and", "the",
                   "was", "born", "died", "est", "était", "fut", "une", "des", "ist", "war", "ein", "eine", "der",

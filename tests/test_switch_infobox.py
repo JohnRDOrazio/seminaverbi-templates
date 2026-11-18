@@ -602,6 +602,13 @@ def test_superscript_digits_are_not_a_date():
     assert isinstance(si.convert("time", "{{Start date|2008|²}}", "en", resolver()), Unresolved)
 
 
+def test_non_ascii_digits_are_not_a_date():
+    # Arabic-Indic digits: \d would take them, int() would read them
+    for raw in ("٢٠٠٨", "٢٠٠٨-١١-١٧", "٢٠٠٨-١١", "١٧ November ١٩٩٩", "November ١٧, ١٩٩٩", "November ١٩٩٩"):
+        assert isinstance(si.convert("time", raw, "en", resolver()), Unresolved), raw
+    assert si.DATE.findall("nato nel ١٩٤٠") == []
+
+
 TV = """{{Infobox television
 | name = Fringe
 | first_aired = %s
