@@ -642,6 +642,13 @@ class Progress:
             record["written"].append(value)
             self._save()
 
+    def drop(self, item: str, prop: str, value) -> None:
+        """Takes `value` out of a write set: it stays on the page instead (a file refused as a statement)."""
+        record = self.sets.get(f"{item}|{prop}")
+        if record is not None:
+            record["datavalues"] = [dv for dv in record["datavalues"] if dv.get("value") != value]
+            self._save()
+
     def finish(self, item: str, prop: str) -> None:
         if self.sets.pop(f"{item}|{prop}", None) is not None:
             self._save()
@@ -1220,7 +1227,9 @@ def _apply(repo, client, plan: PagePlan, mapping: dict, tree: dict, mapped: dict
 
     def values(prop):
         return [(v or {}).get("value") for v in current.get(prop, [])]
-    present = {prop for prop in ours if any(v is None or v not in ours[prop] for v in values(prop))}
+    # (a property whose write set this page left unfinished is not "present": the set is finished first)
+    own = {p for p, r in progress.of_item(plan.item).items() if r["page"] == where}
+    present = {prop for prop in ours if prop not in own and any(v is None or v not in ours[prop] for v in values(prop))}
     todo = [(prop, dv, shown) for prop, dv, shown in plan.writes
             if prop not in present and _with_imports(dv, mapped).get("value") not in values(prop)]
     if todo:
@@ -1249,12 +1258,24 @@ def _apply(repo, client, plan: PagePlan, mapping: dict, tree: dict, mapped: dict
             if prop == image_prop:
                 # Commons-only property refusing the file: it stays on the call
                 params["image"] = shown
+                progress.drop(plan.item, prop, _with_imports(dv, mapped).get("value"))
                 out(f"{where}: image {shown} refused as a statement ({exc}); kept as image=")
                 continue
             out(f"{where}: FAILED writing {prop} = {shown}: {exc}")
             return "failed"
-    for prop in started:
-        progress.finish(plan.item, prop)
+    # before the save: every write set of this page is on the item, or the page is not saved
+    if started or own:
+        now_on = item_claims(repo.entity(plan.item))
+        for prop, record in progress.of_item(plan.item).items():
+            if record["page"] != where:
+                continue
+            on_item = [(v or {}).get("value") for v in now_on.get(prop, [])]
+            short = [dv for dv in record["datavalues"] if dv.get("value") not in on_item]
+            if short:
+                out(f"{where}: FAILED its write set for {prop} is unfinished ({len(short)} value(s) not on the "
+                    f"item); not saved; run again")
+                return "failed"
+            progress.finish(plan.item, prop)
     text = plan.new_text
     if params != plan.params:
         bio_name = (mapping["bio"].get(plan.lang) or {}).get("template")

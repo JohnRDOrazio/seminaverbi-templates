@@ -1105,3 +1105,30 @@ def test_a_value_that_no_longer_resolves_blocks_a_row_left_unfinished():
     # without the record the row was there before the migration: covered, not blocked
     plan = si.plan_page(page(text), claims_of(repo.entity("Q100")), MAPPING, resolver(repo=repo, client=client))
     assert plan.blocked is None and P["director"] in plan.covered
+
+
+def test_an_unfinished_set_is_finished_before_the_save_even_beside_an_unknown_value(capsys):
+    # director A written, B pending; the item also has an "unknown value" director statement
+    text, repo, client, real = _two_director_film()
+    repo.add_claim = real
+    repo.entity("Q100")["claims"][P["director"]] = [
+        statement(item_dv("Q501")), {"mainsnak": {"snaktype": "somevalue"}, "rank": "normal"}]
+    progress = si.Progress()
+    progress.start("Q100", P["director"], "en:Bloodshot (film)", [item_dv("Q501"), item_dv("Q502")])
+    si.run(repo, {"en": client}, Wikidata(), MAPPING, {"en": set()}, apply=True, out=print, progress=progress)
+    # B is written before the save, or the page is not saved
+    directors = [s.get("mainsnak", {}).get("datavalue") for s in repo.entity("Q100")["claims"][P["director"]]]
+    assert item_dv("Q502") in directors or client.edits == []
+    assert not (client.edits and progress.unfinished("Q100", P["director"]))
+
+
+def test_the_save_is_refused_while_the_pages_write_set_is_unfinished(capsys):
+    # a write set the plan did not finish (here: skipped by a stale plan) stops the save
+    text, repo, client, real = _two_director_film()
+    repo.add_claim = real
+    progress = si.Progress()
+    plan = si.plan_page(page(text), claims_of(repo.entity("Q100")), MAPPING, resolver(repo=repo, client=client))
+    progress.start("Q100", P["director"], "en:Bloodshot (film)", [item_dv("Q501"), item_dv("Q502"), item_dv("Q503")])
+    status = si._apply(repo, client, plan, MAPPING, {"en": set()}, {}, print, None, progress)
+    assert status == "failed" and client.edits == []
+    assert "unfinished" in capsys.readouterr().out
