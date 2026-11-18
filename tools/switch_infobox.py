@@ -806,17 +806,35 @@ def sentence(rendered: str) -> str:
     return _text(_paragraph(rendered))
 
 
+def _fold(s: str) -> str:
+    """`s` casefolded, without accents (Città = citta)."""
+    return "".join(c for c in unicodedata.normalize("NFD", s.casefold()) if not unicodedata.combining(c))
+
+
 def _norm(s: str) -> str:
-    return re.sub(r"\s+", " ", s.replace("º", "").replace("°", "")).strip().casefold()
+    return _fold(re.sub(r"\s+", " ", s.replace("º", "").replace("°", "")).strip())
 
 
 # ASCII digits only: \d takes any script's digits, which int() would read
 DATE = re.compile(r"[0-9]{1,2} (?:%s) [0-9]{3,4}|(?<!\w)[0-9]{3,4}(?!\w)"
                   % "|".join(m for ms in MONTHS.values() for m in ms), re.I)
 # words of a predicate that state no fact: copulas, articles, conjunctions (all six languages)
-PREDICATE_STOP = {"stato", "stata", "una", "uno", "del", "della", "dei", "degli", "delle", "per", "and", "the",
-                  "was", "born", "died", "est", "était", "fut", "une", "des", "ist", "war", "ein", "eine", "der",
-                  "die", "das", "und", "foi", "fue", "uma", "los", "las"}
+PREDICATE_STOP = {_fold(w) for w in (
+    # copulas and Bio's fixed wording
+    "stato", "stata", "era", "was", "born", "died", "est", "était", "fut", "ist", "war", "foi", "fue", "fui",
+    # articles (3 letters or more)
+    "una", "uno", "the", "une", "les", "ein", "eine", "einer", "einem", "einen", "eines", "der", "die", "das",
+    "dem", "den", "des", "los", "las", "unos", "unas", "uma", "uns", "umas", "gli",
+    # prepositions, alone and with an article
+    "del", "dello", "della", "dei", "degli", "delle", "dal", "dallo", "dalla", "dai", "dagli", "dalle", "nel",
+    "nello", "nella", "nei", "negli", "nelle", "al", "allo", "alla", "ai", "agli", "alle", "sul", "sullo",
+    "sulla", "sui", "sugli", "sulle", "col", "coi", "con", "per", "tra", "fra", "for", "with", "from", "into",
+    "dans", "avec", "pour", "sur", "par", "aux", "von", "vom", "mit", "aus", "bei", "für", "zum", "zur", "nach",
+    "por", "para", "sin", "entre", "desde", "com", "pelo", "pela", "pelos", "pelas", "dos", "nos", "nas", "num",
+    "numa",
+    # conjunctions
+    "and", "nonché", "nonche", "oppure", "anche", "oder", "sowie", "que", "che", "mais", "but", "pero", "mas",
+)}
 
 
 def _clean_text(s: str) -> str:
@@ -835,8 +853,8 @@ def _facts(rendered: str) -> tuple[str, list, str, set]:
         if DATE.search(m.group(1)):  # a life span gives a year; a parenthesis without one is no span
             span, predicate = m.group(1), text[m.end():]
             break
-    words = [w for w in re.findall(r"[^\W\d_]{3,}", predicate) if w.casefold() not in PREDICATE_STOP]
-    facts += [w for w in words if not any(w.casefold() in _norm(f).split() for f in facts)]
+    words = [w for w in re.findall(r"[^\W\d_]{3,}", predicate) if _fold(w) not in PREDICATE_STOP]
+    facts += [w for w in words if not any(_fold(w) in _norm(f).split() for f in facts)]
     return text, list(dict.fromkeys(facts)), span, set(links)
 
 

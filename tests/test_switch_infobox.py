@@ -659,6 +659,21 @@ def test_nationality_prefers_the_demonyms_of_the_persons_citizenships():
     assert isinstance(si.Resolver("it", repo, wd, None).country("americano"), Unresolved)
 
 
+def test_bio_gate_ignores_wording_but_not_a_dropped_fact():
+    old = ("<p><b>Anna Magnani</b> (<a>Roma</a>, 7 marzo 1908 – <a>Roma</a>, 26 settembre 1973), è stata "
+           "un'<a>attrice</a> nonché <a>cantante</a> <a>italiana</a>, attiva nella Città del cinema degli anni "
+           "trenta</p>")
+    # conjunctions, prepositions, word order, accents and case: the same facts
+    new = ("<p>Anna Magnani (<a>Roma</a>, 7 marzo 1908 – <a>Roma</a>, 26 settembre 1973) è stata un'attrice e "
+           "cantante italiana, attiva negli anni Trenta e nella citta del cinema</p>")
+    assert si.compare_sentences(old, new, set()) == ([], [], [])
+    # an occupation dropped still blocks
+    dropped = new.replace("un'attrice e cantante", "un'attrice")
+    assert si.compare_sentences(old, dropped, set())[0] == ["cantante"]
+    # and so does a word of the free text
+    assert si.compare_sentences(old, new.replace("del cinema", "del teatro"), set())[:2] == (["cinema"], ["teatro"])
+
+
 def test_the_life_span_is_the_parenthesis_with_a_date():
     html_ = ("<p>Fabrizio De André (detto <a>Faber</a>) (<a>Genova</a>, 18 febbraio 1940 – <a>Milano</a>, 11 gennaio "
              "1999) è stato un <a>cantautore</a> italiano</p>")
