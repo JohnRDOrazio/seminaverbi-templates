@@ -44,6 +44,7 @@ import json
 import os
 import re
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import NamedTuple
 from urllib.parse import unquote
@@ -108,7 +109,8 @@ class BioPlan(NamedTuple):
                     # nationality): the new sentence may add these
 
 
-class PagePlan(NamedTuple):
+@dataclass(frozen=True)
+class PagePlan:
     lang: str
     title: str
     item: str
@@ -123,10 +125,13 @@ class PagePlan(NamedTuple):
     preview: dict           # row -> shown, the converted values for the rendered preview
     dropped: list           # (row, raw) the author accepted to lose
     text: str
-    covered: list = []      # props with a value on the old box that the item has already
-    missing_images: list = []  # files the old box names that no repository of the wiki holds: dropped
-    duplicates: list = []   # (row, raw): a further value for a one-value row, differing from the one written
-    unconvertible: list = []  # (row, raw): a value of a one-value row that does not convert, another one did
+    covered: list = field(default_factory=list)  # props with a value on the old box that the item has already
+    # files the old box names that no repository of the wiki holds: dropped
+    missing_images: list = field(default_factory=list)
+    # (row, raw): a further value for a one-value row, differing from the one written
+    duplicates: list = field(default_factory=list)
+    # (row, raw): a value of a one-value row that does not convert, another one did
+    unconvertible: list = field(default_factory=list)
 
     @property
     def imports(self) -> list:

@@ -702,3 +702,12 @@ def test_infobox_parameter_names_match_whatever_their_case():
     assert [(prop, dv) for prop, dv, _ in plan.writes] == [
         (P["publication_date"], si._time_value(1603, None, None, "1603").datavalues[0]),
         (P["genre"], item_dv("Q40"))]
+
+
+def test_page_plans_do_not_share_their_default_lists():
+    required = dict(lang="en", title="A", item="Q1", revid=1, layout="work", writes=[], unresolved=[], new_text=None,
+                    bio=None, blocked=None, params={}, preview={}, dropped=[], text="")
+    one, two = si.PagePlan(**required), si.PagePlan(**{**required, "writes": [], "unresolved": [], "dropped": []})
+    for field in ("covered", "missing_images", "duplicates", "unconvertible"):
+        getattr(one, field).append("x")
+        assert getattr(two, field) == [], field
