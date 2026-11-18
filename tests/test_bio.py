@@ -357,7 +357,9 @@ def test_en_article_by_sound():
     e = env("en")
     for word, art in (("Ukrainian", "a"), ("Ugandan", "a"), ("Uruguayan", "a"), ("Italian", "an"),
                       ("unusual", "an"), ("European", "a"), ("hour", "an"), ("onerous", "an"),
-                      ("one-man band", "a"), ("one", "a"), ("once-famous", "a"), ("Uzbek", "an")):
+                      ("one-man band", "a"), ("one", "a"), ("once-famous", "a"), ("Uzbek", "an"),
+                      ("ugly", "an"), ("Ugandan", "a"), ("unanimous", "a"), ("unanimously elected", "a"),
+                      ("unable", "an"), ("unaware", "an")):
         assert e.call("Module:SV/Bio", "_article", "en", word, False) == art + " " + word
 
 

@@ -220,9 +220,10 @@ end
 function p._article(lang, phrase, female)
 	local lower = phrase:lower()
 	if lang == 'en' then
-		-- by sound: a /juː/ or /w/ start takes "a", a silent h takes "an"
-		for _, start in ipairs({ 'eu', 'uni', 'uk', 'ug', 'uru', 'usa', 'use', 'usu', 'uti', 'ura', 'uro', 'ute',
-			'once' }) do
+		-- by sound: a /juː/ or /w/ start takes "a", a silent h takes "an". Prefixes are as long as the
+		-- sound needs: "uganda" (not "ugly"), "unanim" (unanimous, but not unable or unaware).
+		for _, start in ipairs({ 'eu', 'uni', 'unanim', 'uk', 'uganda', 'uru', 'usa', 'use', 'usu', 'uti', 'ura',
+			'uro', 'ute', 'once' }) do
 			if lower:sub(1, #start) == start then
 				return 'a ' .. phrase
 			end
