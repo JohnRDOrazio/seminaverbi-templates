@@ -597,7 +597,8 @@ def test_second_value_of_a_single_row_is_tried_and_duplicates_reported(capsys):
     si._report(plan, {}, print)
     assert "duplicate value for publication_date, not written: 2009" in capsys.readouterr().out
     assert tv_plan("2008", "{{Start date|2008}}").duplicates == []  # the same date twice
-    assert tv_plan("circa 2008", "about 2009").unresolved == [("publication_date", "circa 2008")]
+    assert tv_plan("circa 2008", "about 2009").unresolved == [("publication_date", "circa 2008"),
+                                                              ("publication_date", "about 2009")]
 
 
 OLD_F = ("<p><b>Anna Magnani</b> (<a>Roma</a>, 7 marzo 1908 – <a>Roma</a>, 26 settembre 1973), è stata "
@@ -647,3 +648,16 @@ def test_bio_with_sesso_f_passes_the_gate_on_matching_feminine_sentences(capsys)
     si.run(repo, {"it": client}, wd, MAPPING, {"it": set()}, apply=True, out=print)
     out = capsys.readouterr().out
     assert client.edits == [] and "BLOCKED" in out and "old:" in out and "new:" in out
+
+
+def test_every_unwritten_value_of_a_one_value_row_is_reported(capsys):
+    plan = tv_plan("2008", "circa 2009")
+    assert [dv["value"]["time"] for _, dv, _ in plan.writes] == ["+2008-00-00T00:00:00Z"]
+    assert plan.unconvertible == [("publication_date", "circa 2009")] and plan.duplicates == []
+    plan = tv_plan("circa 2008", "{{Start date|2008|9|9}}")
+    assert plan.unconvertible == [("publication_date", "circa 2008")] and plan.unresolved == []
+    si._report(plan, {}, print)
+    assert "value for publication_date not convertible, not written: circa 2008" in capsys.readouterr().out
+    # nothing converts: the row is unresolved with every value, not also reported as unconvertible
+    plan = tv_plan("circa 2008", "about 2009")
+    assert plan.unconvertible == [] and [raw for _, raw in plan.unresolved] == ["circa 2008", "about 2009"]

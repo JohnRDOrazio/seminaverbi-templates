@@ -125,6 +125,7 @@ class PagePlan(NamedTuple):
     covered: list = []      # props with a value on the old box that the item has already
     missing_images: list = []  # files the old box names that no repository of the wiki holds: dropped
     duplicates: list = []   # (row, raw): a further value for a one-value row, differing from the one written
+    unconvertible: list = []  # (row, raw): a value of a one-value row that does not convert, another one did
 
     @property
     def imports(self) -> list:
@@ -549,7 +550,7 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
     def plan(layout, **kw):
         base = dict(lang=lang, title=page.title, item=page.item, revid=page.revid, layout=layout, writes=[],
                     unresolved=[], new_text=None, bio=None, blocked=None, params={}, preview={}, dropped=[],
-                    text=page.text, covered=[], missing_images=[], duplicates=[])
+                    text=page.text, covered=[], missing_images=[], duplicates=[], unconvertible=[])
         base.update(kw)
         return PagePlan(**base)
 
@@ -589,7 +590,7 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
         have = {key for key, _, _ in raws}
         raws += [r for r in bio_raws if r[0] not in have]
 
-    writes, unresolved, preview, params, covered, missing, duplicates = [], [], {}, {}, [], [], []
+    writes, unresolved, preview, params, covered, missing, duplicates, unconvertible = [], [], {}, {}, [], [], [], []
 
     def add(prop, dvs, shown):
         for dv in dvs:
@@ -610,7 +611,7 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
             covered.append(prop)
             continue
         single = row["kind"] != "item"
-        converted, failed_raw = [], None
+        converted, failed = [], []  # failed: raws of a one-value row that do not convert
         for param, raw in by_row[key]:
             if row["kind"] == "monolingual":
                 text, _ = title_text(clean(raw))
@@ -628,7 +629,8 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
                     unresolved.append((key, clean(raw)))
                     converted = None
                     break
-                failed_raw = failed_raw or clean(raw)
+                if clean(raw) not in failed:
+                    failed.append(clean(raw))
                 continue
             if single and converted:
                 # the first value that converts wins; another one is reported when it differs
@@ -636,8 +638,11 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
                     duplicates.append((key, clean(raw)))
                 continue
             converted.append(value)
-        if single and not converted and failed_raw is not None:
-            unresolved.append((key, failed_raw))
+        if single and not converted:
+            unresolved += [(key, raw) for raw in failed]
+        elif single:
+            # a value that does not convert is reported, not dropped silently
+            unconvertible += [(key, raw) for raw in failed]
         if not converted:
             continue
         for value in converted:
@@ -676,7 +681,8 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
     new_text = swap(page.text, set(templates), bio_name, call("SV infobox", params), bio_plan and bio_plan.call)
     return plan(layout, writes=writes, unresolved=unresolved, new_text=new_text, bio=bio_plan, blocked=blocked,
                 params=params, preview=preview, dropped=dropped, covered=list(dict.fromkeys(covered)),
-                missing_images=list(dict.fromkeys(missing)), duplicates=duplicates)
+                missing_images=list(dict.fromkeys(missing)), duplicates=duplicates,
+                unconvertible=unconvertible)
 
 
 def _bio_params(facts: dict) -> dict:
@@ -989,6 +995,8 @@ def _report(plan: PagePlan, names: dict, out) -> None:
         out(f"  image kept on the call: {plan.params['image']}")
     for key, raw in plan.duplicates:
         out(f"  duplicate value for {key}, not written: {raw}")
+    for key, raw in plan.unconvertible:
+        out(f"  value for {key} not convertible, not written: {raw}")
     for name in plan.missing_images:
         out(f"  image {name}: missing in every repository, dropped")
     for key, raw in plan.dropped:
