@@ -534,6 +534,7 @@ def main(argv=None, repo=None, clients=None, wikidata=None, classify=None, out=p
         articles, connected = gather(clients, repo, langs)  # all wikis' items, only --wiki's page texts
         articles = [a for a in articles if a.lang in langs]
         what = "an unconnected article"
+        chosen = None
         try:
             if args.only:
                 pages = {(a.lang, a.title) for a in articles}
@@ -546,15 +547,16 @@ def main(argv=None, repo=None, clients=None, wikidata=None, classify=None, out=p
             parser.error(str(exc))
         rows = plan(articles, repo, wikidata, known(repo, wikidata, connected), forced=forced, create=create)
         if args.apply and file_item is None:
-            file_item = _filer(repo, clients, classify, out)
+            file_item = _filer(repo, clients, classify, out, only=chosen)
         return run(rows, repo, args.apply, import_log, create, file_item, out, args.tools_dir)
     except (SyncError, KeyError, OSError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
 
-def _filer(repo, clients, classify, out):
-    """file_items.run for one item, with the arguments file_items.main builds."""
+def _filer(repo, clients, classify, out, only: set | None = None):
+    """file_items.run for one item, with the arguments file_items.main builds; `only`: the --only articles,
+    the only ones it may save."""
     from sync.categories import load
     from tools import file_items, jev
 
@@ -571,7 +573,7 @@ def _filer(repo, clients, classify, out):
 
     def file_item(item):
         report = file_items.run(repo, clients, data, types, props, True, only_item=item, classify=classify,
-                                record=jev.record, out=out)
+                                record=jev.record, out=out, only_pages=only)
         if report.exit_code:
             raise SyncError(f"filing {item}: stopped {len(report.stopped)}, unsafe {len(report.unsafe)}, "
                             f"failed {len(report.failed)} (see above)")

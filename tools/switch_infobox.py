@@ -605,6 +605,10 @@ DEFAULT_PROGRESS = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" 
     "switch_progress.json"
 
 
+class ProgressBusy(Exception):
+    """Another run holds the progress file."""
+
+
 class Progress:
     """The statement write sets a page started on an item and has not finished: "item|prop" -> {"page",
     "datavalues" (every value the page writes or saw for the property), "written"}. A set is recorded before its
@@ -615,6 +619,19 @@ class Progress:
     def __init__(self, path=None):
         self.path = Path(path) if path else None
         self.sets = {}
+        self._lock = None
+        if self.path:
+            # one run at a time: the lock is held from before the load until close(), so no run plans or
+            # writes from a snapshot another run is changing (the file itself is replaced on every save)
+            import fcntl
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self._lock = open(self.path.with_suffix(".lock"), "w")
+            try:
+                fcntl.flock(self._lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                self._lock.close()
+                self._lock = None
+                raise ProgressBusy(f"{self.path} is in use by another run") from None
         if self.path and self.path.exists():
             self.sets = json.loads(self.path.read_text(encoding="utf-8"))
 
@@ -624,6 +641,11 @@ class Progress:
             tmp = self.path.with_suffix(".tmp")
             tmp.write_text(json.dumps(self.sets, indent=1, sort_keys=True), encoding="utf-8")
             os.replace(tmp, self.path)
+
+    def close(self) -> None:
+        if self._lock is not None:
+            self._lock.close()  # releases the lock
+            self._lock = None
 
     def unfinished(self, item: str, prop: str) -> dict | None:
         return self.sets.get(f"{item}|{prop}")
@@ -1257,7 +1279,9 @@ def _apply(repo, client, plan: PagePlan, mapping: dict, tree: dict, mapped: dict
         except SyncError as exc:
             if prop == image_prop:
                 # Commons-only property refusing the file: it stays on the call
-                params["image"] = shown
+                # the file name, never the plan's display text (a resumed value shows a note)
+                value = _with_imports(dv, mapped).get("value")
+                params["image"] = value if isinstance(value, str) else shown
                 progress.drop(plan.item, prop, _with_imports(dv, mapped).get("value"))
                 out(f"{where}: image {shown} refused as a statement ({exc}); kept as image=")
                 continue
@@ -1423,8 +1447,15 @@ def main(argv=None, repo=None, clients=None, wikidata=None, out=print) -> int:
             parser.error(str(exc))
         if only:
             pages = [p for p in pages if (p[0], p[1]) in only]
-        return run(repo, clients, wikidata, load_mapping(), tree_names(load(ROOT)), args.apply, accept, pages,
-                   import_log, out, args.tools_dir, Progress(args.progress))
+        progress = Progress(args.progress)
+        try:
+            return run(repo, clients, wikidata, load_mapping(), tree_names(load(ROOT)), args.apply, accept, pages,
+                       import_log, out, args.tools_dir, progress)
+        finally:
+            progress.close()
+    except ProgressBusy as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
     except (SyncError, OSError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1

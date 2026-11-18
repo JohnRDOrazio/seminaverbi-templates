@@ -207,8 +207,9 @@ def _summary(lang: str) -> str:
 
 
 def run(repo, clients: dict, data, types, props: dict, apply: bool, only_item: str | None = None,
-        classify=None, record=None, out=print, fields: dict | None = None) -> Report:
-    """`fields`: item -> field key the author decided; it replaces the pages' field and skips Jev."""
+        classify=None, record=None, out=print, fields: dict | None = None, only_pages: set | None = None) -> Report:
+    """`fields`: item -> field key the author decided; it replaces the pages' field and skips Jev.
+    `only_pages`: (lang, title) the run may save; the item's other articles still give their facts."""
     author_fields = fields or {}
     node_item = {n.key: None for n in nodes(data)}
     node_item.update(_node_items(data))
@@ -284,6 +285,8 @@ def run(repo, clients: dict, data, types, props: dict, apply: bool, only_item: s
             continue
         by_lang = {p.lang: p for p in pages}
         for lang, (title, text, revid) in plan.edits.items():
+            if only_pages is not None and (lang, title) not in only_pages:
+                continue
             page = by_lang[lang]
             fields, themes = tree_keys(lang, page.categories, data)
             keep = {names_of[k][lang] for k in themes | fields if k == plan.field or k in themes}

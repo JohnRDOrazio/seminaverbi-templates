@@ -597,3 +597,16 @@ def test_group_kind_filters_a_group_layout_page():
                          conf=conf))
     assert (rows["The Beatles"].action, rows["The Beatles"].wd) == ("import", "Q1299")
     assert rows["Beatles Fan Club"].action == "author"  # a person is not a group
+
+
+def test_only_reaches_the_filing_saves(monkeypatch):
+    # the real filing adapter passes the --only articles to file_items, so no other article is saved
+    from tools import file_items
+    seen = {}
+
+    def fake_run(*args, **kwargs):
+        seen.update(kwargs)
+        return file_items.Report(0, 0, 0, [], [], [], [])
+    monkeypatch.setattr(file_items, "run", fake_run)
+    ci._filer(Repo(), {}, lambda text: None, print, only={("en", "Foo")})("Q1")
+    assert seen["only_item"] == "Q1" and seen["only_pages"] == {("en", "Foo")}

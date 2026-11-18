@@ -1132,3 +1132,31 @@ def test_the_save_is_refused_while_the_pages_write_set_is_unfinished(capsys):
     status = si._apply(repo, client, plan, MAPPING, {"en": set()}, {}, print, None, progress)
     assert status == "failed" and client.edits == []
     assert "unfinished" in capsys.readouterr().out
+
+
+def test_a_second_run_cannot_open_a_progress_file_in_use(tmp_path):
+    journal = tmp_path / "progress.json"
+    first = si.Progress(journal)
+    with pytest.raises(si.ProgressBusy):
+        si.Progress(journal)
+    first.close()
+    si.Progress(journal).close()  # free again once the first run ends
+
+
+def test_a_resumed_image_refused_as_a_statement_keeps_its_file_name(capsys):
+    repo, client = film_world()
+    image = {"type": "string", "value": "Bloodshot poster.jpg"}
+    progress = si.Progress()
+    progress.start("Q100", P["image"], "en:Bloodshot (film)", [image])
+    real = repo.add_claim
+
+    def refuse_images(item, prop, datavalue, tags=None, summary=None):
+        if prop == P["image"]:
+            raise SyncError("en: the file is not on Commons")
+        real(item, prop, datavalue, tags, summary)
+    repo.add_claim = refuse_images
+    client.pages["Bloodshot (film)"] = FILM_TEXT.replace("| image = Bloodshot poster.jpg\n", "")
+    si.run(repo, {"en": client}, Wikidata(), MAPPING, {"en": set()}, apply=True, out=print, progress=progress)
+    saved = client.edits[-1][1] if client.edits else ""
+    assert "{{SV infobox|image=Bloodshot poster.jpg}}" in saved
+    assert "earlier run" not in saved
