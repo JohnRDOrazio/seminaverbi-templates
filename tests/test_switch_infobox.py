@@ -1160,3 +1160,23 @@ def test_a_resumed_image_refused_as_a_statement_keeps_its_file_name(capsys):
     saved = client.edits[-1][1] if client.edits else ""
     assert "{{SV infobox|image=Bloodshot poster.jpg}}" in saved
     assert "earlier run" not in saved
+
+
+def test_a_timed_out_image_resumed_beside_an_unknown_value_keeps_its_file_name(capsys):
+    # the image write timed out (record left); the item then gained an unknown-value image statement; the
+    # retry is refused: image= must get the recorded file name, not the plan's display note
+    repo, client = film_world()
+    image = {"type": "string", "value": "Bloodshot poster.jpg"}
+    repo.entity("Q100")["claims"][P["image"]] = [{"mainsnak": {"snaktype": "somevalue"}, "rank": "normal"}]
+    progress = si.Progress()
+    progress.start("Q100", P["image"], "en:Bloodshot (film)", [image])
+    real = repo.add_claim
+
+    def refuse_images(item, prop, datavalue, tags=None, summary=None):
+        if prop == P["image"]:
+            raise SyncError("en: the file is not on Commons")
+        real(item, prop, datavalue, tags, summary)
+    repo.add_claim = refuse_images
+    si.run(repo, {"en": client}, Wikidata(), MAPPING, {"en": set()}, apply=True, out=print, progress=progress)
+    saved = client.edits[-1][1] if client.edits else ""
+    assert "{{SV infobox|image=Bloodshot poster.jpg}}" in saved and "earlier run" not in saved
