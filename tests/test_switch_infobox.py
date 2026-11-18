@@ -976,6 +976,46 @@ def test_a_page_changed_after_planning_writes_no_statement(capsys):
     assert "changed since it was read" in out
 
 
+def test_a_row_written_in_part_is_finished_on_the_next_run(capsys):
+    text = FILM_TEXT.replace("Dave Wilson]]", "Dave Wilson]] and [[Jane Roe]]")
+    repo, client = film_world()
+    repo.links["en", "Jane Roe"] = "Q502"
+    client.pages["Bloodshot (film)"] = text
+    real = repo.add_claim
+
+    def down_on_the_second_director(item, prop, datavalue, tags=None, summary=None):
+        if datavalue == item_dv("Q502"):
+            raise SyncError("en: adding P57 failed: database locked")
+        real(item, prop, datavalue, tags, summary)
+    repo.add_claim = down_on_the_second_director
+    assert si.run(repo, {"en": client}, Wikidata(), MAPPING, {"en": set()}, apply=True, out=print) == 1
+    assert client.edits == [] and repo.entity("Q100")["claims"][P["director"]] == [statement(item_dv("Q501"))]
+    # the next run sees director A on the item: it writes B, not A again, before the switch
+    repo.add_claim = real
+    capsys.readouterr()
+    assert si.run(repo, {"en": client}, Wikidata(), MAPPING, {"en": set()}, apply=True, out=print) == 0
+    assert [dv for _, p, dv in repo.added if p == P["director"]] == [item_dv("Q501"), item_dv("Q502")]
+    assert len(client.edits) == 1
+    # a director the box does not show: the item's property was complete before, nothing is written
+    repo, client = film_world()
+    repo.links["en", "Jane Roe"] = "Q502"
+    repo.entity("Q100")["claims"][P["director"]] = [statement(item_dv("Q501")), statement(item_dv("Q42"))]
+    plan = si.plan_page(page(text), claims_of(repo.entity("Q100")), MAPPING, resolver(repo=repo, client=client))
+    assert P["director"] not in [w[0] for w in plan.writes] and P["director"] in plan.covered
+    # every value of the box on the item already: covered
+    repo.entity("Q100")["claims"][P["director"]] = [statement(item_dv("Q502")), statement(item_dv("Q501"))]
+    plan = si.plan_page(page(text), claims_of(repo.entity("Q100")), MAPPING, resolver(repo=repo, client=client))
+    assert P["director"] not in [w[0] for w in plan.writes] and P["director"] in plan.covered
+
+
+def test_a_row_on_the_item_whose_box_value_does_not_convert_stays_covered():
+    repo, client = film_world()
+    repo.entity("Q100")["claims"][P["director"]] = [statement(item_dv("Q501"))]
+    text = FILM_TEXT.replace("Dave Wilson]]", "Dave Wilson]] and Jane Roe")
+    plan = si.plan_page(page(text), claims_of(repo.entity("Q100")), MAPPING, resolver(repo=repo, client=client))
+    assert plan.blocked is None and plan.unresolved == [] and P["director"] in plan.covered
+
+
 def test_bio_gate_compares_birth_and_death_facts_in_their_places():
     old = ("<p>Anna (<a>Roma</a>, 7 marzo 1908 – <a>Milano</a>, 26 settembre 1973), è stata un'<a>attrice</a> "
            "<a>italiana</a>.</p>")

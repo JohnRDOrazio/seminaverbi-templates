@@ -14,8 +14,9 @@ property and kind). Values are converted only when unambiguous:
          (the farm's shared store, local to en/it.wikipedia) it stays on the call as image=; also when refused
   title  the original title; one equal to the item's label or the page title is the caption already
 
-A row the item already has is not written; a row the shown layout lacks is still written (the fact is
-the item's). For a one-value row the first parameter that converts wins; a differing further value is
+A row the item already has is not written (but for a several-value row whose values on the item are all
+among the old box's, as a run that stopped midway leaves it: the box's other values are); a row the shown
+layout lacks is still written (the fact is the item's). For a one-value row the first parameter that converts wins; a differing further value is
 reported, not written. A file no repository holds is dropped and reported. A page is switched only when every mapped row with a value is
 covered (or the author accepts the loss with --accept-loss TITLE, "it:TITLE" when the title is on both
 wikis); a page with two Wikipedia infoboxes is left to the author. it.wiki's {{Bio}} becomes {{SV bio}}
@@ -138,6 +139,9 @@ class PagePlan:
     duplicates: list = field(default_factory=list)
     # (row, raw): a value of a one-value row that does not convert, another one did
     unconvertible: list = field(default_factory=list)
+    # prop -> the item's datavalues of a multi-value row it had in part (a run that failed midway): the
+    # writes add the box's other values
+    had: dict = field(default_factory=dict)
 
     @property
     def imports(self) -> list:
@@ -610,7 +614,7 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
     def plan(layout, **kw):
         base = dict(lang=lang, title=page.title, item=page.item, revid=page.revid, layout=layout, writes=[],
                     unresolved=[], new_text=None, bio=None, blocked=None, params={}, preview={}, dropped=[],
-                    text=page.text, covered=[], missing_images=[], duplicates=[], unconvertible=[])
+                    text=page.text, covered=[], missing_images=[], duplicates=[], unconvertible=[], had={})
         base.update(kw)
         return PagePlan(**base)
 
@@ -672,6 +676,7 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
         raws += [r for r in bio_raws if r[0] not in have]
 
     writes, unresolved, preview, params, covered, missing, duplicates, unconvertible = [], [], {}, {}, [], [], [], []
+    had = {}  # prop -> the item's datavalues of a multi-value row it has in part
 
     def add(prop, dvs, shown):
         for dv in dvs:
@@ -688,10 +693,11 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
             unresolved += [(key, clean(raw)) for _, raw in by_row[key][:1]]
             continue
         prop = props[row["prop"]]
-        if prop in item_claims:
+        single = row["kind"] != "item"
+        have = item_claims.get(prop)
+        if have is not None and single:
             covered.append(prop)
             continue
-        single = row["kind"] != "item"
         converted, failed = [], []  # failed: raws of a one-value row that do not convert
         for param, raw in by_row[key]:
             if row["kind"] == "monolingual":
@@ -707,7 +713,8 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
                 value = convert(row["kind"], raw, lang, resolver)
             if isinstance(value, Unresolved):
                 if not single:
-                    unresolved.append((key, clean(raw)))
+                    if have is None:  # a row the item has is not blocked by a value that does not convert
+                        unresolved.append((key, clean(raw)))
                     converted = None
                     break
                 if clean(raw) not in failed:
@@ -724,6 +731,18 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
         elif single:
             # a value that does not convert is reported, not dropped silently
             unconvertible += [(key, raw) for raw in failed]
+        if have is not None:
+            # a multi-value row the item has: its values all among the box's is what a run that wrote the row
+            # in part leaves, so the box's other values are written; a value of the item's that the box does
+            # not show means the item's property was complete before, and the item's facts stand
+            known = [h.get("value") for h in have if h]
+            lacking = [dv for v in converted or [] for dv in v.datavalues if dv.get("value") not in known]
+            box = [dv.get("value") for v in converted or [] for dv in v.datavalues]
+            if not lacking or len(known) < len(have) or any(k not in box for k in known):
+                covered.append(prop)
+                continue
+            had[prop] = have
+            converted = [Value([dv for dv in v.datavalues if dv in lacking], v.shown, v.keep) for v in converted]
         if not converted:
             continue
         for value in converted:
@@ -763,7 +782,7 @@ def plan_page(page: Page, item_claims: dict, mapping: dict, resolver=None, accep
     return plan(layout, writes=writes, unresolved=unresolved, new_text=new_text, bio=bio_plan, blocked=blocked,
                 params=params, preview=preview, dropped=dropped, covered=list(dict.fromkeys(covered)),
                 missing_images=list(dict.fromkeys(missing)), duplicates=duplicates,
-                unconvertible=unconvertible)
+                unconvertible=unconvertible, had=had)
 
 
 def _not_a_person(item: str, item_layout: str | None, mapping: dict, resolver) -> str | None:
@@ -1108,8 +1127,20 @@ def _apply(repo, client, plan: PagePlan, mapping: dict, tree: dict, mapped: dict
     if lacking:
         out(f"{where}: FAILED relies on {', '.join(lacking)} for statements that were not written")
         return "failed"
-    present = {prop for prop, _, _ in plan.writes if prop in current}
-    if any(prop not in present for prop, _, _ in plan.writes):
+    # a property the item has now is left as it is, unless each of its values is one the plan writes or saw
+    # (a multi-value row written in part): then only the values it lacks are written
+    ours = {}
+    for prop, dv, _ in plan.writes:
+        ours.setdefault(prop, []).append(_with_imports(dv, mapped).get("value"))
+    for prop, dvs in plan.had.items():
+        ours.setdefault(prop, []).extend((dv or {}).get("value") for dv in dvs)
+
+    def values(prop):
+        return [(v or {}).get("value") for v in current.get(prop, [])]
+    present = {prop for prop in ours if any(v is None or v not in ours[prop] for v in values(prop))}
+    todo = [(prop, dv, shown) for prop, dv, shown in plan.writes
+            if prop not in present and _with_imports(dv, mapped).get("value") not in values(prop)]
+    if todo:
         # the statements are the planned revision's facts: an edit since then may have changed them, and a
         # statement once written makes its row look covered on the next run (the save checks again)
         try:
@@ -1120,9 +1151,7 @@ def _apply(repo, client, plan: PagePlan, mapping: dict, tree: dict, mapped: dict
         if now is None or now[0] != plan.revid:
             out(f"{where}: FAILED changed since it was read; no statement written; run again")
             return "failed"
-    for prop, dv, shown in plan.writes:
-        if prop in present:
-            continue
+    for prop, dv, shown in todo:
         try:
             _add_claim(repo, plan.item, prop, _with_imports(dv, mapped))
         except Transient as exc:
