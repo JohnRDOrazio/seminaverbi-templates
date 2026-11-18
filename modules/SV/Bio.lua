@@ -83,6 +83,56 @@ local function regularFeminine(lang, w)
 	return nil
 end
 
+-- Accented vowels to plain ones, for plurals whose stress mark goes (es inglés → ingleses).
+local UNACCENT = { ['á'] = 'a', ['é'] = 'e', ['í'] = 'i', ['ó'] = 'o', ['ú'] = 'u', ['ê'] = 'e', ['ô'] = 'o' }
+
+local function unaccent(w)
+	for accented, plain in pairs(UNACCENT) do
+		w = w:gsub(accented, plain)
+	end
+	return w
+end
+
+-- The regular plurals of a singular demonym form (masculine or feminine), by language.
+local function regularPlurals(lang, w)
+	local out = {}
+	local function add(ending, replacement)
+		if endsWith(w, ending) then
+			out[#out + 1] = w:sub(1, #w - #ending) .. replacement
+		end
+	end
+	if lang == 'it' then
+		-- italiano → italiani, italiana → italiane, statunitense → statunitensi, tedesco → tedeschi
+		add('o', 'i')
+		add('a', 'e')
+		add('a', 'i')
+		add('e', 'i')
+		add('co', 'chi')
+		add('go', 'ghi')
+		add('ca', 'che')
+		add('ga', 'ghe')
+	elseif lang == 'es' or lang == 'pt' or lang == 'fr' or lang == 'en' then
+		out[#out + 1] = w .. 's'
+		if lang == 'es' then
+			-- español → españoles, inglés → ingleses
+			out[#out + 1] = w .. 'es'
+			out[#out + 1] = unaccent(w) .. 'es'
+		elseif lang == 'pt' then
+			add('ês', 'eses')
+			add('ão', 'ães')
+			add('ão', 'ões')
+			add('ol', 'óis')
+			add('al', 'ais')
+			add('el', 'éis')
+			add('r', 'res')
+			add('z', 'zes')
+		elseif lang == 'fr' then
+			add('al', 'aux')
+		end
+	end
+	return out
+end
+
 -- A German demonym usable as an adjective: lowercase (after any hyphen) and ending in -sch.
 local function germanAdjective(w)
 	local last = w:match('([^-]*)$')
@@ -92,13 +142,34 @@ end
 -- The nationality adjective agreeing with the person, from the country's demonym values in lang,
 -- or nil when the masculine form or the agreement cannot be decided (never guessed).
 function p._demonym(lang, forms, female)
+	-- Wikidata writes fr (and some es/it/pt) demonyms as capitalised nouns; the adjective is lower case
+	local lower = lang == 'fr' or lang == 'es' or lang == 'it' or lang == 'pt'
 	local unique, seen = {}, {}
 	for _, f in ipairs(forms or {}) do
-		if type(f) == 'string' and f ~= '' and not seen[f] then
-			seen[f] = true
-			unique[#unique + 1] = f
+		if type(f) == 'string' and f ~= '' then
+			f = lower and mw.ustring.lower(f) or f
+			if not seen[f] then
+				seen[f] = true
+				unique[#unique + 1] = f
+			end
 		end
 	end
+	-- the values carry no number qualifiers: drop each value that is the regular plural of another
+	local plural = {}
+	for _, f in ipairs(unique) do
+		for _, pl in ipairs(regularPlurals(lang, f)) do
+			if pl ~= f and seen[pl] then
+				plural[pl] = true
+			end
+		end
+	end
+	local singular = {}
+	for _, f in ipairs(unique) do
+		if not plural[f] then
+			singular[#singular + 1] = f
+		end
+	end
+	unique = singular
 	if lang == 'de' then
 		local adjectives = {}
 		for _, f in ipairs(unique) do

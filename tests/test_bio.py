@@ -411,3 +411,55 @@ def test_bach_julian_birth_date_shown_gregorian():
     gregorian = time("+1685-03-31T00:00:00Z", 11)
     gregorian["mainsnak"]["datavalue"]["value"]["calendarmodel"] = "http://www.wikidata.org/entity/Q1985727"
     assert bio("en", entities=with_nek(P4712=[julian, gregorian], P818=None)).startswith("Nek (born 31 March 1685)")
+
+
+# the local items' P489 values as EnrichItems copies them from Wikidata: singular and plural forms,
+# with no gender or number qualifiers (Italy Q46724, United States Q13089)
+ITALY_LIVE = {"it": ["italiano", "italiana", "italiani", "italiane"], "fr": ["Italienne", "Italien"],
+              "de": ["Italiener", "Italienerin", "Italienerinnen"], "en": ["Italian"]}
+USA_LIVE = {"it": ["statunitense", "statunitensi"], "es": ["estadounidense", "estadounidenses"],
+            "pt": ["americano", "americana"], "fr": ["Américain", "Américaine", "États-Unien"],
+            "en": ["American", "Americans"], "de": ["Amerikaner", "Amerikanerin"]}
+
+
+def test_demonym_real_value_sets():
+    assert nationality("it", ITALY_LIVE["it"]) == "italiano"
+    assert nationality("it", ITALY_LIVE["it"], True) == "italiana"
+    assert nationality("it", USA_LIVE["it"]) == "statunitense"
+    assert nationality("it", USA_LIVE["it"], True) == "statunitense"
+    assert nationality("es", USA_LIVE["es"]) == "estadounidense"
+    assert nationality("es", USA_LIVE["es"], True) == "estadounidense"
+    assert nationality("pt", USA_LIVE["pt"]) == "americano"
+    assert nationality("pt", USA_LIVE["pt"], True) == "americana"
+    assert nationality("en", USA_LIVE["en"]) == "American"
+    # fr nouns are capitalised on Wikidata; the adjective is not
+    assert nationality("fr", ITALY_LIVE["fr"]) == "italien"
+    assert nationality("fr", ITALY_LIVE["fr"], True) == "italienne"
+    # two unrelated singular forms (américain, états-unien): undecidable, omitted
+    assert nationality("fr", USA_LIVE["fr"]) is None
+    # de: only nouns, no -isch adjective: omitted, never a capitalised noun as an adjective
+    assert nationality("de", ITALY_LIVE["de"]) is None
+    assert nationality("de", USA_LIVE["de"]) is None
+
+
+def test_demonym_plurals_by_language():
+    assert nationality("it", ["tedesco", "tedesca", "tedeschi", "tedesche"]) == "tedesco"
+    assert nationality("it", ["greco", "greca", "greci", "greche"]) == "greco"
+    assert nationality("it", ["francese", "francesi"], True) == "francese"
+    assert nationality("es", ["inglés", "inglesa", "ingleses", "inglesas"]) == "inglés"
+    assert nationality("es", ["italiano", "italiana", "italianos", "italianas"], True) == "italiana"
+    assert nationality("es", ["Español", "Española", "Españoles", "Españolas"]) == "español"
+    assert nationality("pt", ["português", "portuguesa", "portugueses", "portuguesas"]) == "português"
+    assert nationality("pt", ["alemão", "alemã", "alemães", "alemãs"]) == "alemão"
+    assert nationality("pt", ["espanhol", "espanhola", "espanhóis", "espanholas"]) == "espanhol"
+    assert nationality("fr", ["italien", "italienne", "italiens", "italiennes"]) == "italien"
+    assert nationality("fr", ["Français", "Française", "Françaises"]) == "français"
+
+
+def test_bio_nationality_with_live_italy_values():
+    forms = [mono(f, lang) for lang, fs in ITALY_LIVE.items() for f in fs]
+    ents = dict(BASE, **{ITALY: {"labels": {"it": "Italia"}, "claims": {"P489": forms}}})
+    assert bio(entities=ents) == "Nek (Sassuolo, 6 gennaio 1972) è un cantautore italiano"
+    assert bio("fr", entities=ents) == "Nek (Sassuolo, 6 janvier 1972) est un auteur-compositeur-interprète italien"
+    assert bio("en", entities=ents) == "Nek (born 6 January 1972 in Sassuolo) is an Italian singer-songwriter"
+    assert bio("de", entities=ents) == "Nek (* 6. Januar 1972 in Sassuolo) ist ein Liedermacher"
