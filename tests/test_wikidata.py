@@ -22,8 +22,10 @@ class Wikidata:
         self.links, self.redirects = links or {}, redirects or {}
         self.entities, self.search_hits = entities or {}, search or {}
         self.calls, self.headers = [], {}
+        self.sent_headers = []
 
-    def get(self, url, params=None, timeout=None):
+    def get(self, url, params=None, timeout=None, headers=None):
+        self.sent_headers.append(dict(headers or {}))
         self.calls.append((url, dict(params)))
         p = params
         if p["action"] == "wbsearchentities":
@@ -78,10 +80,12 @@ def test_by_sitelink_is_cached():
     assert len(wd.calls) == n
 
 
-def test_user_agent():
-    wd = Wikidata()
-    WikidataClient(session=wd)
-    assert wd.headers["User-Agent"] == USER_AGENT
+def test_user_agent_is_sent_without_touching_the_callers_session():
+    wd = Wikidata(links={("enwiki", "A"): "Q1"})
+    wd.headers["User-Agent"] = "callers-agent"
+    WikidataClient(session=wd).by_sitelink("enwiki", ["A"])
+    assert wd.headers == {"User-Agent": "callers-agent"}  # the session the caller gave is untouched
+    assert wd.sent_headers and all(h["User-Agent"] == USER_AGENT for h in wd.sent_headers)
 
 
 def test_entity_cached_and_batched():
@@ -108,7 +112,7 @@ def test_search():
 
 def test_error_is_sync_error():
     class Broken(Wikidata):
-        def get(self, url, params=None, timeout=None):
+        def get(self, url, params=None, timeout=None, headers=None):
             return Response({"error": {"code": "x", "info": "y"}})
     with pytest.raises(SyncError, match="wikidata"):
         WikidataClient(session=Broken()).entity("Q1")

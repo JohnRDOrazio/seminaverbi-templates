@@ -3,17 +3,32 @@ from __future__ import annotations
 
 import requests
 
-from sync.wiki import WikiClient
+from sync.wiki import USER_AGENT, WikiClient
 
 API = "https://www.wikidata.org/w/api.php"
 BATCH = 50
 LANGS = "en|it|es|fr|de|pt"
 
 
+class _OwnHeaders:
+    """A view of a session that sends this client's own headers per request and never writes to the session
+    it wraps (WikiClient sets the User-Agent on the session it is given)."""
+
+    def __init__(self, session):
+        self._session = session
+        self.headers = {"User-Agent": USER_AGENT}
+
+    def get(self, url, **kwargs):
+        return self._session.get(url, headers={**self.headers, **kwargs.pop("headers", {})}, **kwargs)
+
+    def post(self, url, **kwargs):
+        return self._session.post(url, headers={**self.headers, **kwargs.pop("headers", {})}, **kwargs)
+
+
 class WikidataClient:
     def __init__(self, session: requests.Session | None = None):
         # WikiClient's request loop (HTTP 429 back-off, error -> SyncError), pointed at Wikidata
-        self._wiki = WikiClient("wikidata", session=session)
+        self._wiki = WikiClient("wikidata", session=_OwnHeaders(session or requests.Session()))
         self._wiki.api = API
         self._links: dict[tuple[str, str], str | None] = {}
         self._entities: dict[str, dict] = {}
