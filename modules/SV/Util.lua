@@ -189,6 +189,9 @@ function p.itemIds(entity, propId)
 	return out
 end
 
+-- The most levels of "subclass of" between a place's class and a class in the climb list.
+local SUBCLASS_STEPS = 3
+
 -- The most steps a place climbs: Wikidata nests a street in a borough in a city.
 local CLIMB_STEPS = 4
 
@@ -207,27 +210,42 @@ function p.place(id, climb, lang)
 	for _, class in ipairs(climb) do
 		fine[class] = true
 	end
-	-- a class in the list, or a subclass of one (hospital building -> building), a few levels up
-	local function isFineClass(class, depth)
-		if fine[class] ~= nil then
-			return fine[class]
+	-- a class in the list, or a subclass of one (hospital building -> building) at most SUBCLASS_STEPS
+	-- levels up. Breadth first, so each ancestor is reached first by its shortest path and a path cut by
+	-- the depth limit cannot hide a shorter one through the same ancestor; only whole answers are kept.
+	local known = {}
+	local function isFineClass(class)
+		if fine[class] then
+			return true
 		end
-		fine[class] = false  -- (no loops)
-		if depth > 0 and wb.subclass_of then
-			for _, parent in ipairs(p.itemIds(mw.wikibase.getEntity(class), wb.subclass_of)) do
-				if isFineClass(parent, depth - 1) then
-					fine[class] = true
-					break
+		if known[class] ~= nil or not wb.subclass_of then
+			return known[class] or false
+		end
+		local seen, level = { [class] = true }, { class }
+		for _ = 1, SUBCLASS_STEPS do
+			local nextLevel = {}
+			for _, c in ipairs(level) do
+				for _, parent in ipairs(p.itemIds(mw.wikibase.getEntity(c), wb.subclass_of)) do
+					if fine[parent] then
+						known[class] = true
+						return true
+					end
+					if not seen[parent] then
+						seen[parent] = true
+						nextLevel[#nextLevel + 1] = parent
+					end
 				end
 			end
+			level = nextLevel
 		end
-		return fine[class]
+		known[class] = false
+		return false
 	end
 	for _ = 1, CLIMB_STEPS do
 		local entity = mw.wikibase.getEntity(id)
 		local isFine = false
 		for _, class in ipairs(p.itemIds(entity, wb.instance_of)) do
-			isFine = isFine or isFineClass(class, 3)
+			isFine = isFine or isFineClass(class)
 		end
 		local parent = isFine and p.best(entity, wb.located_in)[1]
 		if not (parent and parent.id and p.label(parent.id, lang)) then

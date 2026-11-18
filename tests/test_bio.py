@@ -718,3 +718,19 @@ def test_main_puts_the_full_stop_inside_closing_markup_and_before_trailing_citat
     assert main("autore" + marker) == head + "autore." + marker
     # a citation earlier in the text stays where it is
     assert main("autore<ref>T.</ref> di canzoni") == head + "autore<ref>T.</ref> di canzoni."
+
+
+def test_a_subclass_path_through_a_shared_ancestor_is_found_at_any_branch_order():
+    # S -> A -> C -> D (too deep through A) and S -> B -> D -> building (three levels): S climbs, whichever
+    # parent is looked at first
+    S, A, B, C, D = "Q49101", "Q49102", "Q49103", "Q49104", "Q49105"
+    def cls(q, *parents):
+        return {"id": q, "labels": {}, "claims": {"P1709": [item(p) for p in parents]}}
+    for order in ((A, B), (B, A)):
+        ents = dict(PLACES, **{S: cls(S, *order), A: cls(A, C), C: cls(C, D), B: cls(B, D), D: cls(D, BUILDING),
+                               BRIXTON: place(BRIXTON, "Edificio", [S], [LONDON])})
+        assert bowie_at(BRIXTON, NEW_YORK, ents).startswith("David Bowie (Londra, 8 gennaio 1947"), order
+    # four levels up is beyond the walk
+    ents = dict(PLACES, **{S: cls(S, A), A: cls(A, C), C: cls(C, D), D: cls(D, BUILDING),
+                           BRIXTON: place(BRIXTON, "Edificio", [S], [LONDON])})
+    assert bowie_at(BRIXTON, NEW_YORK, ents).startswith("David Bowie (Edificio, 8 gennaio 1947")
