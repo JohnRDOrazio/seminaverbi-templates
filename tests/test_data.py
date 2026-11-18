@@ -10,7 +10,8 @@ REQUIRED = [
     "discernment_heading", "references_heading", "wip_notice", "wip_category", "managed_notice",
     "cite_accessed", "cite_archived", "cite_pages", "cite_missing_title", "bc_year",
     "date_decade", "date_century", "date_millennium", "cattree_themes_heading",
-    "quote_missing_text", "cathopedia_note", "cathopedia_category", "cathopedia_missing_title",
+    "quote_missing_text", "cathopedia_note", "cathopedia_category", "cathopedia_category_text",
+    "cathopedia_missing_title",
 ]
 
 
