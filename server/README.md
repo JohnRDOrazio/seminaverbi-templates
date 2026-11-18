@@ -32,7 +32,8 @@ $MW_INSTALL_PATH/maintenance/run --wiki en <tools-dir>/EnrichItems.php --from-ar
 Record the `seminaverbi_en` size first; drop `--dry-run` to write (expect six `IMPORT <wd> = <local>`
 lines and growth under 1 MB). Output lines: `IMPORT <wd> = <local> (mapped|created)`,
 `IMPORT <wd> = (would create)` on a dry run, `IMPORT <wd> FAILED <reason>`. With `--follow` on a dry
-run, targets that are not mapped yet are not listed.
+run, targets that are not mapped yet are not listed; on a real run a target that cannot be created
+(`! creating <wd> failed`) makes the run end with an error listing it, so it is retried.
 
 `--dry-run` with `--import` writes nothing: an ID that is already mapped prints `(mapped)`; one that is
 not prints `(would create)`, and, as nothing is created, a not-yet-mapped item is not enriched either

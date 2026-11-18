@@ -77,7 +77,7 @@ class EnrichItems extends Maintenance {
 		// Every ID given on the command line is checked before the first write.
 		$importIds = $this->validateArguments( $failed );
 		$imported = $this->runImports( $importIds, $failed );
-		foreach ( $this->localItems( $imported ) as $localSerialization ) {
+		foreach ( $this->localItems( $imported, $failed ) as $localSerialization ) {
 			$localId = new ItemId( $localSerialization );
 			$wdSerialization = $this->originalId( $localSerialization );
 			if ( !$wdSerialization ) {
@@ -360,9 +360,10 @@ class EnrichItems extends Maintenance {
 
 	/**
 	 * @param string[] $imported local item IDs from --import
+	 * @param array<string, true> &$failed receives --follow targets that could not be created
 	 * @return string[] local item IDs
 	 */
-	private function localItems( array $imported = [] ): array {
+	private function localItems( array $imported, array &$failed ): array {
 		// The same normalisation validateArguments() checked: " q5" is Q5.
 		$given = array_map( static fn ( $id ) => strtoupper( trim( (string)$id ) ),
 			(array)$this->getOption( 'item', [] ) );
@@ -407,6 +408,9 @@ class EnrichItems extends Maintenance {
 						$target = $this->ensureLocal( $value->getEntityId() );
 						if ( $target !== null ) {
 							$items[] = $target;
+						} elseif ( !$this->dryRun ) {
+							// a failed import is a failed run, even if the enrichment below skips the property
+							$failed[$value->getEntityId()->getSerialization()] = true;
 						}
 					}
 				}
