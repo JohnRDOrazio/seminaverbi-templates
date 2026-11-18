@@ -42,6 +42,15 @@ function lang:formatDate(fmt, iso)
     return fmt .. '|' .. iso
 end
 function mw.language.getContentLanguage() return lang end
+-- a few CLDR names, as Scribunto's mw.language.fetchLanguageName(code, inLanguage) gives them ('' when unknown)
+local LANGUAGE_NAMES = {
+    it = { en = 'inglese', it = 'italiano', la = 'latino', de = 'tedesco' },
+    en = { en = 'English', it = 'Italian', la = 'Latin', de = 'German' },
+    de = { en = 'Englisch', it = 'Italienisch', de = 'Deutsch' },
+}
+function mw.language.fetchLanguageName(code, inLanguage)
+    return (LANGUAGE_NAMES[inLanguage] or {})[code] or ''
+end
 function mw.title.getCurrentTitle() return { text = py.page_title } end
 function mw.wikibase.getEntityIdForCurrentPage() return py.page_entity end
 function mw.wikibase.getEntity(id) return py.entity(id) end

@@ -5,4 +5,6 @@ A quotation that is not from the Bible (for Bible passages use [[Template:SV Bib
 * <code>source</code>: the work, page or document; may be a link.
 * <code>original</code>: the quotation in its original language, shown above the translation.
 * <code>original_lang</code>: the language code of <code>original</code> (e.g. <code>it</code>, <code>la</code>, <code>grc</code>).
+* <code>text_lang</code>: the language code of <code>text</code> when it is not this wiki's language.
+With <code>original</code>, each version is labelled below with its language, named in this wiki's language, when that name is known: a version whose code is missing, malformed or unknown gets no label. Without <code>text_lang</code> the translation is labelled with this wiki's language.
 </noinclude>

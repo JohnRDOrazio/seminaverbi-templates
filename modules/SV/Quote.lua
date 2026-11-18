@@ -23,18 +23,64 @@ local function langCode(code)
 	return code:lower()
 end
 
+-- lang/dir attributes for a language tag, '' when there is none or it is malformed.
+-- Scripts by direction, for a tag with an explicit script subtag (az-Arab, ar-Latn): ISO 15924, lower case.
+local RTL_SCRIPTS = { arab = true, hebr = true, syrc = true, thaa = true, nkoo = true, adlm = true, rohg = true,
+	samr = true, mand = true, mend = true, yezi = true }
+local LTR_SCRIPTS = { latn = true, cyrl = true, grek = true, armn = true, geor = true, deva = true, hans = true,
+	hant = true, jpan = true, kore = true, ethi = true, copt = true, goth = true, glag = true, runr = true }
+
+-- The base direction of a tag: its script subtag when it has one (auto for a script not known here), else
+-- its language.
+local function direction(code)
+	local script = code:match('^%a+%-(%a%a%a%a)$') or code:match('^%a+%-(%a%a%a%a)%-')
+	if script then
+		return RTL_SCRIPTS[script] and 'rtl' or (LTR_SCRIPTS[script] and 'ltr' or 'auto')
+	end
+	return RTL[code:match('^%a+')] and 'rtl' or 'ltr'
+end
+
+local function langAttrs(code)
+	return code and (' lang="' .. code .. '" dir="' .. direction(code) .. '"') or ''
+end
+
+-- The name of a language in the wiki's language, shown in small text below its version of the quote
+-- (MediaWiki's own localized names, so every wiki gets them in its language); nothing when unknown.
+local function langLabel(code, wikiLang)
+	local name = code and mw.language.fetchLanguageName(code, wikiLang) or ''
+	if name == '' then
+		return nil
+	end
+	return '<div class="sv-quote-lang">' .. Util.escape(name) .. '</div>'
+end
+
 function p.quote(frame)
 	local args = Args.get(frame)
+	local wikiLang = Util.lang()
 	if not args.text then
-		return '<strong class="error">' .. Util.msg('quote_missing_text', Util.lang()) .. '</strong>'
+		return '<strong class="error">' .. Util.msg('quote_missing_text', wikiLang) .. '</strong>'
 	end
-	local out = { '<blockquote class="sv-quote">' }
+	local out = {
+		-- A tag returned as a string is shown as text; it has to go through extensionTag.
+		frame:extensionTag('templatestyles', '', { src = 'SV quote/styles.css' }),
+		'<blockquote class="sv-quote">',
+	}
+	-- with an original, each version is labelled with its language
+	local textCode = langCode(args.text_lang)
 	if args.original then
 		local code = langCode(args.original_lang)
-		local attrs = code and (' lang="' .. code .. '" dir="' .. (RTL[code:match('^%a+')] and 'rtl' or 'ltr') .. '"') or ''
-		out[#out + 1] = '<div class="sv-quote-original"' .. attrs .. '>' .. args.original .. '</div>'
+		out[#out + 1] = '<div class="sv-quote-original"' .. langAttrs(code) .. '>' .. args.original .. '</div>'
+		out[#out + 1] = langLabel(code, wikiLang)  -- nil (no label) appends nothing
 	end
-	out[#out + 1] = '<div class="sv-quote-text">' .. args.text .. '</div>'
+	out[#out + 1] = '<div class="sv-quote-text"' .. langAttrs(textCode) .. '>' .. args.text .. '</div>'
+	if args.original then
+		-- an omitted text_lang is the wiki's language; a malformed one names no language, so no label
+		local labelCode = wikiLang
+		if args.text_lang then
+			labelCode = textCode
+		end
+		out[#out + 1] = langLabel(labelCode, wikiLang)
+	end
 	local credit = {}
 	if args.author then credit[#credit + 1] = args.author end
 	if args.source then credit[#credit + 1] = args.source end

@@ -15,7 +15,7 @@ def msg(lang, key):
 
 def test_quote_basic():
     out = quote(text="T", author="A", source="[https://x S]")
-    assert out.startswith('<blockquote class="sv-quote">')
+    assert '<blockquote class="sv-quote">' in out
     assert "T" in out
     src = out[out.index('<div class="sv-quote-source">'):]
     assert src.index("A") < src.index("[https://x S]")
@@ -62,3 +62,54 @@ def test_quote_rejects_attribute_breakers():
     for bad in ('he" dir="ltr', "he'x", "he x", "he-<b>", "-he", "he--il"):
         out = quote(text="T", original="O", original_lang=bad)
         assert "lang=" not in out, bad
+
+
+def test_a_quote_with_its_original_names_each_language_below_it():
+    out = quote(lang="it", text="Fu la Pietà", original="It was Pity", original_lang="en", author="Gandalf")
+    original, translation = out.index("It was Pity"), out.index("Fu la Pietà")
+    en_label = out.index('<div class="sv-quote-lang">inglese</div>')
+    it_label = out.index('<div class="sv-quote-lang">italiano</div>')
+    assert original < en_label < translation < it_label < out.index("Gandalf")
+
+
+def test_language_names_are_in_the_wikis_language():
+    out = quote(lang="de", text="Es war Mitleid", original="It was Pity", original_lang="en")
+    assert '<div class="sv-quote-lang">Englisch</div>' in out and '<div class="sv-quote-lang">Deutsch</div>' in out
+
+
+def test_a_translation_in_another_language_than_the_wiki():
+    out = quote(lang="it", text="Pietas", text_lang="la", original="Pity", original_lang="en")
+    assert '<div class="sv-quote-lang">latino</div>' in out and "italiano" not in out
+    assert '<div class="sv-quote-text" lang="la" dir="ltr">' in out
+
+
+def test_a_quote_without_original_has_no_language_labels():
+    assert "sv-quote-lang" not in quote(lang="it", text="T")
+
+
+def test_an_unknown_language_gets_no_label():
+    out = quote(lang="it", text="T", original="O", original_lang="xx")
+    assert out.count("sv-quote-lang") == 1  # only the translation's "italiano"
+    # and that one label is the translation's, below it
+    assert out.index('<div class="sv-quote-text">T</div>') < out.index('<div class="sv-quote-lang">italiano</div>')
+
+
+def test_quote_styles_load_through_templatestyles():
+    from lua_env import tag
+    assert quote(text="T").startswith(tag("templatestyles", src="SV quote/styles.css"))
+
+
+def test_a_malformed_text_lang_gets_no_label_but_an_omitted_one_is_the_wikis():
+    out = quote(lang="it", text="Pietas", text_lang="la_", original="Pity", original_lang="en")
+    assert "italiano" not in out and out.count("sv-quote-lang") == 1  # only the original's "inglese"
+    assert '<div class="sv-quote-lang">italiano</div>' in quote(lang="it", text="T", original="O", original_lang="en")
+
+
+def test_direction_follows_an_explicit_script_subtag():
+    # Azerbaijani in Arabic script is right to left; in Latin script left to right; an unknown script: auto
+    assert 'lang="az-arab" dir="rtl"' in quote(text="T", original="O", original_lang="az-Arab")
+    assert 'lang="ar-latn" dir="ltr"' in quote(text="T", original="O", original_lang="ar-Latn")
+    assert 'lang="az-zzzz" dir="auto"' in quote(text="T", original="O", original_lang="az-Zzzz")
+    # no script subtag: the language decides, as before
+    assert 'lang="he" dir="rtl"' in quote(text="T", original="O", original_lang="he")
+    assert 'lang="it" dir="ltr"' in quote(text="T", original="O", original_lang="it")
