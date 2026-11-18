@@ -445,3 +445,23 @@ def test_first_revision_comment():
     assert (p["rvdir"], p["rvlimit"], p["rvprop"]) == ("newer", "1", "comment")
     s = Recorder({"query": {"pages": [{"title": "X", "missing": True}]}})
     assert WikiClient("it", session=s).first_comment("X") == ""
+
+
+def test_image_source_tells_commons_from_other_repositories():
+    def source(page):
+        return WikiClient("it", session=Recorder({"query": {"pages": [page]}})).image_source("X.jpg")
+    # a Commons file passed on by the enwiki foreign repository still lives on Commons
+    assert source({"imagerepository": "enwiki", "imageinfo": [
+        {"descriptionurl": "https://commons.wikimedia.org/wiki/File:X.jpg"}]}) == "commons"
+    assert source({"imagerepository": "wikimediacommons", "imageinfo": [{}]}) == "commons"
+    assert source({"imagerepository": "enwiki", "imageinfo": [
+        {"descriptionurl": "https://en.wikipedia.org/wiki/File:X.jpg"}]}) == "other"
+    assert source({"imagerepository": "local", "imageinfo": [{}]}) == "other"
+    assert source({"missing": True, "imagerepository": ""}) is None
+
+
+def test_render_parses_with_pst():
+    s = Recorder({"parse": {"text": "<p>x</p>"}})
+    assert WikiClient("en", session=s).render("T", "{{X}}") == "<p>x</p>"
+    params = s.calls[-1][1]
+    assert (params["action"], params["title"], params["text"], params["pst"]) == ("parse", "T", "{{X}}", "1")

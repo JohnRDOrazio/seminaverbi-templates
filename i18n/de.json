@@ -41,6 +41,7 @@
   "managed_notice": "Diese Seite wird in git verwaltet und von der Synchronisierung überschrieben: Bearbeite sie unter $1.",
   "quote_missing_text": "SV Zitat: Der Parameter text fehlt.",
   "references_heading": "Einzelnachweise",
+  "switch_summary": "Wechsel zur SV-Infobox; Daten im Datenobjekt",
   "tracking_category_text": "Wartungskategorie: Die SV-Vorlagen fügen hier eine Seite ein, wenn ihr Wikibase-Datenobjekt oder ihre Infobox korrigiert werden muss. Nach der Korrektur des Objekts oder der Seite verlässt sie die Kategorie.",
   "wip_category": "SV-Artikel in Arbeit",
   "wip_notice": "Dieser Artikel ist in Arbeit ($1, $2)."

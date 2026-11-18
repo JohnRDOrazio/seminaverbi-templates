@@ -41,6 +41,7 @@
   "managed_notice": "Questa pagina è gestita in git e sovrascritta dalla sincronizzazione: modificala su $1.",
   "quote_missing_text": "SV citazione: manca il parametro text.",
   "references_heading": "Note",
+  "switch_summary": "Passa all'infobox SV; dati sull'elemento",
   "tracking_category_text": "Categoria di servizio: i template SV vi inseriscono una pagina quando il suo elemento Wikibase o il suo infobox va corretto. Corretto l'elemento o la pagina, la pagina esce dalla categoria.",
   "wip_category": "Voci SV in lavorazione",
   "wip_notice": "Questa voce è in lavorazione ($1, $2)."

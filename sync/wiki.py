@@ -325,6 +325,30 @@ class WikiClient:
         if not data.get("success"):
             raise SyncError(f"{self.lang}: adding {prop} to {item} failed: {data}")
 
+    def entity(self, item: str) -> dict:
+        """The item's claims and labels (wbgetentities)."""
+        entities = self._dig(self._call("GET", action="wbgetentities", ids=item, props="claims|labels"), "entities")
+        return self._dig(entities, item)
+
+    def image_source(self, name: str) -> str | None:
+        """Where the file this wiki shows as File:`name` lives: "commons" (Wikimedia Commons, also when a
+        foreign wiki's repository passes it on), "other" (local, en/it Wikipedia), or None (no such file)."""
+        data = self._call("GET", action="query", prop="imageinfo", titles=f"File:{name}", iiprop="url")
+        page = self._dig(data, "query", "pages", 0)
+        repository = page.get("imagerepository")
+        if not repository:
+            return None
+        description = (page.get("imageinfo") or [{}])[0].get("descriptionurl", "")
+        if repository in ("shared", "wikimediacommons") or "//commons.wikimedia.org/" in description:
+            return "commons"
+        return "other"
+
+    def render(self, title: str, text: str) -> str:
+        """The HTML `text` gives as page `title` (action=parse, pre-save transform applied), without saving."""
+        data = self._call("POST", action="parse", title=title, text=text, prop="text", pst="1",
+                          contentmodel="wikitext", disablelimitreport="1")
+        return self._dig(data, "parse", "text")
+
     def revision(self, title: str) -> tuple[int, str] | None:
         """(latest revid, wikitext) of `title`, or None when the page does not exist."""
         data = self._call("GET", action="query", prop="revisions", titles=title, rvprop="ids|content",

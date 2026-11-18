@@ -394,8 +394,6 @@
     "PreData": "note",
     "PreAttività": "rest",
     "FineIncipit": "rest",
-    "Didascalia": "note",
-    "Didascalia2": "note",
     "Titolo": "note",
     "Pseudonimo": "note"
    },
@@ -407,7 +405,9 @@
     "Punto": "formatting flag",
     "DimImmagine": "image size, presentation only",
     "CognomePrima": "name-order flag",
-    "Debug": "module debug flag"
+    "Debug": "module debug flag",
+    "Didascalia": "image caption, not part of the sentence (SV infobox shows no caption)",
+    "Didascalia2": "box under the image (awards), not part of the sentence"
    }
   }
  }

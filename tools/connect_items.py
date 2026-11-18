@@ -42,6 +42,7 @@ import mwparserfromhell
 from sync.pages import LANGS
 from sync.wiki import SyncError, WikiClient
 from sync.wikidata import WikidataClient
+from tools.imports import WIKIPEDIA, import_command, local_copy as _local_copy, page_key, parse_import_log
 
 ROOT = Path(__file__).resolve().parent.parent
 TAG = "seminaverbi-mcp"
@@ -49,7 +50,6 @@ TAG = "seminaverbi-mcp"
 SUMMARY = json.loads((ROOT / "i18n" / "en.json").read_text(encoding="utf-8"))["connect_summary"]
 MAIN_PAGE_ITEM = "Q4"
 DEFAULT_MAIN_PAGE = "Main Page"  # MediaWiki's default, left over on wikis whose main page is localized
-WIKIPEDIA = [f"{lang}wiki" for lang in LANGS]
 
 COMMENT = re.compile(r"<!--.*?(?:-->|\Z)", re.S)
 # itwiki's {{Album}} also boxes singles: |tipo = Singolo makes the page a song
@@ -61,8 +61,6 @@ INTERLANGUAGE = re.compile(r"^(%s)\s*:\s*(.+)$" % "|".join(LANGS))
 SUMMARY_REF = re.compile(r"(?<![\w:])(?:\[\[\s*:?\s*)?(?:wikipedia|w)\s*:\s*(?:(%s)\s*:\s*)?"
                          r"([^\[\]|#\n]+?)\s*(?:\|[^\]]*)?(?:\]\]|$)" % "|".join(LANGS), re.I)
 QID = re.compile(r"^Q\d+$")
-IMPORTED = re.compile(r"^IMPORT (Q\d+) = (Q\d+) \((?:mapped|created)\)\s*$", re.M)
-IMPORT_FAILED = re.compile(r"^IMPORT (Q\d+) FAILED (.*?)\s*$", re.M)
 
 
 class Article(NamedTuple):
@@ -212,17 +210,6 @@ def known(repo, wikidata, items: list) -> dict:
     return out
 
 
-def _local_copy(repo, entity: dict) -> str | None:
-    """The local item mirroring a Wikidata item: the one carrying one of its Wikipedia sitelinks."""
-    for site in WIKIPEDIA:
-        title = entity.get("sitelinks", {}).get(site, {}).get("title")
-        if title:
-            found = repo.items_for(site, [title])
-            if found.get(title):
-                return found[title]
-    return None
-
-
 def plan(articles: list, repo, wikidata, existing: dict, conf: dict | None = None, forced: dict | None = None,
          create=None) -> list[Connect]:
     conf = conf or load_config()
@@ -346,17 +333,6 @@ def _one_page_per_item(rows: list) -> list:
     return out
 
 
-def parse_import_log(text: str) -> tuple[dict, dict]:
-    """EnrichItems --import output -> ({wd: local}, {wd: failure reason})."""
-    return ({m.group(1): m.group(2) for m in IMPORTED.finditer(text)},
-            {m.group(1): m.group(2) for m in IMPORT_FAILED.finditer(text)})
-
-
-def import_command(wds: list, tools_dir: str) -> str:
-    return (f"php maintenance/run.php {tools_dir}/EnrichItems.php --wiki=en "
-            + " ".join(f"--import {q}" for q in wds))
-
-
 def _line(r: Connect) -> str:
     parts = [f"{r.lang}:{r.title}: {r.action}"]
     if r.wd:
@@ -476,17 +452,7 @@ def decisions(specs: list, articles: list, kind: str) -> dict:
             qid = qid.strip()
             if not sep or not key or not qid:
                 raise ValueError(f"expected TITLE=description (the new item's description), got {spec!r}")
-        lang, sep, title = key.partition(":")
-        if sep and lang in LANGS:
-            if (lang, title) not in unconnected:
-                raise ValueError(f"{key!r} is not an unconnected article")
-        else:
-            langs = [lang for lang, t in sorted(unconnected) if t == key]
-            if not langs:
-                raise ValueError(f"{key!r} is not an unconnected article")
-            if len(langs) > 1:
-                raise ValueError(f"{key!r} is unconnected on both {' and '.join(langs)}; write it as LANG:TITLE")
-            lang, title = langs[0], key
+        lang, title = page_key(key, unconnected, "an unconnected article")
         out[lang, title] = qid
     return out
 
