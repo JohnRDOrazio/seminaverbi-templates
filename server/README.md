@@ -34,6 +34,13 @@ lines and growth under 1 MB). Output lines: `IMPORT <wd> = <local> (mapped|creat
 `IMPORT <wd> = (would create)` on a dry run, `IMPORT <wd> FAILED <reason>`. With `--follow` on a dry
 run, targets that are not mapped yet are not listed.
 
+`--dry-run` with `--import` writes nothing: an ID that is already mapped prints `(mapped)`; one that is
+not prints `(would create)`, and, as nothing is created, a not-yet-mapped item is not enriched either
+(it has no local ID), so the later enrichment shows only the already-mapped imports. Every `--import`,
+`--item` and `--follow` ID is validated first, dry run or not: any invalid one (case is normalised, so
+`q5` is `Q5`) stops the run before anything is written, after printing `IMPORT <id> FAILED invalid ID`
+(the echoed text is sanitised and capped at 40 characters).
+
 `properties.txt` lists Wikidata property IDs; each is mapped to the local property through
 WikibaseImport's mapping table.
 

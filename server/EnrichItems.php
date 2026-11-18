@@ -74,7 +74,9 @@ class EnrichItems extends Maintenance {
 
 		/** @var array<string, true> items left incomplete or unsaved, reported once all items have run */
 		$failed = [];
-		$imported = $this->runImports( $failed );
+		// Every ID given on the command line is checked before the first write.
+		$importIds = $this->validateArguments( $failed );
+		$imported = $this->runImports( $importIds, $failed );
 		foreach ( $this->localItems( $imported ) as $localSerialization ) {
 			$localId = new ItemId( $localSerialization );
 			$wdSerialization = $this->originalId( $localSerialization );
@@ -240,24 +242,65 @@ class EnrichItems extends Maintenance {
 		return $local;
 	}
 
+	/** An untrusted CLI string made safe to echo: printable ASCII only, at most 40 characters. */
+	private function sanitize( string $raw ): string {
+		$clean = preg_replace( '/[^\x20-\x7E]/', '?', $raw );
+		return strlen( $clean ) > 40 ? substr( $clean, 0, 40 ) . '...' : $clean;
+	}
+
+	/**
+	 * Validates --import, --item and --follow before anything is written. Invalid --import IDs get their
+	 * parseable FAILED line; any invalid ID at all stops the run.
+	 * @param array<string, true> &$failed receives invalid --import IDs
+	 * @return string[] the valid --import IDs, upper-cased and without duplicates
+	 */
+	private function validateArguments( array &$failed ): array {
+		$valid = [];
+		$bad = [];
+		// Case is normalised first, so "q5" and "Q5" are one ID.
+		$ids = array_unique( array_map( static fn ( $id ) => strtoupper( trim( (string)$id ) ),
+			(array)$this->getOption( 'import', [] ) ) );
+		foreach ( $ids as $wd ) {
+			if ( preg_match( '/^[QP][1-9]\d*$/', $wd ) ) {
+				$valid[] = $wd;
+			} else {
+				$shown = $this->sanitize( $wd );
+				$this->output( "IMPORT $shown FAILED invalid ID\n" );
+				$failed[$shown] = true;
+				$bad[] = $shown;
+			}
+		}
+		foreach ( (array)$this->getOption( 'item', [] ) as $item ) {
+			if ( !preg_match( '/^Q[1-9]\d*$/', strtoupper( trim( (string)$item ) ) ) ) {
+				$bad[] = $this->sanitize( (string)$item );
+				$this->output( '--item: invalid item ID ' . $this->sanitize( (string)$item ) . "\n" );
+			}
+		}
+		$follow = $this->getOption( 'follow' );
+		if ( $follow ) {
+			foreach ( array_filter( array_map( 'trim', explode( ',', $follow ) ) ) as $prop ) {
+				if ( !preg_match( '/^P[1-9]\d*$/', $prop ) ) {
+					$bad[] = $this->sanitize( $prop );
+					$this->output( '--follow: invalid property ID ' . $this->sanitize( $prop ) . "\n" );
+				}
+			}
+		}
+		if ( $bad ) {
+			$this->fatalError( 'invalid ID(s) given, nothing was written: ' . implode( ', ', $bad ) );
+		}
+		return $valid;
+	}
+
 	/**
 	 * Handles --import; prints one IMPORT line per ID.
+	 * @param string[] $ids validated IDs from validateArguments()
 	 * @param array<string, true> &$failed receives IDs that failed
 	 * @return string[] local item IDs (mapped or created), to be enriched
 	 */
-	private function runImports( array &$failed ): array {
+	private function runImports( array $ids, array &$failed ): array {
 		$items = [];
-		foreach ( array_unique( (array)$this->getOption( 'import', [] ) ) as $wd ) {
-			$wd = strtoupper( trim( $wd ) );
-			if ( preg_match( '/^Q[1-9]\d*$/', $wd ) ) {
-				$wdId = new ItemId( $wd );
-			} elseif ( preg_match( '/^P[1-9]\d*$/', $wd ) ) {
-				$wdId = new NumericPropertyId( $wd );
-			} else {
-				$this->output( "IMPORT $wd FAILED invalid ID\n" );
-				$failed[$wd] = true;
-				continue;
-			}
+		foreach ( $ids as $wd ) {
+			$wdId = $wd[0] === 'Q' ? new ItemId( $wd ) : new NumericPropertyId( $wd );
 			$local = $this->localId( $wd );
 			if ( $local ) {
 				$this->output( "IMPORT $wd = $local (mapped)\n" );
@@ -339,12 +382,7 @@ class EnrichItems extends Maintenance {
 		$items = array_values( array_unique( $items ) );
 		$follow = $this->getOption( 'follow' );
 		if ( $follow ) {
-			$props = array_filter( array_map( 'trim', explode( ',', $follow ) ) );
-			foreach ( $props as $prop ) {
-				if ( !preg_match( '/^P[1-9]\d*$/', $prop ) ) {
-					$this->fatalError( "--follow: invalid property ID $prop" );
-				}
-			}
+			$props = array_filter( array_map( 'trim', explode( ',', $follow ) ) ); // validated up front
 			foreach ( $items as $localSerialization ) {
 				$wd = $this->originalId( $localSerialization );
 				$remote = $wd ? $this->remote( $wd ) : null;
