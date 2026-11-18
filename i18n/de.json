@@ -13,6 +13,7 @@
   "bio_paren_died": "(† $1)",
   "bio_paren_span": "(* $1; † $2)",
   "bio_place_date": "$2 in $1",
+  "bio_place_only": "in $1",
   "category_not_on_wiki": "SV-Artikel mit einer Kategorie, die in diesem Wiki fehlt",
   "category_not_tree": "SV-Artikel in einer Kategorie außerhalb des Baums",
   "category_two_fields": "SV-Artikel mit mehr als einem Fachgebiet",

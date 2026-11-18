@@ -13,6 +13,7 @@
   "bio_paren_died": "(? – $1)",
   "bio_paren_span": "($1 – $2)",
   "bio_place_date": "$1, $2",
+  "bio_place_only": "$1",
   "category_not_on_wiki": "Artículos SV con una categoría que falta en esta wiki",
   "category_not_tree": "Artículos SV archivados en una categoría fuera del árbol",
   "category_two_fields": "Artículos SV con más de un campo",

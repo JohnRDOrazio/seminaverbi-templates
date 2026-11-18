@@ -37,7 +37,10 @@ local function lifeEnd(entity, wb, placeKey, dateKey, lang)
 	if place and date then
 		return Util.msg('bio_place_date', lang, place, date)
 	end
-	return place or date
+	if place then
+		return Util.msg('bio_place_only', lang, place)
+	end
+	return date
 end
 
 local function endsWith(s, suffix)

@@ -176,6 +176,18 @@ def test_missing_birth_data():
     assert bio("en", entities=with_nek(P4712=None, P818=None)) == "Nek is an Italian singer-songwriter"
 
 
+def test_birth_place_only_reads_naturally_in_each_language():
+    expected = {
+        "en": "Nek (born in Sassuolo) is an Italian singer-songwriter",
+        "de": "Nek (* in Sassuolo) ist ein italienischer Liedermacher",
+        "es": "Nek (Sassuolo) es un cantautor italiano",
+        "fr": "Nek (Sassuolo) est un auteur-compositeur-interprète italien",
+        "pt": "Nek (Sassuolo) é um cantautor italiano",
+    }
+    for lang, text in expected.items():
+        assert bio(lang, entities=with_nek(P4712=None)) == text
+
+
 def test_birth_place_only_or_date_only():
     assert bio(entities=with_nek(P4712=None)) == "Nek (Sassuolo) è un cantautore italiano"
     assert bio("en", entities=with_nek(P818=None)) == "Nek (born 6 January 1972) is an Italian singer-songwriter"

@@ -13,6 +13,7 @@
   "bio_paren_died": "(? – $1)",
   "bio_paren_span": "($1 – $2)",
   "bio_place_date": "$1, $2",
+  "bio_place_only": "$1",
   "category_not_on_wiki": "Voci SV con una categoria mancante su questa wiki",
   "category_not_tree": "Voci SV archiviate in una categoria fuori dall'albero",
   "category_two_fields": "Voci SV con più di un campo",
