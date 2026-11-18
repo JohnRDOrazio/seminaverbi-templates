@@ -28,8 +28,10 @@ the page had by hand.
 | en: Daredevil (TV series) | Old `{{Bible quote}}` template (and "Marc 8:27-28" for Mark); Wikipedia leftovers (short description, Reflist, navboxes): 2 citation errors, ~570 red links | convert to SV Bible quote; strip the leftovers | open |
 | it: Daredevil | The Cantalamessa quote alludes to Mt 5:45, Mk 1:11, Rom 8:15 / Gal 4:6 without Bible quote templates | quote them | open |
 | en, it: Fringe | Episode numbers outside the repentance section are off ("Peter" S2E15 → S2E16, "Brown Betty", the "Over There" parts, it "6:02 AM EST") | check against the episode list and correct | open |
-| it: Il Signore degli Anelli (Q4178) | No Gospel themes filed; Jev rates 17 as argued (temptation, mercy, grace, forgiveness, Mary, redemption, hope, Eucharist, resurrection…) | author chooses the themes to file | open |
-| it: Il Signore degli Anelli | Letter 181 (Lord's Prayer) and Letter 246 ("purgatory and reward") taken from secondary summaries; own Italian translations of the letters | check against the Bompiani edition | open |
-| en: The Lord of the Rings | Still holds the same pasted Italian interview | rewrite as it was done on it | open |
-| it: Bob Dylan (Q7056) | No Gospel themes filed; faith, conversion, redemption, prayer, justice are argued in the text | author chooses the themes to file | open |
+| it: Il Signore degli Anelli (Q4178) | No Gospel themes filed; Jev rates 17 as argued | filed Jev's 17 "applied" themes (author: trust Jev); faith, sacrifice, freedom, community strengthened in the text | done (2026-11-18) |
+| it, en: Il Signore degli Anelli / The Lord of the Rings | Letters 43, 142, 181, 210, 213, 246, 320 checked online (Tolkien Estate, secondary quotations of the 2023 edition); 246's "purgatory and reward" confirmed verbatim; one unsupported claim removed | done (it rev 11174) |
+| it, en: Il Signore degli Anelli / The Lord of the Rings | Still to check in the printed *Letters*: the Lord's Prayer wording in 181; whether the printed draft of 246 has the purgatory sentence; Letter 191 (new) rests on secondary excerpts; prophet/priest/king paragraph needs a source; 1926/1931 dates for Tolkien and Lewis | check against the printed edition | open |
+| en: The Lord of the Rings | Still held the pasted Italian interview | translated from the corrected it article; all 17 themes argued | done (en rev 30331) |
+| it: Bob Dylan (Q7056) | No Gospel themes filed | filed Jev's 6 "applied" themes: faith, conversion, redemption, prayer, justice, prudence | done (2026-11-18) |
+| it: Bob Dylan (Q7056) | prudence: filed (Jev 0.81) but only touched in the discernment section | enrich: argue prudence with concrete moments; else remove | open |
 | it: Bob Dylan | The 1979 baptism rests on Ravasi alone; the 1997 New York Times quote is via Ventura (unchecked) | find a second source or soften | open |
