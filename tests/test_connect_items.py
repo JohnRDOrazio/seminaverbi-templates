@@ -486,3 +486,25 @@ def test_local_copy_whose_other_sitelink_moved_is_flagged_not_trusted():
     assert row.action == "author" and row.wd == "Q2"
     assert "Q47700" in row.reason and "itwiki:Fu" in row.reason and "Q1" in row.reason
     assert repo.calls == []
+
+
+def test_kinds_are_the_narrow_classes_not_bread_or_franchise_in_general():
+    kinds = ci.load_config()["kinds"]
+    assert "Q7802" not in kinds["work"] and "Q196600" not in kinds["film"]  # bread / media franchise at large
+    assert {"Q267726", "Q163886"} <= set(kinds["work"]) and "Q13014087" in kinds["film"]
+    assert ci.passes(ent("Q267726"), "Q267726", kinds["work"])  # Easter bread itself
+    assert ci.passes(ent("Q13014087", p31=["Q196600"]), "Q13014087", kinds["film"])  # the Matrix franchise itself
+    assert not ci.passes(ent("Q9", p279=["Q7802"]), "Q9", kinds["work"])  # some other bread
+    assert not ci.passes(ent("Q8", p31=["Q196600"]), "Q8", kinds["film"])  # some other franchise
+
+
+def test_group_kind_filters_a_group_layout_page():
+    conf = {"templates": {"en": {"Infobox band": {"layout": "group"}}}, "bio": {}, "exclude": {},
+            "kinds": ci.load_config()["kinds"]}
+    wd = Wikidata(links={("enwiki", "The Beatles"): "Q1299", ("enwiki", "Beatles Fan Club"): "Q2"},
+                  entities={"Q1299": ent("Q1299", p31=["Q215380"]), "Q2": ent("Q2", p31=["Q5"])})
+    box = "{{Infobox band\n| name = X\n}}"
+    rows = by_title(plan([Article("en", "The Beatles", box), Article("en", "Beatles Fan Club", box)], Repo(), wd,
+                         conf=conf))
+    assert (rows["The Beatles"].action, rows["The Beatles"].wd) == ("import", "Q1299")
+    assert rows["Beatles Fan Club"].action == "author"  # a person is not a group

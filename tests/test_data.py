@@ -133,4 +133,4 @@ def test_import_helpers_and_kinds():
 def test_import_kinds_easter_and_matrix():
     kinds = json.loads((ROOT / "config" / "infobox_import.json").read_text(encoding="utf-8"))["kinds"]
     assert {"Q163886", "Q267726"} <= set(kinds["work"])
-    assert {"Q196600", "Q13014087"} <= set(kinds["film"])
+    assert "Q13014087" in kinds["film"] and "Q196600" not in kinds["film"]
