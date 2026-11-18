@@ -455,3 +455,49 @@ def test_bio_nationality_with_live_italy_values():
     assert bio("fr", entities=ents) == "Nek (Sassuolo, 6 janvier 1972) est un auteur-compositeur-interprète italien"
     assert bio("en", entities=ents) == "Nek (born 6 January 1972 in Sassuolo) is an Italian singer-songwriter"
     assert bio("de", entities=ents) == "Nek (* 6. Januar 1972 in Sassuolo) ist ein Liedermacher"
+
+
+def test_it_dead_unknown_gender_takes_masculine_copula():
+    # no gender statement: Italian's masculine default, "è stato" (never "è stata")
+    claims = {k: v for k, v in BASE[BOWIE]["claims"].items() if k != "P1018"}
+    ents = dict(BASE, **{BOWIE: dict(BASE[BOWIE], claims=claims)})
+    assert bio(page_entity=BOWIE, entities=ents) == \
+        "David Bowie (Londra, 8 gennaio 1947 – New York, 10 gennaio 2016) è stato cantautore britannico"
+
+
+def test_rest_without_occupation():
+    # nothing to predicate: rest follows the parenthesis directly
+    assert bio(entities=with_nek(P63=None), rest="è un cantante") == "Nek (Sassuolo, 6 gennaio 1972) è un cantante"
+    assert bio(entities=with_nek(P63=None), rest=", noto come Nek", ref="<ref>x</ref>") == \
+        "Nek (Sassuolo, 6 gennaio 1972), noto come Nek<ref>x</ref>"
+    assert bio(entities={NEK: {"id": NEK, "labels": {"it": "Nek"}, "claims": {}}}, rest="è un cantante") == "Nek è un cantante"
+
+
+# --- citizenship by rank ---
+
+FRANCE = "Q32"
+
+
+def with_citizenships(*statements):
+    ents = with_nek(P1617=list(statements))
+    ents[FRANCE] = {"labels": {"it": "Francia"}, "claims": {"P489": [mono("francese", "it")]}}
+    return ents
+
+
+def test_citizenship_preferred_rank_wins_over_order():
+    ents = with_citizenships(item(ITALY), item(FRANCE, "preferred"))
+    assert bio(entities=ents) == "Nek (Sassuolo, 6 gennaio 1972) è un cantautore francese"
+
+
+def test_citizenship_deprecated_is_skipped():
+    ents = with_citizenships(item(FRANCE, "deprecated"), item(ITALY))
+    assert bio(entities=ents) == "Nek (Sassuolo, 6 gennaio 1972) è un cantautore italiano"
+    assert bio(entities=with_citizenships(item(FRANCE, "deprecated"))) == \
+        "Nek (Sassuolo, 6 gennaio 1972) è un cantautore"
+
+
+def test_citizenship_first_of_several_best_rank():
+    ents = with_citizenships(item(ITALY, "deprecated"), item(FRANCE, "preferred"), item(ITALY, "preferred"))
+    assert bio(entities=ents) == "Nek (Sassuolo, 6 gennaio 1972) è un cantautore francese"
+    ents = with_citizenships(item(FRANCE), item(ITALY))
+    assert bio(entities=ents) == "Nek (Sassuolo, 6 gennaio 1972) è un cantautore francese"
