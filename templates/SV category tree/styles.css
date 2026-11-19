@@ -1,8 +1,8 @@
 /* {{SV category tree}}: one card per top-level field, then the Gospel themes as chips.
    TemplateStyles on the farm rejects var(), so colours are plain values, with a dark palette for the
-   skins' night mode (html.skin-theme-clientpref-night, or -os with a dark system preference). */
+   skins' night mode (html.skin-theme-clientpref-night, or -os with a dark system preference).
    The cards, chips and badges carry .notheme: the main page's night-mode rule resets every other
-   element's background. The night border colours leave border-top alone so the accents stay.
+   element's background. The night border colours leave border-top alone so the accents stay. */
 .sv-cattree {
 	margin: 1em 0;
 }
