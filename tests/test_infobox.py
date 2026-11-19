@@ -481,6 +481,7 @@ def test_a_composition_has_its_own_layout_with_the_composer():
     ("Q48444", "work"),         # Christmas tradition (Christmas tree)
     ("Q47641", "work"),         # fictional extraterrestrial species (New Gods)
     ("Q9210", "work"),          # fictional humanoid species (New Gods)
+    ("Q6116", "work"),          # tradition (Easter bread)
 ])
 def test_auto_maps_the_types_of_existing_articles(instance_of, layout):
     out = auto([instance_of])
