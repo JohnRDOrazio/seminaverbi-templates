@@ -85,7 +85,9 @@ article's final wikitext saved to a temporary file:
    (≥ 0.75, `applied`) that the text does not yet argue, take it as a sign the work touches it:
    research the work (its text, lyrics, scenes, sources) and, where the relationship is real, write it
    into the article with its scenes and Bible quotes, then file the theme. When research finds no clear
-   relationship, leave the theme off and tell the author why.
+   relationship, leave the theme off and tell the author why. A theme statement files every page linked
+   to the item, in every language: before adding one, check that each linked page argues it too, and
+   enrich the pages that do not (or leave the theme off and tell the author).
 3. **Tree questions** (a new node, or where an existing one belongs):
    `.venv/bin/python -m tools.jev place <node-key> <candidate-parent-key>... --record`. The answer is
    logged in `config/category_decisions.json`; an `author` outcome goes to the author, whose ruling is
