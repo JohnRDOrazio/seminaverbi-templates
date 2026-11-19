@@ -87,8 +87,10 @@ article's final wikitext saved to a temporary file:
    into the article with its scenes and Bible quotes, then file the theme. When research finds no clear
    relationship, leave the theme off and tell the author why. A theme statement files every SeminaVerbi
    page that shows the item: the pages linked to it on the six SeminaVerbi sites (`en it es fr de pt`;
-   Wikipedia sitelinks such as `enwiki` get no SV category), and any page that calls `{{SV infobox}}`
-   or `{{SV categories}}` with `item=` that item (search each wiki for `insource:"item=Q…"`). Before
+   Wikipedia sitelinks such as `enwiki` get no SV category) that call `{{SV infobox}}` or
+   `{{SV categories}}` without `item=` (a linked page whose only call has `item=` another item shows
+   that item instead, and is not one of them), and any page that calls either template with `item=`
+   that item (search each wiki for `insource:"item=Q…"`). Before
    adding a theme, check that each of those pages argues it too, and enrich the pages that do not (or
    leave the theme off and tell the author).
 3. **Tree questions** (a new node, or where an existing one belongs):
