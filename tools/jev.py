@@ -3,6 +3,7 @@
     python -m tools.jev place <node-key> <candidate-key>... [--record]
     python -m tools.jev classify <article-text-file>
     python -m tools.jev themes <article-text-file>
+    python -m tools.jev type <article-text-file> [--candidate QID]...
 
 Jev answers typed questions with calibrated probabilities; the policy below decides in code whether an
 answer is applied or goes to the author. The API key comes only from TYPESAFE_API_KEY and is never printed.
@@ -136,6 +137,40 @@ def themes(client, text: str, data) -> dict:
     return out
 
 
+NONE = "none"  # the type question's "no offered type fits" option
+
+
+def instance_type(client, text: str, candidates: dict[str, str]) -> Decision:
+    """Which candidate item type (local Wikibase QID -> label) the article's subject is an instance of."""
+    criteria = {qid: {"name": label} for qid, label in candidates.items()}
+    criteria[NONE] = {"name": "none of these types: the subject is a different kind of thing"}
+    q = Choice(instructions="`article` is about one subject. Of the item types offered, which one is the subject "
+                            "an instance of: what kind of thing is it? Judge the subject itself, not its themes. "
+                            "If no offered type fits, choose `none`.",
+               criteria=criteria)
+    a = client.system_one(state={"article": text}, questions={"type": q}, model=MODEL).choices["type"]
+    p = a.probabilities[a.choice]
+    applied = a.choice != NONE and confident(p, a.confidence)
+    return Decision("type", None, criteria, dict(a.probabilities), a.confidence, a.choice,
+                    "applied" if applied else "author")
+
+
+def type_candidates() -> list[str]:
+    """The item types the infobox has a layout for (config/infobox_types.json)."""
+    return list(json.loads((ROOT / "config" / "infobox_types.json").read_text(encoding="utf-8"))["types"])
+
+
+def item_labels(qids: list[str]) -> dict[str, str]:
+    """English labels of local Wikibase items, read from the en wiki."""
+    from sync.wiki import WikiClient
+    client = WikiClient("en")
+    out = {}
+    for q in qids:
+        labels = client.entity(q).get("labels", {})
+        out[q] = (labels.get("en") or {}).get("value", q)
+    return out
+
+
 def record(decision: Decision, path: Path = LOG) -> dict:
     return record_all([decision], path)[0]
 
@@ -164,7 +199,7 @@ def _print_decision(d: Decision) -> None:
     print(f"{d.question} {d.node or ''}: {d.choice} ({d.outcome}; confidence {d.confidence:.2f}; {probs})")
 
 
-def main(argv=None, client=None, data=None) -> int:
+def main(argv=None, client=None, data=None, labels=None) -> int:
     parser = argparse.ArgumentParser(prog="python -m tools.jev")
     sub = parser.add_subparsers(dest="command", required=True)
     p = sub.add_parser("place")
@@ -175,6 +210,11 @@ def main(argv=None, client=None, data=None) -> int:
         sp = sub.add_parser(name)
         sp.add_argument("file")
         sp.add_argument("--record", action="store_true")
+    tp = sub.add_parser("type")
+    tp.add_argument("file")
+    tp.add_argument("--candidate", action="append", help="a local item QID (repeatable); default: every type "
+                                                         "config/infobox_types.json maps to a layout")
+    tp.add_argument("--record", action="store_true")
     args = parser.parse_args(argv)
     data = data or load(ROOT)
     by_key = {n.key: n for n in nodes(data)}
@@ -188,6 +228,12 @@ def main(argv=None, client=None, data=None) -> int:
             _print_decision(d)
             if args.record:
                 print(f"recorded {record(d)['id']}")
+        elif args.command == "type":
+            qids = args.candidate or type_candidates()
+            d = instance_type(client, Path(args.file).read_text(encoding="utf-8"), (labels or item_labels)(qids))
+            _print_decision(d)
+            if args.record:
+                print(f"recorded {record(d._replace(node=Path(args.file).stem), LOG)['id']}")
         elif args.command == "classify":
             d = classify(client, Path(args.file).read_text(encoding="utf-8"), data)
             _print_decision(d)

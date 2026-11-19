@@ -93,7 +93,14 @@ article's final wikitext saved to a temporary file:
    that item (search each wiki for `insource:"item=Q…"`). Before
    adding a theme, check that each of those pages argues it too, and enrich the pages that do not (or
    leave the theme off and tell the author).
-3. **Tree questions** (a new node, or where an existing one belongs):
+3. **Item type** (an item with no "instance of"):
+   `.venv/bin/python -m tools.jev type <file>` picks among the types `config/infobox_types.json` maps to
+   a layout (`--candidate QID`, repeatable, to offer others). `applied` (probability ≥ 0.80, confidence
+   ≥ 0.60): add the "instance of" statement (P2016) on the item. `author`: show the author the choice and
+   probabilities (including `none`: no offered type fits, so the author decides). An item that already
+   has an "instance of" (even one with no infobox layout) is never retyped automatically: run the
+   question if useful, and ask the author before adding or changing a type. A type with no layout yet needs a PR to `config/infobox_types.json`.
+4. **Tree questions** (a new node, or where an existing one belongs):
    `.venv/bin/python -m tools.jev place <node-key> <candidate-parent-key>... --record`. The answer is
    logged in `config/category_decisions.json`; an `author` outcome goes to the author, whose ruling is
    recorded next to Jev's (`author_choice`). The tree changes only through a PR to `categories.json`.
@@ -129,7 +136,8 @@ ask the author instead of guessing.
 - **People:** open the article with `{{SV bio}}` on every wiki. It writes the opening sentence from the
   item in the wiki's language and adds no categories (parameters in `templates.md`). It replaces
   it.wiki's `{{Bio}}`.
-- On items, change only sitelinks, labels, descriptions, `SV field` and `SV Gospel theme`, unless the
+- On items, change only sitelinks, labels, descriptions, `SV field`, `SV Gospel theme` and a missing
+  "instance of" (with the Jev routine above), unless the
   author asks in this session for another statement change: other statements feed the infoboxes and are
   filled from Wikidata by `EnrichItems.php`.
 

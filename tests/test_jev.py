@@ -220,3 +220,43 @@ def test_cli_themes_record_outcome_from_the_answers(monkeypatch, tmp_path):
     first, second = json.loads(log.read_text())
     assert first["outcome"] == "author" and first["choice"] == "" and first["confidence"] is None
     assert second["outcome"] == "no"
+
+
+# --- type: which item type (instance of) the article's subject is ---
+
+TYPES = {"Q13367": "film", "Q48444": "Christmas tradition", "Q48432": "musical work/composition"}
+
+
+def test_type_offers_the_candidate_items_by_label():
+    fake = FakeJev({"type": choice({"Q13367": 0.05, "Q48444": 0.9, "Q48432": 0.05}, 0.8)})
+    d = jev.instance_type(fake, "Easter bread is baked for Easter.", TYPES)
+    q = fake.calls[0]["questions"]["type"]
+    assert set(q.criteria) == set(TYPES) | {"none"}
+    assert q.criteria["Q48444"]["name"] == "Christmas tradition"
+    assert fake.calls[0]["state"]["article"] == "Easter bread is baked for Easter."
+    assert (d.question, d.choice, d.outcome) == ("type", "Q48444", "applied")
+
+
+@pytest.mark.parametrize("p, conf, outcome", [(0.85, 0.7, "applied"), (0.85, 0.5, "author"), (0.7, 0.9, "author")])
+def test_type_policy_applied_vs_author(p, conf, outcome):
+    rest = round((1 - p) / 2, 3)
+    fake = FakeJev({"type": choice({"Q13367": p, "Q48444": rest, "Q48432": rest}, conf)})
+    assert jev.instance_type(fake, "text", TYPES).outcome == outcome
+
+
+def test_type_cli_uses_the_given_candidates_and_their_labels(tmp_path, capsys):
+    f = tmp_path / "a.wiki"
+    f.write_text("A film.", encoding="utf-8")
+    fake = FakeJev({"type": choice({"Q13367": 0.95, "Q48444": 0.05}, 0.9)})
+    rc = jev.main(["type", str(f), "--candidate", "Q13367", "--candidate", "Q48444"], client=fake, data=DATA,
+                  labels=lambda qids: {q: TYPES[q] for q in qids})
+    assert rc == 0
+    assert set(fake.calls[0]["questions"]["type"].criteria) == {"Q13367", "Q48444", "none"}
+    assert "type : Q13367 (applied" in capsys.readouterr().out
+
+
+def test_type_offers_none_of_these_and_sends_it_to_the_author():
+    fake = FakeJev({"type": choice({"Q13367": 0.02, "Q48444": 0.02, "Q48432": 0.01, "none": 0.95}, 0.9)})
+    d = jev.instance_type(fake, "A recipe blog post.", TYPES)
+    assert "none" in fake.calls[0]["questions"]["type"].criteria
+    assert (d.choice, d.outcome) == ("none", "author")
