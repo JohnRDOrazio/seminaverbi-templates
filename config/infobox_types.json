@@ -11,7 +11,11 @@
     "Q2031": "play",
     "Q2407": "album",
     "Q47692": "work",
-    "Q1025": "work"
+    "Q1025": "work",
+    "Q48432": "composition",
+    "Q48444": "work",
+    "Q47641": "work",
+    "Q9210": "work"
   },
   "fit": {
     "book": ["literature"],
