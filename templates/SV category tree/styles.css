@@ -1,6 +1,8 @@
 /* {{SV category tree}}: one card per top-level field, then the Gospel themes as chips.
    TemplateStyles on the farm rejects var(), so colours are plain values, with a dark palette for the
    skins' night mode (html.skin-theme-clientpref-night, or -os with a dark system preference). */
+   The cards, chips and badges carry .notheme: the main page's night-mode rule resets every other
+   element's background. The night border colours leave border-top alone so the accents stay.
 .sv-cattree {
 	margin: 1em 0;
 }
@@ -121,14 +123,14 @@
 
 /* night mode: Vector 2022 and Minerva */
 @media screen {
-	html.skin-theme-clientpref-night .sv-cattree-card { background-color: #202122; border-color: #54595d; }
+	html.skin-theme-clientpref-night .sv-cattree-card { background-color: #202122; border-right-color: #54595d; border-bottom-color: #54595d; border-left-color: #54595d; }
 	html.skin-theme-clientpref-night .sv-cattree-count { background-color: #404244; color: #c8ccd1; }
 	html.skin-theme-clientpref-night .sv-cattree-empty a { color: #a2a9b1; }
 	html.skin-theme-clientpref-night .sv-cattree-themes-heading { border-top-color: #72777d; }
 	html.skin-theme-clientpref-night .sv-cattree-chip { background-color: #101418; border-color: #54595d; }
 }
 @media screen and ( prefers-color-scheme: dark ) {
-	html.skin-theme-clientpref-os .sv-cattree-card { background-color: #202122; border-color: #54595d; }
+	html.skin-theme-clientpref-os .sv-cattree-card { background-color: #202122; border-right-color: #54595d; border-bottom-color: #54595d; border-left-color: #54595d; }
 	html.skin-theme-clientpref-os .sv-cattree-count { background-color: #404244; color: #c8ccd1; }
 	html.skin-theme-clientpref-os .sv-cattree-empty a { color: #a2a9b1; }
 	html.skin-theme-clientpref-os .sv-cattree-themes-heading { border-top-color: #72777d; }
