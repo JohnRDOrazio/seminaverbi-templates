@@ -81,7 +81,12 @@ article's final wikitext saved to a temporary file:
 2. **Themes:** `.venv/bin/python -m tools.jev themes <file>` gives a probability per leaf theme.
    ≥ 0.75 `applied`: add it. 0.40–0.75 `author`: list them for the author with the probabilities.
    < 0.40: never add it.
-3. **Tree questions** (a new node, or where an existing one belongs):
+3. **Item type** (an item with no "instance of", or one the infobox has no layout for):
+   `.venv/bin/python -m tools.jev type <file>` picks among the types `config/infobox_types.json` maps to
+   a layout (`--candidate QID`, repeatable, to offer others). `applied` (probability ≥ 0.80, confidence
+   ≥ 0.60): add the "instance of" statement (P2016) on the item. `author`: show the author the choice and
+   probabilities. A type with no layout yet needs a PR to `config/infobox_types.json` first.
+4. **Tree questions** (a new node, or where an existing one belongs):
    `.venv/bin/python -m tools.jev place <node-key> <candidate-parent-key>... --record`. The answer is
    logged in `config/category_decisions.json`; an `author` outcome goes to the author, whose ruling is
    recorded next to Jev's (`author_choice`). The tree changes only through a PR to `categories.json`.
@@ -117,7 +122,8 @@ ask the author instead of guessing.
 - **People:** open the article with `{{SV bio}}` on every wiki. It writes the opening sentence from the
   item in the wiki's language and adds no categories (parameters in `templates.md`). It replaces
   it.wiki's `{{Bio}}`.
-- On items, change only sitelinks, labels, descriptions, `SV field` and `SV Gospel theme`, unless the
+- On items, change only sitelinks, labels, descriptions, `SV field`, `SV Gospel theme` and a missing
+  "instance of" (with the Jev routine above), unless the
   author asks in this session for another statement change: other statements feed the infoboxes and are
   filled from Wikidata by `EnrichItems.php`.
 
