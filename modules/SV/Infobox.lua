@@ -80,9 +80,10 @@ end
 local itemIds = Util.itemIds
 
 -- [[Category:…]] for the item's SV field (one) and SV Gospel themes, in the wiki's language; anything
--- unexpected goes to a tracking category instead of being dropped silently.
+-- unexpected goes to a tracking category instead of being dropped silently. Articles only: a sandbox,
+-- template or project page showing an item's infobox would otherwise count in the tree.
 function p._categories(entity, lang, sortkey)
-	if not entity then
+	if not entity or mw.title.getCurrentTitle().namespace ~= 0 then
 		return ''
 	end
 	local data = mw.loadData('Module:SV/Data')
