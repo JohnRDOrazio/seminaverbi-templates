@@ -43,7 +43,7 @@ end
 
 local function count(n)
 	if n and n > 0 then
-		return ' <span class="sv-cattree-count">' .. n .. '</span>'
+		return ' <span class="sv-cattree-count notheme">' .. n .. '</span>'
 	end
 	return ''
 end
@@ -72,7 +72,7 @@ local function render(node, lang, counts, out)
 end
 
 local function card(field, lang, counts, out)
-	out[#out + 1] = '<div class="sv-cattree-card">\n<div class="sv-cattree-card-title">'
+	out[#out + 1] = '<div class="sv-cattree-card notheme">\n<div class="sv-cattree-card-title">'
 		.. link(field.names, lang) .. count(counts[field.key]) .. '</div>\n<div class="sv-cattree-card-body">'
 	for _, child in ipairs(field.children or {}) do
 		render(child, lang, counts, out)
@@ -83,7 +83,7 @@ end
 local function group(node, lang, counts, out)
 	local chips = {}
 	for _, theme in ipairs(node.children or {}) do
-		chips[#chips + 1] = '<span class="sv-cattree-chip">' .. leaf(theme, lang, counts) .. '</span>'
+		chips[#chips + 1] = '<span class="sv-cattree-chip notheme">' .. leaf(theme, lang, counts) .. '</span>'
 	end
 	out[#out + 1] = '<div class="sv-cattree-group">\n<div class="sv-cattree-group-title">' .. link(node.names, lang)
 		.. '</div>\n<div class="sv-cattree-chips">' .. table.concat(chips, ' ') .. '</div>\n</div>'

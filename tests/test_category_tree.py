@@ -75,7 +75,7 @@ def test_tree_theme_groups_hold_their_themes():
     group = DATA["themes"][0]
     start = out.index('<div class="sv-cattree-group-title">' + link(group["names"]["en"]))
     leaf = group["children"][0]["names"]["en"]
-    assert out.index('<span class="sv-cattree-chip">', start) < out.index(link(leaf), start)
+    assert out.index('<span class="sv-cattree-chip notheme">', start) < out.index(link(leaf), start)
 
 
 # --- cards, chips and article counts ---
@@ -95,7 +95,7 @@ def counted(lang="en", counts=None):
 
 def test_each_top_level_field_is_a_card():
     out = tree()
-    assert out.count('<div class="sv-cattree-card">') == len(DATA["fields"])
+    assert out.count('<div class="sv-cattree-card notheme">') == len(DATA["fields"])
     assert '<div class="sv-cattree-card-title">' + link("Arts") in out
 
 
@@ -109,7 +109,7 @@ def test_themes_are_chips_grouped_by_their_theme_group():
     out = tree()
     group = DATA["themes"][0]
     start = out.index('<div class="sv-cattree-group-title">' + link(group["names"]["en"]))
-    chip = out.index('<span class="sv-cattree-chip">', start)
+    chip = out.index('<span class="sv-cattree-chip notheme">', start)
     assert chip < out.index(link(group["children"][0]["names"]["en"]), start)
 
 
@@ -131,7 +131,7 @@ def test_every_field_category_and_every_theme_is_counted():
 
 def test_a_branch_counts_the_articles_filed_directly_under_it():
     out, _ = counted(counts={"Painting": 3, "Fresco": 2})
-    assert link("Painting") + ' <span class="sv-cattree-count">5</span>' in out
+    assert link("Painting") + ' <span class="sv-cattree-count notheme">5</span>' in out
 
 
 def test_a_failed_lookup_is_unknown_not_zero():
@@ -149,33 +149,33 @@ def test_a_failed_lookup_is_unknown_not_zero():
     assert '<div class="sv-cattree-title">' + link("Painting") + "</div>" in out
     assert '<div class="sv-cattree-card-title">' + link("Arts") + "</div>" in out
     # a sibling that was counted keeps its badge
-    assert link("Fresco") + ' <span class="sv-cattree-count">2</span>' in out
+    assert link("Fresco") + ' <span class="sv-cattree-count notheme">2</span>' in out
 
 
 def test_an_empty_theme_chip_is_dimmed():
     theme = DATA["themes"][0]["children"][0]["names"]["en"]
     out, _ = counted()
-    assert '<span class="sv-cattree-chip"><span class="sv-cattree-empty">' + link(theme) + "</span></span>" in out
+    assert '<span class="sv-cattree-chip notheme"><span class="sv-cattree-empty">' + link(theme) + "</span></span>" in out
 
 
 def test_a_leaf_shows_its_count_and_a_branch_the_sum_of_its_leaves():
     out, _ = counted(counts={"Fresco": 2, "Oil painting": 5, "Dance": 1})
-    assert "* " + link("Dance") + ' <span class="sv-cattree-count">1</span>' in out
-    assert link("Painting") + ' <span class="sv-cattree-count">7</span>' in out
-    assert link("Visual arts") + ' <span class="sv-cattree-count">7</span>' in out
-    assert link("Arts") + ' <span class="sv-cattree-count">8</span>' in out
+    assert "* " + link("Dance") + ' <span class="sv-cattree-count notheme">1</span>' in out
+    assert link("Painting") + ' <span class="sv-cattree-count notheme">7</span>' in out
+    assert link("Visual arts") + ' <span class="sv-cattree-count notheme">7</span>' in out
+    assert link("Arts") + ' <span class="sv-cattree-count notheme">8</span>' in out
 
 
 def test_an_empty_category_has_no_count_and_is_dimmed():
     out, _ = counted()
-    assert '<span class="sv-cattree-count">' not in out
+    assert '<span class="sv-cattree-count notheme">' not in out
     assert '<span class="sv-cattree-empty">' + link("Dance") + "</span>" in out
 
 
 def test_a_theme_chip_shows_its_count():
     theme = DATA["themes"][0]["children"][0]["names"]["en"]
     out, _ = counted(counts={theme: 4})
-    assert '<span class="sv-cattree-chip">' + link(theme) + ' <span class="sv-cattree-count">4</span></span>' in out
+    assert '<span class="sv-cattree-chip notheme">' + link(theme) + ' <span class="sv-cattree-count notheme">4</span></span>' in out
 
 
 def test_the_tree_survives_the_expensive_function_limit():
@@ -188,4 +188,12 @@ def test_the_tree_survives_the_expensive_function_limit():
             return real(...)
         end""")
     out = env.call("Module:SV/Categories", "tree", env.frame({}, {}))
-    assert link("Arts") in out and '<span class="sv-cattree-chip">' in out
+    assert link("Arts") in out and '<span class="sv-cattree-chip notheme">' in out
+
+
+def test_coloured_boxes_opt_out_of_the_main_page_night_theme():
+    """The site's night-mode rule resets backgrounds on the main page for everything but .notheme."""
+    out, _ = counted(counts={"Arts": 3})
+    for cls in ("sv-cattree-card", "sv-cattree-chip", "sv-cattree-count"):
+        assert f'class="{cls}"' not in out
+        assert f'class="{cls} notheme"' in out
