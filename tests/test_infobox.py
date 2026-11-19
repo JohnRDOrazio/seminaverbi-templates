@@ -519,3 +519,10 @@ def test_tree_categories_only_on_articles():
         out = categories(namespace=ns)
         assert "[[Category:Musica]]" not in out and "[[Category:Fede]]" not in out
     assert "[[Category:Musica]]" in categories(namespace=0)
+
+
+def test_tracking_categories_stay_outside_articles():
+    ents = cat_entities(themes=("Q999",), extra={"Q999": {"labels": {"it": "Altro"}, "sitelinks": {"it": "Categoria:Altro"}}})
+    out = categories(entities=ents, namespace=2)
+    assert f"[[Category:{msg('it', 'category_not_tree')}]]" in out
+    assert "[[Category:Musica]]" not in out
