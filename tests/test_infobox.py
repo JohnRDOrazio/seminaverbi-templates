@@ -470,10 +470,32 @@ def test_a_composition_has_its_own_layout_with_the_composer():
     from pathlib import Path
     root = Path(__file__).resolve().parent.parent
     rows = json.loads((root / "config/infobox.json").read_text(encoding="utf-8"))["composition"]
-    assert [r["prop"] for r in rows] == ["image", "title", "composer", "lyrics_by", "publication_date", "genre"]
+    assert [r["prop"] for r in rows] == ["image", "title", "composer", "lyrics_by", "inception",
+                                         "publication_date", "genre"]
     out = render(type="composition", composer="[[Tchaikovsky]]")
     assert '<table class="sv-infobox sv-infobox-composition">' in out
     assert row("composer", "[[Tchaikovsky]]") in out and "performer" not in out
+
+
+@pytest.mark.parametrize("layout", ["composition", "song"])
+def test_a_musical_work_shows_when_it_was_composed(layout):
+    import json
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent
+    rows = json.loads((root / "config/infobox.json").read_text(encoding="utf-8"))[layout]
+    keys = [r["key"] for r in rows]
+    assert {"key": "composed", "prop": "inception", "kind": "time"} in rows
+    assert keys.index("lyrics_by") < keys.index("composed") < keys.index("publication_date")
+    labels = {"en": "composed", "it": "composto", "es": "compuesto", "fr": "composé", "de": "komponiert",
+              "pt": "composto"}
+    for lang, text in labels.items():
+        assert row(text, "1883") in render(type=layout, lang=lang, composed="1883"), lang
+
+
+def test_a_composed_row_reads_the_inception_of_the_item():
+    out = render(type="composition", lang="en", page_entity="Q90", entities={
+        "Q90": {"labels": {"en": "Legend"}, "claims": {"P4732": [time("+1883-00-00T00:00:00Z", 9)]}}})
+    assert row("composed", "1883") in out
 
 
 @pytest.mark.parametrize("instance_of, layout", [

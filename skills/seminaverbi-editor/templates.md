@@ -147,8 +147,8 @@ Fields per `type`:
 - `film`: image, title, director, screenwriter, cast, publication_date, original_language_film, country_of_origin, genre
 - `tv`: image, title, creator, cast, original_language_film, country_of_origin, genre, publication_date
 - `album`: image, title, performer, publication_date, genre, record_label
-- `composition`: image, title, composer, lyrics_by, publication_date, genre
-- `song`: image, title, performer, composer, lyrics_by, publication_date, genre
+- `composition`: image, title, composer, lyrics_by, composed, publication_date, genre
+- `song`: image, title, performer, composer, lyrics_by, composed, publication_date, genre
 - `play`: image, title, author, original_language_work, publication_date, genre
 - `artwork`: image, title, creator, inception
 - `work`: image, title, creator, publication_date, genre, country_of_origin

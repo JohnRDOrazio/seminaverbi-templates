@@ -61,5 +61,6 @@
   "switch_summary": "Pasa a la ficha SV; datos en el elemento",
   "tracking_category_text": "Categoría de seguimiento: las plantillas SV añaden aquí una página cuando su elemento de Wikibase o su ficha necesita corrección. Al corregir el elemento o la página, esta sale de la categoría.",
   "wip_category": "Artículos SV en desarrollo",
-  "wip_notice": "Este artículo está en desarrollo ($1, $2)."
+  "wip_notice": "Este artículo está en desarrollo ($1, $2).",
+  "label_composed": "compuesto"
 }

@@ -61,5 +61,6 @@
   "switch_summary": "Passa all'infobox SV; dati sull'elemento",
   "tracking_category_text": "Categoria di servizio: i template SV vi inseriscono una pagina quando il suo elemento Wikibase o il suo infobox va corretto. Corretto l'elemento o la pagina, la pagina esce dalla categoria.",
   "wip_category": "Voci SV in lavorazione",
-  "wip_notice": "Questa voce è in lavorazione ($1, $2)."
+  "wip_notice": "Questa voce è in lavorazione ($1, $2).",
+  "label_composed": "composto"
 }

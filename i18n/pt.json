@@ -61,5 +61,6 @@
   "switch_summary": "Passa para a infocaixa SV; dados no item",
   "tracking_category_text": "Categoria de manutenção: as predefinições SV colocam aqui uma página quando o seu item do Wikibase ou a sua infocaixa precisa de correção. Corrigido o item ou a página, esta sai da categoria.",
   "wip_category": "Artigos SV em construção",
-  "wip_notice": "Este artigo está em construção ($1, $2)."
+  "wip_notice": "Este artigo está em construção ($1, $2).",
+  "label_composed": "composto"
 }
