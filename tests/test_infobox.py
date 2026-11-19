@@ -504,6 +504,8 @@ def test_a_composed_row_reads_the_inception_of_the_item():
     ("Q47641", "work"),         # fictional extraterrestrial species (New Gods)
     ("Q9210", "work"),          # fictional humanoid species (New Gods)
     ("Q6116", "work"),          # tradition (Easter bread)
+    ("Q2259", "song"),          # song
+    ("Q6194", "song"),          # single (the Nek and Mannoia songs)
 ])
 def test_auto_maps_the_types_of_existing_articles(instance_of, layout):
     out = auto([instance_of])
