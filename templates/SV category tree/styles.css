@@ -1,34 +1,128 @@
+/* {{SV category tree}}: one card per top-level field, then the Gospel themes as chips.
+   Colours come from the skin's design tokens (Codex CSS variables, light and dark mode on Vector 2022
+   and Minerva), with fallbacks for skins without them. */
 .sv-cattree {
-	columns: 3 18em;
-	column-gap: 2em;
-	margin: 0.5em 0;
+	margin: 1em 0;
 }
+
+.sv-cattree-fields {
+	display: grid;
+	grid-template-columns: repeat( auto-fill, minmax( 16em, 1fr ) );
+	gap: 1em;
+	align-items: start;
+}
+
+.sv-cattree-card {
+	background-color: #f8f9fa;
+	background-color: var( --background-color-neutral-subtle, #f8f9fa );
+	border: 1px solid #c8ccd1;
+	border-color: var( --border-color-subtle, #c8ccd1 );
+	border-top: 4px solid #36c;
+	border-radius: 6px;
+	padding: 0.6em 0.9em 0.7em;
+}
+
+/* an accent per card, cycling through five colours */
+.sv-cattree-card:nth-child( 5n+1 ) { border-top-color: #36c; }
+.sv-cattree-card:nth-child( 5n+2 ) { border-top-color: #a66200; }
+.sv-cattree-card:nth-child( 5n+3 ) { border-top-color: #14866d; }
+.sv-cattree-card:nth-child( 5n+4 ) { border-top-color: #8a4fbf; }
+.sv-cattree-card:nth-child( 5n+5 ) { border-top-color: #b32424; }
+
+.sv-cattree-card-title {
+	font-size: 1.15em;
+	font-weight: bold;
+	line-height: 1.4;
+	margin-bottom: 0.3em;
+}
+
+.sv-cattree-card-body ul {
+	margin: 0.1em 0 0.3em 1.2em;
+}
+
+.sv-cattree-card-body li {
+	margin-bottom: 0.1em;
+}
+
 .sv-cattree-node {
-	break-inside: avoid;
-	margin-bottom: 0.6em;
+	margin: 0.15em 0;
 }
+
+.sv-cattree-node .sv-cattree-node {
+	margin-left: 1em;
+}
+
 .sv-cattree-title {
 	font-weight: bold;
 	line-height: 1.6;
 }
-.sv-cattree-node .sv-cattree-node {
-	margin-left: 1em;
+
+.sv-cattree-count {
+	display: inline-block;
+	min-width: 1.4em;
+	padding: 0 0.4em;
+	margin-left: 0.2em;
+	border-radius: 1em;
+	background-color: #eaecf0;
+	background-color: var( --background-color-interactive, #eaecf0 );
+	color: #54595d;
+	color: var( --color-subtle, #54595d );
+	font-size: 0.8em;
+	font-weight: normal;
+	line-height: 1.5;
+	text-align: center;
 }
+
+.sv-cattree-empty a {
+	color: #72777d;
+	color: var( --color-subtle, #72777d );
+}
+
 .sv-cattree-themes-heading {
-	column-span: all;
-	font-weight: bold;
-	font-size: 1.1em;
-	margin: 1em 0 0.3em;
+	margin: 1.6em 0 0.6em;
+	padding-top: 0.6em;
 	border-top: 1px solid #a2a9b1;
-	padding-top: 0.5em;
+	border-top-color: var( --border-color-base, #a2a9b1 );
+	font-size: 1.25em;
+	font-weight: bold;
 }
+
 .sv-cattree-themes {
-	columns: 3 18em;
-	column-gap: 2em;
-	column-span: all;
+	display: grid;
+	grid-template-columns: repeat( auto-fill, minmax( 18em, 1fr ) );
+	gap: 0.8em 1.5em;
 }
-@media screen and (max-width: 720px) {
-	.sv-cattree {
-		columns: 1;
+
+.sv-cattree-group-title {
+	font-weight: bold;
+	margin-bottom: 0.3em;
+}
+
+.sv-cattree-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.35em;
+}
+
+.sv-cattree-chip {
+	display: inline-block;
+	padding: 0.15em 0.65em;
+	border: 1px solid #c8ccd1;
+	border-color: var( --border-color-subtle, #c8ccd1 );
+	border-radius: 1em;
+	background-color: #fff;
+	background-color: var( --background-color-base, #fff );
+	line-height: 1.5;
+	white-space: nowrap;
+}
+
+.sv-cattree-chip .sv-cattree-count {
+	margin-left: 0.3em;
+}
+
+@media screen and ( max-width: 720px ) {
+	.sv-cattree-fields,
+	.sv-cattree-themes {
+		grid-template-columns: 1fr;
 	}
 }

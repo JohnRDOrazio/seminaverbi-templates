@@ -1,3 +1,3 @@
 <includeonly>{{#invoke:SV/Categories|tree}}</includeonly><noinclude>
-The category navigation for the main page: the fields of the arts and sciences, then the Gospel themes, in this wiki's language. No parameters. The tree comes from <code>config/categories.json</code> in the repository; a red link means the category page does not exist on this wiki yet.
+The category navigation for the main page, in this wiki's language: a card for each top-level field of the arts and sciences, with its branches collapsed, then the Gospel themes as chips in their groups. Each category shows its number of articles (a branch, the sum of its leaves). No parameters. The tree comes from <code>config/categories.json</code> in the repository; a red link means the category page does not exist on this wiki yet.
 </noinclude>

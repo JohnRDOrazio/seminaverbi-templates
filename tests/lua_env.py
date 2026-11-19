@@ -60,6 +60,10 @@ function mw.wikibase.getEntityIdForCurrentPage() return py.page_entity end
 function mw.wikibase.getEntity(id) return py.entity(id) end
 function mw.wikibase.getLabelByLang(id, l) return py.label(id, l) end
 function mw.wikibase.getSitelink(id, site) return py.sitelink(id, site or py.lang) end
+-- mw.site.stats.pagesInCategory(name, 'pages'): the counts a test gives (0 otherwise); every call is
+-- recorded, since each one is an expensive parser function call on the wiki.
+mw.site = { stats = {} }
+function mw.site.stats.pagesInCategory(name, which) return py.pages_in_category(name, which) end
 function make_frame(args, pargs)
     local parent = { args = pargs }
     local f = { args = args, getParent = function() return parent end }
@@ -80,12 +84,14 @@ end
 
 class LuaEnv:
     def __init__(self, lang="en", data=None, entities=None, page_entity=None, page_title="Test page",
-                 patch_data=None):
+                 patch_data=None, category_counts=None):
         self.lua = lupa.LuaRuntime(unpack_returned_tuples=True)
         self.lang = lang
         self.entities = entities or {}
         self._data = data
         self._patch = patch_data
+        self.category_counts = category_counts or {}
+        self.category_calls = []
         table = self.lua.table_from
         bridge = {
             "lang": lang,
@@ -99,9 +105,14 @@ class LuaEnv:
             "entity": lambda i: table(self.entities[i], recursive=True) if i in self.entities else None,
             "label": lambda i, l: self.entities.get(i, {}).get("labels", {}).get(l),
             "sitelink": lambda i, s: self.entities.get(i, {}).get("sitelinks", {}).get(s),
+            "pages_in_category": self._pages_in_category,
         }
         self.lua.execute(_PRELUDE, table(bridge))
         self._make_frame = self.lua.globals().make_frame
+
+    def _pages_in_category(self, name, which):
+        self.category_calls.append((name, which))
+        return self.category_counts.get(name, 0)
 
     def _load_data(self):
         if self._data is not None:
