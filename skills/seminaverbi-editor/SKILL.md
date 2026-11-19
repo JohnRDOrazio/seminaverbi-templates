@@ -81,6 +81,11 @@ article's final wikitext saved to a temporary file:
 2. **Themes:** `.venv/bin/python -m tools.jev themes <file>` gives a probability per leaf theme.
    ≥ 0.75 `applied`: add it. 0.40–0.75 `author`: list them for the author with the probabilities.
    < 0.40: never add it.
+   A theme is filed only when the text argues it, whatever Jev's score. When Jev scores a theme high
+   (≥ 0.75, `applied`) that the text does not yet argue, take it as a sign the work touches it:
+   research the work (its text, lyrics, scenes, sources) and, where the relationship is real, write it
+   into the article with its scenes and Bible quotes, then file the theme. When research finds no clear
+   relationship, leave the theme off and tell the author why.
 3. **Tree questions** (a new node, or where an existing one belongs):
    `.venv/bin/python -m tools.jev place <node-key> <candidate-parent-key>... --record`. The answer is
    logged in `config/category_decisions.json`; an `author` outcome goes to the author, whose ruling is
