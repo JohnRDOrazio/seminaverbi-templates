@@ -75,7 +75,7 @@ def test_tree_theme_groups_hold_their_themes():
     group = DATA["themes"][0]
     start = out.index('<div class="sv-cattree-group-title">' + link(group["names"]["en"]))
     leaf = group["children"][0]["names"]["en"]
-    assert out.index('<span class="sv-cattree-chip">' + link(leaf)) > start
+    assert out.index('<span class="sv-cattree-chip">', start) < out.index(link(leaf), start)
 
 
 # --- cards, chips and article counts ---
@@ -109,18 +109,53 @@ def test_themes_are_chips_grouped_by_their_theme_group():
     out = tree()
     group = DATA["themes"][0]
     start = out.index('<div class="sv-cattree-group-title">' + link(group["names"]["en"]))
-    chip = '<span class="sv-cattree-chip">' + link(group["children"][0]["names"]["en"])
-    assert out.index(chip) > start
+    chip = out.index('<span class="sv-cattree-chip">', start)
+    assert chip < out.index(link(group["children"][0]["names"]["en"]), start)
 
 
-def test_only_leaf_categories_are_counted():
+def nodes(items):
+    for item in items:
+        yield item
+        yield from nodes(item.get("children", []))
+
+
+def test_every_field_category_and_every_theme_is_counted():
     _, env = counted()
     names = [name for name, _ in env.category_calls]
-    expected = [n["names"]["en"] for n in leaves(DATA["fields"])] + \
+    expected = [n["names"]["en"] for n in nodes(DATA["fields"])] + \
                [t["names"]["en"] for g in DATA["themes"] for t in g["children"]]
     assert sorted(names) == sorted(expected)
     assert all(which == "pages" for _, which in env.category_calls)
     assert len(names) <= 300  # $wgExpensiveParserFunctionLimit on the farm
+
+
+def test_a_branch_counts_the_articles_filed_directly_under_it():
+    out, _ = counted(counts={"Painting": 3, "Fresco": 2})
+    assert link("Painting") + ' <span class="sv-cattree-count">5</span>' in out
+
+
+def test_a_failed_lookup_is_unknown_not_zero():
+    env = LuaEnv(category_counts={"Fresco": 2, "Dance": 1})
+    env.lua.execute("""
+        local real = mw.site.stats.pagesInCategory
+        mw.site.stats.pagesInCategory = function(name, which)
+            if name == 'Oil painting' then error('Too many expensive function calls') end
+            return real(name, which)
+        end""")
+    out = env.call("Module:SV/Categories", "tree", env.frame({}, {}))
+    # the failed leaf: no badge and not dimmed; its ancestors: no (incomplete) total
+    assert "* " + link("Oil painting") + "\n" in out
+    assert '<span class="sv-cattree-empty">' + link("Oil painting") not in out
+    assert '<div class="sv-cattree-title">' + link("Painting") + "</div>" in out
+    assert '<div class="sv-cattree-card-title">' + link("Arts") + "</div>" in out
+    # a sibling that was counted keeps its badge
+    assert link("Fresco") + ' <span class="sv-cattree-count">2</span>' in out
+
+
+def test_an_empty_theme_chip_is_dimmed():
+    theme = DATA["themes"][0]["children"][0]["names"]["en"]
+    out, _ = counted()
+    assert '<span class="sv-cattree-chip"><span class="sv-cattree-empty">' + link(theme) + "</span></span>" in out
 
 
 def test_a_leaf_shows_its_count_and_a_branch_the_sum_of_its_leaves():
