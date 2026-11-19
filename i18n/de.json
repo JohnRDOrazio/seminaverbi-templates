@@ -61,5 +61,6 @@
   "switch_summary": "Wechsel zur SV-Infobox; Daten im Datenobjekt",
   "tracking_category_text": "Wartungskategorie: Die SV-Vorlagen fügen hier eine Seite ein, wenn ihr Wikibase-Datenobjekt oder ihre Infobox korrigiert werden muss. Nach der Korrektur des Objekts oder der Seite verlässt sie die Kategorie.",
   "wip_category": "SV-Artikel in Arbeit",
-  "wip_notice": "Dieser Artikel ist in Arbeit ($1, $2)."
+  "wip_notice": "Dieser Artikel ist in Arbeit ($1, $2).",
+  "label_composed": "komponiert"
 }

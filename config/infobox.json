@@ -191,6 +191,11 @@
       "kind": "item"
     },
     {
+      "key": "composed",
+      "prop": "inception",
+      "kind": "time"
+    },
+    {
       "key": "publication_date",
       "prop": "publication_date",
       "kind": "time"
@@ -226,6 +231,11 @@
       "key": "lyrics_by",
       "prop": "lyrics_by",
       "kind": "item"
+    },
+    {
+      "key": "composed",
+      "prop": "inception",
+      "kind": "time"
     },
     {
       "key": "publication_date",
