@@ -31,6 +31,25 @@ Category check, with the editor bot's credentials (`SV_EDITOR_USER` / `SV_EDITOR
 python -m tools.categories check --wiki fr [--create] [--dry-run]
 ```
 
+## The category tree on the main pages
+
+Each wiki's main page ends with `{{SV category tree}}` (`modules/SV/Categories.lua`): a card per
+top-level field, collapsible branches, the Gospel themes as chips, and article counts.
+
+- **Counts** come from `mw.site.stats.pagesInCategory`, an expensive parser function: one call per
+  category, about 190 per page. The farm's `LocalSettings.php` raises `$wgExpensiveParserFunctionLimit`
+  to 300 for this. A failed or over-limit lookup shows no count rather than an error. Counts are computed
+  when the page is parsed, so a cached main page costs nothing; purge it to refresh them.
+- **Only articles count.** `{{SV infobox}}` and `{{SV categories}}` file the field and theme categories
+  in the main namespace only, so a sandbox or template page showing an item's infobox stays out.
+- **TemplateStyles on the farm rejects `var()`**, and one bad value makes the sync refuse the whole
+  stylesheet (the old one stays live). Use plain colours.
+- **Night mode:** style it under `html.skin-theme-clientpref-night` and, inside
+  `@media (prefers-color-scheme: dark)`, `html.skin-theme-clientpref-os`. The site's night-mode rule
+  for the main page resets the background of every element except `.notheme`, so the cards, chips and
+  badges carry `notheme`; Vector then gives `.notheme` the day text colour, so the night palette sets the
+  text and link colours too. Check the page in both themes after a change.
+
 ## Test
 
 ```

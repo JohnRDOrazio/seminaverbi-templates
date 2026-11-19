@@ -48,7 +48,7 @@ the page had by hand.
 | Article | Finding | Action | Status |
 |---------|---------|--------|--------|
 | en: Carlo Acutis (Q48400) | Field was Computer science; no holiness/Eucharist field node (holiness is a theme) | field → Saints; programming and the Eucharistic-miracles website were already covered; canonization (7 Sept 2025) updated; unused refs commented out | done (item 30422, page 30423–30426) |
-| en: Carlo Acutis | Still has Wikipedia leftovers and `[[wikipedia:Category:…]]` lines; no Gospel themes on the item (holiness supported by the text) | `[[wikipedia:Category:…]]` lines removed (rev 30504); refs are still list-defined, to be redone in the rewrite; file holiness | open |
+| en: Carlo Acutis | Still has Wikipedia leftovers and `[[wikipedia:Category:…]]` lines; no Gospel themes on the item (holiness supported by the text) | `[[wikipedia:Category:…]]` lines removed (rev 30504); refs are still list-defined, to be redone in the rewrite; file holiness | done (2026-11-19 check: the cleanup tool finds nothing left; nine argued themes on the item) |
 | it: Guerre Stellari (Q4102) | Publisher's blurb, no Gospel reading or discernment | rewritten with Gospel sections and discernment; 8 argued themes filed (Sacrificio, Tentazione, Redenzione, Conversione, Misericordia, Carità, Famiglia, Peccato) | done (it 11246; item 30438–30449) |
 | it: Guerre Stellari | Lucas on Anakin's birth rests on a fan transcript; Italian dub lines are own translations; title capitalises "Stellari" | find an official source; check the dub; consider moving to "Guerre stellari" | open |
 | Song titles | Songs carry "(song)" on en, "(brano musicale)" on it | en: Holy Mother, Presence of the Lord, Hear Me Lord, Baba Yetu → "(song)"; Legend (Tchaikovsky) → Legend (Tchaikovsky song). it: My Sweet Lord, What Is Life, Awaiting On You All, Hear Me Lord, The Prayer, I.N.R.I. (Lucio Dalla) → "(brano musicale)". Wedding Song (There Is Love) kept | done |
@@ -60,11 +60,11 @@ the page had by hand.
 | it: Dark, Matrix, La vita è meravigliosa | Bible references in English notation | Italian abbreviations with comma notation (Mc 13,33; Mt 17,1-8; 2Pt 1,16-18; Ap 9,6; Nm 11,11-15; Gc 5,13; Rm 12,2; Fil 4,13; Gv 3,1-21) | done (it 11295–11303) |
 | Navboxes | Wikipedia navboxes with no SV counterpart | removed on Hear Me Lord (30496), Holy Land (30497, 30500), The Prayer (it 11304), La tentazione di Sant'Antonio (it 11305), Ballate per uomini e bestie (it 11309) | done |
 | Hand fixes | Leftovers the tool reports but does not change | Christmas tree Genesis 2:9 (30495); New Gods Hebrew span (30498); Helen Keller section tag and 15 category lines (30499, 30503); Nek Treccani link (it 11306); My Sweet Lord Google Books citation (it 11307); Rubens `{{nl}}` → "(NL)" (it 11308, 11310, 11311); Hear Me Lord and Tchaikovsky notes as a native group plus `{{SV references}}` (30501, 30502) | done |
-| en: Christmas tree, New Gods | CS1 error categories ("missing title", "generic name") predate the cleanup | fix the citations | open |
-| en: Liturgy of St. John Chrysostom (Tchaikovsky) | CS1 "invalid parameter value" predates the infobox switch | fix the citation | open |
+| en: Christmas tree, New Gods | CS1 error categories ("missing title", "generic name") predate the cleanup | fix the citations | done (2026-11-19 check: no error categories left after the rewrites) |
+| en: Liturgy of St. John Chrysostom (Tchaikovsky) | CS1 "invalid parameter value" predates the infobox switch | fix the citation | done (2026-11-19 check: no error category left) |
 | en: Legend (Tchaikovsky song) (Q48407) | Wikipedia copy | rewritten to the standard (the Gospel in the legend, discernment on "Jewish children" with *Nostra aetate* 4); faith and death written in after Jev scored them high; field Music, 11 themes; melody score restored | done (30510, 30518, 30522) |
-| en: Legend (Tchaikovsky song) | Item has only "instance of": the infobox shows "SV infobox missing data" | match the Wikidata item and import it with `EnrichItems.php` (composer, date, lyricist) | open |
-| Infobox types | Q48432 (musical work/composition) and Q48444 (Christmas tradition) map to no layout ("SV infoboxes with an unknown item type") | map Q48432 → composition; decide a layout (or `work`) for customs like Q48444 | open |
+| en: Legend (Tchaikovsky song) | Item has only "instance of": the infobox shows "SV infobox missing data" | match the Wikidata item and import it with `EnrichItems.php` (composer, date, lyricist) | done (item enriched: composer, date, lyricist, language) |
+| Infobox types | Q48432 (musical work/composition) and Q48444 (Christmas tradition) map to no layout ("SV infoboxes with an unknown item type") | map Q48432 → composition; decide a layout (or `work`) for customs like Q48444 | done (Q48432 → composition, Q48444 and Q6116 → work; 2026-11-19: Easter egg (Q48403) had no instance of, now tradition (Q6116); SQLite's software types → work (PR #34)) |
 | Score extension | LilyPond 2.24 dropped safe mode; every `<score>` showed an error | Shellbox sandbox in `/opt/seminaverbi-shellbox` (127.0.0.1:8926); `$wgScoreSafeMode = false` | done (2026-11-19) |
 | en: Christmas tree (Q48401) | 91 KB Wikipedia copy | rewritten (paradise tree, tree of life and Cross, evergreen, lights, faith at home, Boniface, discernment on pagan origins and Jeremiah 10); themes Faith, Redemption | done (30523) |
 | en: Christmas tree, Easter egg | Field: the items say Popular culture / Culinary arts; Jev leans to Religion (0.63 / 0.72, `author`) | Cultural traditions (author's choice) | done (items 30537, 30538) |
@@ -73,3 +73,11 @@ the page had by hand.
 | en: Easter egg (Q48403) | 54 KB Wikipedia copy | rewritten (origins, Roman Ritual blessing, sealed tomb, new life, blood, fast and feast, Mary Magdalene, discernment on Ostara and superstition); theme Resurrection | done (30535) |
 | en: Easter egg | Jev `author` themes: Faith 0.72, Redemption 0.58, Cross 0.56, Eternal life 0.54, Death 0.53 | Redemption and Cross added (author), with Resurrection; the others left off | done (30538) |
 
+
+## Main pages (2026-11-19)
+
+| Page | Finding | Proposed | Status |
+|------|---------|----------|--------|
+| es, fr, de, pt: main page | Created from the en/it text: Church documents in the Holy See's official texts, the prose and the Fathers in our own translation (marked as such) | a native speaker reads the de and pt pages | open |
+| fr, de, pt: main page | Wikipedia link titles not checked against the language Wikipedias (Wikimedia rate-limited this server): Paul de Tarse, Paulus von Tarsus, Paulo de Tarso, and the other `w:fr:`/`w:de:`/`w:pt:` links | check each title exists; fall back to `w:en:` where it does not | open |
+| all: main page | Section heading aligned with the it "Panoramica delle aree tematiche" (en "Overview of subject areas") | — | done (en 30821, es 516, fr 550, pt 510; de already matched) |
