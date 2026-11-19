@@ -1,3 +1,5 @@
+import pytest
+
 from claims import item, mono, text, time
 from lua_env import LuaEnv, tag
 
@@ -472,3 +474,16 @@ def test_a_composition_has_its_own_layout_with_the_composer():
     out = render(type="composition", composer="[[Tchaikovsky]]")
     assert '<table class="sv-infobox sv-infobox-composition">' in out
     assert row("composer", "[[Tchaikovsky]]") in out and "performer" not in out
+
+
+@pytest.mark.parametrize("instance_of, layout", [
+    ("Q48432", "composition"),  # musical work/composition (Legend, the Liturgy)
+    ("Q48444", "work"),         # Christmas tradition (Christmas tree)
+    ("Q47641", "work"),         # fictional extraterrestrial species (New Gods)
+    ("Q9210", "work"),          # fictional humanoid species (New Gods)
+    ("Q6116", "work"),          # tradition (Easter bread)
+])
+def test_auto_maps_the_types_of_existing_articles(instance_of, layout):
+    out = auto([instance_of])
+    assert f'<table class="sv-infobox sv-infobox-{layout}">' in out
+    assert msg("it", "infobox_unknown_type") not in out

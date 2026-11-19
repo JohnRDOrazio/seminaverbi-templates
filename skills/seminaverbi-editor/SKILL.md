@@ -81,13 +81,25 @@ article's final wikitext saved to a temporary file:
 2. **Themes:** `.venv/bin/python -m tools.jev themes <file>` gives a probability per leaf theme.
    ≥ 0.75 `applied`: add it. 0.40–0.75 `author`: list them for the author with the probabilities.
    < 0.40: never add it.
+   A theme is filed only when the text argues it, whatever Jev's score. When Jev scores a theme high
+   (≥ 0.75, `applied`) that the text does not yet argue, take it as a sign the work touches it:
+   research the work (its text, lyrics, scenes, sources) and, where the relationship is real, write it
+   into the article with its scenes and Bible quotes, then file the theme. When research finds no clear
+   relationship, leave the theme off and tell the author why. A theme statement files every SeminaVerbi
+   page that shows the item: the pages linked to it on the six SeminaVerbi sites (`en it es fr de pt`;
+   Wikipedia sitelinks such as `enwiki` get no SV category) that call `{{SV infobox}}` or
+   `{{SV categories}}` without `item=` (a linked page whose only call has `item=` another item shows
+   that item instead, and is not one of them), and any page that calls either template with `item=`
+   that item (search each wiki for `insource:"item=Q…"`). Before
+   adding a theme, check that each of those pages argues it too, and enrich the pages that do not (or
+   leave the theme off and tell the author).
 3. **Item type** (an item with no "instance of"):
    `.venv/bin/python -m tools.jev type <file>` picks among the types `config/infobox_types.json` maps to
    a layout (`--candidate QID`, repeatable, to offer others). `applied` (probability ≥ 0.80, confidence
    ≥ 0.60): add the "instance of" statement (P2016) on the item. `author`: show the author the choice and
-   probabilities (including `none`: no offered type fits, so the author decides). An item that already has an "instance of" (even one with no infobox layout) is never
-   retyped automatically: run the question if useful, and ask the author before adding or changing a
-   type. A type with no layout yet needs a PR to `config/infobox_types.json`.
+   probabilities (including `none`: no offered type fits, so the author decides). An item that already
+   has an "instance of" (even one with no infobox layout) is never retyped automatically: run the
+   question if useful, and ask the author before adding or changing a type. A type with no layout yet needs a PR to `config/infobox_types.json`.
 4. **Tree questions** (a new node, or where an existing one belongs):
    `.venv/bin/python -m tools.jev place <node-key> <candidate-parent-key>... --record`. The answer is
    logged in `config/category_decisions.json`; an `author` outcome goes to the author, whose ruling is
