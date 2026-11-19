@@ -55,7 +55,7 @@ local LANGUAGE_NAMES = {
 function mw.language.fetchLanguageName(code, inLanguage)
     return (LANGUAGE_NAMES[inLanguage] or {})[code] or ''
 end
-function mw.title.getCurrentTitle() return { text = py.page_title } end
+function mw.title.getCurrentTitle() return { text = py.page_title, namespace = py.namespace } end
 function mw.wikibase.getEntityIdForCurrentPage() return py.page_entity end
 function mw.wikibase.getEntity(id) return py.entity(id) end
 function mw.wikibase.getLabelByLang(id, l) return py.label(id, l) end
@@ -84,7 +84,7 @@ end
 
 class LuaEnv:
     def __init__(self, lang="en", data=None, entities=None, page_entity=None, page_title="Test page",
-                 patch_data=None, category_counts=None):
+                 patch_data=None, category_counts=None, namespace=0):
         self.lua = lupa.LuaRuntime(unpack_returned_tuples=True)
         self.lang = lang
         self.entities = entities or {}
@@ -96,6 +96,7 @@ class LuaEnv:
         bridge = {
             "lang": lang,
             "page_title": page_title,
+            "namespace": namespace,
             "page_entity": page_entity,
             "ulower": lambda x: x.lower(),
             "uupper": lambda x: x.upper(),

@@ -214,9 +214,9 @@ def cat_entities(field=(MUSIC,), themes=(FAITH,), extra=None):
     return ents
 
 
-def categories(lang="it", page_entity="Q4178", entities=None, **args):
+def categories(lang="it", page_entity="Q4178", entities=None, namespace=0, **args):
     env = LuaEnv(lang=lang, entities=entities if entities is not None else cat_entities(),
-                 page_entity=page_entity, page_title="Pagina")
+                 page_entity=page_entity, page_title="Pagina", namespace=namespace)
     return env.call("Module:SV/Infobox", "categories", env.frame(args))
 
 
@@ -513,3 +513,18 @@ def test_auto_maps_the_types_of_existing_articles(instance_of, layout):
     out = auto([instance_of])
     assert f'<table class="sv-infobox sv-infobox-{layout}">' in out
     assert msg("it", "infobox_unknown_type") not in out
+
+
+def test_tree_categories_only_on_articles():
+    """A user sandbox or template page showing an item's infobox must not count as an article."""
+    for ns in (2, 4, 10):
+        out = categories(namespace=ns)
+        assert "[[Category:Musica]]" not in out and "[[Category:Fede]]" not in out
+    assert "[[Category:Musica]]" in categories(namespace=0)
+
+
+def test_tracking_categories_stay_outside_articles():
+    ents = cat_entities(themes=("Q999",), extra={"Q999": {"labels": {"it": "Altro"}, "sitelinks": {"it": "Categoria:Altro"}}})
+    out = categories(entities=ents, namespace=2)
+    assert f"[[Category:{msg('it', 'category_not_tree')}]]" in out
+    assert "[[Category:Musica]]" not in out

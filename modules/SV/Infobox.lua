@@ -80,11 +80,14 @@ end
 local itemIds = Util.itemIds
 
 -- [[Category:…]] for the item's SV field (one) and SV Gospel themes, in the wiki's language; anything
--- unexpected goes to a tracking category instead of being dropped silently.
+-- unexpected goes to a tracking category instead of being dropped silently. The tree categories are
+-- filed from articles only (a sandbox, template or project page showing an item's infobox would
+-- otherwise count in the tree); the tracking categories are filed everywhere.
 function p._categories(entity, lang, sortkey)
 	if not entity then
 		return ''
 	end
+	local article = mw.title.getCurrentTitle().namespace == 0
 	local data = mw.loadData('Module:SV/Data')
 	local fieldItems, themeItems = treeItems(data)
 	local out, seen, tracked = {}, {}, {}
@@ -107,7 +110,7 @@ function p._categories(entity, lang, sortkey)
 			return
 		end
 		local name = title:match('^[^:]+:(.+)$') or title
-		if not seen[name] then
+		if article and not seen[name] then
 			seen[name] = true
 			out[#out + 1] = '[[Category:' .. name .. suffix .. ']]'
 		end
