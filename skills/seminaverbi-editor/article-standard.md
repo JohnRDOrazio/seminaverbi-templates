@@ -26,7 +26,7 @@ work (book, film, TV series, album, song, play, artwork) or a person is **not a 
   ideology. Point at the concrete scene or lyric and at the teaching it departs from; never apply labels
   loosely.
 - End the article with the section started by `{{SV discernment}}` (same heading on every wiki), then
-  `{{SV references}}`. `{{SV references}}` writes its own heading (Notes, Note, Notas…): never put a
+  `{{SV references}}`. `{{SV references}}` writes its own heading (References, Note, Referencias…): never put a
   heading of your own above it, or the page shows an empty section.
 
 ## One work, one page, one field
