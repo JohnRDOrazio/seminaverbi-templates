@@ -137,16 +137,22 @@ def themes(client, text: str, data) -> dict:
     return out
 
 
+NONE = "none"  # the type question's "no offered type fits" option
+
+
 def instance_type(client, text: str, candidates: dict[str, str]) -> Decision:
     """Which candidate item type (local Wikibase QID -> label) the article's subject is an instance of."""
     criteria = {qid: {"name": label} for qid, label in candidates.items()}
+    criteria[NONE] = {"name": "none of these types: the subject is a different kind of thing"}
     q = Choice(instructions="`article` is about one subject. Of the item types offered, which one is the subject "
-                            "an instance of: what kind of thing is it? Judge the subject itself, not its themes.",
+                            "an instance of: what kind of thing is it? Judge the subject itself, not its themes. "
+                            "If no offered type fits, choose `none`.",
                criteria=criteria)
     a = client.system_one(state={"article": text}, questions={"type": q}, model=MODEL).choices["type"]
     p = a.probabilities[a.choice]
+    applied = a.choice != NONE and confident(p, a.confidence)
     return Decision("type", None, criteria, dict(a.probabilities), a.confidence, a.choice,
-                    "applied" if confident(p, a.confidence) else "author")
+                    "applied" if applied else "author")
 
 
 def type_candidates() -> list[str]:

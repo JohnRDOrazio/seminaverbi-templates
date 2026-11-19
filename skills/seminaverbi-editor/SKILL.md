@@ -85,7 +85,7 @@ article's final wikitext saved to a temporary file:
    `.venv/bin/python -m tools.jev type <file>` picks among the types `config/infobox_types.json` maps to
    a layout (`--candidate QID`, repeatable, to offer others). `applied` (probability ≥ 0.80, confidence
    ≥ 0.60): add the "instance of" statement (P2016) on the item. `author`: show the author the choice and
-   probabilities. An item that already has an "instance of" (even one with no infobox layout) is never
+   probabilities (including `none`: no offered type fits, so the author decides). An item that already has an "instance of" (even one with no infobox layout) is never
    retyped automatically: run the question if useful, and ask the author before adding or changing a
    type. A type with no layout yet needs a PR to `config/infobox_types.json`.
 4. **Tree questions** (a new node, or where an existing one belongs):
