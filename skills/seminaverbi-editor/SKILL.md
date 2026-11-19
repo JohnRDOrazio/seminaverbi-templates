@@ -81,11 +81,13 @@ article's final wikitext saved to a temporary file:
 2. **Themes:** `.venv/bin/python -m tools.jev themes <file>` gives a probability per leaf theme.
    ≥ 0.75 `applied`: add it. 0.40–0.75 `author`: list them for the author with the probabilities.
    < 0.40: never add it.
-3. **Item type** (an item with no "instance of", or one the infobox has no layout for):
+3. **Item type** (an item with no "instance of"):
    `.venv/bin/python -m tools.jev type <file>` picks among the types `config/infobox_types.json` maps to
    a layout (`--candidate QID`, repeatable, to offer others). `applied` (probability ≥ 0.80, confidence
    ≥ 0.60): add the "instance of" statement (P2016) on the item. `author`: show the author the choice and
-   probabilities. A type with no layout yet needs a PR to `config/infobox_types.json` first.
+   probabilities. An item that already has an "instance of" (even one with no infobox layout) is never
+   retyped automatically: run the question if useful, and ask the author before adding or changing a
+   type. A type with no layout yet needs a PR to `config/infobox_types.json`.
 4. **Tree questions** (a new node, or where an existing one belongs):
    `.venv/bin/python -m tools.jev place <node-key> <candidate-parent-key>... --record`. The answer is
    logged in `config/category_decisions.json`; an `author` outcome goes to the author, whose ruling is
