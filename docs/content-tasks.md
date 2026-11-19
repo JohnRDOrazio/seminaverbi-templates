@@ -67,9 +67,9 @@ the page had by hand.
 | Infobox types | Q48432 (musical work/composition) and Q48444 (Christmas tradition) map to no layout ("SV infoboxes with an unknown item type") | map Q48432 → composition; decide a layout (or `work`) for customs like Q48444 | open |
 | Score extension | LilyPond 2.24 dropped safe mode; every `<score>` showed an error | Shellbox sandbox in `/opt/seminaverbi-shellbox` (127.0.0.1:8926); `$wgScoreSafeMode = false` | done (2026-11-19) |
 | en: Christmas tree (Q48401) | 91 KB Wikipedia copy | rewritten (paradise tree, tree of life and Cross, evergreen, lights, faith at home, Boniface, discernment on pagan origins and Jeremiah 10); themes Faith, Redemption | done (30523) |
-| en: Christmas tree, Easter egg | Field: the items say Popular culture / Culinary arts; Jev leans to Religion (0.63 / 0.72, `author`) | author to choose (e.g. Cultural traditions, or Christianity) | open |
-| en: Christmas tree | Jev `author` themes: Cross 0.74, Sacrifice 0.74, Incarnation 0.59, Hope 0.58 (Cross is argued in the text) | author to decide | open |
+| en: Christmas tree, Easter egg | Field: the items say Popular culture / Culinary arts; Jev leans to Religion (0.63 / 0.72, `author`) | Cultural traditions (author's choice) | done (items 30537, 30538) |
+| en: Christmas tree | Jev `author` themes: Cross 0.74, Sacrifice 0.74, Incarnation 0.59, Hope 0.58 (Cross is argued in the text) | Cross added (author); the others left off | done (30537) |
 | en/it: Hear Me Lord (Q48405) | Wikipedia copies with the full copyrighted lyrics | both rewritten (prayer in three words, Psalms and Gospel, discernment on its Hindu context); lyrics replaced by short quotes; 8 themes (Prayer, Repentance, Faith, Conversion, Temperance, Grace, Forgiveness, Temptation) | done (en 30526, it 11316) |
 | en: Easter egg (Q48403) | 54 KB Wikipedia copy | rewritten (origins, Roman Ritual blessing, sealed tomb, new life, blood, fast and feast, Mary Magdalene, discernment on Ostara and superstition); theme Resurrection | done (30535) |
-| en: Easter egg | Jev `author` themes: Faith 0.72, Redemption 0.58, Cross 0.56, Eternal life 0.54, Death 0.53 | author to decide; research to weave in where real | open |
+| en: Easter egg | Jev `author` themes: Faith 0.72, Redemption 0.58, Cross 0.56, Eternal life 0.54, Death 0.53 | Redemption and Cross added (author), with Resurrection; the others left off | done (30538) |
 
