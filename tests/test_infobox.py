@@ -506,6 +506,8 @@ def test_a_composed_row_reads_the_inception_of_the_item():
     ("Q6116", "work"),          # tradition (Easter bread)
     ("Q2259", "song"),          # song
     ("Q6194", "song"),          # single (the Nek and Mannoia songs)
+    ("Q47518", "work"),         # serverless RDBMS (SQLite)
+    ("Q47517", "work"),         # public-domain software (SQLite)
 ])
 def test_auto_maps_the_types_of_existing_articles(instance_of, layout):
     out = auto([instance_of])
