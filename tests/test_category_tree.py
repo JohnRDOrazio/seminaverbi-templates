@@ -39,14 +39,14 @@ def test_tree_top_level_links_localized():
 
 def test_tree_nesting():
     out = tree()
-    start = out.index('<div class="sv-cattree-node mw-collapsible">' + "\n" + '<div class="sv-cattree-title">'
-                      + link("Visual arts"))
+    start = out.index('<div class="sv-cattree-node mw-collapsible mw-collapsed">' + "\n"
+                      + '<div class="sv-cattree-title">' + link("Visual arts"))
     end = out.index(link("Crafts and decorative arts"))
     block = out[start:end]
     assert link("Painting") in block and link("Fresco") in block
     assert block.index(link("Painting")) < block.index(link("Fresco"))
     # a leaf is a list item, not a collapsible block
-    assert "* " + link("Dance") in out
+    assert '* <span class="sv-cattree-empty">' + link("Dance") in out
     assert '<div class="sv-cattree-title">' + link("Dance") not in out
 
 
@@ -70,9 +70,87 @@ def test_tree_apostrophe_and_accents():
     assert link("Peinture à l'huile") in tree("fr")
 
 
-def test_tree_theme_groups_are_collapsible():
+def test_tree_theme_groups_hold_their_themes():
     out = tree()
     group = DATA["themes"][0]
-    start = out.index('<div class="sv-cattree-title">' + link(group["names"]["en"]))
+    start = out.index('<div class="sv-cattree-group-title">' + link(group["names"]["en"]))
     leaf = group["children"][0]["names"]["en"]
-    assert out.index("* " + link(leaf)) > start
+    assert out.index('<span class="sv-cattree-chip">' + link(leaf)) > start
+
+
+# --- cards, chips and article counts ---
+
+def leaves(items):
+    for item in items:
+        if item.get("children"):
+            yield from leaves(item["children"])
+        else:
+            yield item
+
+
+def counted(lang="en", counts=None):
+    env = LuaEnv(lang=lang, category_counts=counts or {})
+    return env.call("Module:SV/Categories", "tree", env.frame({}, {})), env
+
+
+def test_each_top_level_field_is_a_card():
+    out = tree()
+    assert out.count('<div class="sv-cattree-card">') == len(DATA["fields"])
+    assert '<div class="sv-cattree-card-title">' + link("Arts") in out
+
+
+def test_branches_below_a_card_start_collapsed():
+    out = tree()
+    assert ('<div class="sv-cattree-node mw-collapsible mw-collapsed">' + "\n"
+            + '<div class="sv-cattree-title">' + link("Visual arts")) in out
+
+
+def test_themes_are_chips_grouped_by_their_theme_group():
+    out = tree()
+    group = DATA["themes"][0]
+    start = out.index('<div class="sv-cattree-group-title">' + link(group["names"]["en"]))
+    chip = '<span class="sv-cattree-chip">' + link(group["children"][0]["names"]["en"])
+    assert out.index(chip) > start
+
+
+def test_only_leaf_categories_are_counted():
+    _, env = counted()
+    names = [name for name, _ in env.category_calls]
+    expected = [n["names"]["en"] for n in leaves(DATA["fields"])] + \
+               [t["names"]["en"] for g in DATA["themes"] for t in g["children"]]
+    assert sorted(names) == sorted(expected)
+    assert all(which == "pages" for _, which in env.category_calls)
+    assert len(names) <= 300  # $wgExpensiveParserFunctionLimit on the farm
+
+
+def test_a_leaf_shows_its_count_and_a_branch_the_sum_of_its_leaves():
+    out, _ = counted(counts={"Fresco": 2, "Oil painting": 5, "Dance": 1})
+    assert "* " + link("Dance") + ' <span class="sv-cattree-count">1</span>' in out
+    assert link("Painting") + ' <span class="sv-cattree-count">7</span>' in out
+    assert link("Visual arts") + ' <span class="sv-cattree-count">7</span>' in out
+    assert link("Arts") + ' <span class="sv-cattree-count">8</span>' in out
+
+
+def test_an_empty_category_has_no_count_and_is_dimmed():
+    out, _ = counted()
+    assert '<span class="sv-cattree-count">' not in out
+    assert '<span class="sv-cattree-empty">' + link("Dance") + "</span>" in out
+
+
+def test_a_theme_chip_shows_its_count():
+    theme = DATA["themes"][0]["children"][0]["names"]["en"]
+    out, _ = counted(counts={theme: 4})
+    assert '<span class="sv-cattree-chip">' + link(theme) + ' <span class="sv-cattree-count">4</span></span>' in out
+
+
+def test_the_tree_survives_the_expensive_function_limit():
+    env = LuaEnv(category_counts={"Dance": 1, "Fresco": 2})
+    env.lua.execute("""
+        local real, calls = mw.site.stats.pagesInCategory, 0
+        mw.site.stats.pagesInCategory = function(...)
+            calls = calls + 1
+            if calls > 1 then error('Too many expensive function calls') end
+            return real(...)
+        end""")
+    out = env.call("Module:SV/Categories", "tree", env.frame({}, {}))
+    assert link("Arts") in out and '<span class="sv-cattree-chip">' in out
