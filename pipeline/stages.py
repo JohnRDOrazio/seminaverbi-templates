@@ -1,4 +1,6 @@
 """Pipeline stages: the shared stage loop, stage 1 ("already covered?"), stage 3 (quick judgment) and stage 5 (adjudication)."""
+import re
+
 from pipeline import load_config
 from sync import categories
 from sync.wiki import WikiClient
@@ -77,8 +79,8 @@ def _dossier_text(notes: list[dict]) -> str:
 
 
 def _paragraphs(notes: list[dict]) -> list[tuple[str, str]]:
-    """(paragraph, url) for every non-empty line-separated paragraph of every note."""
-    return [(p.strip(), n["url"]) for n in notes for p in n["text"].splitlines() if p.strip()]
+    """(paragraph, url) for every non-empty blank-line-separated paragraph of every note."""
+    return [(p.strip(), n["url"]) for n in notes for p in re.split(r"\n\s*\n", n["text"]) if p.strip()]
 
 
 def _excerpt(paragraph: str) -> str:

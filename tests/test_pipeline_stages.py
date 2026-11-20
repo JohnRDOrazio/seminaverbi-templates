@@ -205,3 +205,10 @@ def test_dossier_text_joins_notes(q):
     j = FakeJudge()
     adjudicate(r, j, DATA)
     assert j.text == "[Head] (en)\nA\n\n[Testa] (it)\nB"
+
+
+def test_wrapped_paragraph_reaches_evidence_whole(q):
+    r = make_row(q, notes=[note(text="first line\nsecond line\n\nother para")], languages={"en": 1})
+    j = FakeJudge(themes={T1: {"p": 0.8, "status": "applied"}})
+    adjudicate(r, j, DATA)
+    assert j.evidence_calls[0][1] == ["first line\nsecond line", "other para"]
