@@ -627,3 +627,11 @@ def test_a_read_back_failure_after_approval_does_not_stop_the_vote_sync(q, capsy
     assert q.row("Q1").status == "open"  # not recorded without the saved page's word; retried next run
     assert "approved" in en.pages[PREFIX + "One"][1]  # the completed edit is kept
     assert "One" in capsys.readouterr().err
+
+
+def test_translation_suggestion_without_labels_uses_a_sitelink(q):
+    q.add("Q104123", "film", "calibration", {}, {"enwiki": "Pulp Fiction", "itwiki": "Pulp Fiction (film)"},
+          calibration=True)
+    q.set_outcome("Q104123", 1, "pass", {"have": ["it"], "missing": ["en", "es", "fr", "de", "pt"]})
+    suggestions = ranking(q)[ranking(q).index("== Translation suggestions =="):]
+    assert "[https://www.wikidata.org/wiki/Q104123 Pulp Fiction]" in suggestions

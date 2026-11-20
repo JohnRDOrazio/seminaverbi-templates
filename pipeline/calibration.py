@@ -3,11 +3,11 @@ import json
 from pathlib import Path
 
 from pipeline import load_config
+from pipeline.publish import display_name
 from pipeline.stages import THEME_KEEP, _local_item, direct
 from sync import categories
 
 ROOT = Path(__file__).resolve().parent.parent
-LANGS = ("en", "it", "es", "fr", "de", "pt")
 
 
 def _item_keys(tree: dict) -> dict[str, str]:
@@ -40,11 +40,6 @@ def _cell(text) -> str:
     return str(text).replace("|", "\\|").replace("\n", " ")
 
 
-def _title(row) -> str:
-    label = next((row.labels[lang] for lang in LANGS if row.labels.get(lang)), None)
-    return label or next((row.sitelinks[f"{lang}wiki"] for lang in LANGS if row.sitelinks.get(f"{lang}wiki")), row.qid)
-
-
 def _field_verdict(jev_field, item_field: set[str], ancestors) -> str:
     if jev_field and item_field == {jev_field}:
         return "agree"
@@ -71,7 +66,7 @@ def _verdict(row, result: dict, quick_drop: float) -> str:
 
 
 def _row_block(row, wiki, props, keys, ancestors, quick_drop) -> str:
-    lines = [f"### {_cell(_title(row))} ({row.qid})", "", "| | Jev | SeminaVerbi item |", "| --- | --- | --- |"]
+    lines = [f"### {_cell(display_name(row))} ({row.qid})", "", "| | Jev | SeminaVerbi item |", "| --- | --- | --- |"]
     result = row.data.get(5)
     if not result:
         return "\n".join(lines + ["| result | not judged (no stage 5 outcome) | |"])
