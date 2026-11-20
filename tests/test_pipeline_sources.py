@@ -24,7 +24,10 @@ class FakeSession:
 
     def get(self, url, **kwargs):
         self.calls.append((url, kwargs))
-        return self.responses.pop(0)
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
 
 
 @pytest.fixture(autouse=True)
@@ -56,6 +59,21 @@ def test_select_retries_on_429_then_succeeds():
 def test_select_retries_503_and_gives_up_after_three():
     s = FakeSession(*[Resp(status=503) for _ in range(4)])
     with pytest.raises(SyncError):
+        Sparql(s).select("q")
+    assert len(s.calls) == 4
+
+
+def test_select_retries_a_read_timeout_then_succeeds():
+    import requests
+    s = FakeSession(requests.exceptions.ReadTimeout("slow"), bindings({"n": {"value": "1"}}))
+    assert Sparql(s).select("q") == [{"n": "1"}]
+    assert len(s.calls) == 2
+
+
+def test_select_gives_up_after_three_read_timeouts():
+    import requests
+    s = FakeSession(*[requests.exceptions.ReadTimeout("slow") for _ in range(4)])
+    with pytest.raises(requests.exceptions.ReadTimeout):
         Sparql(s).select("q")
     assert len(s.calls) == 4
 

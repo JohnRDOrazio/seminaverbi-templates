@@ -27,8 +27,16 @@ class Sparql:
         headers = {"User-Agent": USER_AGENT, "Accept": "application/sparql-results+json"}
         retries = 0
         while True:
-            r = self.session.get(SPARQL_ENDPOINT, params={"query": query, "format": "json"},
-                                 headers=headers, timeout=60)
+            try:
+                r = self.session.get(SPARQL_ENDPOINT, params={"query": query, "format": "json"},
+                                     headers=headers, timeout=60)
+            except requests.exceptions.ReadTimeout:
+                # the endpoint stalls now and then on a query it answers in a second on the next try
+                if retries >= SPARQL_RETRIES:
+                    raise
+                time.sleep(_retry_wait(None, retries))
+                retries += 1
+                continue
             if r.status_code not in (429, 503):
                 break
             if retries >= SPARQL_RETRIES:
