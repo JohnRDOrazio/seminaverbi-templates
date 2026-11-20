@@ -124,6 +124,12 @@
       "Q277759"
     ],
     "illustrissimi_page": "Illustrissimi",
-    "illustrissimi_section": "I personaggi di Illustrissimi"
+    "illustrissimi_section": "I personaggi di Illustrissimi",
+    "religious_classes": [
+      "Q179461",
+      "Q29154430"
+    ],
+    "bible": "Q1845",
+    "music_class": "Q2188189"
   }
 }

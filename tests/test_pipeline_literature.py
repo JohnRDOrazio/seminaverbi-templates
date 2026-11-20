@@ -93,6 +93,7 @@ CFG_FULL = {
         "subjects": ["Q302"], "book_class": "Q29154430", "biblical_classes": ["Q12405827"], "genres": ["Q1084059"],
         "series_classes": ["Q1667921", "Q277759"],
         "illustrissimi_page": "Illustrissimi", "illustrissimi_section": "I personaggi",
+        "religious_classes": ["Q179461", "Q29154430"], "bible": "Q1845", "music_class": "Q2188189",
     },
 }
 
@@ -288,6 +289,8 @@ def test_series_of_asks_for_a_shared_author_and_a_series_class():
 def test_a_work_query_folds_its_volumes(q):
     class Sparql(FoldSparql):
         def select(self, query):
+            if "?kind" in query:  # the exclusion query: nothing religious or musical here
+                return []
             if "?volume" in query or "VALUES ?item" in query:
                 return super().select(query)
             return [vol("Q_V", "Volume", 30)] if "VALUES ?author { wd:Q_SEED }" in query \
@@ -635,3 +638,67 @@ def test_a_shared_author_member_in_two_series_is_recorded_but_not_folded(q):
                    [{"volume": "Q_V", "series": "Q_S"}, {"volume": "Q_V", "series": "Q_S2"}])
     assert set(q.row("Q_S").data[0]["volumes"]) == {"Q_V"}
     assert "folded_into" not in q.row("Q_V").data[0]
+
+
+# ---- religious texts and musical works ----
+
+EXCL = {"sitelink_floor": 15, "literature": {"religious_classes": ["Q179461", "Q29154430"], "bible": "Q1845",
+                                             "music_class": "Q2188189"}}
+
+
+def test_an_excluded_work_is_dropped():
+    row = lrow(["facet"], 300)
+    row.data[0]["excluded"] = "a religious text"
+    assert literature.triage(row, CFG) == ("drop", "a religious text, not a literary work")
+
+
+def _excluding(q, kinds):
+    """Run `exclude` with the class query answering `kinds` ({qid: [kind, ...]})."""
+    sparql = FakeSparql({"wd:Q2188189": [{"item": qid, "kind": k} for qid, ks in kinds.items() for k in ks]})
+    literature.exclude(q, sparql, EXCL)
+    return sparql
+
+
+def test_religious_texts_are_marked_and_musical_works_move_to_music(q, capsys):
+    for qid in ("Q_BIBLE", "Q_MUSICAL", "Q_NOVEL"):
+        q.add(qid, "literature", "facet", {"en": qid}, {}, data={"count": 40})
+    sparql = _excluding(q, {"Q_BIBLE": ["religious"], "Q_MUSICAL": ["music"]})
+    assert "wdt:P361+ wd:Q1845" in sparql.queries[0] and "wd:Q179461" in sparql.queries[0]
+    assert q.row("Q_BIBLE").data[0]["excluded"] == "a religious text"
+    assert q.row("Q_MUSICAL").domain == "music"
+    assert "excluded" not in q.row("Q_NOVEL").data[0] and q.row("Q_NOVEL").domain == "literature"
+    assert "Q_MUSICAL" in capsys.readouterr().out
+
+
+def test_a_religious_musical_work_is_excluded_not_moved(q):
+    q.add("Q_PSALM", "literature", "illustrissimi:author", {"en": "Psalm 3"}, {}, data={"count": 25})
+    _excluding(q, {"Q_PSALM": ["music", "religious"]})
+    r = q.row("Q_PSALM")
+    assert r.domain == "literature" and r.data[0]["excluded"] == "a religious text"
+
+
+def test_only_rows_that_can_pass_triage_are_checked(q):
+    q.add("Q_LOW", "literature", "facet", {}, {}, data={"count": 3})
+    q.add("Q_NAMED", "literature", "illustrissimi", {}, {}, data={"count": 1})
+    q.add("Q_CAL", "literature", "calibration", {}, {}, calibration=True, data={"count": 90})
+    q.add("Q_FILM", "film", "facet", {}, {}, data={"count": 90})
+    sparql = _excluding(q, {})
+    assert len(sparql.queries) == 1
+    assert "wd:Q_NAMED" in sparql.queries[0]
+    assert not any(f"wd:{x} " in sparql.queries[0] for x in ("Q_LOW", "Q_CAL", "Q_FILM"))
+
+
+def test_an_excluded_row_already_triaged_is_triaged_again(q):
+    q.add("Q_BIBLE", "literature", "facet", {}, {}, data={"count": 40})
+    q.set_outcome("Q_BIBLE", 1, "pass")
+    q.set_outcome("Q_BIBLE", 2, "pass")
+    _excluding(q, {"Q_BIBLE": ["religious"]})
+    assert 2 not in q.row("Q_BIBLE").outcomes
+
+
+def test_candidates_run_the_exclusion(q, monkeypatch):
+    seen = []
+    monkeypatch.setattr(literature, "exclude", lambda queue, sparql, cfg: seen.append(queue))
+    literature.candidates(q, FakeSparql(), FakeWikipedia([]), {**CFG_FULL, "_it_wikipedia": FakeItWikipedia([])},
+                          FakeWikidata({}))
+    assert seen == [q]

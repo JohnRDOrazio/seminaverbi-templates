@@ -291,7 +291,41 @@ def candidates(queue, sparql, wikipedia, cfg: dict, wikidata=None) -> int:
                      "francis works", classes)
     for description, pattern in common.facet_patterns(lit):
         added += _bounded_rows(queue, sparql, pattern, f"facet {description}", "facet", classes)[0]
+    exclude(queue, sparql, cfg)
     return added
+
+
+def exclude(queue, sparql, cfg: dict) -> None:
+    """Mark the religious texts (an instance of a `religious_classes` class, or part of the Bible) so that triage
+    drops them, and move the musical works (`music_class`: musicals, operas, songs with a libretto or lyrics) to
+    the music domain, where they wait for its stages. A religious text that is also a musical work (a psalm) is
+    excluded. Only the rows that can pass triage are checked (above the floor, or named directly by a source);
+    a row already triaged is triaged again, one with a status is left alone."""
+    lit = cfg["literature"]
+    todo = [r for r in queue.open_rows("literature")
+            if set(r.sources) & DIRECT or r.data.get(0, {}).get("count", 0) >= cfg["sitelink_floor"]]
+    for i in range(0, len(todo), CHUNK):
+        chunk = todo[i:i + CHUNK]
+        rows = _run(sparql, "religious texts and musical works", (
+            "SELECT DISTINCT ?item ?kind WHERE {\n"
+            f"  VALUES ?item {{ {common.values([r.qid for r in chunk])} }}\n"
+            f"  {{ VALUES ?class {{ {common.values(lit['religious_classes'])} }}\n"
+            "    ?item wdt:P31/wdt:P279* ?class . BIND(\"religious\" AS ?kind) }\n"
+            f"  UNION {{ ?item wdt:P361+ wd:{lit['bible']} . BIND(\"religious\" AS ?kind) }}\n"
+            f"  UNION {{ ?item wdt:P31/wdt:P279* wd:{lit['music_class']} . BIND(\"music\" AS ?kind) }}\n"
+            f"}}\nLIMIT {LIMIT}"))
+        kinds: dict[str, set[str]] = {}
+        for row in rows:
+            kinds.setdefault(row["item"], set()).add(row["kind"])
+        for qid, found in kinds.items():
+            if "religious" in found:
+                queue.add(qid, "literature", queue.row(qid).sources[0], {}, {}, False,
+                          {"excluded": "a religious text"})
+                if 2 in queue.row(qid).outcomes:
+                    queue.redo(2, qid)
+            else:
+                queue.set_domain(qid, "music")
+                print(f"literature candidates: {qid} is a musical work, moved to the music domain")
 
 
 HEADINGS = {
@@ -434,6 +468,8 @@ def triage(row, cfg: dict) -> tuple[str, str]:
     data = row.data.get(0, {})
     if data.get("folded_into"):
         return "drop", f"folded into {data['folded_into']}"
+    if data.get("excluded"):
+        return "drop", f"{data['excluded']}, not a literary work"
     if EDITION in data.get("instance_of", []):
         return "drop", "an edition or translation, not a work of its own"
     if not set(row.sources) & DIRECT:

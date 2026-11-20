@@ -107,3 +107,10 @@ def test_becoming_a_calibration_row_clears_its_non_pass_outcomes(tmp_path):
     q.set_outcome("Q2", 1, "pass", {}); q.set_outcome("Q2", 2, "drop", {})
     q.add("Q2", "film", "calibration", {}, {}, calibration=True)  # already a calibration row: kept
     assert q._rows("qid=?", ("Q2",))[0].outcomes == {1: "pass", 2: "drop"}
+
+
+def test_set_domain_moves_a_row_to_another_domain(q):
+    q.add("Q1", "literature", "facet", {"en": "Jesus Christ Superstar"}, {})
+    q.set_domain("Q1", "music")
+    assert q.row("Q1").domain == "music"
+    assert [r.qid for r in q.pending(1, domain="literature")] == []
