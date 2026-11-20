@@ -214,7 +214,7 @@ ORIGINAL_LANGUAGES = {"Q1860": "en", "Q652": "it", "Q1321": "es", "Q150": "fr", 
 # lower-case fragments of the section headings worth reading, per language
 HEADINGS = {
     "en": ("plot", "synopsis", "theme", "analysis", "reception", "religio", "critical response", "interpretation"),
-    "it": ("trama", "sinossi", "tem", "analisi", "critica", "accoglienza", "religios", "interpretazione"),
+    "it": ("trama", "sinossi", "tema", "temi", "analisi", "critica", "accoglienza", "religios", "interpretazione"),
     "es": ("argumento", "sinopsis", "trama", "temas", "análisis", "recepción", "crítica", "religios"),
     "fr": ("intrigue", "synopsis", "thème", "analyse", "accueil", "critique", "réception", "religi"),
     "de": ("handlung", "inhalt", "thema", "themen", "analyse", "rezeption", "kritik", "religi"),
@@ -234,7 +234,7 @@ def _heading(raw: str) -> str:
 
 def _wanted(heading: str, lang: str, series: bool) -> bool:
     low = heading.lower()
-    if any(word in low for word in HEADINGS[lang]):
+    if any(re.search(rf"\b{re.escape(word)}", low) for word in HEADINGS[lang]):  # at a word start only
         return True
     return series and any(re.match(rf"{word}\b", low) for word in SEASONS[lang])
 
@@ -259,11 +259,13 @@ def _creator_names(entity: dict, lang: str, wikidata) -> list[str]:
 
 
 def _sections(wiki, title: str) -> list[tuple[str, str]]:
-    """The page's sections, or none when the page does not exist (a missing page is not an error here)."""
+    """The page's sections, or none when the page does not exist; any other API error propagates."""
     try:
         return [(_heading(h), t) for h, t in wiki.sections(title)]
-    except SyncError:
-        return []
+    except SyncError as exc:
+        if "missingtitle" in str(exc) or "nosuchpage" in str(exc):
+            return []
+        raise
 
 
 def dossier(row, cfg: dict, wiki_for, wikidata) -> dict:

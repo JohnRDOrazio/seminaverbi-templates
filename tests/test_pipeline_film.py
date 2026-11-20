@@ -3,6 +3,7 @@ import pytest
 from pipeline.domains import DOMAINS, film
 from pipeline.domains.film import calibration_qids, candidates, triage
 from pipeline.queue import Queue, Row
+from pipeline.stages import run_stage
 from sync.wiki import SyncError
 
 CFG = {
@@ -312,3 +313,25 @@ def test_dossier_stage_drops_an_empty_dossier_but_not_a_calibration_row():
     assert outcome == "pass" and data["notes"] == []
     wiki_for = wiki_for_pages({("en", "wikipedia"): {"B": EN_PAGE}})
     assert film.dossier_stage(dossier_row({"enwiki": "B"}), DCFG, wiki_for, wd)[0] == "pass"
+
+
+def test_stems_match_at_a_word_start_only():
+    page = [("Sistema", "x"), ("Tempo", "x"), ("Temi", "x"), ("Contemporanea", "x")]
+    d = film.dossier(dossier_row({"itwiki": "B"}), DCFG, wiki_for_pages({("it", "wikipedia"): {"B": page}}),
+                     FakeWikidataEntities({"Q1": entity()}))
+    assert [n["heading"] for n in d["notes"]] == ["Temi"]
+
+
+class Failing(FakeSections):
+    def sections(self, title):
+        raise SyncError("en: ratelimited: slow down")
+
+
+def test_a_non_missing_api_error_propagates_and_leaves_the_row_pending(q):
+    q.add("Q1", "film", "facet", {}, {"enwiki": "B"}, False, {"count": 30, "instance_of": ["Q11424"]})
+    q.set_outcome("Q1", 3, "pass", {})
+    wikidata = FakeWikidataEntities({"Q1": entity()})
+    fn = lambda r: film.dossier_stage(r, DCFG, lambda lang, project="wikipedia": Failing(lang, project, {}), wikidata)
+    with pytest.raises(SyncError):
+        run_stage(q, 4, fn)
+    assert [r.qid for r in q.pending(4)] == ["Q1"]
