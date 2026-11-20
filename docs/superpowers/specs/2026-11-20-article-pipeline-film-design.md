@@ -106,7 +106,9 @@ clears one row's stage for a deliberate re-run.
    candidate's Wikipedia sitelinks on the local Wikibase (`wbgetentities` by `sites`/`titles`); a
    local item that has a SeminaVerbi sitelink means covered. Also a title search on the six wikis.
    Covered on every wiki it should be: dropped. Covered on some: recorded as a **translation**
-   suggestion (listed on the ranking page, no proposal page). Calibration rows skip this stage.
+   suggestion (listed on the ranking page, no proposal page). Calibration rows always pass this
+   stage, with their coverage recorded, so a calibration article missing on some wikis is still listed
+   as a translation suggestion.
 2. **Triage (film).** Notability floor: sitelinks ≥ 15 for facet candidates, none for seed-list
    candidates (the list already chose them). Drop non-fiction clips, trailers and episodes (episodes
    are judged through their series).
@@ -196,7 +198,8 @@ Calls made for the builder (the author may overturn any):
   finds a machine-readable copy; otherwise it is reported as dropped.
 - **Calibration:** the set is the articles in the film and television tree categories on all six wikis
   (by their items); an article whose item has no Wikidata QID is listed in the report and skipped.
-  Calibration rows skip stages 1 and 2 and are never dropped at stage 3, so every disagreement shows.
+  Calibration rows always pass stages 1 and 2 (stage 1 still records their coverage) and are never
+  dropped at stage 3, so every disagreement shows.
 - **The timer:** `votes` needs no Jev, only the bot; the systemd user timer runs it through
   `runeditor.py`, which reads the bot's credentials from `editor.env` as it does now.
 - **Votes after a user leaves `voter`:** they still count; VoteNY does not distinguish, and the

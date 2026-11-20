@@ -20,7 +20,7 @@
 - `max_new_per_run` = 200 candidates entering stage 3 per run; vote threshold = 3. Both in `config/pipeline.json`.
 - Evidence excerpt ≤ 25 words, with its source URL; dossier text is notes, never posted whole.
 - The bot rewrites only the `{{SV proposal|…}}` call at the top of a proposal page; never moves or deletes a proposal page; never changes a `status=declined`; never proposes a declined QID again.
-- Calibration rows skip stages 1 and 2 and are never dropped at stage 3.
+- Calibration rows always pass stages 1 and 2 (stage 1 records their coverage) and are never dropped at stage 3.
 - Queue file: `data/pipeline.sqlite`, git-ignored. No local Wikibase import before approval.
 
 ## Review Focus
