@@ -154,6 +154,31 @@ Fields per `type`:
 - `work`: image, title, creator, publication_date, genre, country_of_origin
 - `group`: image, inception, genre, record_label, country_of_origin
 
+## SV proposal
+
+The box of one article proposal on the en wiki (written by the pipeline bot at the top of a proposal page): the work, its connection to the Gospel, field, themes with evidence, outline, sources, and the vote button while the proposal is open. The author or a sysop sets status=declined and a reason.
+
+| parameter | meaning |
+|---|---|
+| `qid` | the work's Wikidata item (Q…) |
+| `label_LANG` | the title in language LANG (en, it, es, fr, de, pt); the page language's is shown, else en |
+| `domain` | the pipeline domain, e.g. film |
+| `connection` | direct, seeds, entertainment or none |
+| `connection_p` | probability of the connection, a decimal (0.83 shows 83%) |
+| `field` | a field node key of config/categories.json |
+| `field_p` | probability of the field, a decimal |
+| `themeN` | N = 1, 2, …: a theme node key of config/categories.json |
+| `themeN_p` | probability of theme N, a decimal |
+| `themeN_status` | applied or author |
+| `themeN_evidence` | the excerpt that supports theme N; empty shows nothing |
+| `themeN_source` | URL of the excerpt; empty shows the excerpt without a link |
+| `outline` | proposed sections, separated by ' ; ' |
+| `sources` | URLs, separated by spaces |
+| `first_wiki` | language code of the wiki the article is written on first |
+| `status` | open (default), approved, created or declined; anything else counts as open |
+| `reason` | why a declined proposal was declined |
+| `article` | title of the created article on first_wiki (status created) |
+
 ## SV quote
 
 A quotation that is not from the Bible, optionally with its original-language text above the translation.

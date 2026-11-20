@@ -62,5 +62,21 @@
   "tracking_category_text": "Categoría de seguimiento: las plantillas SV añaden aquí una página cuando su elemento de Wikibase o su ficha necesita corrección. Al corregir el elemento o la página, esta sale de la categoría.",
   "wip_category": "Artículos SV en desarrollo",
   "wip_notice": "Este artículo está en desarrollo ($1, $2).",
-  "label_composed": "compuesto"
+  "label_composed": "compuesto",
+  "proposal_title": "Propuesta de artículo: $1",
+  "proposal_status_open": "Abierta a votación",
+  "proposal_status_approved": "Aprobada",
+  "proposal_status_created": "Artículo creado",
+  "proposal_status_declined": "Rechazada",
+  "proposal_connection_direct": "Influencia cristiana o bíblica directa",
+  "proposal_connection_seeds": "Semillas implícitas del Verbo",
+  "proposal_connection_entertainment": "Imaginería bíblica usada como entretenimiento",
+  "proposal_connection_none": "Sin conexión real",
+  "proposal_field": "Ámbito",
+  "proposal_themes": "Temas evangélicos",
+  "proposal_outline": "Esquema propuesto",
+  "proposal_sources": "Fuentes",
+  "proposal_first_wiki": "Primera wiki",
+  "proposal_reason": "Motivo",
+  "proposal_category": "Propuestas SV ($1)"
 }

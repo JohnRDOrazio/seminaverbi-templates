@@ -1,0 +1,7 @@
+[Unit]
+Description=SeminaVerbi article pipeline: count proposal votes and approve
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/development/seminaverbi-templates
+ExecStart=%h/development/seminaverbi-templates/.venv/bin/python %h/.config/seminaverbi/runeditor.py pipeline votes

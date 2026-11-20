@@ -20,6 +20,22 @@ function mw.text.trim(s) return (tostring(s):gsub('^%s+', ''):gsub('%s+$', '')) 
 function mw.text.nowiki(s)
     return (tostring(s):gsub('["&\'<=>%[%]{|}]', function(c) return '&#' .. c:byte() .. ';' end))
 end
+-- as Scribunto's (decodeNamedEntities false): numeric entities and &lt; &gt; &amp; &quot; &nbsp;
+local NAMED = { lt = '<', gt = '>', amp = '&', quot = '"', nbsp = '\194\160' }
+local function utf8char(n)
+    if n < 0x80 then return string.char(n) end
+    if n < 0x800 then return string.char(0xC0 + math.floor(n / 64), 0x80 + n % 64) end
+    if n < 0x10000 then
+        return string.char(0xE0 + math.floor(n / 4096), 0x80 + math.floor(n / 64) % 64, 0x80 + n % 64)
+    end
+    return string.char(0xF0 + math.floor(n / 262144), 0x80 + math.floor(n / 4096) % 64,
+        0x80 + math.floor(n / 64) % 64, 0x80 + n % 64)
+end
+function mw.text.decode(s)
+    s = tostring(s):gsub('&#[xX](%x+);', function(h) return utf8char(tonumber(h, 16)) end)
+    s = s:gsub('&#(%d+);', function(d) return utf8char(tonumber(d)) end)
+    return (s:gsub('&(%a+);', function(name) return NAMED[name] end))
+end
 local function load(name)
     if cache[name] == nil then
         if name == 'Module:SV/Data' then
@@ -64,6 +80,12 @@ function mw.wikibase.getSitelink(id, site) return py.sitelink(id, site or py.lan
 -- recorded, since each one is an expensive parser function call on the wiki.
 mw.site = { stats = {} }
 function mw.site.stats.pagesInCategory(name, which) return py.pages_in_category(name, which) end
+-- mw.uri.encode(s, 'WIKI'): spaces become underscores, bytes outside the unreserved and wiki-safe set %XX.
+mw.uri = {}
+function mw.uri.encode(s, kind)
+    assert(kind == 'WIKI', 'only the WIKI encoding is mocked')
+    return (tostring(s):gsub(' ', '_'):gsub("[^%w%-_%.~!$()*,:;@/]", function(c) return string.format('%%%02X', c:byte()) end))
+end
 function make_frame(args, pargs)
     local parent = { args = pargs }
     local f = { args = args, getParent = function() return parent end }

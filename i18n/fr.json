@@ -62,5 +62,21 @@
   "tracking_category_text": "Catégorie de suivi : les modèles SV y ajoutent une page quand son élément Wikibase ou son infobox doit être corrigé. Une fois l'élément ou la page corrigé, la page quitte la catégorie.",
   "wip_category": "Articles SV en cours de rédaction",
   "wip_notice": "Cet article est en cours de rédaction ($1, $2).",
-  "label_composed": "composé"
+  "label_composed": "composé",
+  "proposal_title": "Proposition d'article : $1",
+  "proposal_status_open": "Ouverte au vote",
+  "proposal_status_approved": "Approuvée",
+  "proposal_status_created": "Article créé",
+  "proposal_status_declined": "Refusée",
+  "proposal_connection_direct": "Influence chrétienne ou biblique directe",
+  "proposal_connection_seeds": "Semences implicites du Verbe",
+  "proposal_connection_entertainment": "Imagerie biblique utilisée pour le divertissement",
+  "proposal_connection_none": "Aucun lien réel",
+  "proposal_field": "Domaine",
+  "proposal_themes": "Thèmes évangéliques",
+  "proposal_outline": "Plan proposé",
+  "proposal_sources": "Sources",
+  "proposal_first_wiki": "Premier wiki",
+  "proposal_reason": "Motif",
+  "proposal_category": "Propositions SV ($1)"
 }
