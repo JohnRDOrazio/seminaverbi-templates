@@ -597,16 +597,19 @@ def test_a_known_volume_with_a_higher_count_clears_the_series_outcomes(q):
     assert s.outcomes == {0: "pass"} and s.data[0]["count"] == 40
 
 
-def _direct_series(q, members):
-    """A directly found series Q_S and the volumes query answer `members` (rows with series and shared)."""
+def _direct_series(q, members, series_of=()):
+    """A directly found series Q_S and the volumes query answer `members` (rows with series and shared);
+    `series_of`: the series-of-volumes query answer (rows with volume and series)."""
     class Sparql(FakeSparql):
         def select(self, query):
             self.queries.append(query)
-            return members if "VALUES ?series" in query else []
+            if "VALUES ?series" in query:
+                return members
+            return list(series_of) if "VALUES ?volume" in query else []
 
     literature._insert(q, {"item": "Q_S", "n": "12", "types": "Q1667921"}, "facet", series=True)
     sparql = Sparql()
-    literature.attach_volumes(q, sparql, ["Q_S"])
+    literature.attach_volumes(q, sparql, ["Q_S"], ["Q1667921"])
     return sparql
 
 
@@ -624,3 +627,11 @@ def test_a_member_sharing_an_author_is_folded(q):
     q.add("Q_V", "literature", "author", {"en": "V"}, {"enwiki": "V"}, data={"count": 30})
     _direct_series(q, [{**vol("Q_V", "Volume", 30), "series": "Q_S", "shared": "true"}])
     assert q.row("Q_V").data[0]["folded_into"] == "Q_S"
+
+
+def test_a_shared_author_member_in_two_series_is_recorded_but_not_folded(q):
+    q.add("Q_V", "literature", "author", {"en": "V"}, {"enwiki": "V"}, data={"count": 30})
+    _direct_series(q, [{**vol("Q_V", "Volume", 30), "series": "Q_S", "shared": "true"}],
+                   [{"volume": "Q_V", "series": "Q_S"}, {"volume": "Q_V", "series": "Q_S2"}])
+    assert set(q.row("Q_S").data[0]["volumes"]) == {"Q_V"}
+    assert "folded_into" not in q.row("Q_V").data[0]

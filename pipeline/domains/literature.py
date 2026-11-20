@@ -162,10 +162,11 @@ def _extend_series(queue, series_qid: str, labels: dict, sitelinks: dict, data: 
     return added
 
 
-def attach_volumes(queue, sparql, qids: list[str]) -> None:
+def attach_volumes(queue, sparql, qids: list[str], series_classes: list[str]) -> None:
     """Give the series `qids` found directly (no volumes yet) their volumes: the parts (P527) and the items that
     are part of them (P179), with their Wikipedia sitelinks. The volumes are recorded on the series (as `fold`
-    does) and not added as rows."""
+    does) and not added as rows; a volume's own row is folded only when it shares an author with the series and
+    is in no other literary series (`series_of`), as in `fold`."""
     todo = []
     for qid in dict.fromkeys(qids):
         row = queue.row(qid)
@@ -179,11 +180,15 @@ def attach_volumes(queue, sparql, qids: list[str]) -> None:
         # ?shared is bound only for a volume sharing an author with the series (a BIND(EXISTS) is left unbound)
         pattern += "\n  OPTIONAL { ?item wdt:P50 ?a . ?series wdt:P50 ?a . BIND(\"true\" AS ?shared) }"
         rows = _run(sparql, "volumes of series", common.query(pattern, "?series ?shared "))
+        shared = sorted({r["item"] for r in rows if r.get("shared") == "true"})
+        other = series_of(sparql, shared, series_classes) if shared else {}
         for row in chunk:
             mine = [r for r in rows if r["series"] == row.qid and r["item"] != row.qid]
+            foldable = {r["item"] for r in mine
+                        if r.get("shared") == "true" and set(other.get(r["item"], [])) <= {row.qid}}
             if mine:
                 _extend_series(queue, row.qid, row.labels, row.sitelinks, {"count": row.data[0].get("count", 0)},
-                               mine, row.sources[0], {r["item"] for r in mine if r.get("shared") == "true"})
+                               mine, row.sources[0], foldable)
 
 
 def fold(queue, sparql, rows: list[dict], source: str, cfg: dict) -> int:
@@ -216,7 +221,7 @@ def _bounded_rows(queue, sparql, pattern: str, label: str, source: str, classes:
         found += len(rows)
         added += _add_rows(queue, rows, source, series=cls != WORK, sparql=sparql, series_classes=series_classes)
         if cls != WORK:
-            attach_volumes(queue, sparql, [r["item"] for r in rows])
+            attach_volumes(queue, sparql, [r["item"] for r in rows], series_classes)
     return added, found
 
 
