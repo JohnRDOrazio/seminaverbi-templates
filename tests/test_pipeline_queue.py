@@ -70,3 +70,22 @@ def test_repeat_add_with_calibration_sets_the_flag(q):
     assert q.pending(1)[0].calibration is True
     q.add("Q1", "film", "facet", {}, {})  # a later plain add never clears it
     assert q.pending(1)[0].calibration is True
+
+
+def test_votes_page_and_with_outcome(q):
+    q.add("Q1", "film", "s", {}, {}); q.add("Q2", "film", "s", {}, {})
+    q.set_votes("Q1", 4); q.set_page("Q1", "Semina Verbi:Article proposals/A")
+    q.set_outcome("Q1", 1, "translation", {"have": ["it"]}); q.set_outcome("Q2", 1, "pass")
+    r = q.with_outcome(1, "translation")
+    assert [(x.qid, x.votes, x.page) for x in r] == [("Q1", 4, "Semina Verbi:Article proposals/A")]
+
+
+def test_queue_without_votes_column_is_migrated(tmp_path):
+    import sqlite3
+    db = sqlite3.connect(tmp_path / "old.sqlite")
+    db.execute("CREATE TABLE candidates (qid TEXT PRIMARY KEY, domain TEXT NOT NULL, sources TEXT NOT NULL,"
+               " labels TEXT NOT NULL, sitelinks TEXT NOT NULL, calibration INTEGER NOT NULL,"
+               " status TEXT, page TEXT, reason TEXT, added_at REAL NOT NULL)")
+    db.commit(); db.close()
+    q = Queue(tmp_path / "old.sqlite"); q.add("Q1", "film", "s", {}, {}); q.set_votes("Q1", 2)
+    assert q.pending(1)[0].votes == 2

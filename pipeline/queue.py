@@ -13,7 +13,7 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS candidates (
     qid TEXT PRIMARY KEY, domain TEXT NOT NULL, sources TEXT NOT NULL,
     labels TEXT NOT NULL, sitelinks TEXT NOT NULL, calibration INTEGER NOT NULL,
-    status TEXT, page TEXT, reason TEXT, added_at REAL NOT NULL);
+    status TEXT, page TEXT, reason TEXT, votes INTEGER, added_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS outcomes (
     qid TEXT NOT NULL, stage INTEGER NOT NULL, outcome TEXT NOT NULL,
     data_json TEXT NOT NULL, at REAL NOT NULL, PRIMARY KEY (qid, stage));
@@ -35,6 +35,7 @@ class Row:
     data: dict = field(default_factory=dict)
     status: str | None = None
     page: str | None = None
+    votes: int | None = None
 
 
 class Queue:
@@ -42,6 +43,8 @@ class Queue:
         self.db = sqlite3.connect(str(path))
         self.db.row_factory = sqlite3.Row
         self.db.executescript(SCHEMA)
+        if "votes" not in {c["name"] for c in self.db.execute("PRAGMA table_info(candidates)")}:
+            self.db.execute("ALTER TABLE candidates ADD COLUMN votes INTEGER")  # queue made before votes existed
         self.db.commit()
 
     def add(self, qid, domain, source, labels, sitelinks, calibration=False, data: dict | None = None) -> bool:
@@ -82,7 +85,7 @@ class Queue:
         for c in self.db.execute(sql, args).fetchall():
             row = Row(c["qid"], c["domain"], json.loads(c["sources"]), json.loads(c["labels"]),
                       json.loads(c["sitelinks"]), bool(c["calibration"]),
-                      status=c["status"], page=c["page"])
+                      status=c["status"], page=c["page"], votes=c["votes"])
             for o in self.db.execute("SELECT stage, outcome, data_json FROM outcomes WHERE qid=?",
                                      (row.qid,)):
                 row.outcomes[o["stage"]] = o["outcome"]
@@ -140,3 +143,19 @@ class Queue:
 
     def by_status(self, status) -> list[Row]:
         return self._rows("status=?", (status,))
+
+    def set_votes(self, qid, n: int):
+        self.db.execute("UPDATE candidates SET votes=? WHERE qid=?", (n, qid))
+        self.db.commit()
+
+    def set_page(self, qid, title: str):
+        self.db.execute("UPDATE candidates SET page=? WHERE qid=?", (title, qid))
+        self.db.commit()
+
+    def with_outcome(self, stage: int, outcome: str) -> list[Row]:
+        return self._rows("EXISTS (SELECT 1 FROM outcomes o WHERE o.qid=candidates.qid"
+                          " AND o.stage=? AND o.outcome=?)", (stage, outcome))
+
+    def by_status_in(self, statuses) -> list[Row]:
+        marks = ",".join("?" * len(statuses))
+        return self._rows(f"status IN ({marks})", tuple(statuses))
