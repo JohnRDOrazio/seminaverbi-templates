@@ -164,3 +164,25 @@ def test_escaped_url_links_to_the_original_address():
     from pipeline.publish import _escape
     out = render(sources=_escape("https://a.example/x?a=1&b=2"), theme1_source=_escape("https://b.example/?q=1&r=2"))
     assert "[https://a.example/x?a=1&b=2 " in out and "[https://b.example/?q=1&r=2]" in out
+
+
+def test_themes_after_a_missing_theme_are_rendered():
+    """CodeRabbit 4640187351: a missing theme1 must not hide theme2 and later themes."""
+    out = render(theme1=None, theme1_p=None, theme1_status=None, theme1_evidence=None, theme1_source=None,
+                 theme3="hope", theme3_p="0.40", theme3_status="author", theme3_evidence="Third excerpt.")
+    assert names("cross", "en") in out and names("hope", "en") in out
+    assert "Third excerpt." in out
+    assert out.index(names("cross", "en")) < out.index(names("hope", "en"))
+
+
+def test_themes_render_in_numeric_order_not_string_order():
+    out = render(theme10="hope", theme10_p="0.30")
+    assert out.index(names("cross", "en")) < out.index(names("hope", "en"))
+
+
+def test_created_link_decodes_an_escaped_title():
+    """CodeRabbit 4640187355: `War &amp; Peace` links to War_%26_Peace, not to the entity text."""
+    from pipeline.publish import _escape
+    out = render(status="created", article=_escape("War & Peace"), first_wiki="it")
+    assert "https://it.seminaverbi.bibleget.io/wiki/War_%26_Peace" in out
+    assert "amp" not in out.split("seminaverbi.bibleget.io/wiki/")[1].split(" ")[0]

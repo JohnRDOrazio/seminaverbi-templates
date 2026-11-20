@@ -71,9 +71,17 @@ local function withPercent(text, value)
 end
 
 local function themes(args, categories, lang, out)
+	-- every themeN present, in numeric order: a missing or blank theme does not hide the later ones
+	local numbers = {}
+	for name in pairs(args) do
+		local n = type(name) == 'string' and name:match('^theme(%d+)$')
+		if n then
+			numbers[#numbers + 1] = tonumber(n)
+		end
+	end
+	table.sort(numbers)
 	local items = {}
-	local i = 1
-	while args['theme' .. i] do
+	for _, i in ipairs(numbers) do
 		local status = args['theme' .. i .. '_status']
 		local line = '<li' .. (status and (' class="sv-proposal-theme-' .. Util.escape((status:gsub('[^%w%-]', ''))) .. '"') or '') .. '>'
 			.. withPercent('<strong>' .. themeLabel(categories, args['theme' .. i], lang) .. '</strong>',
@@ -84,7 +92,6 @@ local function themes(args, categories, lang, out)
 				.. (source and (' ' .. externalLink(source)) or '') .. '</div>'
 		end
 		items[#items + 1] = line .. '</li>'
-		i = i + 1
 	end
 	if #items > 0 then
 		out[#out + 1] = '<div class="sv-proposal-row"><span class="sv-proposal-label">' .. Util.msg('proposal_themes', lang)
@@ -158,7 +165,7 @@ function p.main(frame)
 		out[#out + 1] = row(Util.msg('proposal_reason', lang), plain(args.reason))
 	elseif status == 'created' and args.article and firstWiki then
 		out[#out + 1] = '<div class="sv-proposal-row">' .. externalLink('https://' .. firstWiki .. FARM_HOST
-			.. mw.uri.encode(args.article, 'WIKI'), plain(args.article)) .. '</div>'
+			.. mw.uri.encode(mw.text.decode(args.article), 'WIKI'), plain(args.article)) .. '</div>'
 	end
 	out[#out + 1] = '</div>'
 	if status == 'open' then
