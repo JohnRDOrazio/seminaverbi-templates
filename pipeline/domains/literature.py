@@ -124,15 +124,23 @@ def _fold_into(queue, series_qid: str, series_row: dict, volumes: list[dict], so
     """Add or extend the series row with `volumes` (common.query rows); the volume rows already in the queue
     are marked folded (their own sources untouched). A series already approved, created or declined gets
     nothing."""
+    labels, sitelinks, data = common.row_data(series_row)
+    return _extend_series(queue, series_qid, labels, sitelinks, data, volumes, source)
+
+
+def _extend_series(queue, series_qid: str, labels: dict, sitelinks: dict, data: dict, volumes: list[dict],
+                   source: str) -> int:
     if _other_domain(queue, series_qid):
         return 0
     old = queue.row(series_qid)
     if old and old.status in CLOSED:
         return 0
     known = dict(old.data.get(0, {}).get("volumes", {})) if old else {}
+    new_volume = False
     for volume in volumes:
-        _, sitelinks, data = common.row_data(volume)
-        known[volume["item"]] = {"sitelinks": sitelinks, "count": data["count"]}
+        _, volume_sitelinks, volume_data = common.row_data(volume)
+        new_volume = new_volume or volume["item"] not in known
+        known[volume["item"]] = {"sitelinks": volume_sitelinks, "count": volume_data["count"]}
         own = queue.row(volume["item"])
         if own is not None and own.domain == "literature" and own.data.get(0, {}).get("folded_into") != series_qid:
             queue.add(volume["item"], "literature", own.sources[0], {}, {}, False, {"folded_into": series_qid})
@@ -141,12 +149,36 @@ def _fold_into(queue, series_qid: str, series_row: dict, volumes: list[dict], so
             else:
                 print(f"literature candidates: {volume['item']} folded into {series_qid} but already "
                       f"{own.status}, left alone")
-    labels, sitelinks, data = common.row_data(series_row)
     data.update(series=True, volumes=known, count=max([data["count"], *(v["count"] for v in known.values())]))
     if not _has_wikipedia(sitelinks):
         with_page = [v for v in known.values() if _has_wikipedia(v["sitelinks"])]
         data["lead_sitelinks"] = max(with_page or known.values(), key=lambda v: v["count"])["sitelinks"]
-    return queue.add(series_qid, "literature", source, labels, sitelinks, False, data)
+    added = queue.add(series_qid, "literature", source, labels, sitelinks, False, data)
+    if new_volume and old and old.status is None:
+        queue.redo(1, series_qid)  # coverage, triage and the later stages saw the previous volume list
+    return added
+
+
+def attach_volumes(queue, sparql, qids: list[str]) -> None:
+    """Give the series `qids` found directly (no volumes yet) their volumes: the parts (P527) and the items that
+    are part of them (P179), with their Wikipedia sitelinks. The volumes are recorded on the series (as `fold`
+    does) and not added as rows."""
+    todo = []
+    for qid in dict.fromkeys(qids):
+        row = queue.row(qid)
+        if row and row.domain == "literature" and row.data.get(0, {}).get("series") \
+                and not row.data[0].get("volumes"):
+            todo.append(row)
+    for i in range(0, len(todo), CHUNK):
+        chunk = todo[i:i + CHUNK]
+        pattern = (f"  VALUES ?series {{ {common.values([r.qid for r in chunk])} }}\n"
+                   "  { ?series wdt:P527 ?item } UNION { ?item wdt:P179 ?series }")
+        rows = _run(sparql, "volumes of series", common.query(pattern, "?series "))
+        for row in chunk:
+            mine = [r for r in rows if r["series"] == row.qid and r["item"] != row.qid]
+            if mine:
+                _extend_series(queue, row.qid, row.labels, row.sitelinks, {"count": row.data[0].get("count", 0)},
+                               mine, row.sources[0])
 
 
 def fold(queue, sparql, rows: list[dict], source: str, cfg: dict) -> int:
@@ -178,6 +210,8 @@ def _bounded_rows(queue, sparql, pattern: str, label: str, source: str, classes:
         rows = _run(sparql, f"{label} ({cls})", common.bounded(pattern, cls))
         found += len(rows)
         added += _add_rows(queue, rows, source, series=cls != WORK, sparql=sparql, series_classes=series_classes)
+        if cls != WORK:
+            attach_volumes(queue, sparql, [r["item"] for r in rows])
     return added, found
 
 
@@ -193,8 +227,10 @@ def _works_of(queue, sparql, qids: list[str], source: str, label: str, classes: 
 def _direct_pattern(qids: list[str]) -> str:
     """The entries themselves, or the work of each one that is a fictional character (P1441, present in work;
     never of a human, whose works are found by P50: P1441 on a person lists Bible books and the like)."""
-    return (f"  VALUES ?entry {{ {common.values(qids)} }}\n"
-            "  { ?entry wdt:P1441 ?item FILTER NOT EXISTS { ?entry wdt:P31 wd:Q5 } } UNION { BIND(?entry AS ?item) }")
+    values = common.values(qids)  # each branch binds its own entries: a group cannot see a sibling's VALUES
+    return (f"  {{ VALUES ?entry {{ {values} }}\n"
+            "    ?entry wdt:P1441 ?item FILTER NOT EXISTS { ?entry wdt:P31 wd:Q5 } }\n"
+            f"  UNION {{ VALUES ?item {{ {values} }} }}")
 
 
 def _direct(queue, sparql, qids: list[str], source: str, label: str, classes: list[str]) -> int:

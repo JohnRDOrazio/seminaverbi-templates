@@ -520,3 +520,66 @@ def test_a_fictional_character_still_reaches_its_work_through_p1441(q):
                           FakeWikidata({"Pinocchio": "Q_PINOCCHIO"}))
     assert q.row("Q_P").sources[0] == "illustrissimi"
     assert any("wdt:P1441 ?item FILTER NOT EXISTS { ?entry wdt:P31 wd:Q5 }" in s for s in sparql.queries)
+
+
+# ---- PR review ----
+
+def test_each_direct_branch_binds_its_own_entries():
+    pattern = literature._direct_pattern(["Q_A", "Q_B"])
+    first, second = pattern.split("UNION")
+    assert "VALUES ?entry { wd:Q_A wd:Q_B }" in first and "wdt:P1441 ?item" in first
+    assert "VALUES ?item { wd:Q_A wd:Q_B }" in second and "BIND" not in pattern
+
+
+def _failed_series(q, count=10):
+    bare = {"item": "Q_S", "n": str(count), "types": "Q1667921"}
+    literature._insert(q, bare, "author", series=True)
+    for stage, outcome in ((1, "pass"), (2, "drop")):
+        q.set_outcome("Q_S", stage, outcome)
+    return {"Q_S": item("Q_S", "Saga", count, "Q1667921")}
+
+
+def test_a_new_volume_clears_the_series_outcomes_from_stage_one(q):
+    details = _failed_series(q)
+    folding(q, [vol("Q_V", "Volume", 40)], {"Q_V": ["Q_S"]}, details)
+    s = q.row("Q_S")
+    assert s.outcomes == {0: "pass"} and s.data[0]["count"] == 40
+    assert literature.triage(s, CFG)[0] == "pass"
+
+
+def test_rediscovering_the_same_volume_keeps_the_outcomes(q):
+    details = _failed_series(q)
+    folding(q, [vol("Q_V", "Volume", 40)], {"Q_V": ["Q_S"]}, details)
+    q.set_outcome("Q_S", 1, "pass")
+    q.set_outcome("Q_S", 2, "pass")
+    folding(q, [vol("Q_V", "Volume", 40)], {"Q_V": ["Q_S"]}, details, "facet")
+    assert q.row("Q_S").outcomes == {0: "pass", 1: "pass", 2: "pass"}
+
+
+def test_a_new_volume_keeps_the_outcomes_of_a_series_with_a_status(q):
+    details = _failed_series(q)
+    q.set_status("Q_S", "open")
+    folding(q, [vol("Q_V", "Volume", 40)], {"Q_V": ["Q_S"]}, details)
+    assert q.row("Q_S").outcomes == {0: "pass", 1: "pass", 2: "drop"}
+
+
+def test_a_series_found_directly_gets_its_volumes_and_is_a_translation_suggestion(q):
+    from test_pipeline_stages import FakeRepo, wikis
+
+    class Sparql(FakeSparql):
+        def select(self, query):
+            self.queries.append(query)
+            if "VALUES ?series" in query:
+                assert "wdt:P527" in query and "wdt:P179" in query
+                return [{**vol("Q_V", "The Hobbit", 90), "series": "Q_S"}]
+            if "VALUES ?subject { wd:Q302 }" in query and "wd:Q1667921 ." in query:
+                return [item("Q_S", "Middle-earth", 12, "Q1667921")]
+            return []
+
+    literature.candidates(q, Sparql(), FakeWikipedia([]), {**CFG_FULL, "_it_wikipedia": FakeItWikipedia([])},
+                          FakeWikidata({}))
+    s = q.row("Q_S")
+    assert s.data[0]["volumes"] == {"Q_V": {"sitelinks": {"enwiki": "The Hobbit"}, "count": 90}}
+    assert s.data[0]["count"] == 90 and q.row("Q_V") is None
+    repo = FakeRepo({("enwiki", "The Hobbit"): "Q9"}, {"Q9": {"en": "The Hobbit", "fr": "Le Hobbit"}})
+    assert literature.covered(s, repo, wikis())[0] == "translation"

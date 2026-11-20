@@ -30,9 +30,11 @@ _DETAILS = (
 )
 
 
-def query(pattern: str) -> str:
-    """Rows (QID, labels, Wikipedia URLs, sitelink count, P31 types) of the items `pattern` binds to ?item."""
-    return f"{_FIELDS}\nWHERE {{\n{_ORDERED}{pattern}\n{_DETAILS}}}\nGROUP BY ?item\nLIMIT {LIMIT}"
+def query(pattern: str, key: str = "") -> str:
+    """Rows (QID, labels, Wikipedia URLs, sitelink count, P31 types) of the items `pattern` binds to ?item;
+    `key` (e.g. "?series ") is a variable of the pattern kept next to ?item in each row."""
+    return (f"{_FIELDS.replace('SELECT ', 'SELECT ' + key, 1)}\nWHERE {{\n{_ORDERED}{pattern}\n{_DETAILS}}}\n"
+            f"GROUP BY {key}?item\nLIMIT {LIMIT}")
 
 
 def bounded(pattern: str, cls: str) -> str:
