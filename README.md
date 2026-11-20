@@ -53,7 +53,9 @@ Literature (`--domain literature`) runs the same stages over books, poems and se
 configured authors, Wikidata facets (Jesus, the Bible, saints, biblical characters, Christian genres), the works
 the Illustrissimi letters name and the works of Pope Francis's 2024 letter on reading. A series is one page: its
 volumes are folded into it and the dossier reads each volume's page. Works under the sitelink floor are dropped,
-except those the Illustrissimi or Francis lists name directly. Illustrissimi links that are redirects are followed to
+except those the Illustrissimi or Francis lists name directly. Religious texts (scripture, its books and parts,
+apocrypha, other religions' sacred texts) are dropped at triage; musical works (musicals, operas) are moved to the
+`music` domain, where they wait for its stages. Illustrissimi links that are redirects are followed to
 their target; only links with no Wikidata item, or people and items with no literary work, are reported. The dossier
 adds Wikisource pages to the proposal's sources as links only (they are never read). Run `python -m pipeline calibrate
 --domain literature` first, to check the cut-offs against the articles SeminaVerbi already has.

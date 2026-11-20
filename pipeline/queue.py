@@ -150,6 +150,15 @@ class Queue:
                         (status, *fields.values(), qid))
         self.db.commit()
 
+    def set_domain(self, qid, domain: str):
+        """Move a row to another domain: its stages then run (or wait) under that domain."""
+        self.db.execute("UPDATE candidates SET domain=? WHERE qid=?", (domain, qid))
+        self.db.commit()
+
+    def open_rows(self, domain: str) -> list[Row]:
+        """The domain's candidate rows with no status yet (not calibration rows)."""
+        return self._rows("domain=? AND status IS NULL AND calibration=0", (domain,))
+
     def by_status(self, status) -> list[Row]:
         return self._rows("status=?", (status,))
 
