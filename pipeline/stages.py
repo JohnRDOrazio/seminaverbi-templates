@@ -1,4 +1,5 @@
 """Pipeline stages: the shared stage loop and stage 1, "already covered?"."""
+from pipeline import load_config
 from sync.wiki import WikiClient
 
 LANGS = ("en", "it", "es", "fr", "de", "pt")
@@ -46,3 +47,20 @@ def covered(row, repo: WikiClient, wikis: dict[str, WikiClient]) -> tuple[str, d
     if len(have) == len(LANGS):
         return "drop", {"have": have}
     return "translation", {"have": have, "missing": [lang for lang in LANGS if lang not in have]}
+
+
+def quick(row, judge, wikipedia_for) -> tuple[str, dict]:
+    """Stage 3: drop if Jev finds the work implausibly connected to the Gospel (below quick_drop).
+
+    The synopsis is the Wikipedia lead in the first of en, it, es, fr, de, pt the row has a sitelink for.
+    Calibration rows always pass, with the probability recorded; a row with no Wikipedia sitelink passes unjudged."""
+    for lang in LANGS:
+        title = row.sitelinks.get(f"{lang}wiki")
+        if title:
+            p = judge.plausible(row, wikipedia_for(lang).lead(title))
+            break
+    else:
+        return "pass", {"note": "no wikipedia sitelink"}
+    if row.calibration or p >= load_config()["quick_drop"]:
+        return "pass", {"p": p}
+    return "drop", {"p": p}
