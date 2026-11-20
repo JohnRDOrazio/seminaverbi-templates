@@ -340,7 +340,11 @@ def _reconcile_approved(queue, en, declined: list) -> None:
     for row in queue.by_status("approved"):
         if not row.page or row.calibration:
             continue
-        params = _page_call(en.revision(row.page))
+        try:
+            params = _page_call(en.revision(row.page))
+        except SyncError as e:
+            print(f"votes: {row.page} not read, skipped: {e}", file=sys.stderr)
+            continue
         if params is None or params.get("qid") != row.qid:
             print(f"votes: {row.page} has no {{{{SV proposal}}}} call of {row.qid}, left alone", file=sys.stderr)
             continue
@@ -366,8 +370,11 @@ def sync_votes(queue, en, cfg) -> dict:
     for row in queue.by_status("open"):
         if not row.page or row.calibration:
             continue
-        current = en.revision(row.page)
-        params = _page_call(current)
+        try:
+            params = _page_call(en.revision(row.page))
+        except SyncError as e:
+            print(f"votes: {row.page} not read, skipped: {e}", file=sys.stderr)
+            continue
         if params is None:
             print(f"votes: {row.page} has no {{{{SV proposal}}}} call, left alone", file=sys.stderr)
             continue
@@ -385,14 +392,22 @@ def sync_votes(queue, en, cfg) -> dict:
     for row in voting:
         n = counts[row.page]
         queue.set_votes(row.qid, n)
-        if n >= cfg["vote_threshold"] and _write(en, row.page, _approver(row.qid)):
+        if n < cfg["vote_threshold"]:
+            continue
+        try:
+            if not _write(en, row.page, _approver(row.qid)):
+                continue
             # the edit may have been merged with a concurrent one: record what the saved page says
             saved = _saved_status(en, row.page, row.qid)
-            if saved == "approved":
-                queue.set_status(row.qid, "approved")
-                approved.append(row.qid)
-            else:
-                print(f"votes: {row.page} not approved: the saved page has status {saved!r}", file=sys.stderr)
+        except SyncError as e:
+            # an edit already saved stays; the row stays open and the saved page is read again next run
+            print(f"votes: {row.page} not read, approval not recorded: {e}", file=sys.stderr)
+            continue
+        if saved == "approved":
+            queue.set_status(row.qid, "approved")
+            approved.append(row.qid)
+        else:
+            print(f"votes: {row.page} not approved: the saved page has status {saved!r}", file=sys.stderr)
     _write(en, RANKING_TITLE, lambda old: ranking(queue))
     return {"approved": approved, "declined": declined}
 

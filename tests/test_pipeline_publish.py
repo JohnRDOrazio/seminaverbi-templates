@@ -577,3 +577,53 @@ def test_approval_is_recorded_only_when_the_saved_page_says_approved(q, capsys):
     assert sync_votes(q, en, CFG)["approved"] == []
     assert q.row("Q1").status == "open"
     assert "not approved" in capsys.readouterr().err
+
+
+class ReadFailEn(FakeEn):
+    """Reading a page in `read_fail` raises; one in `fail_after_edit` raises once the bot has edited it."""
+
+    def __init__(self, pages=None):
+        super().__init__(pages)
+        self.read_fail, self.fail_after_edit = set(), set()
+
+    def revision(self, title):
+        edited = any(e["title"] == title for e in self.edits)
+        if title in self.read_fail or (title in self.fail_after_edit and edited):
+            raise SyncError("read failed")
+        return super().revision(title)
+
+
+def test_an_approved_page_read_failure_does_not_stop_the_vote_sync(q, capsys):
+    """CodeRabbit (PR 36, publish.py:343): one proposal's read failure is reported, the others go on."""
+    en = ReadFailEn()
+    approved_page(q, en, "declined")
+    en.read_fail.add(PREFIX + "One")
+    open_page(q, en, "Q2", "Two")
+    en.votes[PREFIX + "Two"] = 3
+    assert sync_votes(q, en, CFG) == {"approved": ["Q2"], "declined": []}
+    assert q.row("Q1").status == "approved"
+    assert "One" in capsys.readouterr().err
+
+
+def test_an_open_page_read_failure_does_not_stop_the_vote_sync(q, capsys):
+    en = ReadFailEn()
+    open_page(q, en, "Q1", "One")
+    open_page(q, en, "Q2", "Two")
+    en.read_fail.add(PREFIX + "One")
+    en.votes = {PREFIX + "One": 5, PREFIX + "Two": 3}
+    assert sync_votes(q, en, CFG)["approved"] == ["Q2"]
+    assert q.row("Q1").status == "open"
+    assert "One" in capsys.readouterr().err
+    assert any(e["title"] == RANK for e in en.edits)
+
+
+def test_a_read_back_failure_after_approval_does_not_stop_the_vote_sync(q, capsys):
+    en = ReadFailEn()
+    open_page(q, en, "Q1", "One")
+    open_page(q, en, "Q2", "Two")
+    en.fail_after_edit.add(PREFIX + "One")
+    en.votes = {PREFIX + "One": 5, PREFIX + "Two": 3}
+    assert sync_votes(q, en, CFG)["approved"] == ["Q2"]
+    assert q.row("Q1").status == "open"  # not recorded without the saved page's word; retried next run
+    assert "approved" in en.pages[PREFIX + "One"][1]  # the completed edit is kept
+    assert "One" in capsys.readouterr().err
