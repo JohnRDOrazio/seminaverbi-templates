@@ -450,3 +450,13 @@ def test_the_verdict_of_a_confident_direct_connection_without_a_theme(monkeypatc
     q.set_outcome("Q1", 5, "pass", {**q.row("Q1").data[5],
                                     "connection": {"choice": "direct", "probabilities": {"direct": 0.99}}})
     assert "| verdict | would be proposed (direct connection) | |" in calibration.report(q, {"en": FakeWiki({})}, tree=TREE)
+
+
+def test_a_saved_theme_under_the_current_cutoff_is_neither_shown_nor_counted(monkeypatch):
+    """CodeRabbit (PR 37, calibration.py:61): a result saved under the 0.40 cutoff is read with today's."""
+    monkeypatch.setattr(calibration, "load_config", lambda: {"quick_drop": 0.25})
+    q = Queue(":memory:")
+    calibration_row(q, {"en": "F"}, {"enwiki": "F"}, themes=(("mercy", 0.45),))
+    out = calibration.report(q, {"en": FakeWiki({SV_THEME: ["Q20"]})}, tree=TREE)
+    assert "| verdict | would be dropped: no theme at 0.50 | |" in out
+    assert "| themes | none |" in out and "not found by Jev: mercy (0.45)" in out

@@ -147,3 +147,10 @@ def test_season_reads_episode_summaries_and_story_sections_in_one_request():
 def test_season_of_a_missing_page_is_empty():
     s = FakeSession(Resp({"error": {"code": "missingtitle", "info": "The page you specified doesn't exist."}}))
     assert Wikipedia("en", s).season("Nope") == []
+
+
+@pytest.mark.parametrize("name", ["Episode_list", "Episode_list/sublist|S1", "episode  list"])
+def test_season_accepts_underscores_in_the_episode_template_name(name):
+    wikitext = f"== Episodes ==\n{{{{{name}\n |Title=Pilot\n |ShortSummary=Walter asks forgiveness.\n}}}}\n"
+    out = Wikipedia("en", FakeSession(Resp({"parse": {"wikitext": wikitext}}))).season("S")
+    assert out == [("Episode: Pilot", "Walter asks forgiveness.")]

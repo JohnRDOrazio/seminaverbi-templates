@@ -53,12 +53,17 @@ def _field_verdict(jev_field, item_field: set[str], ancestors) -> str:
     return "DISAGREE"
 
 
+def _kept(result: dict) -> list[dict]:
+    """The saved themes that meet today's cutoff (a result saved under an older one keeps its themes)."""
+    return [t for t in result.get("themes", []) if t["p"] >= THEME_KEEP]
+
+
 def _verdict(row, result: dict, quick_drop: float) -> str:
     """What the pipeline would do with this work if it were a new candidate."""
     quick = (row.data.get(3) or {}).get("p")
     if quick is not None and quick < quick_drop:
         return f"would be dropped: quick check {quick:.2f} < {quick_drop:.2f}"
-    if not result.get("themes"):
+    if not _kept(result):
         if direct(result.get("connection", {})):
             return "would be proposed (direct connection)"
         return f"would be dropped: no theme at {THEME_KEEP:.2f}"
@@ -83,7 +88,7 @@ def _row_block(row, wiki, props, keys, ancestors, quick_drop) -> str:
     jev_field = result.get("field", {}).get("choice")
     verdict = _field_verdict(jev_field, item_field, ancestors)
     lines.append(f"| field | {_cell(jev_field)} | {_cell(', '.join(sorted(item_field)) or 'none')} ({verdict}) |")
-    jev_themes = {t["key"]: t["p"] for t in result.get("themes", [])}
+    jev_themes = {t["key"]: t["p"] for t in _kept(result)}
     scores = result.get("theme_scores", {})
     shown = ", ".join(f"{k} ({v:.2f})" for k, v in sorted(jev_themes.items(), key=lambda kv: -kv[1])) or "none"
     missed = [k + (f" ({scores[k]:.2f})" if k in scores else "") for k in sorted(item_themes - set(jev_themes))]

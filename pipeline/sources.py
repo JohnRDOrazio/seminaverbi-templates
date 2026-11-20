@@ -107,7 +107,7 @@ def _plain_text(wikitext: str) -> str:
     return mwparserfromhell.parse("\n".join(lines)).strip_code().strip()
 
 
-_EPISODE = re.compile(r"^episode list", re.I)
+_EPISODE = re.compile(r"^episode[ _]+list", re.I)  # MediaWiki reads "_" in a name as a space
 _SUMMARY_PARAMS = ("ShortSummary", "Summary")
 
 
