@@ -43,8 +43,10 @@ Stages (each records its outcome per candidate, so a run resumes where it stoppe
 1. `covered`: drop what SeminaVerbi already covers on all six wikis; mark partial coverage as a translation.
 2. `triage`: drop episodes, trailers, clips and facet-only candidates under the sitelink floor.
 3. `quick`: Jev judges the Wikipedia lead; below `quick_drop` the candidate is dropped.
-4. `dossier`: notes from Wikipedia sections and Wikiquote, in up to three languages.
-5. `adjudicate`: Jev decides connection, field and themes, picks evidence and builds the outline.
+4. `dossier`: notes from the Wikipedia lead and sections (for a series, its season pages with their episode
+   summaries) and Wikiquote, in up to three languages.
+5. `adjudicate`: Jev decides connection, field and themes (themes read over the whole dossier, in parts), picks
+   evidence and builds the outline; a candidate with no theme at 0.50 is dropped unless Jev is confident (0.80) of a direct Christian influence.
 6. `publish`: writes the `{{SV proposal}}` pages and the ranking page.
 
 Commands (options `--db PATH`, default `data/pipeline.sqlite`, and `--domain`, default `film`, go before or after the command):

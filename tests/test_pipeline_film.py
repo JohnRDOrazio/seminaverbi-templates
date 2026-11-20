@@ -227,8 +227,10 @@ def claim(qid):
     return {"mainsnak": {"datavalue": {"value": {"id": qid}}}}
 
 
-def entity(label=None, **claims):
-    return {"labels": {"en": {"value": label}} if label else {}, "claims": {p: [claim(q) for q in qs] for p, qs in claims.items()}}
+def entity(label=None, sitelinks=None, **claims):
+    return {"labels": {"en": {"value": label}} if label else {},
+            "claims": {p: [claim(q) for q in qs] for p, qs in claims.items()},
+            "sitelinks": {site: {"title": t} for site, t in (sitelinks or {}).items()}}
 
 
 class FakeWikidataEntities:
@@ -248,6 +250,12 @@ class FakeSections:
         if title not in self.pages:
             raise SyncError("missingtitle")
         return self.pages[title]
+
+    def lead(self, title):
+        return self.pages.get(f"#lead:{title}", "")
+
+    def season(self, title):
+        return self.pages.get(f"#season:{title}", [])
 
     def url(self, title):
         return f"https://{self.lang}.{self.project}.org/wiki/{title.replace(' ', '_')}"
@@ -295,7 +303,7 @@ def test_a_language_without_a_sitelink_is_never_used():
 
 
 def test_series_gets_one_note_per_season():
-    page = [("Premise", "x"), ("Season 1", "S1 text"), ("Season 2", "S2 text"), ("Plot", "p")]
+    page = [("Cast", "x"), ("Season 1", "S1 text"), ("Season 2", "S2 text"), ("Plot", "p")]
     wiki_for = wiki_for_pages({("en", "wikipedia"): {"S": page}})
     d = film.dossier(dossier_row({"enwiki": "S"}, instance_of=("Q5398426",)), DCFG, wiki_for,
                      FakeWikidataEntities({"Q1": entity()}))
@@ -374,7 +382,7 @@ class SeriesOnlySparql(FakeSparql):
         return self.rows if series_only and self.marker in query else []
 
 
-SEASON_PAGE = [("Premise", "x"), ("Season 1", "S1 text"), ("Season 2", "S2 text")]
+SEASON_PAGE = [("Cast", "x"), ("Season 1", "S1 text"), ("Season 2", "S2 text")]
 MINISERIES = "Q1259759"  # a subclass of television series: P31 holds only it
 
 
@@ -434,3 +442,63 @@ def test_a_calibration_film_is_not_flagged_as_a_series(q):
 def test_a_film_never_gets_season_sections(q):
     q.add("Q7", "film", "facet", {}, {"enwiki": "S"}, False, {"count": 30, "instance_of": [film.FILM]})
     assert _season_headings(q) == []
+
+
+# ---- the fuller dossier: the lead, story sections, season pages ----
+
+def test_the_lead_comes_first():
+    pages = {("en", "wikipedia"): {"B": [("Plot", "p")], "#lead:B": "B is a 2008 series."}}
+    d = film.dossier(dossier_row({"enwiki": "B"}), DCFG, wiki_for_pages(pages), FakeWikidataEntities({"Q1": entity()}))
+    assert [(n["heading"], n["text"]) for n in d["notes"]] == [("Lead", "B is a 2008 series."), ("Plot", "p")]
+    assert d["notes"][0]["url"] == "https://en.wikipedia.org/wiki/B"
+
+
+@pytest.mark.parametrize("lang,heading", [("en", "Premise"), ("en", "Story arc"), ("en", "Series overview"),
+                                          ("en", "Mythology"), ("it", "Premessa"), ("es", "Premisa"),
+                                          ("fr", "Résumé"), ("de", "Prämisse"), ("pt", "Premissa")])
+def test_story_sections_are_kept(lang, heading):
+    pages = {(lang, "wikipedia"): {"B": [(heading, "story"), ("Cast", "x")]}}
+    original = next(q for q, code in film.ORIGINAL_LANGUAGES.items() if code == lang)
+    d = film.dossier(dossier_row({f"{lang}wiki": "B"}), DCFG, wiki_for_pages(pages),
+                     FakeWikidataEntities({"Q1": entity(P364=[original])}))
+    assert [n["heading"] for n in d["notes"]] == [heading]
+
+
+SEASON = [("", "Season one follows Olivia."), ("Cast", "Anna Torv"), ("Episode: Pilot", "A flight lands."),
+          ("Production", "Filmed in Toronto."), ("Reception", "Praised."), ("References", "r")]
+
+
+def series_wikidata(seasons=("Q71",), list_page=None):
+    entities = {"Q1": entity(P527=list(seasons) + ["Q79"], **({"P1811": [list_page]} if list_page else {})),
+                "Q71": entity(P31=[film.SEASON], sitelinks={"enwiki": "B season 1", "itwiki": "B (prima stagione)"}),
+                "Q79": entity(P31=["Q5"], sitelinks={"enwiki": "Not a season"}),
+                "Q80": entity(sitelinks={"enwiki": "List of B episodes"})}
+    return FakeWikidataEntities(entities)
+
+
+def test_a_series_reads_its_season_pages():
+    pages = {("en", "wikipedia"): {"B": [("Plot", "p")], "#season:B season 1": SEASON,
+                                   "#season:Not a season": [("", "never read")]}}
+    d = film.dossier(dossier_row({"enwiki": "B"}, instance_of=(film.SERIES,)), DCFG, wiki_for_pages(pages),
+                     series_wikidata())
+    season_notes = [n for n in d["notes"] if "season_1" in n["url"]]
+    assert [(n["heading"], n["text"]) for n in season_notes] == [
+        ("B season 1", "Season one follows Olivia."), ("B season 1 / Episode: Pilot", "A flight lands."),
+        ("B season 1 / Reception", "Praised.")]
+    assert season_notes[0]["url"] == "https://en.wikipedia.org/wiki/B_season_1"
+    assert d["languages"] == {"en": 4}
+
+
+def test_a_series_without_season_items_reads_its_episode_list():
+    pages = {("en", "wikipedia"): {"B": [("Plot", "p")], "#season:List of B episodes": [("Episode: Pilot", "s")]}}
+    d = film.dossier(dossier_row({"enwiki": "B"}, instance_of=(film.SERIES,)), DCFG, wiki_for_pages(pages),
+                     series_wikidata(seasons=(), list_page="Q80"))
+    assert [n["heading"] for n in d["notes"]] == ["Plot", "List of B episodes / Episode: Pilot"]
+
+
+def test_a_film_never_reads_season_pages():
+    pages = {("en", "wikipedia"): {"B": [("Plot", "p")], "#season:B season 1": SEASON}}
+    wikidata = series_wikidata()
+    d = film.dossier(dossier_row({"enwiki": "B"}), DCFG, wiki_for_pages(pages), wikidata)
+    assert [n["heading"] for n in d["notes"]] == ["Plot"]
+    assert wikidata.asked == ["Q1"]

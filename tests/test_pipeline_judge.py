@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import pytest
 from typesafe_sdk import TypeSafeError
 
-from pipeline.judge import Judge, qhash
+from pipeline.judge import CONNECTIONS, Judge, qhash
 from pipeline.queue import Queue
 from pipeline.stages import quick
 from test_jev import DATA, FakeJev, choice
@@ -41,7 +41,7 @@ def test_connection_choice_has_the_four_keys(queue):
     fake = FakeJev({"connection": choice(probs, 0.8)})
     out = Judge(fake, queue, DATA).connection(row(queue), "dossier")
     assert set(fake.calls[0]["questions"]["connection"].criteria) == {"direct", "seeds", "entertainment", "none"}
-    assert fake.calls[0]["questions"]["connection"].criteria["none"] == {"name": "no real connection"}
+    assert fake.calls[0]["questions"]["connection"].criteria["none"] == {"name": CONNECTIONS["none"]}
     assert out == {"choice": "seeds", "probabilities": probs, "confidence": 0.8}
 
 
@@ -246,3 +246,10 @@ def test_the_queue_keeps_the_question_text_not_only_its_name(queue):
     assert any(PLAUSIBLE in s and jev.MODEL in s for s in stored)
     assert any(CONNECTION in s and CONNECTIONS["none"] in s for s in stored)
     assert "plausible" not in stored and "connection" not in stored
+
+
+def test_the_connection_question_allows_an_implicit_tie_in_one_storyline_or_episode():
+    from pipeline.judge import CONNECTION, CONNECTIONS
+    assert "seeds of the Word" in CONNECTION
+    assert all(w in CONNECTION for w in ("storyline", "character", "episode"))
+    assert "episode" in CONNECTIONS["seeds"] and "not even" in CONNECTIONS["none"]

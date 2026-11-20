@@ -225,17 +225,35 @@ def triage(row, cfg: dict) -> tuple[str, str]:
 ORIGINAL_LANGUAGES = {"Q1860": "en", "Q652": "it", "Q1321": "es", "Q150": "fr", "Q188": "de", "Q5146": "pt"}
 # lower-case fragments of the section headings worth reading, per language
 HEADINGS = {
-    "en": ("plot", "synopsis", "theme", "analysis", "reception", "religio", "critical response", "interpretation"),
-    "it": ("trama", "sinossi", "tema", "temi", "analisi", "critica", "accoglienza", "religios", "interpretazione"),
-    "es": ("argumento", "sinopsis", "trama", "temas", "análisis", "recepción", "crítica", "religios"),
-    "fr": ("intrigue", "synopsis", "thème", "analyse", "accueil", "critique", "réception", "religi"),
-    "de": ("handlung", "inhalt", "thema", "themen", "analyse", "rezeption", "kritik", "religi"),
-    "pt": ("enredo", "sinopse", "trama", "temas", "análise", "recepção", "crítica", "religios"),
+    "en": ("plot", "synopsis", "theme", "analysis", "reception", "religio", "critical response", "interpretation",
+           "premise", "overview", "story", "mytholog", "summary"),
+    "it": ("trama", "sinossi", "tema", "temi", "analisi", "critica", "accoglienza", "religios", "interpretazione",
+           "premessa", "riassunto", "mitologia"),
+    "es": ("argumento", "sinopsis", "trama", "temas", "análisis", "recepción", "crítica", "religios",
+           "premisa", "resumen", "mitología"),
+    "fr": ("intrigue", "synopsis", "thème", "analyse", "accueil", "critique", "réception", "religi",
+           "résumé", "prémisse", "mythologie"),
+    "de": ("handlung", "inhalt", "thema", "themen", "analyse", "rezeption", "kritik", "religi",
+           "prämisse", "überblick", "mythologie"),
+    "pt": ("enredo", "sinopse", "trama", "temas", "análise", "recepção", "crítica", "religios",
+           "premissa", "resumo", "mitologia"),
 }
 SEASONS = {
     "en": ("season", "series"), "it": ("stagione",), "es": ("temporada",), "fr": ("saison",),
     "de": ("staffel",), "pt": ("temporada",),
 }
+SEASON = "Q3464665"  # television series season
+# on a season or episode-list page every section is read except these (lower-case word starts, any language)
+SEASON_SKIP = ("cast", "interpreti", "personaggi e interpreti", "reparto", "elenco", "distribution", "besetzung",
+               "note", "notes", "references", "referencias", "références", "einzelnachweise", "referências",
+               "bibliogra", "external links", "collegamenti esterni", "enlaces externos", "liens externes",
+               "weblinks", "ligações externas", "see also", "voci correlate", "véase también", "voir aussi",
+               "siehe auch", "ver também", "ratings", "ascolti", "audiencia", "audiences", "audiencias",
+               "einschaltquoten", "audiência", "production", "produzione", "producción", "produktion",
+               "produção", "development", "sviluppo", "desarrollo", "développement", "entwicklung",
+               "desenvolvimento", "home media", "home video", "release", "broadcast", "trasmissione",
+               "emisión", "diffusion", "ausstrahlung", "exibição", "awards", "premi", "premios", "récompenses",
+               "auszeichnungen", "prêmios", "music", "musica", "música", "musique", "musik")
 CREATOR_PROPERTIES = ("P57", "P58", "P170")  # director, screenwriter, creator
 _TAG = re.compile(r"<[^>]+>")
 
@@ -280,6 +298,28 @@ def _sections(wiki, title: str) -> list[tuple[str, str]]:
         raise
 
 
+def _skipped(heading: str) -> bool:
+    low = heading.lower()
+    return any(re.match(rf"{re.escape(word)}", low) for word in SEASON_SKIP)
+
+
+def _sitelinks(entity: dict) -> dict[str, str]:
+    return {site: v["title"] for site, v in entity.get("sitelinks", {}).items() if "title" in v}
+
+
+def _season_pages(entity: dict, wikidata) -> list[dict[str, str]]:
+    """Sitelinks of the series' seasons (P527 items that are a television series season), in order; when there
+    are none, of its list of episodes (P1811)."""
+    seasons = []
+    for qid in _qids(entity, "P527"):
+        part = wikidata.entity(qid)
+        if SEASON in _qids(part, "P31"):
+            seasons.append(_sitelinks(part))
+    if seasons:
+        return seasons
+    return [_sitelinks(wikidata.entity(qid)) for qid in _qids(entity, "P1811")]
+
+
 def dossier(row, cfg: dict, wiki_for, wikidata) -> dict:
     """Stage 4: research notes {"notes": [{lang, url, heading, text}], "languages": {lang: notes}}.
 
@@ -293,12 +333,21 @@ def dossier(row, cfg: dict, wiki_for, wikidata) -> dict:
     wanted = [l for l in dict.fromkeys([original, "en", "it"]) if l and f"{l}wiki" in row.sitelinks]
     languages = wanted[:cfg["dossier_languages"]]
     notes = []
+    season_pages = _season_pages(entity, wikidata) if series else []
     for lang in languages:
         title = row.sitelinks[f"{lang}wiki"]
         wikipedia = wiki_for(lang, "wikipedia")
+        lead = wikipedia.lead(title)
+        if lead:
+            notes.append({"lang": lang, "url": wikipedia.url(title), "heading": "Lead", "text": lead})
         for heading, text in _sections(wikipedia, title):
             if text and _wanted(heading, lang, series):
                 notes.append({"lang": lang, "url": wikipedia.url(title), "heading": heading, "text": text})
+        for page in (p[f"{lang}wiki"] for p in season_pages if f"{lang}wiki" in p):
+            for heading, text in wikipedia.season(page):
+                if text and not _skipped(heading):
+                    notes.append({"lang": lang, "url": wikipedia.url(page),
+                                  "heading": f"{page} / {heading}" if heading else page, "text": text})
         if lang in ("en", "it"):
             creators = _creator_names(entity, lang, wikidata)
             quote = wiki_for(lang, "wikiquote")

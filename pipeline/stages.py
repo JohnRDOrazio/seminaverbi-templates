@@ -104,13 +104,55 @@ def quick(row, judge, wikipedia_for) -> tuple[str, dict]:
     return "drop", {"p": p}
 
 
-THEME_KEEP = 0.40
+THEME_KEEP = 0.50  # a theme is proposed at this probability or above
+MAX_THEMES = 8  # the most themes one proposal lists, best first
+DIRECT_PASS = 0.80  # a direct Christian or biblical influence this probable is proposed even with no kept theme
 EXCERPT_WORDS = 25
-MAX_DOSSIER_CHARS = 20_000  # the most dossier text one Jev question is sent (a long article stays one request)
+MAX_DOSSIER_CHARS = 20_000  # the most dossier text one Jev question is sent
+MAX_PARTS = 5  # a longer dossier is read in parts of MAX_DOSSIER_CHARS for the themes, at most this many
+
+
+def _note_text(n: dict) -> str:
+    return f"[{n['heading']}] ({n['lang']})\n{n['text']}"
 
 
 def _dossier_text(notes: list[dict]) -> str:
-    return "\n\n".join(f"[{n['heading']}] ({n['lang']})\n{n['text']}" for n in notes)[:MAX_DOSSIER_CHARS]
+    return "\n\n".join(_note_text(n) for n in notes)[:MAX_DOSSIER_CHARS]
+
+
+def _pieces(n: dict) -> list[dict]:
+    """The note, or, when it does not fit in one part, copies of it holding consecutive paragraphs that do
+    (a single paragraph longer than a part is cut)."""
+    if len(_note_text(n)) <= MAX_DOSSIER_CHARS:
+        return [n]
+    room = MAX_DOSSIER_CHARS - len(_note_text({**n, "text": ""}))
+    out, current = [], ""
+    for p in (p.strip() for p in re.split(r"\n\s*\n", n["text"])):
+        if not p:
+            continue
+        p = p[:room]
+        if current and len(current) + 2 + len(p) > room:
+            out.append({**n, "text": current})
+            current = ""
+        current = f"{current}\n\n{p}" if current else p
+    if current:
+        out.append({**n, "text": current})
+    return out
+
+
+def _parts(notes: list[dict]) -> list[list[dict]]:
+    """The notes packed in order into at most MAX_PARTS parts, each within MAX_DOSSIER_CHARS once joined."""
+    parts, size = [[]], 0
+    for piece in (p for n in notes for p in _pieces(n)):
+        length = len(_note_text(piece))
+        if parts[-1] and size + 2 + length > MAX_DOSSIER_CHARS:
+            if len(parts) == MAX_PARTS:
+                break
+            parts.append([])
+            size = 0
+        size += length + (2 if len(parts[-1]) else 0)
+        parts[-1].append(piece)
+    return parts
 
 
 def _paragraphs(notes: list[dict]) -> list[tuple[str, str]]:
@@ -139,24 +181,39 @@ def _first_wiki(languages: dict[str, int]) -> str:
     return max(LANGS, key=lambda lang: (languages.get(lang, 0), -LANGS.index(lang))) if languages else "en"
 
 
+def direct(connection: dict) -> bool:
+    """Jev finds a direct Christian or biblical influence at DIRECT_PASS or above."""
+    return (connection.get("choice") == "direct"
+            and connection.get("probabilities", {}).get("direct", 0) >= DIRECT_PASS)
+
+
 def adjudicate(row, judge, data) -> tuple[str, dict]:
     """Stage 5: connection type, field, kept themes with evidence, outline and first wiki for the proposal.
 
-    A "none" connection drops the row (calibration rows pass with the result kept). Themes are kept when
-    their status is applied or author and their probability is at least 0.40, listed by probability."""
+    The themes are asked of each part of the dossier (see _parts) and each keeps its best probability, so a
+    seed of the Word in one storyline or episode counts; connection and field are asked of the first part.
+    A theme is kept when its status is applied or author and its probability is at least THEME_KEEP; the best
+    MAX_THEMES are listed. A row with no kept theme is dropped unless Jev finds a direct Christian or biblical
+    influence at DIRECT_PASS or above (calibration rows pass with the result kept); the connection type is
+    shown on the proposal and never drops a row."""
     dossier = row.data.get(4, {"notes": [], "languages": {}})
-    notes = dossier["notes"]
-    text = _dossier_text(notes)
+    parts = _parts(dossier["notes"])
+    text = _dossier_text(parts[0])
     connection = judge.connection(row, text)
     field = judge.field(row, text)
     names = {n.key: n.names["en"] for n in categories.leaf_themes(data)}
-    kept = sorted(((k, v) for k, v in judge.themes(row, text).items()
+    best: dict[str, tuple[dict, int]] = {}
+    for i, part in enumerate(parts):
+        for key, v in judge.themes(row, _dossier_text(part)).items():
+            if key not in best or v["p"] > best[key][0]["p"]:
+                best[key] = (v, i)
+    kept = sorted(((k, v, i) for k, (v, i) in best.items()
                    if v["status"] in ("applied", "author") and v["p"] >= THEME_KEEP and k in names),
-                  key=lambda kv: -kv[1]["p"])
-    paragraphs = _paragraphs(notes)
+                  key=lambda kvi: -kvi[1]["p"])[:MAX_THEMES]
     themes = []
-    for key, v in kept:
+    for key, v, i in kept:
         evidence = {"url": None, "excerpt": ""}
+        paragraphs = _paragraphs(parts[i])
         if paragraphs:
             paragraph, url = paragraphs[judge.evidence(row, key, [p for p, _ in paragraphs])]
             evidence = {"url": url, "excerpt": _excerpt(paragraph)}
@@ -164,7 +221,8 @@ def adjudicate(row, judge, data) -> tuple[str, dict]:
     outline = (["Lead", "Story and the Gospel"] + [f"Theme: {names[t['key']]}" for t in themes]
                + ["Discernment", "See also", "References"])
     result = {"connection": connection, "field": field, "themes": themes, "outline": outline,
-              "first_wiki": _first_wiki(dossier["languages"])}
-    if connection["choice"] == "none" and not row.calibration:
+              "first_wiki": _first_wiki(dossier["languages"]),
+              "theme_scores": {k: v["p"] for k, (v, _) in best.items()}}
+    if not themes and not direct(connection) and not row.calibration:
         return "drop", result
     return "pass", result
