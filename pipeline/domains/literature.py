@@ -14,6 +14,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 from types import SimpleNamespace
+from urllib.parse import quote as urlquote
 
 from sync import categories
 from sync.wikidata import WikidataClient
@@ -54,10 +55,25 @@ def _run(sparql, label: str, query: str) -> list[dict]:
     return common.run_query(sparql, "literature", label, query)
 
 
+def _other_domain(queue, qid: str):
+    """The row's domain when the QID is already a candidate of another domain (the queue is keyed by QID alone):
+    reported, and the caller skips it."""
+    old = queue.row(qid)
+    if old and old.domain != "literature":
+        print(f"literature candidates: {qid} is already a {old.domain} candidate, skipped")
+        return old.domain
+    return None
+
+
 def _insert(queue, row: dict, source: str, series: bool = False) -> int:
+    if _other_domain(queue, row["item"]):
+        return 0
     labels, sitelinks, data = common.row_data(row)
     if series:
         data["series"] = True
+        old = queue.row(row["item"])
+        if old and "count" in old.data.get(0, {}):  # a series folded earlier counts its best volume
+            data["count"] = max(data["count"], old.data[0]["count"])
     return queue.add(row["item"], "literature", source, labels, sitelinks, False, data)
 
 
@@ -107,6 +123,8 @@ def _fold_into(queue, series_qid: str, series_row: dict, volumes: list[dict], so
     """Add or extend the series row with `volumes` (common.query rows); the volume rows already in the queue
     are marked folded (their own sources untouched). A series already approved, created or declined gets
     nothing."""
+    if _other_domain(queue, series_qid):
+        return 0
     old = queue.row(series_qid)
     if old and old.status in CLOSED:
         return 0
@@ -114,12 +132,19 @@ def _fold_into(queue, series_qid: str, series_row: dict, volumes: list[dict], so
     for volume in volumes:
         _, sitelinks, data = common.row_data(volume)
         known[volume["item"]] = {"sitelinks": sitelinks, "count": data["count"]}
-        if (own := queue.row(volume["item"])) is not None:
+        own = queue.row(volume["item"])
+        if own is not None and own.domain == "literature" and own.data.get(0, {}).get("folded_into") != series_qid:
             queue.add(volume["item"], "literature", own.sources[0], {}, {}, False, {"folded_into": series_qid})
+            if own.status is None:
+                queue.redo(2, volume["item"])  # triage runs again and drops the volume
+            else:
+                print(f"literature candidates: {volume['item']} folded into {series_qid} but already "
+                      f"{own.status}, left alone")
     labels, sitelinks, data = common.row_data(series_row)
     data.update(series=True, volumes=known, count=max([data["count"], *(v["count"] for v in known.values())]))
     if not _has_wikipedia(sitelinks):
-        data["lead_sitelinks"] = max(known.values(), key=lambda v: v["count"])["sitelinks"]
+        with_page = [v for v in known.values() if _has_wikipedia(v["sitelinks"])]
+        data["lead_sitelinks"] = max(with_page or known.values(), key=lambda v: v["count"])["sitelinks"]
     return queue.add(series_qid, "literature", source, labels, sitelinks, False, data)
 
 
@@ -165,9 +190,10 @@ def _works_of(queue, sparql, qids: list[str], source: str, label: str, classes: 
 
 
 def _direct_pattern(qids: list[str]) -> str:
-    """The entries themselves, or the work of each one that is a fictional character (P1441, present in work)."""
+    """The entries themselves, or the work of each one that is a fictional character (P1441, present in work;
+    never of a human, whose works are found by P50: P1441 on a person lists Bible books and the like)."""
     return (f"  VALUES ?entry {{ {common.values(qids)} }}\n"
-            "  { ?entry wdt:P1441 ?item } UNION { BIND(?entry AS ?item) }")
+            "  { ?entry wdt:P1441 ?item FILTER NOT EXISTS { ?entry wdt:P31 wd:Q5 } } UNION { BIND(?entry AS ?item) }")
 
 
 def _direct(queue, sparql, qids: list[str], source: str, label: str, classes: list[str]) -> int:
@@ -304,7 +330,7 @@ def dossier(row, cfg: dict, wiki_for, wikidata) -> dict:
                 if text and any(name in heading.lower() for name in authors):
                     notes.append({"lang": lang, "url": quote.url(title), "heading": heading, "text": text})
         if source := own.get(f"{lang}wikisource"):
-            links.append(f"https://{lang}.wikisource.org/wiki/{source.replace(' ', '_')}")
+            links.append(f"https://{lang}.wikisource.org/wiki/{urlquote(source.replace(' ', '_'), safe='/:()')}")
     counts = {lang: sum(n["lang"] == lang for n in notes) for lang in languages}
     return {"notes": notes, "languages": counts, "links": links}
 

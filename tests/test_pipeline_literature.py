@@ -421,3 +421,79 @@ def test_literature_dossier_stage_drops_empty():
     assert literature.dossier_stage(drow({"enwiki": "B"}), DC, wiki_for_pages({}), wd) == (
         "drop", {"reason": "empty dossier"})
     assert literature.dossier_stage(drow({"enwiki": "B"}, calibration=True), DC, wiki_for_pages({}), wd)[0] == "pass"
+
+
+# ---- fixes from the final review ----
+
+def test_a_series_keeps_its_folded_count_when_a_series_query_returns_it_again(q):
+    bare = {"item": "Q_S", "n": "3", "types": "Q1667921"}
+    folding(q, [vol("Q_V", "Volume", 40)], {"Q_V": ["Q_S"]}, {"Q_S": bare})
+    literature._add_rows(q, [bare], "author", series=True)  # the series-class query returns the same series
+    s = q.row("Q_S")
+    assert s.data[0]["count"] == 40 and set(s.data[0]["volumes"]) == {"Q_V"} and "lead_sitelinks" in s.data[0]
+    assert literature.triage(s, CFG)[0] == "pass"
+
+
+def test_a_human_addressee_with_p1441_and_no_works_is_reported_not_added(q, capsys):
+    class Sparql(FakeSparql):
+        def select(self, query):
+            self.queries.append(query)
+            # a Bible book "present in work" of the human: returned unless the query excludes humans
+            if "wdt:P1441" in query and "wd:Q5" not in query:
+                return [item("Q_BIBLE", "Genesis", 90, "Q7725634")]
+            return []
+
+    wikidata = FakeWikidata({"Gesu": "Q302"})
+    literature.candidates(q, Sparql(), FakeWikipedia([]), {**CFG_FULL, "_it_wikipedia": FakeItWikipedia(["Gesu"])},
+                          wikidata)
+    assert q.row("Q_BIBLE") is None
+    assert "illustrissimi: no literary work for 'Gesu'" in capsys.readouterr().out
+
+
+def _existing_volume(q, status=None):
+    q.add("Q_V", "literature", "author", {"en": "V"}, {"enwiki": "V"}, data={"count": 30})
+    q.set_outcome("Q_V", 1, "pass")
+    q.set_outcome("Q_V", 2, "pass")
+    if status:
+        q.set_status("Q_V", status)
+    return folding(q, [vol("Q_V", "Volume", 30)], {"Q_V": ["Q_S"]}, {"Q_S": item("Q_S", "Saga", 12, "Q1667921")})
+
+
+def test_folding_a_volume_with_no_status_reruns_its_triage(q):
+    _existing_volume(q)
+    assert 2 not in q.row("Q_V").outcomes and 1 in q.row("Q_V").outcomes
+    assert literature.triage(q.row("Q_V"), CFG)[0] == "drop"
+
+
+@pytest.mark.parametrize("status", ["open", "approved", "created", "declined"])
+def test_folding_a_volume_with_a_status_leaves_it_alone(q, capsys, status):
+    _existing_volume(q, status)
+    assert 2 in q.row("Q_V").outcomes
+    assert f"literature candidates: Q_V folded into Q_S but already {status}, left alone" in capsys.readouterr().out
+
+
+def test_lead_sitelinks_prefer_a_volume_with_a_wikipedia_page(q):
+    wikisource_only = {"item": "Q_A", "n": "99", "types": "Q7725634"}
+    folding(q, [wikisource_only, vol("Q_B", "Has page", 5)], {"Q_A": ["Q_S"], "Q_B": ["Q_S"]},
+            {"Q_S": {"item": "Q_S", "n": "1", "types": "Q1667921"}})
+    assert q.row("Q_S").data[0]["lead_sitelinks"] == {"enwiki": "Has page"}
+
+
+def test_wikisource_link_quotes_the_title():
+    wd = FakeWikidataEntities({"Q1": entity(sitelinks={"enwikisource": "Who Was It?"})})
+    d = literature.dossier(drow({"enwiki": "B"}), DC, wiki_for_pages({("en", "wikipedia"): {"B": [("Plot", "p")]}}), wd)
+    assert d["links"] == ["https://en.wikisource.org/wiki/Who_Was_It%3F"]
+
+
+def test_a_qid_already_in_another_domain_is_skipped(q, capsys):
+    q.add("Q_F", "film", "facet", {}, {}, data={"count": 50})
+    assert literature._insert(q, item("Q_F", "Film", 90, "Q7725634"), "author") == 0
+    assert q.row("Q_F").domain == "film" and q.row("Q_F").sources == ["facet"] and q.row("Q_F").data[0]["count"] == 50
+    assert "literature candidates: Q_F is already a film candidate, skipped" in capsys.readouterr().out
+
+
+def test_a_series_qid_in_another_domain_is_not_extended(q, capsys):
+    q.add("Q_S", "film", "facet", {}, {}, data={"count": 50})
+    n, _ = folding(q, [vol("Q_V", "Volume", 30)], {"Q_V": ["Q_S"]}, {"Q_S": item("Q_S", "Saga", 12, "Q1667921")})
+    assert n == 0 and "volumes" not in q.row("Q_S").data[0] and q.row("Q_S").sources == ["facet"]
+    assert "literature candidates: Q_S is already a film candidate, skipped" in capsys.readouterr().out
