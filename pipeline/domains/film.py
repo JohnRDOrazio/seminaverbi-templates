@@ -16,90 +16,29 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from urllib.parse import unquote
 
 from sync import categories
-from sync.wiki import SyncError
 from sync.wikidata import WikidataClient
 
-LANGS = ("en", "it", "es", "fr", "de", "pt")
-FILM, SERIES = "Q11424", "Q5398426"
-SAINT_PROPERTY = "P411"
-LIMIT = 500  # per query: keeps each one well under the endpoint's 60 s timeout
-CHUNK = 50
-# television series episode, trailer, film clip: judged through their series or not at all
-NON_WORKS = {"Q21191270": "episode", "Q622550": "trailer", "Q128696755": "clip"}
-NON_WIKIPEDIA = {"commonswiki", "wikidatawiki", "metawiki", "specieswiki", "mediawikiwiki"}
+from . import common
+from .common import CHUNK, LANGS, LIMIT, NON_WIKIPEDIA  # noqa: F401  (re-exported: tests patch film.LIMIT)
 
-# keep the patterns in the order written: left to the optimizer, the wide joins time out on WDQS
-_ORDERED = "  hint:Query hint:optimizer \"None\" .\n"
-_FIELDS = (
-    "SELECT ?item (SAMPLE(?count) AS ?n) (GROUP_CONCAT(DISTINCT ?type; separator=\" \") AS ?types)"
-    + "".join(f" (SAMPLE(?lab_{l}) AS ?l_{l}) (SAMPLE(?lnk_{l}) AS ?s_{l})" for l in LANGS)
-)
-_DETAILS = (
-    "  ?item wikibase:sitelinks ?count .\n"
-    "  OPTIONAL { ?item wdt:P31 ?t . BIND(STRAFTER(STR(?t), \"/entity/\") AS ?type) }\n"
-    + "".join(
-        f"  OPTIONAL {{ ?item rdfs:label ?lab_{l} FILTER(LANG(?lab_{l}) = \"{l}\") }}\n"
-        f"  OPTIONAL {{ ?lnk_{l} schema:about ?item ; schema:isPartOf <https://{l}.wikipedia.org/> }}\n"
-        for l in LANGS)
-)
-
-
-def _query(pattern: str) -> str:
-    """Rows (QID, labels, Wikipedia URLs, sitelink count, P31 types) of the items `pattern` binds to ?item."""
-    return f"{_FIELDS}\nWHERE {{\n{_ORDERED}{pattern}\n{_DETAILS}}}\nGROUP BY ?item\nLIMIT {LIMIT}"
-
-
-def _bounded(pattern: str, cls: str) -> str:
-    """The query of `pattern` on items of class `cls`, at most LIMIT items: the most linked ones (sitelink
-    count), so a truncated result drops the least notable."""
-    return _query(f"  {{ SELECT DISTINCT ?item ?sitelinks WHERE {{\n{_ORDERED}{pattern}\n"
-                  f"  ?item wdt:P31/wdt:P279* wd:{cls} .\n  ?item wikibase:sitelinks ?sitelinks .\n"
-                  f"  }} ORDER BY DESC(?sitelinks) LIMIT {LIMIT} }}")
-
-
-def _values(qids) -> str:
-    return " ".join(f"wd:{q}" for q in qids)
-
-
-def _title(url: str) -> str:
-    return unquote(url.rsplit("/wiki/", 1)[-1]).replace("_", " ")
-
-
-def _row_data(row: dict) -> tuple[dict, dict, dict]:
-    labels = {l: row[f"l_{l}"] for l in LANGS if row.get(f"l_{l}")}
-    sitelinks = {f"{l}wiki": _title(row[f"s_{l}"]) for l in LANGS if row.get(f"s_{l}")}
-    data = {"count": int(row.get("n") or len(sitelinks)), "instance_of": row.get("types", "").split()}
-    return labels, sitelinks, data
+_query, _bounded, _values, _title = common.query, common.bounded, common.values, common.title
+_row_data, _qids, _sitelinks = common.row_data, common.qids, common.entity_sitelinks
+_sections, _heading, _wikidata_qid = common.sections, common.heading, common.wikidata_qid
 
 
 def _facet_patterns(cfg: dict) -> list[tuple[str, str]]:
     """(description, pattern) for every facet; each one is run once for films and once for series."""
-    film = cfg["film"]
-    subjects = _values(film["subjects"])
-    link = "?item wdt:P921|wdt:P144 ?subject ."
-    return [
-        ("subjects", f"  VALUES ?subject {{ {subjects} }}\n  {link}"),
-        ("books of the Bible", f"  ?subject wdt:P31 wd:{film['book_class']} .\n  {link}"),
-        ("saints", f"  ?subject wdt:{SAINT_PROPERTY} [] ; wdt:P31 wd:Q5 .\n  {link}"),
-        ("biblical characters",
-         f"  VALUES ?class {{ {_values(film['biblical_classes'])} }}\n  ?subject wdt:P31 ?class .\n  {link}"),
-        ("genres", f"  VALUES ?genre {{ {_values(film['genres'])} }}\n  ?item wdt:P136 ?genre ."),
-    ]
+    return common.facet_patterns(cfg["film"])
 
 
 def _run(sparql, label: str, query: str) -> list[dict]:
-    try:
-        rows = sparql.select(query)
-    except Exception as exc:  # logged, then re-raised: a failed source must stop the run, not shrink it
-        print(f"film candidates: {label} failed: {exc}")
-        raise
-    if len(rows) >= LIMIT:
-        print(f"film candidates: {label}: {len(rows)} rows is the query limit, results may be truncated")
-    return rows
+    return common.run_query(sparql, "film", label, query, limit=LIMIT)  # LIMIT read here, so tests can patch it
 
+FILM, SERIES = "Q11424", "Q5398426"
+# television series episode, trailer, film clip: judged through their series or not at all
+NON_WORKS = {"Q21191270": "episode", "Q622550": "trailer", "Q128696755": "clip"}
 
 def _take(queue, rows: list[dict], source: str, calibration: bool = False, series: bool = False) -> int:
     """Add the rows; `series`: they came from a query bounded to the series class (P31 may hold only a subclass
@@ -162,44 +101,7 @@ def calibration_qids(wikis: dict, wikidata=None, tree: dict | None = None) -> tu
     'lang:Title' of those with no local item or no Wikipedia sitelink (reported, never guessed)."""
     wikidata = wikidata or WikidataClient()
     tree = tree or categories.load(Path(__file__).resolve().parents[2])
-    nodes = categories.nodes(tree)
-    keys = {"film", "television"}
-    for node in nodes:  # nodes come parent-first, so one pass collects every descendant
-        if node.parent_key in keys:
-            keys.add(node.key)
-    repo = wikis["en"]  # the farm's Wikibase repository: the client wikis have no wbgetentities
-    qids: list[str] = []
-    unmapped: list[str] = []
-    for lang, wiki in wikis.items():
-        for node in nodes:
-            if node.key not in keys or lang not in node.names:
-                continue
-            for title, ns in wiki.members(f"Category:{node.names[lang]}"):
-                if ns != 0:
-                    continue
-                qid = _wikidata_qid(repo, wikidata, lang, title)
-                if qid is None:
-                    if f"{lang}:{title}" not in unmapped:
-                        unmapped.append(f"{lang}:{title}")
-                elif qid not in qids:
-                    qids.append(qid)
-    return qids, unmapped
-
-
-def _wikidata_qid(repo, wikidata, lang: str, title: str) -> str | None:
-    """The Wikidata QID of the page `title` on the `lang` SeminaVerbi wiki (site id `lang`), through the local
-    item's Wikipedia sitelinks, asked of the repository."""
-    item = repo.item_for(lang, title)
-    if not item:
-        return None
-    links = repo.item_sitelinks(item)[1]
-    sites = ["enwiki"] + sorted(s for s in links if s.endswith("wiki") and s != "enwiki")
-    for site in sites:
-        if site in links and site not in NON_WIKIPEDIA:
-            qid = wikidata.by_sitelink(site, [links[site]]).get(links[site])
-            if qid:
-                return qid
-    return None
+    return common.calibration_qids(wikis, wikidata, tree, {"film", "television"})
 
 
 def triage(row, cfg: dict) -> tuple[str, str]:
@@ -255,11 +157,6 @@ SEASON_SKIP = ("cast", "interpreti", "personaggi e interpreti", "reparto", "elen
                "emisión", "diffusion", "ausstrahlung", "exibição", "awards", "premi", "premios", "récompenses",
                "auszeichnungen", "prêmios", "music", "musica", "música", "musique", "musik")
 CREATOR_PROPERTIES = ("P57", "P58", "P170")  # director, screenwriter, creator
-_TAG = re.compile(r"<[^>]+>")
-
-
-def _heading(raw: str) -> str:
-    return _TAG.sub("", raw).strip()
 
 
 def _wanted(heading: str, lang: str, series: bool) -> bool:
@@ -267,15 +164,6 @@ def _wanted(heading: str, lang: str, series: bool) -> bool:
     if any(re.search(rf"\b{re.escape(word)}", low) for word in HEADINGS[lang]):  # at a word start only
         return True
     return series and any(re.match(rf"{word}\b", low) for word in SEASONS[lang])
-
-
-def _qids(entity: dict, prop: str) -> list[str]:
-    out = []
-    for claim in entity.get("claims", {}).get(prop, []):
-        value = claim.get("mainsnak", {}).get("datavalue", {}).get("value")
-        if isinstance(value, dict) and value.get("id"):
-            out.append(value["id"])
-    return out
 
 
 def _creator_names(entity: dict, lang: str, wikidata) -> list[str]:
@@ -288,23 +176,9 @@ def _creator_names(entity: dict, lang: str, wikidata) -> list[str]:
     return names
 
 
-def _sections(wiki, title: str) -> list[tuple[str, str]]:
-    """The page's sections, or none when the page does not exist; any other API error propagates."""
-    try:
-        return [(_heading(h), t) for h, t in wiki.sections(title)]
-    except SyncError as exc:
-        if "missingtitle" in str(exc) or "nosuchpage" in str(exc):
-            return []
-        raise
-
-
 def _skipped(heading: str) -> bool:
     low = heading.lower()
     return any(re.match(rf"{re.escape(word)}", low) for word in SEASON_SKIP)
-
-
-def _sitelinks(entity: dict) -> dict[str, str]:
-    return {site: v["title"] for site, v in entity.get("sitelinks", {}).items() if "title" in v}
 
 
 def _season_pages(entity: dict, wikidata) -> list[dict[str, str]]:
