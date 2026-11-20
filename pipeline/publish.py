@@ -185,7 +185,7 @@ def ranking(queue) -> str:
         info = r.data.get(1, {})
         name = display_name(r)
         lines.append(f"* [https://www.wikidata.org/wiki/{r.qid} {name}] – on: {', '.join(info.get('have', []))};"
-                     f" missing: {', '.join(info.get('missing', []))}")
+                     f" missing: {', '.join(info.get('missing', []))}" + (f" ({info['note']})" if info.get("note") else ""))
     return "\n".join(lines) + "\n"
 
 

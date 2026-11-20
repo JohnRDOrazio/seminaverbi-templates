@@ -105,7 +105,7 @@ def _stage_functions(domain, queue, cfg) -> dict:
         return domain.dossier_stage(row, cfg, wiki_for, lazy.setdefault("wikidata", _wikidata()))
 
     return {
-        1: lambda row: stages.covered(row, wikis()["en"], wikis()),
+        1: lambda row: (getattr(domain, "covered", None) or stages.covered)(row, wikis()["en"], wikis()),
         2: _triage_stage(domain, cfg),
         3: lambda row: stages.quick(row, judge(), wiki_for),
         4: dossier,

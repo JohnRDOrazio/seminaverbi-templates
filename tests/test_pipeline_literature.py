@@ -308,3 +308,24 @@ def test_rows_from_a_series_query_are_not_folded(q):
     literature._add_rows(q, [item("Q_S", "Saga", 50, "Q1667921")], "author", sparql=sparql,
                          series_classes=["Q1667921"], series=True)
     assert q.row("Q_S").data[0]["series"] is True and sparql.queries == []
+
+
+def test_a_series_covered_through_a_volume_is_a_translation_suggestion():
+    from test_pipeline_stages import FakeRepo, wikis
+
+    volumes = {"Q10": {"sitelinks": {"enwiki": "The Hobbit"}, "count": 90},
+               "Q11": {"sitelinks": {"enwiki": "Other"}, "count": 5}}
+    series = Row("Q5", "literature", ["author"], {}, {"enwiki": "Middle-earth"}, False,
+                 data={0: {"count": 1, "series": True, "volumes": volumes}})
+    repo = FakeRepo({("enwiki", "The Hobbit"): "Q9"}, {"Q9": {"en": "The Hobbit", "fr": "Le Hobbit"}})
+    assert literature.covered(series, repo, wikis()) == (
+        "translation", {"have": ["en", "fr"], "missing": ["it", "es", "de", "pt"],
+                        "note": "covered through The Hobbit"})
+
+
+def test_a_series_with_no_covered_volume_passes():
+    from test_pipeline_stages import FakeRepo, wikis
+
+    series = Row("Q5", "literature", ["author"], {}, {}, False,
+                 data={0: {"volumes": {"Q10": {"sitelinks": {"enwiki": "The Hobbit"}, "count": 90}}}})
+    assert literature.covered(series, FakeRepo(), wikis()) == ("pass", {})

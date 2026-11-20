@@ -13,10 +13,12 @@ Only the stub of stages 0 and 4 exists so far.
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 from sync import categories
 from sync.wikidata import WikidataClient
 
+from pipeline import stages
 from pipeline.sources import Wikipedia
 
 from . import common
@@ -278,3 +280,25 @@ def triage(row, cfg: dict) -> tuple[str, str]:
         if count < floor:
             return "drop", f"{count} sitelinks, under the floor of {floor}"
     return "pass", ""
+
+
+def _volume_title(qid: str, sitelinks: dict) -> str:
+    return sitelinks.get("enwiki") or next(iter(sitelinks.values()), None) or qid
+
+
+def covered(row, repo, wikis) -> tuple[str, dict]:
+    """Stage 1: `stages.covered` on the series; a series it passes is still a translation suggestion when one of
+    its volumes is covered on some wiki (the first such volume sets `have` and the `note`)."""
+    outcome, data = stages.covered(row, repo, wikis)
+    if outcome != "pass":
+        return outcome, data
+    for qid, volume in row.data.get(0, {}).get("volumes", {}).items():
+        sitelinks = volume.get("sitelinks", {})
+        stand_in = SimpleNamespace(qid=qid, sitelinks=sitelinks, labels={}, calibration=False, data={})
+        volume_outcome, volume_data = stages.covered(stand_in, repo, wikis)
+        if volume_outcome != "pass":
+            have = volume_data["have"]
+            missing = [lang for lang in LANGS if lang not in have]
+            return "translation", {"have": have, "missing": missing,
+                                   "note": f"covered through {_volume_title(qid, sitelinks)}"}
+    return outcome, data

@@ -635,3 +635,11 @@ def test_translation_suggestion_without_labels_uses_a_sitelink(q):
     q.set_outcome("Q104123", 1, "pass", {"have": ["it"], "missing": ["en", "es", "fr", "de", "pt"]})
     suggestions = ranking(q)[ranking(q).index("== Translation suggestions =="):]
     assert "[https://www.wikidata.org/wiki/Q104123 Pulp Fiction]" in suggestions
+
+
+def test_ranking_shows_the_translation_note(q):
+    q.add("Q9", "literature", "s", {"en": "Middle-earth"}, {})
+    q.set_outcome("Q9", 1, "translation", {"have": ["en"], "missing": ["it"], "note": "covered through The Hobbit"})
+    lines = ranking(q).splitlines()
+    line = next(l for l in lines if "Middle-earth" in l)
+    assert line.endswith("missing: it (covered through The Hobbit)")
