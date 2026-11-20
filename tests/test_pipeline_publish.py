@@ -643,3 +643,12 @@ def test_ranking_shows_the_translation_note(q):
     lines = ranking(q).splitlines()
     line = next(l for l in lines if "Middle-earth" in l)
     assert line.endswith("missing: it (covered through The Hobbit)")
+
+
+def test_dossier_links_are_proposal_sources(q):
+    r = add(q)
+    q.set_outcome("Q1", 4, "pass", {"notes": [{"lang": "en", "url": "http://x/a b", "heading": "", "text": "t"}],
+                                    "languages": {"en": 1},
+                                    "links": ["https://en.wikisource.org/wiki/A b", "http://x/a%20b"]})
+    r = q.row("Q1")
+    assert "|sources=http://x/a%20b https://en.wikisource.org/wiki/A%20b\n" in proposal_call(r, r.data[5])

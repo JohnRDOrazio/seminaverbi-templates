@@ -49,6 +49,14 @@ Stages (each records its outcome per candidate, so a run resumes where it stoppe
    evidence and builds the outline; a candidate with no theme at 0.50 is dropped unless Jev is confident (0.80) of a direct Christian influence.
 6. `publish`: writes the `{{SV proposal}}` pages and the ranking page.
 
+Literature (`--domain literature`) runs the same stages over books, poems and series. Candidates come from the
+configured authors, Wikidata facets (Jesus, the Bible, saints, biblical characters, Christian genres), the works
+the Illustrissimi letters name and the works of Pope Francis's 2024 letter on reading. A series is one page: its
+volumes are folded into it and the dossier reads each volume's page. Works under the sitelink floor are dropped,
+except those the Illustrissimi or Francis lists name directly. The dossier adds Wikisource pages to the proposal's
+sources as links only (they are never read). Run `python -m pipeline calibrate --domain literature` first, to check
+the cut-offs against the articles SeminaVerbi already has.
+
 Commands (options `--db PATH`, default `data/pipeline.sqlite`, and `--domain`, default `film`, go before or after the command):
 
 ```

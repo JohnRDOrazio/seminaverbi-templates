@@ -2,7 +2,8 @@ import pytest
 
 from pipeline.domains import DOMAINS, common, literature
 from pipeline.queue import Queue, Row
-from test_pipeline_film import FakeSparql, FakeWikidata, FakeWikipedia, item
+from test_pipeline_film import (FakeSparql, FakeWikidata, FakeWikidataEntities, FakeWikipedia, entity, item,
+                                wiki_for_pages)
 
 CFG = {"sitelink_floor": 15}
 
@@ -81,11 +82,6 @@ def test_calibration_marks_series(q):
 
 def test_questions_have_the_three_keys():
     assert set(literature.QUESTIONS) == {"plausible", "connection", "connections"}
-
-
-def test_unfinished_stages_raise():
-    with pytest.raises(NotImplementedError):
-        literature.dossier(None, {}, None, None)
 
 
 CFG_FULL = {
@@ -352,3 +348,76 @@ def test_a_series_itself_covered_is_returned_unchanged_despite_a_covered_volume(
                     {"Q5": {"it": "Terra di Mezzo"}, "Q9": {"en": "The Hobbit", "fr": "Le Hobbit"}})
     assert literature.covered(_series_with_hobbit(False), repo, wikis()) == (
         "translation", {"have": ["it"], "missing": ["en", "es", "fr", "de", "pt"]})
+
+
+# ---- the dossier ----
+
+DC = {"dossier_languages": 3}
+
+
+def drow(sitelinks, series=False, volumes=None, lead_sitelinks=None, calibration=False):
+    data = {"count": 30, "instance_of": ["Q7725634"], "series": series}
+    if volumes is not None:
+        data["volumes"] = volumes
+    if lead_sitelinks is not None:
+        data["lead_sitelinks"] = lead_sitelinks
+    return Row("Q1", "literature", ["author"], {}, sitelinks, calibration, data={0: data})
+
+
+def test_dossier_starts_with_the_original_language():
+    wd = FakeWikidataEntities({"Q1": entity(P407=["Q652"])})
+    pages = {("en", "wikipedia"): {"B": [("Plot", "en")]}, ("it", "wikipedia"): {"B it": [("Trama", "it")]}}
+    d = literature.dossier(drow({"enwiki": "B", "itwiki": "B it"}), DC, wiki_for_pages(pages), wd)
+    assert list(d["languages"]) == ["it", "en"]
+    assert d["notes"][0]["lang"] == "it"
+
+
+def test_a_non_six_original_language_falls_back_to_the_six():
+    wd = FakeWikidataEntities({"Q1": entity(P407=["Q7737"])})
+    pages = {("de", "wikipedia"): {"B de": [("Handlung", "de")]}, ("pt", "wikipedia"): {"B pt": [("Enredo", "x")]}}
+    d = literature.dossier(drow({"dewiki": "B de", "ptwiki": "B pt"}), DC, wiki_for_pages(pages), wd)
+    assert list(d["languages"]) == ["de", "pt"]
+
+
+def test_series_reads_each_volume_page():
+    wd = FakeWikidataEntities({"Q1": entity(P527=["V1", "V2"]), "V1": entity(sitelinks={"enwiki": "Vol 1"}),
+                               "V2": entity(sitelinks={"enwiki": "Vol 2"})})
+    pages = {("en", "wikipedia"): {"S": [("Plot", "s")], "Vol 1": [("Plot", "p1"), ("Cast", "x")],
+                                   "Vol 2": [], "#lead:Vol 2": "lead two"}}
+    d = literature.dossier(drow({"enwiki": "S"}, series=True), DC, wiki_for_pages(pages), wd)
+    assert [n["heading"] for n in d["notes"]] == ["Plot", "Vol 1 / Plot", "Vol 2"]
+
+
+def test_a_series_without_its_own_page_reads_its_volumes():
+    vols = {"V1": {"sitelinks": {"enwiki": "Vol 1"}, "count": 9}, "V2": {"sitelinks": {"enwiki": "Vol 2"}, "count": 3}}
+    wd = FakeWikidataEntities({"Q1": entity()})
+    pages = {("en", "wikipedia"): {"Vol 1": [("Plot", "p1")], "Vol 2": [("Plot", "p2")],
+                                   "#lead:Vol 1": "lead one"}}
+    d = literature.dossier(drow({}, series=True, volumes=vols, lead_sitelinks={"enwiki": "Vol 1"}),
+                           DC, wiki_for_pages(pages), wd)
+    assert [n["heading"] for n in d["notes"]] == ["Lead", "Plot", "Vol 2 / Plot"]  # Vol 1 is the work page: read once
+    assert "V1" not in wd.asked
+
+
+def test_wikiquote_keeps_sections_naming_the_author():
+    wd = FakeWikidataEntities({"Q1": entity(P50=["A1"]), "A1": entity(label="Chesterton")})
+    pages = {("en", "wikipedia"): {"B": []},
+             ("en", "wikiquote"): {"B": [("Chesterton", "quote"), ("Other", "no")]}}
+    d = literature.dossier(drow({"enwiki": "B"}), DC, wiki_for_pages(pages), wd)
+    assert [(n["heading"], n["url"]) for n in d["notes"]] == [("Chesterton", "https://en.wikiquote.org/wiki/B")]
+
+
+def test_wikisource_is_a_link_not_a_note():
+    wd = FakeWikidataEntities({"Q1": entity(sitelinks={"enwikisource": "The Man Who Was Thursday",
+                                                       "frwikisource": "X"})})
+    pages = {("en", "wikipedia"): {"The Man": [("Plot", "p")]}}
+    d = literature.dossier(drow({"enwiki": "The Man"}), DC, wiki_for_pages(pages), wd)
+    assert d["links"] == ["https://en.wikisource.org/wiki/The_Man_Who_Was_Thursday"]
+    assert all("wikisource" not in n["url"] for n in d["notes"])
+
+
+def test_literature_dossier_stage_drops_empty():
+    wd = FakeWikidataEntities({"Q1": entity()})
+    assert literature.dossier_stage(drow({"enwiki": "B"}), DC, wiki_for_pages({}), wd) == (
+        "drop", {"reason": "empty dossier"})
+    assert literature.dossier_stage(drow({"enwiki": "B"}, calibration=True), DC, wiki_for_pages({}), wd)[0] == "pass"

@@ -8,10 +8,10 @@ SeminaVerbi already has articles on).
 
 Stage-0 data on a row: ``count`` (sitelinks), ``instance_of`` (P31 QIDs), ``series`` (bool), ``volumes``
 (``{volume_qid: {"sitelinks": {...}, "count": int}}``), ``lead_sitelinks`` and ``folded_into`` (series QID).
-Only the stub of stages 0 and 4 exists so far.
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -21,7 +21,7 @@ from sync.wikidata import WikidataClient
 from pipeline import stages
 from pipeline.sources import Wikipedia
 
-from . import common
+from . import common, film
 from .common import CHUNK, LANGS, LIMIT  # noqa: F401
 
 CLOSED = ("approved", "created", "declined")  # a series with one of these statuses absorbs nothing
@@ -221,12 +221,100 @@ def candidates(queue, sparql, wikipedia, cfg: dict, wikidata=None) -> int:
     return added
 
 
+HEADINGS = {
+    "en": ("plot", "synopsis", "summary", "content", "structure", "theme", "analysis", "interpretation", "religio",
+           "christian", "reception"),
+    "it": ("trama", "sinossi", "contenuto", "struttura", "tema", "temi", "analisi", "interpretazione", "religios",
+           "critica"),
+    "es": ("argumento", "sinopsis", "resumen", "contenido", "estructura", "temas", "análisis", "interpretación",
+           "religios"),
+    "fr": ("intrigue", "résumé", "synopsis", "contenu", "structure", "thème", "analyse", "interprétation",
+           "religi"),
+    "de": ("handlung", "inhalt", "aufbau", "thema", "themen", "deutung", "interpretation", "analyse", "religi"),
+    "pt": ("enredo", "sinopse", "resumo", "conteúdo", "estrutura", "temas", "análise", "interpretação",
+           "religios"),
+}
+
+
+def _wanted(heading: str, lang: str) -> bool:
+    low = heading.lower()
+    return any(re.search(rf"\b{re.escape(word)}", low) for word in HEADINGS[lang])  # at a word start only
+
+
+def _author_names(entity: dict, lang: str, wikidata) -> list[str]:
+    names = []
+    for qid in common.qids(entity, "P50"):
+        label = wikidata.entity(qid).get("labels", {}).get(lang, {}).get("value")
+        if label:
+            names.append(label.lower())
+    return names
+
+
+def _volume_pages(entity: dict, stage0: dict, wikidata) -> list[dict[str, str]]:
+    """Sitelinks of each volume of a series: the stored `volumes`, else the series' parts (P527); a volume with
+    no stored sitelinks is read from its Wikidata entity."""
+    volumes = stage0.get("volumes")
+    qids = list(volumes) if volumes else common.qids(entity, "P527")
+    return [(volumes or {}).get(qid, {}).get("sitelinks") or common.entity_sitelinks(wikidata.entity(qid))
+            for qid in qids]
+
+
 def dossier(row, cfg: dict, wiki_for, wikidata) -> dict:
-    raise NotImplementedError("Task 5")
+    """Stage 4: research notes {"notes": [{lang, url, heading, text}], "languages": {lang: notes}, "links": [url]}.
+
+    Languages are the original language (P407, when it is one of the six), then en, it, es, fr, de, pt, limited to
+    those the work has a Wikipedia page in (the row's sitelinks, or `lead_sitelinks` when it has none) and to
+    cfg['dossier_languages']. Per language: the lead and wanted sections of the work's page and, for a series, of
+    each volume's page (headed "<page> / <heading>"); Wikiquote sections naming an author (P50). `links` are the
+    work's Wikisource pages in those languages: never fetched, never a note."""
+    entity = wikidata.entity(row.qid)
+    stage0 = row.data.get(0, {})
+    pages = row.sitelinks if _has_wikipedia(row.sitelinks) else stage0.get("lead_sitelinks", {})
+    original = next((film.ORIGINAL_LANGUAGES[q] for q in common.qids(entity, "P407")
+                     if q in film.ORIGINAL_LANGUAGES), None)
+    wanted = [l for l in dict.fromkeys([original, *LANGS]) if l and f"{l}wiki" in pages]
+    languages = wanted[:cfg["dossier_languages"]]
+    notes, links = [], []
+    volumes = _volume_pages(entity, stage0, wikidata) if stage0.get("series") else []
+    own = common.entity_sitelinks(entity)
+    for lang in languages:
+        wikipedia = wiki_for(lang, "wikipedia")
+        title = pages[f"{lang}wiki"]
+        read = {title}
+        lead = wikipedia.lead(title)
+        if lead:
+            notes.append({"lang": lang, "url": wikipedia.url(title), "heading": "Lead", "text": lead})
+        for heading, text in common.sections(wikipedia, title):
+            if text and _wanted(heading, lang):
+                notes.append({"lang": lang, "url": wikipedia.url(title), "heading": heading, "text": text})
+        for page in (v[f"{lang}wiki"] for v in volumes if f"{lang}wiki" in v):
+            if page in read:
+                continue
+            read.add(page)
+            if lead := wikipedia.lead(page):
+                notes.append({"lang": lang, "url": wikipedia.url(page), "heading": page, "text": lead})
+            for heading, text in common.sections(wikipedia, page):
+                if text and _wanted(heading, lang):
+                    notes.append({"lang": lang, "url": wikipedia.url(page), "heading": f"{page} / {heading}",
+                                  "text": text})
+        if lang in ("en", "it"):
+            authors = _author_names(entity, lang, wikidata)
+            quote = wiki_for(lang, "wikiquote")
+            for heading, text in common.sections(quote, title) if authors else []:
+                if text and any(name in heading.lower() for name in authors):
+                    notes.append({"lang": lang, "url": quote.url(title), "heading": heading, "text": text})
+        if source := own.get(f"{lang}wikisource"):
+            links.append(f"https://{lang}.wikisource.org/wiki/{source.replace(' ', '_')}")
+    counts = {lang: sum(n["lang"] == lang for n in notes) for lang in languages}
+    return {"notes": notes, "languages": counts, "links": links}
 
 
 def dossier_stage(row, cfg: dict, wiki_for, wikidata) -> tuple[str, dict]:
-    raise NotImplementedError("Task 5")
+    """Stage 4 function for run_stage: a non-calibration row with no notes is dropped."""
+    result = dossier(row, cfg, wiki_for, wikidata)
+    if not result["notes"] and not row.calibration:
+        return "drop", {"reason": "empty dossier"}
+    return "pass", result
 
 
 def _series_classes() -> list[str]:
