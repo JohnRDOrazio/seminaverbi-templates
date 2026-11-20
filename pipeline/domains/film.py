@@ -1,4 +1,4 @@
-"""Film and television: candidate finding (stage 0) and triage (stage 2).
+"""Film and television: candidate finding (stage 0), triage (stage 2) and the dossier (stage 4).
 
 Sources, tagged on each queue row: ``vatican`` (the films linked from the en.wikipedia article on the
 1995 Vatican film list), ``award:<QID>`` (films that received an award of the configured classes),
@@ -14,10 +14,12 @@ Arts & Faith dropped (no machine-readable list).
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from urllib.parse import unquote
 
 from sync import categories
+from sync.wiki import SyncError
 from sync.wikidata import WikidataClient
 
 LANGS = ("en", "it", "es", "fr", "de", "pt")
@@ -203,3 +205,98 @@ def triage(row, cfg: dict) -> tuple[str, str]:
         if count < cfg["sitelink_floor"]:
             return "drop", f"{count} sitelinks, under the floor of {cfg['sitelink_floor']}"
     return "pass", ""
+
+
+# ---- stage 4: the dossier ----
+
+# original language (P364) item -> code, among the six wikis
+ORIGINAL_LANGUAGES = {"Q1860": "en", "Q652": "it", "Q1321": "es", "Q150": "fr", "Q188": "de", "Q5146": "pt"}
+# lower-case fragments of the section headings worth reading, per language
+HEADINGS = {
+    "en": ("plot", "synopsis", "theme", "analysis", "reception", "religio", "critical response", "interpretation"),
+    "it": ("trama", "sinossi", "tem", "analisi", "critica", "accoglienza", "religios", "interpretazione"),
+    "es": ("argumento", "sinopsis", "trama", "temas", "análisis", "recepción", "crítica", "religios"),
+    "fr": ("intrigue", "synopsis", "thème", "analyse", "accueil", "critique", "réception", "religi"),
+    "de": ("handlung", "inhalt", "thema", "themen", "analyse", "rezeption", "kritik", "religi"),
+    "pt": ("enredo", "sinopse", "trama", "temas", "análise", "recepção", "crítica", "religios"),
+}
+SEASONS = {
+    "en": ("season", "series"), "it": ("stagione",), "es": ("temporada",), "fr": ("saison",),
+    "de": ("staffel",), "pt": ("temporada",),
+}
+CREATOR_PROPERTIES = ("P57", "P58", "P170")  # director, screenwriter, creator
+_TAG = re.compile(r"<[^>]+>")
+
+
+def _heading(raw: str) -> str:
+    return _TAG.sub("", raw).strip()
+
+
+def _wanted(heading: str, lang: str, series: bool) -> bool:
+    low = heading.lower()
+    if any(word in low for word in HEADINGS[lang]):
+        return True
+    return series and any(re.match(rf"{word}\b", low) for word in SEASONS[lang])
+
+
+def _qids(entity: dict, prop: str) -> list[str]:
+    out = []
+    for claim in entity.get("claims", {}).get(prop, []):
+        value = claim.get("mainsnak", {}).get("datavalue", {}).get("value")
+        if isinstance(value, dict) and value.get("id"):
+            out.append(value["id"])
+    return out
+
+
+def _creator_names(entity: dict, lang: str, wikidata) -> list[str]:
+    names = []
+    for prop in CREATOR_PROPERTIES:
+        for qid in _qids(entity, prop):
+            label = wikidata.entity(qid).get("labels", {}).get(lang, {}).get("value")
+            if label:
+                names.append(label.lower())
+    return names
+
+
+def _sections(wiki, title: str) -> list[tuple[str, str]]:
+    """The page's sections, or none when the page does not exist (a missing page is not an error here)."""
+    try:
+        return [(_heading(h), t) for h, t in wiki.sections(title)]
+    except SyncError:
+        return []
+
+
+def dossier(row, cfg: dict, wiki_for, wikidata) -> dict:
+    """Stage 4: research notes {"notes": [{lang, url, heading, text}], "languages": {lang: notes}}.
+
+    Languages are the original language (P364, when it is one of the six), en, then it, limited to those the row
+    has a Wikipedia sitelink for and to cfg['dossier_languages']. `wiki_for(lang, project)` gives a Wikipedia or
+    Wikiquote reader. On Wikiquote only sections whose heading names a director, screenwriter or creator are kept."""
+    entity = wikidata.entity(row.qid)
+    series = SERIES in row.data.get(0, {}).get("instance_of", [])
+    original = next((ORIGINAL_LANGUAGES[q] for q in _qids(entity, "P364") if q in ORIGINAL_LANGUAGES), None)
+    wanted = [l for l in dict.fromkeys([original, "en", "it"]) if l and f"{l}wiki" in row.sitelinks]
+    languages = wanted[:cfg["dossier_languages"]]
+    notes = []
+    for lang in languages:
+        title = row.sitelinks[f"{lang}wiki"]
+        wikipedia = wiki_for(lang, "wikipedia")
+        for heading, text in _sections(wikipedia, title):
+            if text and _wanted(heading, lang, series):
+                notes.append({"lang": lang, "url": wikipedia.url(title), "heading": heading, "text": text})
+        if lang in ("en", "it"):
+            creators = _creator_names(entity, lang, wikidata)
+            quote = wiki_for(lang, "wikiquote")
+            for heading, text in _sections(quote, title) if creators else []:
+                if text and any(name in heading.lower() for name in creators):
+                    notes.append({"lang": lang, "url": quote.url(title), "heading": heading, "text": text})
+    counts = {lang: sum(n["lang"] == lang for n in notes) for lang in languages}
+    return {"notes": notes, "languages": counts}
+
+
+def dossier_stage(row, cfg: dict, wiki_for, wikidata) -> tuple[str, dict]:
+    """Stage 4 function for run_stage: a non-calibration row with no notes is dropped."""
+    result = dossier(row, cfg, wiki_for, wikidata)
+    if not result["notes"] and not row.calibration:
+        return "drop", {"reason": "empty dossier"}
+    return "pass", result

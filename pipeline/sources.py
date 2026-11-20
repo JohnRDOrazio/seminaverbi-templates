@@ -44,14 +44,14 @@ def _plain(value: str) -> str:
 
 
 class Wikipedia:
-    def __init__(self, lang: str, session: requests.Session | None = None):
-        self.lang = lang
+    def __init__(self, lang: str, session: requests.Session | None = None, project: str = "wikipedia"):
+        self.lang, self.project = lang, project
         # WikiClient's request loop (HTTP 429 back-off, error -> SyncError), pointed at Wikipedia
         self._wiki = WikiClient(lang, session=_OwnHeaders(session or requests.Session()))
-        self._wiki.api = f"https://{lang}.wikipedia.org/w/api.php"
+        self._wiki.api = f"https://{lang}.{project}.org/w/api.php"
 
     def url(self, title: str) -> str:
-        return f"https://{self.lang}.wikipedia.org/wiki/{quote(title.replace(' ', '_'), safe='/:()')}"
+        return f"https://{self.lang}.{self.project}.org/wiki/{quote(title.replace(' ', '_'), safe='/:()')}"
 
     def lead(self, title: str) -> str:
         """Plain-text introduction of the article ('' when there is none); redirects are followed."""

@@ -194,3 +194,121 @@ def test_calibration_qids_map_through_the_local_item_and_report_unmapped():
     assert qids == ["Q500", "Q501"]
     assert unmapped == ["en:Lonely", "en:NoLink"]
     assert "Category:Film" in wikis["en"].asked and "Category:Cinema" in wikis["it"].asked
+
+
+# ---- stage 4: the dossier ----
+
+def claim(qid):
+    return {"mainsnak": {"datavalue": {"value": {"id": qid}}}}
+
+
+def entity(label=None, **claims):
+    return {"labels": {"en": {"value": label}} if label else {}, "claims": {p: [claim(q) for q in qs] for p, qs in claims.items()}}
+
+
+class FakeWikidataEntities:
+    def __init__(self, entities):
+        self.entities, self.asked = entities, []
+
+    def entity(self, qid):
+        self.asked.append(qid)
+        return self.entities.get(qid, {})
+
+
+class FakeSections:
+    def __init__(self, lang, project, pages):
+        self.lang, self.project, self.pages = lang, project, pages
+
+    def sections(self, title):
+        if title not in self.pages:
+            raise SyncError("missingtitle")
+        return self.pages[title]
+
+    def url(self, title):
+        return f"https://{self.lang}.{self.project}.org/wiki/{title.replace(' ', '_')}"
+
+
+def wiki_for_pages(pages):
+    """pages: {(lang, project): {title: [(heading, text)]}}"""
+    return lambda lang, project="wikipedia": FakeSections(lang, project, pages.get((lang, project), {}))
+
+
+def dossier_row(sitelinks, instance_of=("Q11424",), calibration=False):
+    return Row("Q1", "film", ["facet"], {}, sitelinks, calibration,
+               data={0: {"count": 30, "instance_of": list(instance_of)}})
+
+
+DCFG = {"dossier_languages": 3}
+EN_PAGE = [("Plot", "A man dies."), ("Production", "Shot in Spain."), ("Critical reception", "Praised."),
+           ("<i>Themes</i> and analysis", "Grace.")]
+
+
+def test_dossier_keeps_plot_and_reception_sections_only():
+    wikidata = FakeWikidataEntities({"Q1": entity()})
+    d = film.dossier(dossier_row({"enwiki": "Ben-Hur"}), DCFG, wiki_for_pages({("en", "wikipedia"): {"Ben-Hur": EN_PAGE}}),
+                     wikidata)
+    assert [n["heading"] for n in d["notes"]] == ["Plot", "Critical reception", "Themes and analysis"]
+    assert d["languages"] == {"en": 3}
+
+
+def test_dossier_languages_start_with_original_language():
+    wikidata = FakeWikidataEntities({"Q1": entity(P364=["Q652"])})
+    pages = {("en", "wikipedia"): {"B": [("Plot", "en plot")]}, ("it", "wikipedia"): {"B it": [("Trama", "it trama")]},
+             ("fr", "wikipedia"): {"B fr": [("Intrigue", "fr")]}}
+    row_ = dossier_row({"enwiki": "B", "itwiki": "B it", "frwiki": "B fr"})
+    d = film.dossier(row_, {"dossier_languages": 2}, wiki_for_pages(pages), wikidata)
+    assert list(d["languages"]) == ["it", "en"]
+    d = film.dossier(dossier_row({"enwiki": "B", "frwiki": "B fr"}), DCFG, wiki_for_pages(pages),
+                     FakeWikidataEntities({"Q1": entity(P364=["Q150"])}))
+    assert list(d["languages"]) == ["fr", "en"]
+
+
+def test_a_language_without_a_sitelink_is_never_used():
+    d = film.dossier(dossier_row({"enwiki": "B"}), DCFG, wiki_for_pages({("en", "wikipedia"): {"B": EN_PAGE}}),
+                     FakeWikidataEntities({"Q1": entity(P364=["Q652"])}))
+    assert list(d["languages"]) == ["en"]
+
+
+def test_series_gets_one_note_per_season():
+    page = [("Premise", "x"), ("Season 1", "S1 text"), ("Season 2", "S2 text"), ("Plot", "p")]
+    wiki_for = wiki_for_pages({("en", "wikipedia"): {"S": page}})
+    d = film.dossier(dossier_row({"enwiki": "S"}, instance_of=("Q5398426",)), DCFG, wiki_for,
+                     FakeWikidataEntities({"Q1": entity()}))
+    assert [n["heading"] for n in d["notes"]] == ["Season 1", "Season 2", "Plot"]
+    d = film.dossier(dossier_row({"enwiki": "S"}), DCFG, wiki_for, FakeWikidataEntities({"Q1": entity()}))
+    assert [n["heading"] for n in d["notes"]] == ["Plot"]
+
+
+def test_every_note_keeps_its_url():
+    d = film.dossier(dossier_row({"enwiki": "Ben-Hur"}), DCFG, wiki_for_pages({("en", "wikipedia"): {"Ben-Hur": EN_PAGE}}),
+                     FakeWikidataEntities({"Q1": entity()}))
+    assert {n["url"] for n in d["notes"]} == {"https://en.wikipedia.org/wiki/Ben-Hur"}
+    assert all(n["lang"] == "en" and n["text"] for n in d["notes"])
+
+
+def test_wikiquote_keeps_only_sections_naming_a_creator():
+    wikidata = FakeWikidataEntities({"Q1": entity(P57=["Q9"]), "Q9": entity("William Wyler")})
+    quotes = [("William Wyler", "Interview quote."), ("Cast", "Someone: hi."), ("Dialogue", "d")]
+    pages = {("en", "wikipedia"): {"B": [("Plot", "p")]}, ("en", "wikiquote"): {"B": quotes}}
+    d = film.dossier(dossier_row({"enwiki": "B"}), DCFG, wiki_for_pages(pages), wikidata)
+    quote_notes = [n for n in d["notes"] if "wikiquote" in n["url"]]
+    assert [n["heading"] for n in quote_notes] == ["William Wyler"]
+
+
+def test_wikiquote_is_skipped_without_creators_or_page():
+    pages = {("en", "wikipedia"): {"B": [("Plot", "p")]}, ("en", "wikiquote"): {"B": [("Dialogue", "d")]}}
+    d = film.dossier(dossier_row({"enwiki": "B"}), DCFG, wiki_for_pages(pages), FakeWikidataEntities({"Q1": entity()}))
+    assert [n["heading"] for n in d["notes"]] == ["Plot"]
+    d = film.dossier(dossier_row({"enwiki": "B"}), DCFG, wiki_for_pages({("en", "wikipedia"): {"B": [("Plot", "p")]}}),
+                     FakeWikidataEntities({"Q1": entity(P57=["Q9"]), "Q9": entity("W")}))
+    assert len(d["notes"]) == 1
+
+
+def test_dossier_stage_drops_an_empty_dossier_but_not_a_calibration_row():
+    wiki_for = wiki_for_pages({("en", "wikipedia"): {"B": [("Production", "x")]}})
+    wd = FakeWikidataEntities({"Q1": entity()})
+    assert film.dossier_stage(dossier_row({"enwiki": "B"}), DCFG, wiki_for, wd) == ("drop", {"reason": "empty dossier"})
+    outcome, data = film.dossier_stage(dossier_row({"enwiki": "B"}, calibration=True), DCFG, wiki_for, wd)
+    assert outcome == "pass" and data["notes"] == []
+    wiki_for = wiki_for_pages({("en", "wikipedia"): {"B": EN_PAGE}})
+    assert film.dossier_stage(dossier_row({"enwiki": "B"}), DCFG, wiki_for, wd)[0] == "pass"
