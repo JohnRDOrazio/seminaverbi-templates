@@ -497,3 +497,26 @@ def test_a_series_qid_in_another_domain_is_not_extended(q, capsys):
     n, _ = folding(q, [vol("Q_V", "Volume", 30)], {"Q_V": ["Q_S"]}, {"Q_S": item("Q_S", "Saga", 12, "Q1667921")})
     assert n == 0 and "volumes" not in q.row("Q_S").data[0] and q.row("Q_S").sources == ["facet"]
     assert "literature candidates: Q_S is already a film candidate, skipped" in capsys.readouterr().out
+
+
+def test_a_series_keeps_its_count_when_a_work_query_returns_it_later(q):
+    bare = {"item": "Q_S", "n": "3", "types": "Q1667921"}
+    folding(q, [vol("Q_V", "Volume", 40)], {"Q_V": ["Q_S"]}, {"Q_S": bare})
+    literature._insert(q, bare, "author")  # fold() inserts a row in no series this way
+    s = q.row("Q_S")
+    assert s.data[0]["count"] == 40 and set(s.data[0]["volumes"]) == {"Q_V"}
+    assert literature.triage(s, CFG)[0] == "pass"
+
+
+def test_a_fictional_character_still_reaches_its_work_through_p1441(q):
+    class Sparql(FakeSparql):
+        def select(self, query):
+            self.queries.append(query)
+            return [item("Q_P", "Pinocchio book", 90, "Q7725634")] if "wdt:P1441" in query else []
+
+    sparql = Sparql()
+    literature.candidates(q, sparql, FakeWikipedia([]),
+                          {**CFG_FULL, "_it_wikipedia": FakeItWikipedia(["Pinocchio"])},
+                          FakeWikidata({"Pinocchio": "Q_PINOCCHIO"}))
+    assert q.row("Q_P").sources[0] == "illustrissimi"
+    assert any("wdt:P1441 ?item FILTER NOT EXISTS { ?entry wdt:P31 wd:Q5 }" in s for s in sparql.queries)

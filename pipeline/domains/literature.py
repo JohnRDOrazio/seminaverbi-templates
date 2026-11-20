@@ -69,11 +69,12 @@ def _insert(queue, row: dict, source: str, series: bool = False) -> int:
     if _other_domain(queue, row["item"]):
         return 0
     labels, sitelinks, data = common.row_data(row)
+    old = queue.row(row["item"])
+    stored = old.data.get(0, {}) if old else {}
     if series:
         data["series"] = True
-        old = queue.row(row["item"])
-        if old and "count" in old.data.get(0, {}):  # a series folded earlier counts its best volume
-            data["count"] = max(data["count"], old.data[0]["count"])
+    if (series or stored.get("series") or stored.get("volumes")) and "count" in stored:
+        data["count"] = max(data["count"], stored["count"])  # a series folded earlier counts its best volume
     return queue.add(row["item"], "literature", source, labels, sitelinks, False, data)
 
 
