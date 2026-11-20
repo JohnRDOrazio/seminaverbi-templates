@@ -329,3 +329,26 @@ def test_a_series_with_no_covered_volume_passes():
     series = Row("Q5", "literature", ["author"], {}, {}, False,
                  data={0: {"volumes": {"Q10": {"sitelinks": {"enwiki": "The Hobbit"}, "count": 90}}}})
     assert literature.covered(series, FakeRepo(), wikis()) == ("pass", {})
+
+
+def _series_with_hobbit(calibration):
+    return Row("Q5", "literature", ["calibration"], {}, {"enwiki": "Middle-earth"}, calibration,
+               data={0: {"volumes": {"Q10": {"sitelinks": {"enwiki": "The Hobbit"}, "count": 90}}}})
+
+
+def test_a_calibration_series_keeps_its_own_coverage_despite_a_covered_volume():
+    from test_pipeline_stages import FakeRepo, wikis
+
+    repo = FakeRepo({("enwiki", "Middle-earth"): "Q5", ("enwiki", "The Hobbit"): "Q9"},
+                    {"Q5": {"it": "Terra di Mezzo"}, "Q9": {"en": "The Hobbit", "fr": "Le Hobbit"}})
+    assert literature.covered(_series_with_hobbit(True), repo, wikis()) == (
+        "pass", {"have": ["it"], "missing": ["en", "es", "fr", "de", "pt"]})
+
+
+def test_a_series_itself_covered_is_returned_unchanged_despite_a_covered_volume():
+    from test_pipeline_stages import FakeRepo, wikis
+
+    repo = FakeRepo({("enwiki", "Middle-earth"): "Q5", ("enwiki", "The Hobbit"): "Q9"},
+                    {"Q5": {"it": "Terra di Mezzo"}, "Q9": {"en": "The Hobbit", "fr": "Le Hobbit"}})
+    assert literature.covered(_series_with_hobbit(False), repo, wikis()) == (
+        "translation", {"have": ["it"], "missing": ["en", "es", "fr", "de", "pt"]})

@@ -290,8 +290,8 @@ def covered(row, repo, wikis) -> tuple[str, dict]:
     """Stage 1: `stages.covered` on the series; a series it passes is still a translation suggestion when one of
     its volumes is covered on some wiki (the first such volume sets `have` and the `note`)."""
     outcome, data = stages.covered(row, repo, wikis)
-    if outcome != "pass":
-        return outcome, data
+    if outcome != "pass" or row.calibration or data.get("have"):
+        return outcome, data  # the series itself is covered (or an existing article): not covered only through a volume
     for qid, volume in row.data.get(0, {}).get("volumes", {}).items():
         sitelinks = volume.get("sitelinks", {})
         stand_in = SimpleNamespace(qid=qid, sitelinks=sitelinks, labels={}, calibration=False, data={})
