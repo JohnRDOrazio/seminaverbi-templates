@@ -1,0 +1,14 @@
+<includeonly>{{#invoke:SV/Proposal|main}}</includeonly><noinclude>
+The box of one article proposal, on the English wiki: the work, its connection to the Gospel, field, themes with their evidence, proposed outline and sources, then the vote button while the proposal is open. The pipeline bot writes the call at the top of each proposal page; the author or a sysop sets <code>status</code> (and <code>reason</code> when declining). Parameters:
+* qid: the Wikidata item (e.g. <code>Q42</code>).
+* label_en, label_it, label_es, label_fr, label_de, label_pt: the work's title in each language; the page language's, else English.
+* domain: the pipeline domain (e.g. <code>film</code>).
+* connection: <code>direct</code>, <code>seeds</code>, <code>entertainment</code> or <code>none</code>; connection_p its probability (<code>0.83</code> shows 83%).
+* field: a field key of the category tree; field_p its probability.
+* theme1, theme2, …: theme keys of the category tree; each with theme1_p (probability), theme1_status, theme1_evidence (excerpt) and theme1_source (URL of the excerpt).
+* outline: sections separated by <code> ; </code>. sources: URLs separated by spaces.
+* first_wiki: the language code of the wiki the article is written on first.
+* status: <code>open</code> (default), <code>approved</code>, <code>created</code> or <code>declined</code>. reason: why it was declined. article: the title of the created article on first_wiki.
+
+Pages using it are listed in the category "SV proposals (status)".
+</noinclude>

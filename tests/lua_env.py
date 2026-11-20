@@ -64,6 +64,12 @@ function mw.wikibase.getSitelink(id, site) return py.sitelink(id, site or py.lan
 -- recorded, since each one is an expensive parser function call on the wiki.
 mw.site = { stats = {} }
 function mw.site.stats.pagesInCategory(name, which) return py.pages_in_category(name, which) end
+-- mw.uri.encode(s, 'WIKI'): spaces become underscores, bytes outside the unreserved and wiki-safe set %XX.
+mw.uri = {}
+function mw.uri.encode(s, kind)
+    assert(kind == 'WIKI', 'only the WIKI encoding is mocked')
+    return (tostring(s):gsub(' ', '_'):gsub("[^%w%-_%.~!$()*,:;@/]", function(c) return string.format('%%%02X', c:byte()) end))
+end
 function make_frame(args, pargs)
     local parent = { args = pargs }
     local f = { args = args, getParent = function() return parent end }

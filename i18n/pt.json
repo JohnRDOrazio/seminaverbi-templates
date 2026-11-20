@@ -62,5 +62,21 @@
   "tracking_category_text": "Categoria de manutenção: as predefinições SV colocam aqui uma página quando o seu item do Wikibase ou a sua infocaixa precisa de correção. Corrigido o item ou a página, esta sai da categoria.",
   "wip_category": "Artigos SV em construção",
   "wip_notice": "Este artigo está em construção ($1, $2).",
-  "label_composed": "composto"
+  "label_composed": "composto",
+  "proposal_title": "Proposta de artigo: $1",
+  "proposal_status_open": "Aberta a votação",
+  "proposal_status_approved": "Aprovada",
+  "proposal_status_created": "Artigo criado",
+  "proposal_status_declined": "Recusada",
+  "proposal_connection_direct": "Influência cristã ou bíblica direta",
+  "proposal_connection_seeds": "Sementes implícitas do Verbo",
+  "proposal_connection_entertainment": "Imagética bíblica usada como entretenimento",
+  "proposal_connection_none": "Sem ligação real",
+  "proposal_field": "Área",
+  "proposal_themes": "Temas evangélicos",
+  "proposal_outline": "Estrutura proposta",
+  "proposal_sources": "Fontes",
+  "proposal_first_wiki": "Primeira wiki",
+  "proposal_reason": "Motivo",
+  "proposal_category": "Propostas SV ($1)"
 }

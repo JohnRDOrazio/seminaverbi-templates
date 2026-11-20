@@ -62,5 +62,21 @@
   "tracking_category_text": "Categoria di servizio: i template SV vi inseriscono una pagina quando il suo elemento Wikibase o il suo infobox va corretto. Corretto l'elemento o la pagina, la pagina esce dalla categoria.",
   "wip_category": "Voci SV in lavorazione",
   "wip_notice": "Questa voce è in lavorazione ($1, $2).",
-  "label_composed": "composto"
+  "label_composed": "composto",
+  "proposal_title": "Proposta di articolo: $1",
+  "proposal_status_open": "Aperta al voto",
+  "proposal_status_approved": "Approvata",
+  "proposal_status_created": "Articolo creato",
+  "proposal_status_declined": "Respinta",
+  "proposal_connection_direct": "Influsso cristiano o biblico diretto",
+  "proposal_connection_seeds": "Semi impliciti del Verbo",
+  "proposal_connection_entertainment": "Immaginario biblico usato per intrattenimento",
+  "proposal_connection_none": "Nessun legame reale",
+  "proposal_field": "Ambito",
+  "proposal_themes": "Temi evangelici",
+  "proposal_outline": "Struttura proposta",
+  "proposal_sources": "Fonti",
+  "proposal_first_wiki": "Prima wiki",
+  "proposal_reason": "Motivo",
+  "proposal_category": "Proposte SV ($1)"
 }

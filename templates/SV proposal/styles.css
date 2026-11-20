@@ -1,0 +1,59 @@
+/* {{SV proposal}}: the box of one article proposal.
+   TemplateStyles on the farm rejects var(), so colours are plain values, with a dark palette for the
+   skins' night mode (html.skin-theme-clientpref-night, or -os with a dark system preference).
+   The box carries .notheme: Vector gives .notheme the day text colour, so the night palette sets the
+   text and link colours too. */
+.sv-proposal {
+	margin: 1em 0;
+	padding: 0.7em 1em 0.8em;
+	background-color: #f8f9fa;
+	border: 1px solid #c8ccd1;
+	border-top: 4px solid #36c;
+	border-radius: 6px;
+}
+
+.sv-proposal-title {
+	font-size: 1.2em;
+	margin-bottom: 0.4em;
+}
+
+.sv-proposal-row {
+	margin: 0.3em 0;
+}
+
+.sv-proposal-label {
+	font-weight: bold;
+}
+
+.sv-proposal-p {
+	color: #54595d;
+	font-size: 90%;
+}
+
+.sv-proposal ul {
+	margin: 0.2em 0 0.2em 1.4em;
+}
+
+.sv-proposal-excerpt {
+	font-style: italic;
+	color: #54595d;
+}
+
+.sv-proposal-theme-author .sv-proposal-p {
+	color: #a66200;
+}
+
+@media screen {
+	html.skin-theme-clientpref-night .sv-proposal { background-color: #202122; color: #eaecf0; border-right-color: #54595d; border-bottom-color: #54595d; border-left-color: #54595d; }
+	html.skin-theme-clientpref-night .sv-proposal a:not( .new ) { color: #88a3e8; }
+	html.skin-theme-clientpref-night .sv-proposal-p,
+	html.skin-theme-clientpref-night .sv-proposal-excerpt { color: #c8ccd1; }
+	html.skin-theme-clientpref-night .sv-proposal-theme-author .sv-proposal-p { color: #e0a64a; }
+}
+@media screen and ( prefers-color-scheme: dark ) {
+	html.skin-theme-clientpref-os .sv-proposal { background-color: #202122; color: #eaecf0; border-right-color: #54595d; border-bottom-color: #54595d; border-left-color: #54595d; }
+	html.skin-theme-clientpref-os .sv-proposal a:not( .new ) { color: #88a3e8; }
+	html.skin-theme-clientpref-os .sv-proposal-p,
+	html.skin-theme-clientpref-os .sv-proposal-excerpt { color: #c8ccd1; }
+	html.skin-theme-clientpref-os .sv-proposal-theme-author .sv-proposal-p { color: #e0a64a; }
+}

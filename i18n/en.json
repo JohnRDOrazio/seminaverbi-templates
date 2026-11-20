@@ -62,5 +62,21 @@
   "tracking_category_text": "Tracking category: the SV templates add a page here when its Wikibase item or infobox needs fixing. Fix the item or the page and it leaves the category.",
   "wip_category": "SV articles in progress",
   "wip_notice": "This article is a work in progress ($1, $2).",
-  "label_composed": "composed"
+  "label_composed": "composed",
+  "proposal_title": "Article proposal: $1",
+  "proposal_status_open": "Open for voting",
+  "proposal_status_approved": "Approved",
+  "proposal_status_created": "Article created",
+  "proposal_status_declined": "Declined",
+  "proposal_connection_direct": "Direct Christian or biblical influence",
+  "proposal_connection_seeds": "Implicit seeds of the Word",
+  "proposal_connection_entertainment": "Biblical imagery used for entertainment",
+  "proposal_connection_none": "No real connection",
+  "proposal_field": "Field",
+  "proposal_themes": "Gospel themes",
+  "proposal_outline": "Proposed outline",
+  "proposal_sources": "Sources",
+  "proposal_first_wiki": "First wiki",
+  "proposal_reason": "Reason",
+  "proposal_category": "SV proposals ($1)"
 }

@@ -62,5 +62,21 @@
   "tracking_category_text": "Wartungskategorie: Die SV-Vorlagen fügen hier eine Seite ein, wenn ihr Wikibase-Datenobjekt oder ihre Infobox korrigiert werden muss. Nach der Korrektur des Objekts oder der Seite verlässt sie die Kategorie.",
   "wip_category": "SV-Artikel in Arbeit",
   "wip_notice": "Dieser Artikel ist in Arbeit ($1, $2).",
-  "label_composed": "komponiert"
+  "label_composed": "komponiert",
+  "proposal_title": "Artikelvorschlag: $1",
+  "proposal_status_open": "Zur Abstimmung offen",
+  "proposal_status_approved": "Angenommen",
+  "proposal_status_created": "Artikel erstellt",
+  "proposal_status_declined": "Abgelehnt",
+  "proposal_connection_direct": "Direkter christlicher oder biblischer Einfluss",
+  "proposal_connection_seeds": "Implizite Samen des Wortes",
+  "proposal_connection_entertainment": "Biblische Bilderwelt zur Unterhaltung",
+  "proposal_connection_none": "Keine echte Verbindung",
+  "proposal_field": "Bereich",
+  "proposal_themes": "Themen des Evangeliums",
+  "proposal_outline": "Vorgeschlagene Gliederung",
+  "proposal_sources": "Quellen",
+  "proposal_first_wiki": "Erstes Wiki",
+  "proposal_reason": "Grund",
+  "proposal_category": "SV-Vorschläge ($1)"
 }

@@ -34,7 +34,15 @@ def test_documented_params_are_read():
         module = re.search(r"#invoke:SV/(\w+)\|", text).group(1)
         source = (ROOT / "modules" / "SV" / f"{module}.lua").read_text(encoding="utf-8")
         for param in docs[name]["params"]:
-            reads = [f"args[{param}]"] if param.isdigit() else [f"args.{param}", f"args['{param}']"]
+            placeholder = re.match(r"^(\w*?)(N|LANG)(_\w+)?$", param)
+            if param.isdigit():
+                reads = [f"args[{param}]"]
+            elif placeholder:
+                # a family of parameters (theme1, theme2, …) is read through a concatenated key
+                prefix, _, suffix = placeholder.groups()
+                reads = [f"args['{prefix}' .. " if not suffix else f"'{suffix}']"]
+            else:
+                reads = [f"args.{param}", f"args['{param}']"]
             assert any(r in source for r in reads), f"{name}: {param} is documented but {module}.lua never reads it"
 
 
