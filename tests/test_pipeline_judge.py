@@ -185,4 +185,64 @@ def test_cache_keys_follow_the_question_texts_and_model(queue, monkeypatch):
     assert asks_again(make, lambda j: j.field(r, "d"),
                       lambda mp: mp.setattr(jev, "LEVEL_INSTRUCTIONS", "Which category? (reworded)"),
                       monkeypatch, levels + levels)
-    assert asks_again(make_t, lambda j: j.field(r, "d"), edit_field, monkeypatch, levels + levels)
+    # per-request cache: only the level whose options changed (film's definition, offered at level 2) is asked
+    # again; the reworded instructions above are still in force, so the first ask is answered from the cache
+    fake = FakeJev(levels[1])
+    edit_field(monkeypatch)
+    assert make_t(fake).field(r, "d")["choice"] == "feature-films"
+    assert [set(c["questions"]["level"].criteria) for c in fake.calls] == [{"film", "music"}]
+
+
+class FailsAfter(FakeJev):
+    """Answers the given responses, then raises TypeSafeError (a paid level succeeded, the next one failed)."""
+
+    def system_one(self, state, questions, model=None):
+        if not self.responses:
+            self.calls.append({"state": state, "questions": questions, "model": model})
+            raise TypeSafeError("down")
+        return super().system_one(state, questions, model)
+
+
+LEVELS = [{"level": choice({"arts": 0.95, "religion": 0.05}, 0.9)},
+          {"level": choice({"film": 0.95, "music": 0.05}, 0.9)},
+          {"level": choice({"feature-films": 0.95, "short-films": 0.05}, 0.9)}]
+
+
+def test_a_failed_level_keeps_the_paid_levels_before_it(queue):
+    """CodeRabbit 4640187385: level 1 answered, level 2 failed; the retry must not pay for level 1 again."""
+    first = FailsAfter(LEVELS[0])
+    with pytest.raises(TypeSafeError):
+        Judge(first, queue, DATA).field(row(queue), "dossier")
+    assert len(first.calls) == 2
+    retry = FakeJev(LEVELS[1], LEVELS[2])
+    d = Judge(retry, queue, DATA).field(row(queue), "dossier")
+    assert d["choice"] == "feature-films" and d["outcome"] == "applied"
+    assert len(retry.calls) == 2
+    assert [set(c["questions"]["level"].criteria) for c in retry.calls] == [{"film", "music"},
+                                                                          {"feature-films", "short-films"}]
+
+
+def test_a_cached_level_is_shared_by_the_same_question_on_the_same_row(queue):
+    fake = FakeJev(*LEVELS)
+    judge = Judge(fake, queue, DATA)
+    judge.field(row(queue), "dossier")
+    assert len(fake.calls) == 3
+    assert judge.field(row(queue), "dossier")["choice"] == "feature-films"
+    assert len(fake.calls) == 3
+
+
+def _stored_questions(queue):
+    return [r["question"] for r in queue.db.execute("SELECT question FROM jev")]
+
+
+def test_the_queue_keeps_the_question_text_not_only_its_name(queue):
+    """CodeRabbit 4640187374: the `question` column holds the wording that was asked (and hashed)."""
+    from pipeline.judge import CONNECTION, CONNECTIONS, PLAUSIBLE
+    Judge(FakeJev({"plausible": 0.7}), queue, DATA).plausible(row(queue), "A synopsis.")
+    conn = choice({"direct": 0.9, "seeds": 0.05, "entertainment": 0.03, "none": 0.02}, 0.9)
+    Judge(FakeJev({"connection": conn}), queue, DATA).connection(row(queue), "dossier")
+    stored = _stored_questions(queue)
+    assert len(stored) == 2
+    assert any(PLAUSIBLE in s and jev.MODEL in s for s in stored)
+    assert any(CONNECTION in s and CONNECTIONS["none"] in s for s in stored)
+    assert "plausible" not in stored and "connection" not in stored

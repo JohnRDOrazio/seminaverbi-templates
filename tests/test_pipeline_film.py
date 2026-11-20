@@ -69,7 +69,8 @@ def test_domains_registry():
 def test_vatican_links_resolve_to_qids_and_unresolved_are_reported(q, capsys):
     wikipedia = FakeWikipedia(["Ben-Hur", "Nosuch", "Not a film"])
     wikidata = FakeWikidata({"Ben-Hur": "Q1", "Not a film": "Q9"})
-    sparql = FakeSparql({"VALUES ?item": [item("Q1", "Ben-Hur", n=2)]})  # Q9 is no film: the query drops it
+    # Q9 is no film: the query drops it; Q1 is a film (the series query of the same chunk has no rows)
+    sparql = FakeSparql({"wd:Q9 }\n  ?item wdt:P31/wdt:P279* wd:Q11424 .": [item("Q1", "Ben-Hur", n=2)]})
     added = candidates(q, sparql, wikipedia, CFG, wikidata=wikidata)
     assert added == 1
     assert wikipedia.asked == ["Vatican's list of films"]
@@ -83,6 +84,7 @@ def test_vatican_links_resolve_to_qids_and_unresolved_are_reported(q, capsys):
     assert "Nosuch" in out and "Ben-Hur" not in out
     vatican_query = next(s for s in sparql.queries if "VALUES ?item" in s)
     assert "wd:Q1" in vatican_query and "wd:Q9" in vatican_query and "wd:Q11424" in vatican_query
+    assert any("VALUES ?item" in s and "wd:Q5398426" in s for s in sparql.queries)
 
 
 def test_award_and_facet_sources_merge_on_one_row(q):
@@ -357,3 +359,78 @@ def test_a_non_missing_api_error_propagates_and_leaves_the_row_pending(q):
     with pytest.raises(SyncError):
         run_stage(q, 4, fn)
     assert [r.qid for r in q.pending(4)] == ["Q1"]
+
+
+class SeriesOnlySparql(FakeSparql):
+    """Rows only for queries bounded to the series class (and, if given, containing `marker`)."""
+
+    def __init__(self, rows, marker=""):
+        super().__init__()
+        self.rows, self.marker = rows, marker
+
+    def select(self, query):
+        self.queries.append(query)
+        series_only = f"wd:{film.SERIES}" in query and f"wd:{film.FILM}" not in query
+        return self.rows if series_only and self.marker in query else []
+
+
+SEASON_PAGE = [("Premise", "x"), ("Season 1", "S1 text"), ("Season 2", "S2 text")]
+MINISERIES = "Q1259759"  # a subclass of television series: P31 holds only it
+
+
+def _season_headings(q):
+    r = q.row("Q7")
+    d = film.dossier(r, DCFG, wiki_for_pages({("en", "wikipedia"): {"S": SEASON_PAGE}}),
+                     FakeWikidataEntities({"Q7": entity()}))
+    return [n["heading"] for n in d["notes"]]
+
+
+def test_a_subclass_series_found_by_the_series_query_keeps_its_seasons(q):
+    """CodeRabbit 4640187370: P31 holds a subclass of Q5398426 only; the dossier must still treat it as a series."""
+    sparql = SeriesOnlySparql([item("Q7", "S", n=30, types=MINISERIES)], marker="wdt:P921")
+    candidates(q, sparql, FakeWikipedia([]), CFG, wikidata=FakeWikidata({}))
+    assert q.row("Q7").data[0]["series"] is True
+    assert _season_headings(q) == ["Season 1", "Season 2"]
+
+
+def test_a_later_film_query_does_not_clear_the_series_flag(q):
+    q.add("Q7", "film", "facet", {}, {"enwiki": "S"}, False, {"count": 30, "instance_of": [MINISERIES], "series": True})
+    q.add("Q7", "film", "award:X", {}, {"enwiki": "S"}, False, {"count": 30, "instance_of": [MINISERIES]})
+    assert _season_headings(q) == ["Season 1", "Season 2"]
+
+
+def test_a_subclass_series_from_the_vatican_list_keeps_its_seasons(q):
+    sparql = SeriesOnlySparql([item("Q7", "S", n=30, types=MINISERIES)], marker="VALUES ?item")
+    candidates(q, sparql, FakeWikipedia(["S"]), CFG, wikidata=FakeWikidata({"S": "Q7"}))
+    assert _season_headings(q) == ["Season 1", "Season 2"]
+
+
+class NoFilmSparql(FakeSparql):
+    """Rows for every item query not bounded to the film class: the calibration query and its series check."""
+
+    def __init__(self, rows, series=True):
+        super().__init__()
+        self.rows, self.series = rows, series
+
+    def select(self, query):
+        self.queries.append(query)
+        if f"wd:{film.FILM}" in query or (not self.series and f"wd:{film.SERIES}" in query):
+            return []
+        return self.rows
+
+
+def test_a_subclass_series_calibration_row_keeps_its_seasons(q):
+    film.add_calibration(q, NoFilmSparql([item("Q7", "S", n=30, types=MINISERIES)]), ["Q7"])
+    assert q.row("Q7").calibration and q.row("Q7").sources == ["calibration"]
+    assert _season_headings(q) == ["Season 1", "Season 2"]
+
+
+def test_a_calibration_film_is_not_flagged_as_a_series(q):
+    film.add_calibration(q, NoFilmSparql([item("Q7", "S", n=30)], series=False), ["Q7"])
+    assert "series" not in q.row("Q7").data[0]
+    assert _season_headings(q) == []
+
+
+def test_a_film_never_gets_season_sections(q):
+    q.add("Q7", "film", "facet", {}, {"enwiki": "S"}, False, {"count": 30, "instance_of": [film.FILM]})
+    assert _season_headings(q) == []

@@ -101,10 +101,14 @@ def _run(sparql, label: str, query: str) -> list[dict]:
     return rows
 
 
-def _take(queue, rows: list[dict], source: str, calibration: bool = False) -> int:
+def _take(queue, rows: list[dict], source: str, calibration: bool = False, series: bool = False) -> int:
+    """Add the rows; `series`: they came from a query bounded to the series class (P31 may hold only a subclass
+    of it), kept as data[0]["series"]. Never written False, so a film query on the same item does not clear it."""
     added = 0
     for row in rows:
         labels, sitelinks, data = _row_data(row)
+        if series:
+            data["series"] = True
         added += queue.add(row["item"], "film", source, labels, sitelinks, calibration, data)
     return added
 
@@ -124,20 +128,20 @@ def candidates(queue, sparql, wikipedia, cfg: dict, wikidata=None) -> int:
     qids = list(dict.fromkeys(resolved.values()))
     for i in range(0, len(qids), CHUNK):
         values = f"  VALUES ?item {{ {_values(qids[i:i + CHUNK])} }}\n"
-        rows = _run(sparql, f"vatican ({page})", _query(
-            values + f"  {{ ?item wdt:P31/wdt:P279* wd:{FILM} }} UNION {{ ?item wdt:P31/wdt:P279* wd:{SERIES} }}"))
-        added += _take(queue, rows, "vatican")
+        for cls in (FILM, SERIES):
+            rows = _run(sparql, f"vatican ({page}, {cls})", _query(values + f"  ?item wdt:P31/wdt:P279* wd:{cls} ."))
+            added += _take(queue, rows, "vatican", series=cls == SERIES)
 
     for award in film["seeds"]["awards"]:
         for cls in (FILM, SERIES):
             pattern = f"  ?award wdt:P31?/wdt:P279? wd:{award} .\n  ?item wdt:P166 ?award ."
             rows = _run(sparql, f"award {award} ({cls})", _bounded(pattern, cls))
-            added += _take(queue, rows, f"award:{award}")
+            added += _take(queue, rows, f"award:{award}", series=cls == SERIES)
 
     for description, pattern in _facet_patterns(cfg):
         for cls in (FILM, SERIES):
             rows = _run(sparql, f"facet {description} ({cls})", _bounded(pattern, cls))
-            added += _take(queue, rows, "facet")
+            added += _take(queue, rows, "facet", series=cls == SERIES)
     return added
 
 
@@ -148,6 +152,8 @@ def add_calibration(queue, sparql, qids: list[str]) -> int:
         values = f"  VALUES ?item {{ {_values(qids[i:i + CHUNK])} }}\n"
         rows = _run(sparql, "calibration", _query(values))
         added += _take(queue, rows, "calibration", calibration=True)
+        series = _run(sparql, "calibration (series)", _query(values + f"  ?item wdt:P31/wdt:P279* wd:{SERIES} ."))
+        _take(queue, series, "calibration", calibration=True, series=True)
     return added
 
 
@@ -281,7 +287,8 @@ def dossier(row, cfg: dict, wiki_for, wikidata) -> dict:
     has a Wikipedia sitelink for and to cfg['dossier_languages']. `wiki_for(lang, project)` gives a Wikipedia or
     Wikiquote reader. On Wikiquote only sections whose heading names a director, screenwriter or creator are kept."""
     entity = wikidata.entity(row.qid)
-    series = SERIES in row.data.get(0, {}).get("instance_of", [])
+    stage0 = row.data.get(0, {})
+    series = bool(stage0.get("series")) or SERIES in stage0.get("instance_of", [])
     original = next((ORIGINAL_LANGUAGES[q] for q in _qids(entity, "P364") if q in ORIGINAL_LANGUAGES), None)
     wanted = [l for l in dict.fromkeys([original, "en", "it"]) if l and f"{l}wiki" in row.sitelinks]
     languages = wanted[:cfg["dossier_languages"]]

@@ -1,8 +1,11 @@
-"""Jev questions for the pipeline, each cached in the queue by a hash of the model, every text the question
-sends (instructions, options, thresholds) and its input: a reworded question or a new model is asked afresh."""
+"""Jev questions for the pipeline. Every Jev request is cached in the queue on its own, keyed by a hash of the
+model, the serialized questions (instructions, options) and the state sent: a reworded question or a new model is
+asked afresh, and when one request of several fails (a level of tools.jev.classify, say) the paid ones are kept.
+The thresholds are applied in code to the cached answers, so changing one costs no request."""
 import hashlib
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 from typesafe_sdk import Choice, Noul
 
@@ -27,29 +30,42 @@ def qhash(name: str, instructions: str, state_text: str) -> str:
     return hashlib.sha256("\0".join((name, instructions, state_text)).encode("utf-8")).hexdigest()
 
 
-def _wording(*parts) -> str:
-    """The cache-key text of a question: the model and every text sent with it (dicts as sorted JSON)."""
-    return "\n".join([jev.MODEL] + [p if isinstance(p, str) else json.dumps(p, ensure_ascii=False, sort_keys=True)
-                                    for p in parts])
+def _dump(value):
+    return json.dumps(value, ensure_ascii=False, sort_keys=True)
 
 
-def _field_wording(data) -> str:
-    """Every instruction and option text tools.jev.classify can send, and the thresholds that decide its answer."""
-    levels = {}
-    pending = [None]
-    while pending:
-        key = pending.pop(0)
-        criteria = jev.level_criteria(data, key)
-        if criteria:
-            levels[key or "root"] = criteria
-            pending += list(criteria)
-    return _wording(jev.LEVEL_INSTRUCTIONS, levels,
-                    {"choice": [jev.CHOICE_PROBABILITY, jev.CHOICE_CONFIDENCE], "tie": jev.BEAM_TIE})
+def _question(q) -> dict:
+    """What a typesafe_sdk question sends: its type, instructions and options."""
+    return {"type": q.type, "instructions": q.instructions, "criteria": q.criteria}
 
 
-def _themes_wording(data) -> str:
-    return _wording({t.key: jev.theme_instructions(t) for t in leaf_themes(data)},
-                    {"apply": jev.THEME_APPLY, "ask": jev.THEME_ASK})
+def question_text(model: str, questions: dict) -> str:
+    """The serialized wording of one request (model and questions), stored with its answer and hashed."""
+    return _dump({"model": model, "questions": {k: _question(q) for k, q in questions.items()}})
+
+
+class CachingClient:
+    """A Jev client for one queue row: each successful system_one request is stored in the queue's jev cache
+    and answered from it when the same request (model, questions, state) is made again."""
+
+    def __init__(self, client, queue, qid):
+        self.client, self.queue, self.qid = client, queue, qid
+
+    def system_one(self, state, questions, model=None):
+        wording = question_text(model, questions)
+        h = qhash("system_one", wording, _dump(state))
+        stored = self.queue.jev_get(self.qid, h)
+        if stored is None:
+            a = self.client.system_one(state=state, questions=questions, model=model)
+            stored = {
+                "choices": {k: {"choice": c.choice, "probabilities": dict(c.probabilities),
+                                "confidence": c.confidence} for k, c in (getattr(a, "choices", None) or {}).items()},
+                "nouls": {k: float(n.noul) for k, n in (getattr(a, "nouls", None) or {}).items()},
+            }
+            self.queue.jev_put(self.qid, h, wording, stored)  # a raised request stores nothing
+        return SimpleNamespace(
+            choices={k: SimpleNamespace(**c) for k, c in stored["choices"].items()},
+            nouls={k: SimpleNamespace(noul=p) for k, p in stored["nouls"].items()})
 
 
 class Judge:
@@ -64,41 +80,29 @@ class Judge:
             self._data = load(ROOT)
         return self._data
 
-    def _cached(self, row, name, instructions, state_text, ask) -> dict:
-        """The cached answer, else ask() -> dict, stored. An exception from ask() stores nothing."""
-        h = qhash(name, instructions, state_text)
-        hit = self.queue.jev_get(row.qid, h)
-        if hit is not None:
-            return hit
-        answer = ask()
-        self.queue.jev_put(row.qid, h, name, answer)
-        return answer
+    def _client(self, row) -> CachingClient:
+        return CachingClient(self.client, self.queue, row.qid)
 
-    def _choice(self, key, question, state) -> dict:
-        a = self.client.system_one(state=state, questions={key: question}, model=jev.MODEL).choices[key]
+    def _choice(self, row, key, question, state) -> dict:
+        a = self._client(row).system_one(state=state, questions={key: question}, model=jev.MODEL).choices[key]
         return {"choice": a.choice, "probabilities": dict(a.probabilities), "confidence": a.confidence}
 
     def plausible(self, row, synopsis: str) -> float:
-        def ask():
-            a = self.client.system_one(state={"text": synopsis}, questions={"plausible": Noul(instructions=PLAUSIBLE)},
-                                       model=jev.MODEL)
-            return {"p": float(a.nouls["plausible"].noul)}
-        return self._cached(row, "plausible", _wording(PLAUSIBLE), synopsis, ask)["p"]
+        a = self._client(row).system_one(state={"text": synopsis},
+                                         questions={"plausible": Noul(instructions=PLAUSIBLE)}, model=jev.MODEL)
+        return float(a.nouls["plausible"].noul)
 
     def connection(self, row, dossier_text: str) -> dict:
         q = Choice(instructions=CONNECTION, criteria={k: {"name": v} for k, v in CONNECTIONS.items()})
-        return self._cached(row, "connection", _wording(CONNECTION, CONNECTIONS), dossier_text,
-                            lambda: self._choice("connection", q, {"text": dossier_text}))
+        return self._choice(row, "connection", q, {"text": dossier_text})
 
     def field(self, row, dossier_text: str) -> dict:
-        return self._cached(row, "field", _field_wording(self.data), dossier_text,
-                            lambda: jev.classify(self.client, dossier_text, self.data)._asdict())
+        """tools.jev.classify through the cache: each level it asks is cached as it succeeds."""
+        return jev.classify(self._client(row), dossier_text, self.data)._asdict()
 
     def themes(self, row, dossier_text: str) -> dict:
-        def ask():
-            result = jev.themes(self.client, dossier_text, self.data)
-            return {key: {"p": p, "status": status} for key, (p, status) in result.items()}
-        return self._cached(row, "themes", _themes_wording(self.data), dossier_text, ask)
+        result = jev.themes(self._client(row), dossier_text, self.data)
+        return {key: {"p": p, "status": status} for key, (p, status) in result.items()}
 
     def evidence(self, row, theme_key: str, paragraphs: list[str]) -> int:
         """Index of the paragraph that best supports the theme (its name and definition are looked up by key)."""
@@ -108,6 +112,4 @@ class Judge:
         instructions = (f"Which paragraph of the dossier best supports that the work genuinely explores the "
                         f"theme of {name} ({definition})?")
         q = Choice(instructions=instructions, criteria={f"p{i}": {"name": p} for i, p in enumerate(paragraphs)})
-        answer = self._cached(row, "evidence", _wording(instructions), json.dumps(paragraphs, ensure_ascii=False),
-                              lambda: {"index": int(self._choice("evidence", q, {"theme": name})["choice"][1:])})
-        return answer["index"]
+        return int(self._choice(row, "evidence", q, {"theme": name})["choice"][1:])
