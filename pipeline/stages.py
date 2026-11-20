@@ -1,4 +1,4 @@
-"""Pipeline stages: the shared stage loop and stage 1, "already covered?"."""
+"""Pipeline stages: the shared stage loop, stage 1 ("already covered?") and stage 3 (quick judgment)."""
 from pipeline import load_config
 from sync.wiki import WikiClient
 
@@ -60,7 +60,7 @@ def quick(row, judge, wikipedia_for) -> tuple[str, dict]:
             p = judge.plausible(row, wikipedia_for(lang).lead(title))
             break
     else:
-        return "pass", {"note": "no wikipedia sitelink"}
+        return ("pass", {}) if row.calibration else ("drop", {"reason": "no wikipedia sitelink"})
     if row.calibration or p >= load_config()["quick_drop"]:
         return "pass", {"p": p}
     return "drop", {"p": p}

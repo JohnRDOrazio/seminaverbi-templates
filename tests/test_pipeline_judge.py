@@ -115,3 +115,13 @@ def test_quick_falls_back_to_next_language_and_keeps_calibration(queue):
     j = FakeJudge(0.0)
     assert quick(r, j, FakeWikipedia) == ("pass", {"p": 0.0})
     assert j.seen == ["it:B"]
+
+
+def test_quick_without_wikipedia_sitelink(queue):
+    queue.add("Q3", "film", "wikidata", {}, {"commonswiki": "X"})
+    queue.add("Q4", "film", "wikidata", {}, {}, calibration=True)
+    rows = {x.qid: x for x in queue.pending(1)}
+    j = FakeJudge(0.9)
+    assert quick(rows["Q3"], j, FakeWikipedia) == ("drop", {"reason": "no wikipedia sitelink"})
+    assert quick(rows["Q4"], j, FakeWikipedia) == ("pass", {})
+    assert j.seen == []
