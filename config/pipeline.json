@@ -26,5 +26,104 @@
       "Q7717463",
       "Q9259727"
     ]
+  },
+  "literature": {
+    "sitelink_floor": 15,
+    "authors": [
+      {
+        "qid": "Q1067",
+        "name": "Dante Alighieri"
+      },
+      {
+        "qid": "Q1064",
+        "name": "Alessandro Manzoni"
+      },
+      {
+        "qid": "Q183167",
+        "name": "G. K. Chesterton"
+      },
+      {
+        "qid": "Q892",
+        "name": "J. R. R. Tolkien"
+      },
+      {
+        "qid": "Q9204",
+        "name": "C. S. Lewis"
+      },
+      {
+        "qid": "Q107002",
+        "name": "Evelyn Waugh"
+      },
+      {
+        "qid": "Q128560",
+        "name": "Graham Greene"
+      },
+      {
+        "qid": "Q234579",
+        "name": "Flannery O'Connor"
+      },
+      {
+        "qid": "Q315072",
+        "name": "Georges Bernanos"
+      },
+      {
+        "qid": "Q80889",
+        "name": "Sigrid Undset"
+      },
+      {
+        "qid": "Q316217",
+        "name": "Shūsaku Endō"
+      },
+      {
+        "qid": "Q334965",
+        "name": "Charles Péguy"
+      },
+      {
+        "qid": "Q295830",
+        "name": "Paul Claudel"
+      },
+      {
+        "qid": "Q81685",
+        "name": "François Mauriac"
+      },
+      {
+        "qid": "Q991",
+        "name": "Fyodor Dostoevsky"
+      }
+    ],
+    "francis_2024": [
+      {"qid": "Q909", "name": "Jorge Luis Borges", "kind": "author"},
+      {"qid": "Q7199", "name": "Marcel Proust", "kind": "author"},
+      {"qid": "Q464928", "name": "In Search of Lost Time", "kind": "work"},
+      {"qid": "Q41408", "name": "Federico García Lorca", "kind": "author"},
+      {"qid": "Q320713", "name": "Cantar de mio Cid", "kind": "work"},
+      {"qid": "Q37767", "name": "T. S. Eliot", "kind": "author"},
+      {"qid": "Q153905", "name": "Paul Celan", "kind": "author"},
+      {"qid": "Q83158", "name": "Jean Cocteau", "kind": "author"},
+      {"qid": "Q9204", "name": "C. S. Lewis", "kind": "author"},
+      {"qid": "Q180671", "name": "Aratus", "kind": "author"},
+      {"qid": "Q42194191", "name": "Phaenomena", "kind": "work"},
+      {"qid": "Q319406", "name": "Epimenides of Crete", "kind": "author"}
+    ],
+    "subjects": [
+      "Q302",
+      "Q1845",
+      "Q5043"
+    ],
+    "book_class": "Q29154430",
+    "biblical_classes": [
+      "Q12405827"
+    ],
+    "genres": [
+      "Q1084059",
+      "Q100339660",
+      "Q208628"
+    ],
+    "series_classes": [
+      "Q1667921",
+      "Q277759"
+    ],
+    "illustrissimi_page": "Illustrissimi",
+    "illustrissimi_section": "I personaggi di Illustrissimi"
   }
 }

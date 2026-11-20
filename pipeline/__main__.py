@@ -13,6 +13,7 @@ from typesafe_sdk import TypeSafeError
 
 from pipeline import calibration, load_config, stages
 from pipeline.domains import DOMAINS
+from pipeline.domains.common import domain_config
 from pipeline.publish import approved_report, publish, sync_votes
 from pipeline.queue import Queue
 from sync import categories
@@ -89,6 +90,7 @@ def _triage_stage(domain, cfg):
 def _stage_functions(domain, queue, cfg) -> dict:
     """Stages 1-5 as run_stage callables; the Jev client and the wikis are made when first needed."""
     lazy: dict = {}
+    cfg = domain_config(cfg, getattr(domain, "__name__", "").rsplit(".", 1)[-1])  # idempotent; direct callers too
 
     def wikis():
         return lazy.setdefault("wikis", _wikis())
@@ -103,7 +105,7 @@ def _stage_functions(domain, queue, cfg) -> dict:
         return domain.dossier_stage(row, cfg, wiki_for, lazy.setdefault("wikidata", _wikidata()))
 
     return {
-        1: lambda row: stages.covered(row, wikis()["en"], wikis()),
+        1: lambda row: (getattr(domain, "covered", None) or stages.covered)(row, wikis()["en"], wikis()),
         2: _triage_stage(domain, cfg),
         3: lambda row: stages.quick(row, judge(), wiki_for),
         4: dossier,
@@ -229,7 +231,7 @@ def main(argv=None) -> int:
     args = parse_args(argv, parser)
     if args.command == "redo" and args.stage < 1:
         parser.error("redo 0 is refused: stage 0 holds the data the later stages need; run candidates again instead")
-    cfg = load_config()
+    cfg = domain_config(load_config(), args.domain)  # the domain's own sitelink floor, for every command
     try:
         return COMMANDS[args.command](args, Queue(args.db), cfg) or 0
     except (CliError, SyncError, TypeSafeError) as exc:

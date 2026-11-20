@@ -62,8 +62,9 @@ def _params(row, result) -> list[tuple[str, str]]:
               (f"theme{n}_status", theme["status"]), (f"theme{n}_evidence", ev.get("excerpt") or ""),
               (f"theme{n}_source", ev.get("url") or "")]
     urls = []
-    for note in (row.data.get(4) or {}).get("notes", []):
-        url = note["url"].replace(" ", "%20")
+    dossier = row.data.get(4) or {}
+    for url in [n["url"] for n in dossier.get("notes", [])] + dossier.get("links", []):
+        url = url.replace(" ", "%20")
         if url not in urls:
             urls.append(url)
     status = row.status if row.status in KEPT_STATUSES else "open"
@@ -185,7 +186,7 @@ def ranking(queue) -> str:
         info = r.data.get(1, {})
         name = display_name(r)
         lines.append(f"* [https://www.wikidata.org/wiki/{r.qid} {name}] – on: {', '.join(info.get('have', []))};"
-                     f" missing: {', '.join(info.get('missing', []))}")
+                     f" missing: {', '.join(info.get('missing', []))}" + (f" ({info['note']})" if info.get("note") else ""))
     return "\n".join(lines) + "\n"
 
 

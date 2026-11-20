@@ -86,11 +86,15 @@ def covered(row, repo: WikiClient, wikis: dict[str, WikiClient]) -> tuple[str, d
 def quick(row, judge, wikipedia_for) -> tuple[str, dict]:
     """Stage 3: drop if Jev finds the work implausibly connected to the Gospel (below quick_drop).
 
-    The synopsis is the Wikipedia lead in the first of en, it, es, fr, de, pt the row has a sitelink for.
+    The synopsis is the Wikipedia lead in the first of en, it, es, fr, de, pt the row has a sitelink for (a
+    series with none of its own: the stage-0 `lead_sitelinks`, those of its best volume).
     Calibration rows always pass, with the probability recorded; a row with no Wikipedia sitelink, or whose
     lead is empty, is dropped without asking Jev (calibration rows pass)."""
+    sitelinks = row.sitelinks
+    if not any(f"{lang}wiki" in sitelinks for lang in LANGS):  # a literary series borrows its best volume's page
+        sitelinks = row.data.get(0, {}).get("lead_sitelinks", {})
     for lang in LANGS:
-        title = row.sitelinks.get(f"{lang}wiki")
+        title = sitelinks.get(f"{lang}wiki")
         if title:
             lead = wikipedia_for(lang).lead(title)
             if not lead.strip():

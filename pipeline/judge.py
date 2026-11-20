@@ -9,26 +9,16 @@ from types import SimpleNamespace
 
 from typesafe_sdk import Choice, Noul
 
+from pipeline.domains import DOMAINS, film
 from sync.categories import leaf_themes, load
 from tools import jev
 
 ROOT = Path(__file__).resolve().parent.parent
 
-PLAUSIBLE = ("Does the work described in `text` plausibly show the influence of the Gospel, or a seed of the "
-             "Word (a moral or spiritual truth that the Gospel brings to fulfilment)? The work need not be "
-             "religious: an implicit seed in one storyline, character arc or episode is enough.")
-CONNECTION = ("`text` is a dossier on one work (for a television series, possibly several seasons). How does "
-              "the work relate to the Gospel? A work need not be religious to carry seeds of the Word: a moral or "
-              "spiritual truth that the Gospel brings to fulfilment (mercy, forgiveness, sacrifice, conversion, "
-              "hope...) is enough, even when it is implicit and found in a single storyline, character arc or "
-              "episode. Judge the work itself, not its marketing.")
-CONNECTIONS = {
-    "direct": "direct Christian or biblical influence",
-    "seeds": "implicit seeds of the Word: a truth the Gospel fulfils, in the whole work or in one storyline, "
-             "character or episode",
-    "entertainment": "biblical or Christian imagery used for entertainment",
-    "none": "no connection, not even an implicit one",
-}
+# Jev's wording per domain lives in the domain module (QUESTIONS); film's stays importable under these names
+PLAUSIBLE = film.QUESTIONS["plausible"]
+CONNECTION = film.QUESTIONS["connection"]
+CONNECTIONS = film.QUESTIONS["connections"]
 
 
 def qhash(name: str, instructions: str, state_text: str) -> str:
@@ -92,13 +82,21 @@ class Judge:
         a = self._client(row).system_one(state=state, questions={key: question}, model=jev.MODEL).choices[key]
         return {"choice": a.choice, "probabilities": dict(a.probabilities), "confidence": a.confidence}
 
+    @staticmethod
+    def _questions(row) -> dict:
+        """The wording of the row's domain; film's for a domain without one."""
+        return getattr(DOMAINS.get(row.domain, film), "QUESTIONS", film.QUESTIONS)
+
     def plausible(self, row, synopsis: str) -> float:
+        wording = self._questions(row)["plausible"]
         a = self._client(row).system_one(state={"text": synopsis},
-                                         questions={"plausible": Noul(instructions=PLAUSIBLE)}, model=jev.MODEL)
+                                         questions={"plausible": Noul(instructions=wording)}, model=jev.MODEL)
         return float(a.nouls["plausible"].noul)
 
     def connection(self, row, dossier_text: str) -> dict:
-        q = Choice(instructions=CONNECTION, criteria={k: {"name": v} for k, v in CONNECTIONS.items()})
+        wording = self._questions(row)
+        q = Choice(instructions=wording["connection"],
+                   criteria={k: {"name": v} for k, v in wording["connections"].items()})
         return self._choice(row, "connection", q, {"text": dossier_text})
 
     def field(self, row, dossier_text: str) -> dict:

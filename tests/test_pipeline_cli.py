@@ -460,3 +460,17 @@ def test_a_saved_theme_under_the_current_cutoff_is_neither_shown_nor_counted(mon
     out = calibration.report(q, {"en": FakeWiki({SV_THEME: ["Q20"]})}, tree=TREE)
     assert "| verdict | would be dropped: no theme at 0.50 | |" in out
     assert "| themes | none |" in out and "not found by Jev: mercy (0.45)" in out
+
+
+def test_literature_domain_is_accepted_and_stage_2_reads_its_floor(wired, monkeypatch):
+    from pipeline.domains import literature
+    path, _ = wired
+    config = {**CONFIG, "literature": {"sitelink_floor": 8}}
+    monkeypatch.setattr(cli, "load_config", lambda: config)
+    seen = []
+    monkeypatch.setattr(literature, "triage", lambda row, cfg: (seen.append(cfg["sitelink_floor"]), ("pass", ""))[1])
+    Queue(path).add("Q1", "literature", "author", {"en": "A book"}, {"enwiki": "A book"},
+                    data={"instance_of": [], "count": 10})
+    assert cli.main(["covered", "--domain", "literature", "--db", str(path)]) == 0
+    assert cli.main(["triage", "--domain", "literature", "--db", str(path)]) == 0
+    assert seen == [8] and config["sitelink_floor"] == 15
