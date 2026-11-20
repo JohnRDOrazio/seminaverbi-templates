@@ -12,6 +12,12 @@ KEPT_STATUSES = ("approved", "created", "declined")
 _FORBIDDEN = re.compile(r"[#<>\[\]|{}]")
 _CALL = re.compile(r"\{\{\s*(?:Template\s*:\s*)?SV[ _]+proposal\s*(?=[|}])", re.IGNORECASE)
 _RANK = {"open": 0, "approved": 1, "created": 2}
+
+
+def display_name(row) -> str:
+    """A readable name for `row`: its first label in LANGS order, else a Wikipedia sitelink, else the QID."""
+    label = next((row.labels[lang] for lang in LANGS if row.labels.get(lang)), None)
+    return label or next((row.sitelinks[f"{lang}wiki"] for lang in LANGS if row.sitelinks.get(f"{lang}wiki")), row.qid)
 _MASK = re.compile(r"<!--.*?-->|<nowiki>.*?</nowiki>", re.DOTALL | re.IGNORECASE)
 _COMMENT = re.compile(r"<!--.*?(?:-->|$)", re.DOTALL)
 
@@ -177,7 +183,7 @@ def ranking(queue) -> str:
         lines.append("''None.''")
     for r in suggestions:
         info = r.data.get(1, {})
-        name = r.labels.get("en") or next(iter(r.labels.values()), r.qid)
+        name = display_name(r)
         lines.append(f"* [https://www.wikidata.org/wiki/{r.qid} {name}] – on: {', '.join(info.get('have', []))};"
                      f" missing: {', '.join(info.get('missing', []))}")
     return "\n".join(lines) + "\n"
