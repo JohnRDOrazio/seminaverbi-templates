@@ -138,3 +138,10 @@ def test_every_language_has_the_keys():
         strings = i18n(lang)
         assert [k for k in KEYS if not strings.get(k)] == []
     assert "$1" in i18n("en")["proposal_category"]
+
+
+def test_unknown_field_and_theme_keys_are_shown_literally():
+    out = render(field="[[Category:Foo]]", theme1="[[File:X.png]]", theme2="''x'' __NOINDEX__")
+    assert "[[Category:Foo]]" not in out and "[[File:X.png]]" not in out
+    assert "''x''" not in out and "__NOINDEX__" not in out
+    assert out.count("[[Category:") == 1  # only the proposal category

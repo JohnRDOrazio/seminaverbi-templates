@@ -12,7 +12,8 @@ local FARM_HOST = '.seminaverbi.bibleget.io/wiki/'
 
 -- Text shown literally: no wiki markup can come out of it.
 local function plain(s)
-	return mw.text.nowiki(s)
+	-- nowiki leaves __MAGIC_WORDS__ alone
+	return (mw.text.nowiki(s):gsub('__', '_&#95;'))
 end
 
 -- 0.83 -> "83%"; nil when it is not a number.
@@ -46,8 +47,15 @@ local function nodeName(nodes, key, lang)
 	return nil
 end
 
-local function themeName(categories, key, lang)
-	return nodeName(categories.themes, key, lang) or nodeName(categories.fields, key, lang) or key
+-- The HTML for a node key: its name in lang when the tree has it, else the key shown literally.
+local function nodeLabel(nodes, key, lang)
+	local name = nodeName(nodes, key, lang)
+	return name and Util.escape(name) or plain(key)
+end
+
+local function themeLabel(categories, key, lang)
+	local name = nodeName(categories.themes, key, lang) or nodeName(categories.fields, key, lang)
+	return name and Util.escape(name) or plain(key)
 end
 
 local function row(label, value)
@@ -65,7 +73,7 @@ local function themes(args, categories, lang, out)
 	while args['theme' .. i] do
 		local status = args['theme' .. i .. '_status']
 		local line = '<li' .. (status and (' class="sv-proposal-theme-' .. Util.escape((status:gsub('[^%w%-]', ''))) .. '"') or '') .. '>'
-			.. withPercent('<strong>' .. Util.escape(themeName(categories, args['theme' .. i], lang)) .. '</strong>',
+			.. withPercent('<strong>' .. themeLabel(categories, args['theme' .. i], lang) .. '</strong>',
 				args['theme' .. i .. '_p'])
 		local evidence, source = args['theme' .. i .. '_evidence'], args['theme' .. i .. '_source']
 		if evidence then
@@ -113,7 +121,7 @@ function p.main(frame)
 	end
 	if args.field then
 		out[#out + 1] = row(Util.msg('proposal_field', lang),
-			withPercent(Util.escape(nodeName(categories.fields, args.field, lang) or args.field), args.field_p))
+			withPercent(nodeLabel(categories.fields, args.field, lang), args.field_p))
 	end
 	themes(args, categories, lang, out)
 	if args.outline then
