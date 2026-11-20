@@ -9,12 +9,17 @@ LANGS = ("en", "it", "es", "fr", "de", "pt")
 WIKIPEDIA_SITES = tuple(f"{lang}wiki" for lang in LANGS)
 
 
-def run_stage(queue, stage: int, fn, limit=None) -> dict[str, int]:
+def run_stage(queue, stage: int, fn, limit=None, only=None) -> dict[str, int]:
     """Run fn(row) -> (outcome, data) over the pending rows of `stage`, recording each outcome.
+
+    `only(row) -> bool` leaves the other rows pending (applied before `limit`).
 
     An exception stops the loop, leaves that row without an outcome and is re-raised."""
     counts: dict[str, int] = {}
-    for row in queue.pending(stage, limit=limit):
+    rows = queue.pending(stage) if only else queue.pending(stage, limit=limit)
+    if only:
+        rows = [r for r in rows if only(r)][:limit]
+    for row in rows:
         outcome, data = fn(row)
         queue.set_outcome(row.qid, stage, outcome, data)
         counts[outcome] = counts.get(outcome, 0) + 1

@@ -31,6 +31,56 @@ Category check, with the editor bot's credentials (`SV_EDITOR_USER` / `SV_EDITOR
 python -m tools.categories check --wiki fr [--create] [--dry-run]
 ```
 
+## The article pipeline
+
+`python -m pipeline` finds film and television candidates for new articles, judges them with Jev, and posts
+proposals on the English wiki (`Semina Verbi:Article proposals/…`) for the approved users to vote on.
+Design: `docs/superpowers/specs/2026-11-20-article-pipeline-film-design.md`.
+
+Stages (each records its outcome per candidate, so a run resumes where it stopped):
+
+0. `candidates`: the Vatican list of films, the SIGNIS and Ecumenical Jury awards, and Wikidata facets (SPARQL).
+1. `covered`: drop what SeminaVerbi already covers on all six wikis; mark partial coverage as a translation.
+2. `triage`: drop episodes, trailers, clips and facet-only candidates under the sitelink floor.
+3. `quick`: Jev judges the Wikipedia lead; below `quick_drop` the candidate is dropped.
+4. `dossier`: notes from Wikipedia sections and Wikiquote, in up to three languages.
+5. `adjudicate`: Jev decides connection, field and themes, picks evidence and builds the outline.
+6. `publish`: writes the `{{SV proposal}}` pages and the ranking page.
+
+Commands (options `--db PATH`, default `data/pipeline.sqlite`, and `--domain`, default `film`, go before or after the command):
+
+```
+python -m pipeline candidates|covered|triage|quick|dossier|adjudicate   # one stage
+python -m pipeline run [--publish]    # stages 0-5, at most max_new_per_run entering stage 3; publish only with the flag
+python -m pipeline calibrate          # add the articles SeminaVerbi already has, run stages 1-5 on them, print the report
+python -m pipeline redo STAGE [--qid Q]   # clear that stage and later ones (STAGE 0 is refused)
+python -m pipeline publish | votes | approved
+```
+
+`calibrate` prints, per existing article, Jev's connection, field and themes beside the item's `SV field` and
+`SV Gospel theme` statements, plus the pages that could not be mapped to Wikidata. Read it before posting anything;
+wording or cut-off changes go through a pull request, then `redo`.
+
+The queue is one SQLite file, `data/pipeline.sqlite` (git-ignored; created on first use). It holds the candidates,
+their outcomes per stage and Jev's cached answers.
+
+Commands that write to the wiki (`publish`, `run --publish`, `votes`) log in as the editor bot from
+`SV_EDITOR_USER` / `SV_EDITOR_PASSWORD`, so run them through `~/.config/seminaverbi/runeditor.py pipeline …`.
+Only `quick`, `adjudicate`, `run` and `calibrate` need `TYPESAFE_API_KEY` (Jev).
+
+**Vote timer.** `votes` counts the votes on open proposals and approves those at the threshold
+(`vote_threshold` in `config/pipeline.json`, now 3; `max_new_per_run` and the other cut-offs live there too).
+A user timer runs it every 3 hours:
+
+```
+systemctl --user link "$PWD"/deploy/systemd/sv-pipeline-votes.{service,timer}
+systemctl --user enable --now sv-pipeline-votes.timer
+```
+
+**Sources and licences.** Wikidata (CC0) supplies the candidates. Wikipedia and Wikiquote are read as notes for the
+writer and Jev, never copied into articles. IMDb and TMDb are not used. The Arts & Faith Top 100 was dropped: it has
+no machine-readable list.
+
 ## The category tree on the main pages
 
 Each wiki's main page ends with `{{SV category tree}}` (`modules/SV/Categories.lua`): a card per

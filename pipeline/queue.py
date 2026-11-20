@@ -40,6 +40,8 @@ class Row:
 
 class Queue:
     def __init__(self, path: Path | str):
+        if str(path) != ":memory:":
+            Path(path).parent.mkdir(parents=True, exist_ok=True)  # data/ is git-ignored, absent on a fresh checkout
         self.db = sqlite3.connect(str(path))
         self.db.row_factory = sqlite3.Row
         self.db.executescript(SCHEMA)
@@ -155,6 +157,9 @@ class Queue:
     def with_outcome(self, stage: int, outcome: str) -> list[Row]:
         return self._rows("EXISTS (SELECT 1 FROM outcomes o WHERE o.qid=candidates.qid"
                           " AND o.stage=? AND o.outcome=?)", (stage, outcome))
+
+    def calibration_rows(self) -> list[Row]:
+        return self._rows("calibration=1", ())
 
     def by_status_in(self, statuses) -> list[Row]:
         marks = ",".join("?" * len(statuses))
