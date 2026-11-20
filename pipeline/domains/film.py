@@ -27,6 +27,26 @@ _query, _bounded, _values, _title = common.query, common.bounded, common.values,
 _row_data, _qids, _sitelinks = common.row_data, common.qids, common.entity_sitelinks
 _sections, _heading, _wikidata_qid = common.sections, common.heading, common.wikidata_qid
 
+# Jev's wording for the quick judgment, the connection choice and its options (pipeline.judge asks with these).
+# Verbatim: the cached answers are keyed by a hash of this text.
+QUESTIONS = {
+    "plausible": ("Does the work described in `text` plausibly show the influence of the Gospel, or a seed of the "
+                  "Word (a moral or spiritual truth that the Gospel brings to fulfilment)? The work need not be "
+                  "religious: an implicit seed in one storyline, character arc or episode is enough."),
+    "connection": ("`text` is a dossier on one work (for a television series, possibly several seasons). How does "
+                   "the work relate to the Gospel? A work need not be religious to carry seeds of the Word: a moral "
+                   "or spiritual truth that the Gospel brings to fulfilment (mercy, forgiveness, sacrifice, "
+                   "conversion, hope...) is enough, even when it is implicit and found in a single storyline, "
+                   "character arc or episode. Judge the work itself, not its marketing."),
+    "connections": {
+        "direct": "direct Christian or biblical influence",
+        "seeds": "implicit seeds of the Word: a truth the Gospel fulfils, in the whole work or in one storyline, "
+                 "character or episode",
+        "entertainment": "biblical or Christian imagery used for entertainment",
+        "none": "no connection, not even an implicit one",
+    },
+}
+
 
 def _facet_patterns(cfg: dict) -> list[tuple[str, str]]:
     """(description, pattern) for every facet; each one is run once for films and once for series."""

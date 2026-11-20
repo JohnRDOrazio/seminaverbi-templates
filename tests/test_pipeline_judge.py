@@ -253,3 +253,49 @@ def test_the_connection_question_allows_an_implicit_tie_in_one_storyline_or_epis
     assert "seeds of the Word" in CONNECTION
     assert all(w in CONNECTION for w in ("storyline", "character", "episode"))
     assert "episode" in CONNECTIONS["seeds"] and "not even" in CONNECTIONS["none"]
+
+
+FILM_CONNECTION_HASH = "32ec60aff78f226ca6fca45dad148563c36db4ca04a5a66f30955e560cd30c73"  # recorded before the change
+FILM_PLAUSIBLE_HASH = "ecf1345b053aa8c295db60ca8909053f6f794b3b78c6e1439db7a23503c42c1c"
+
+
+def _wording_hash(fake, key):
+    from pipeline.judge import question_text
+    return qhash("system_one", question_text(jev.MODEL, {key: fake.calls[0 if key == "connection" else 1]["questions"][key]}),
+                 "{}")
+
+
+def test_film_wording_is_unchanged(queue):
+    # state is {"text": ...}; the recorded hashes use "{}" as state, so compare the wording hash only
+    fake = FakeJev({"connection": choice({"direct": 1.0, "seeds": 0.0, "entertainment": 0.0, "none": 0.0}, 0.9)},
+                   {"plausible": 0.5})
+    judge = Judge(fake, queue, DATA)
+    judge.connection(row(queue), "t")
+    judge.plausible(row(queue), "t")
+    assert _wording_hash(fake, "connection") == FILM_CONNECTION_HASH
+    assert _wording_hash(fake, "plausible") == FILM_PLAUSIBLE_HASH
+
+
+def test_a_row_is_asked_with_its_domain_wording(queue, monkeypatch):
+    from pipeline.domains import DOMAINS
+    lit = SimpleNamespace(QUESTIONS={"plausible": "LIT plausible?", "connection": "LIT connection?",
+                                     "connections": {"a": "alpha", "b": "beta"}})
+    monkeypatch.setitem(DOMAINS, "literature", lit)
+    queue.add("L1", "literature", "wikidata", {"en": "B"}, {})
+    r = queue.row("L1")
+    fake = FakeJev({"connection": choice({"a": 0.9, "b": 0.1}, 0.9)}, {"plausible": 0.5})
+    judge = Judge(fake, queue, DATA)
+    judge.connection(r, "text")
+    judge.plausible(r, "text")
+    q = fake.calls[0]["questions"]["connection"]
+    assert q.instructions == "LIT connection?" and set(q.criteria) == {"a", "b"}
+    assert fake.calls[1]["questions"]["plausible"].instructions == "LIT plausible?"
+
+
+def test_an_unknown_domain_uses_film_wording(queue):
+    from pipeline.domains import film
+    queue.add("X1", "nowhere", "wikidata", {"en": "C"}, {})
+    r = queue.row("X1")
+    fake = FakeJev({"connection": choice({"direct": 1.0, "seeds": 0.0, "entertainment": 0.0, "none": 0.0}, 0.9)})
+    Judge(fake, queue, DATA).connection(r, "t")
+    assert fake.calls[0]["questions"]["connection"].instructions == film.QUESTIONS["connection"]
