@@ -2,7 +2,7 @@ import pytest
 
 import re
 
-from pipeline.publish import (approved_report, count_votes, page_title, proposal_call, publish as publish_all,
+from pipeline.publish import (_set_status_param, approved_report, count_votes, page_title, proposal_call, publish as publish_all,
                               ranking, replace_call, sync_votes)
 from pipeline.queue import Queue
 from sync.wiki import SyncError
@@ -330,3 +330,55 @@ def test_approved_report(q):
         assert needle in report
     q.set_status("Q1", "open")
     assert approved_report(q) == ""
+
+
+def test_page_declined_between_read_and_write_is_not_overwritten(q):
+    en = FakeEn()
+    open_page(q, en, "Q1", "One")
+    en.votes[PREFIX + "One"] = 5
+    real = en.parse
+
+    def parse(title, text):
+        en.pages[PREFIX + "One"] = (2, "{{SV proposal\n|qid=Q1\n|status=declined\n}}\n")
+        return real(title, text)
+    en.parse = parse
+    assert sync_votes(q, en, CFG)["approved"] == []
+    assert "declined" in en.pages[PREFIX + "One"][1]
+    assert not q.by_status("approved")
+
+
+def test_call_vanishing_between_reads_does_not_crash(q):
+    en = FakeEn()
+    open_page(q, en, "Q1", "One")
+    en.votes[PREFIX + "One"] = 5
+    real = en.parse
+
+    def parse(title, text):
+        en.pages[PREFIX + "One"] = (2, "gone")
+        return real(title, text)
+    en.parse = parse
+    assert sync_votes(q, en, CFG)["approved"] == []
+    assert en.pages[PREFIX + "One"] == (2, "gone")
+
+
+def test_created_page_is_read_back_not_downgraded(q):
+    en = FakeEn()
+    open_page(q, en, "Q1", "One", status="created", extra="|article=Foo\n")
+    en.votes[PREFIX + "One"] = 5
+    before = en.pages[PREFIX + "One"]
+    assert sync_votes(q, en, CFG)["approved"] == []
+    assert en.pages[PREFIX + "One"] == before
+    assert q.by_status("created")[0].qid == "Q1"
+
+
+@pytest.mark.parametrize("call", [
+    "{{SV proposal\n|qid=Q1\n}}",
+    "{{SV proposal\n|qid=Q1\n|status=open\n|reason=a\n|article=B\n}}",
+    "{{SV proposal\n|qid=Q1\n|t={{x|status=no}}\n|l=[[A|status=b]]\n|status = open \n|z=1\n}}",
+])
+def test_set_status_param_changes_only_status(call):
+    new = _set_status_param(call, "approved")
+    assert dict(__import__("pipeline.publish", fromlist=["_split"])._split(new))["status"] == "approved"
+    stripped_old = re.sub(r"\|status = open \n|\|status=open\n", "", call)
+    stripped_new = re.sub(r"\|status ?= ?approved ?\n", "", new)
+    assert stripped_new == stripped_old

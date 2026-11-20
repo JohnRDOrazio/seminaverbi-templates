@@ -280,8 +280,20 @@ def _set_status_param(call: str, value: str) -> str:
     return call[:end].rstrip("\n") + f"\n|status={value}\n" + call[end:]
 
 
-def _approve(old: str) -> str:
-    span = _find_call(old)
+def _approver(qid: str):
+    """A `_write` builder: approve the page only if, as it is now, it is still this QID's and still open."""
+    def build(old):
+        span = _find_call(old) if old is not None else None
+        if span is None:
+            return old
+        params = dict(_split(old[span[0]:span[1]]))
+        if params.get("qid") != qid or params.get("status", "").lower() not in ("", "open"):
+            return old  # changed since it was read (declined by hand, say): leave it alone
+        return _approve(old, span)
+    return build
+
+
+def _approve(old: str, span) -> str:
     return old[:span[0]] + _set_status_param(old[span[0]:span[1]], "approved") + old[span[1]:]
 
 
@@ -299,16 +311,18 @@ def sync_votes(queue, en, cfg) -> dict:
         if params.get("qid") != row.qid:
             print(f"votes: {row.page} belongs to another QID, left alone", file=sys.stderr)
             continue
-        if params.get("status", "").lower() == "declined":
+        status = params.get("status", "").lower()
+        if status in KEPT_STATUSES:
             _read_back(queue, row, row.page, current)
-            declined.append(row.qid)
+            if status == "declined":
+                declined.append(row.qid)
         else:
             voting.append(row)
     counts = count_votes(en, [r.page for r in voting]) if voting else {}
     for row in voting:
         n = counts[row.page]
         queue.set_votes(row.qid, n)
-        if n >= cfg["vote_threshold"] and _write(en, row.page, _approve):
+        if n >= cfg["vote_threshold"] and _write(en, row.page, _approver(row.qid)):
             queue.set_status(row.qid, "approved")
             approved.append(row.qid)
     _write(en, RANKING_TITLE, lambda old: ranking(queue))
