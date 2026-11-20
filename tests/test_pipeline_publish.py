@@ -451,3 +451,129 @@ def test_approved_report_has_the_dossier_notes(q):
     report = approved_report(q)
     assert "Trama" in report and "(it)" in report and "http://x/it" in report
     assert "a" * 400 in report and "TAIL" not in report
+
+
+# ---- CodeRabbit review of PR #36 ----
+
+class SwapAfterFirstRead(FakeEn):
+    """The page is replaced by `text` right after its first revision read (an edit lands in between)."""
+
+    def __init__(self, title, text, **kw):
+        super().__init__(**kw)
+        self.title, self.text, self.reads = title, text, 0
+
+    def revision(self, title):
+        out = super().revision(title)
+        if title == self.title:
+            self.reads += 1
+            if self.reads == 1:
+                self.pages[title] = (out[0] + 1, self.text)
+        return out
+
+
+def test_a_page_taken_by_another_qid_after_the_check_is_left_alone(q, capsys):
+    """CodeRabbit 4640187392: ownership is checked on the text `_write` saves against."""
+    add(q, "Q1", "One")
+    foreign = "{{SV proposal\n|qid=Q9\n|status=open\n}}\n"
+    en = SwapAfterFirstRead(PREFIX + "One", foreign, pages={PREFIX + "One": "{{SV proposal\n|qid=Q1\n|status=open\n}}\n"})
+    publish_all(q, en, {})
+    assert [e["title"] for e in en.edits] == [RANK]
+    assert en.pages[PREFIX + "One"][1] == foreign
+    assert q.row("Q1").status is None
+
+
+def test_a_matching_call_is_still_updated_by_the_builder(q):
+    add(q, "Q1", "One")
+    en = FakeEn({PREFIX + "One": "{{SV proposal\n|qid=Q1\n|status=open\n}}\n\nhuman text\n"})
+    publish_all(q, en, {})
+    assert en.edits[0]["title"] == PREFIX + "One" and "|field=cinema" in en.pages[PREFIX + "One"][1]
+    assert "human text" in en.pages[PREFIX + "One"][1]
+
+
+def _effective_status(call):
+    from pipeline.publish import _fields
+    return _fields(call)["status"]
+
+
+def test_set_status_param_skips_parameters_inside_a_comment():
+    """CodeRabbit 4640187405: a commented `|status=` is not the parameter; the comment stays closed."""
+    call = "{{SV proposal\n|qid=Q1\n<!-- |status=declined -->\n|status=open\n}}"
+    new = _set_status_param(call, "approved")
+    assert new == "{{SV proposal\n|qid=Q1\n<!-- |status=declined -->\n|status=approved\n}}"
+    call = "{{SV proposal\n|qid=Q1\n<!-- |reason= -->|status=open\n}}"
+    new = _set_status_param(call, "approved")
+    assert "<!-- |reason= -->" in new and _effective_status(new) == "approved"
+
+
+def test_set_status_param_changes_the_effective_last_status():
+    """CodeRabbit 4640187417: with `status` twice, MediaWiki uses the last one."""
+    call = "{{SV proposal\n|qid=Q1\n|status=open\n|z=1\n|status=open\n}}"
+    new = _set_status_param(call, "approved")
+    assert new == "{{SV proposal\n|qid=Q1\n|status=open\n|z=1\n|status=approved\n}}"
+    assert _effective_status(new) == "approved"
+
+
+def test_an_unknown_status_counts_as_open_for_approval(q):
+    """CodeRabbit 4640187425: the template shows `status=bogus` as open, so its votes can approve it."""
+    en = FakeEn()
+    open_page(q, en, "Q1", "One", status="bogus")
+    en.votes[PREFIX + "One"] = 3
+    assert sync_votes(q, en, CFG)["approved"] == ["Q1"]
+    assert _effective_status(en.pages[PREFIX + "One"][1].split("\n\n")[0]) == "approved"
+    assert q.row("Q1").status == "approved"
+
+
+def approved_page(q, en, status, extra=""):
+    open_page(q, en, "Q1", "One", status=status, extra=extra)
+    q.set_status("Q1", "approved")
+    en.votes[PREFIX + "One"] = 9
+
+
+def test_a_decline_after_approval_is_read_back(q):
+    """CodeRabbit 4640187432: an approved row is reconciled with its page, without counting votes again."""
+    en = FakeEn()
+    approved_page(q, en, "declined", "|reason=duplicate\n")
+    assert sync_votes(q, en, CFG) == {"approved": [], "declined": ["Q1"]}
+    assert q.row("Q1").status == "declined"
+    assert q.db.execute("SELECT reason FROM candidates WHERE qid='Q1'").fetchone()["reason"] == "duplicate"
+    assert not [p for p in en.parses if "One" in p[1]]
+    assert "One" not in ranking(q).split("== Approved ==")[1].split("== Created ==")[0]
+
+
+def test_a_created_approved_row_is_read_back(q):
+    en = FakeEn()
+    approved_page(q, en, "created", "|article=Foo\n")
+    sync_votes(q, en, CFG)
+    assert q.row("Q1").status == "created"
+
+
+@pytest.mark.parametrize("status", ["open", "approved", ""])
+def test_an_approved_row_is_never_reopened_or_recounted(q, status):
+    en = FakeEn()
+    approved_page(q, en, status)
+    before = en.pages[PREFIX + "One"]
+    assert sync_votes(q, en, CFG) == {"approved": [], "declined": []}
+    assert q.row("Q1").status == "approved"
+    assert en.pages[PREFIX + "One"] == before
+    assert not [p for p in en.parses if "One" in p[1]]
+
+
+class MergingEn(FakeEn):
+    """The approval edit is merged with a concurrent edit that appended `|status=declined` to the call."""
+
+    def edit(self, title, text, summary, tags=None, createonly=False, baserevid=None):
+        out = super().edit(title, text, summary, tags, createonly, baserevid)
+        if title != RANK:
+            rev, saved = self.pages[title]
+            self.pages[title] = (rev, saved.replace("}}", "|status=declined\n}}", 1))
+        return out
+
+
+def test_approval_is_recorded_only_when_the_saved_page_says_approved(q, capsys):
+    """CodeRabbit 4640187436: the saved page is read back; a merged later `status=declined` wins."""
+    en = MergingEn()
+    open_page(q, en, "Q1", "One")
+    en.votes[PREFIX + "One"] = 3
+    assert sync_votes(q, en, CFG)["approved"] == []
+    assert q.row("Q1").status == "open"
+    assert "not approved" in capsys.readouterr().err

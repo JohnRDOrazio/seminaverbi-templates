@@ -218,6 +218,19 @@ def _read_back(queue, row, title, params: dict) -> bool:
     return True
 
 
+def _publisher(qid: str, call: str):
+    """A `_write` builder: the page with its call replaced, only if the page as it is now has this QID's call
+    (or does not exist yet); a missing or foreign call leaves the text unchanged, so nothing is written."""
+    def build(old):
+        if old is None:
+            return replace_call(None, call)
+        span = _find_call(old)
+        if span is None or _fields(old[span[0]:span[1]]).get("qid") != qid:
+            return old
+        return replace_call(old, call)
+    return build
+
+
 def _publish_row(queue, en, row) -> int:
     """Write one proposal page; 1 when it was written. A row becomes open only once its call is on the page."""
     title = page_title(row, queue)
@@ -231,7 +244,7 @@ def _publish_row(queue, en, row) -> int:
         if params.get("qid") != row.qid:
             print(f"publish: {title} belongs to another QID, left alone", file=sys.stderr)
             return 0
-    written = int(_write(en, title, lambda old: replace_call(old, call)))
+    written = int(_write(en, title, _publisher(row.qid, call)))
     params = _page_call(en.revision(title))
     if params is None or params.get("qid") != row.qid:
         return written  # not created (a failed edit, say): the row stays unopened and is tried next run
@@ -276,27 +289,32 @@ def count_votes(en, titles: list[str]) -> dict[str, int]:
 
 
 def _set_status_param(call: str, value: str) -> str:
-    """`call` with only its `status` parameter replaced; everything else stays byte-identical."""
+    """`call` with its effective (last) `status` parameter replaced; everything else stays byte-identical.
+    Parameter boundaries are found on the text with comments and nowiki masked, as `_split` does."""
+    masked = _MASK.sub(lambda m: " " * len(m.group()), call)
     body_start, end = 2, len(call) - 2
-    depth, i, start = 0, body_start, body_start
+    depth, i, start, last = 0, body_start, body_start, None
     while i <= end:
-        two = call[i:i + 2]
+        two = masked[i:i + 2]
         if i < end and two in ("{{", "[["):
             depth += 1; i += 2
         elif i < end and two in ("}}", "]]"):
             depth = max(depth - 1, 0); i += 2
-        elif i == end or (call[i] == "|" and depth == 0):
-            part = call[start:i]
-            name, eq, _ = part.partition("=")
+        elif i == end or (masked[i] == "|" and depth == 0):
+            name, eq, _ = masked[start:i].partition("=")
             if eq and name.strip().lower() == "status" and start > body_start:
-                lead = part[:len(part) - len(part.lstrip())]
-                trail = part[len(part.rstrip()):]
-                return call[:start] + lead + f"status={value}" + trail + call[i:]
+                last = (start, i)
             start = i + 1
             i += 1
         else:
             i += 1
-    return call[:end].rstrip("\n") + f"\n|status={value}\n" + call[end:]
+    if last is None:
+        return call[:end].rstrip("\n") + f"\n|status={value}\n" + call[end:]
+    start, stop = last
+    part = call[start:stop]
+    lead = part[:len(part) - len(part.lstrip())]
+    trail = part[len(part.rstrip()):]
+    return call[:start] + lead + f"status={value}" + trail + call[stop:]
 
 
 def _approver(qid: str):
@@ -306,7 +324,8 @@ def _approver(qid: str):
         if span is None:
             return old
         params = _fields(old[span[0]:span[1]])
-        if params.get("qid") != qid or params.get("status", "").lower() not in ("", "open"):
+        # an unknown status is shown as open by the template, and so it is open here
+        if params.get("qid") != qid or params.get("status", "").lower() in KEPT_STATUSES:
             return old  # changed since it was read (declined by hand, say): leave it alone
         return _approve(old, span)
     return build
@@ -316,9 +335,34 @@ def _approve(old: str, span) -> str:
     return old[:span[0]] + _set_status_param(old[span[0]:span[1]], "approved") + old[span[1]:]
 
 
+def _reconcile_approved(queue, en, declined: list) -> None:
+    """Read a hand-set decline or creation on an approved row's page back; never recount or reopen it."""
+    for row in queue.by_status("approved"):
+        if not row.page or row.calibration:
+            continue
+        params = _page_call(en.revision(row.page))
+        if params is None or params.get("qid") != row.qid:
+            print(f"votes: {row.page} has no {{{{SV proposal}}}} call of {row.qid}, left alone", file=sys.stderr)
+            continue
+        if params.get("status", "").lower() in ("declined", "created"):
+            _read_back(queue, row, row.page, params)
+            if params["status"].lower() == "declined":
+                declined.append(row.qid)
+
+
+def _saved_status(en, title, qid) -> str | None:
+    """The effective status of `qid`'s call on the saved page, or None when the page has no call of it."""
+    params = _page_call(en.revision(title))
+    if params is None or params.get("qid") != qid:
+        return None
+    return params.get("status", "").lower()
+
+
 def sync_votes(queue, en, cfg) -> dict:
-    """Count votes on open proposals, promote those at the threshold, read declines back, rewrite the ranking."""
+    """Count votes on open proposals, promote those at the threshold, read declines back (on approved rows
+    too), rewrite the ranking."""
     approved, declined, voting = [], [], []
+    _reconcile_approved(queue, en, declined)
     for row in queue.by_status("open"):
         if not row.page or row.calibration:
             continue
@@ -342,8 +386,13 @@ def sync_votes(queue, en, cfg) -> dict:
         n = counts[row.page]
         queue.set_votes(row.qid, n)
         if n >= cfg["vote_threshold"] and _write(en, row.page, _approver(row.qid)):
-            queue.set_status(row.qid, "approved")
-            approved.append(row.qid)
+            # the edit may have been merged with a concurrent one: record what the saved page says
+            saved = _saved_status(en, row.page, row.qid)
+            if saved == "approved":
+                queue.set_status(row.qid, "approved")
+                approved.append(row.qid)
+            else:
+                print(f"votes: {row.page} not approved: the saved page has status {saved!r}", file=sys.stderr)
     _write(en, RANKING_TITLE, lambda old: ranking(queue))
     return {"approved": approved, "declined": declined}
 
