@@ -145,3 +145,22 @@ def test_unknown_field_and_theme_keys_are_shown_literally():
     assert "[[Category:Foo]]" not in out and "[[File:X.png]]" not in out
     assert "''x''" not in out and "__NOINDEX__" not in out
     assert out.count("[[Category:") == 1  # only the proposal category
+
+
+def test_escaped_values_show_their_original_characters():
+    from pipeline.publish import _escape
+    raw = "a <!-- b <ref> ~~~~ {{x}} & c &lt;"
+    out = render(theme1_evidence=_escape(raw))
+    assert "a &#60;!-- b &#60;ref&#62; &#126;&#126;&#126;&#126; &#123;&#123;x&#125;&#125; &#38; c &#38;lt;" in out
+    assert "<!--" not in out and "~~~" not in out and "&#38;#" not in out
+
+
+def test_status_is_case_insensitive():
+    out = render(status="Declined", reason="no")
+    assert tag("vote") not in out and "[[Category:SV proposals (declined)]]" in out
+
+
+def test_escaped_url_links_to_the_original_address():
+    from pipeline.publish import _escape
+    out = render(sources=_escape("https://a.example/x?a=1&b=2"), theme1_source=_escape("https://b.example/?q=1&r=2"))
+    assert "[https://a.example/x?a=1&b=2 " in out and "[https://b.example/?q=1&r=2]" in out

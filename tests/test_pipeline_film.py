@@ -162,16 +162,29 @@ def test_calibration_rows_are_flagged(q):
 
 
 class FakeWiki:
-    def __init__(self, members, items, links):
-        self._members, self._items, self._links = members, items, links
+    """A client wiki: category members only; Wikibase calls are refused, as on it, es, fr, de, pt."""
+    def __init__(self, members):
+        self._members = members
         self.asked = []
 
     def members(self, category):
         self.asked.append(category)
         return self._members.get(category, [])
 
+    def _no_wikibase(self, *a, **kw):
+        raise AssertionError("client wikis have no wbgetentities: ask the repository")
+
+    item_for = items_for = item_sitelinks = _no_wikibase
+
+
+class FakeRepo(FakeWiki):
+    """The en wiki, which is also the Wikibase repository: items keyed by (site, title)."""
+    def __init__(self, members, items, links):
+        super().__init__(members)
+        self._items, self._links = items, links
+
     def item_for(self, site, title):
-        return self._items.get(title)
+        return self._items.get((site, title))
 
     def item_sitelinks(self, item):
         return 1, self._links.get(item, {})
@@ -179,22 +192,31 @@ class FakeWiki:
 
 def test_calibration_qids_map_through_the_local_item_and_report_unmapped():
     wikis = {
-        "en": FakeWiki({"Category:Feature films": [("Ordet", 0), ("Category:Sub", 14), ("Lonely", 0), ("NoLink", 0)],
+        "en": FakeRepo({"Category:Feature films": [("Ordet", 0), ("Category:Sub", 14), ("Lonely", 0), ("NoLink", 0)],
                         "Category:Television": [("Show", 0)]},
-                       {"Ordet": "Q10", "Show": "Q11", "NoLink": "Q12"},
-                       {"Q10": {"en": "Ordet", "enwiki": "Ordet (film)"}, "Q11": {"enwiki": "Show"}, "Q12": {"en": "NoLink"}}),
-        "it": FakeWiki({"Category:Film drammatici": [("Ordet", 0)]}, {"Ordet": "Q10"},
-                       {"Q10": {"enwiki": "Ordet (film)"}}),
+                       {("en", "Ordet"): "Q10", ("en", "Show"): "Q11", ("en", "NoLink"): "Q12", ("it", "Ordet"): "Q10",
+                        ("it", "Solo"): "Q13"},
+                       {"Q10": {"en": "Ordet", "it": "Ordet", "enwiki": "Ordet (film)"}, "Q11": {"enwiki": "Show"},
+                        "Q12": {"en": "NoLink"}, "Q13": {"it": "Solo", "itwiki": "Solo (film)"}}),
+        "it": FakeWiki({"Category:Film drammatici": [("Ordet", 0), ("Solo", 0)]}),
     }
-    wikidata = FakeWikidata({"Ordet (film)": "Q500", "Show": "Q501"})
+    wikidata = FakeWikidata({"Ordet (film)": "Q500", "Show": "Q501", "Solo (film)": "Q502"})
     tree = {"root": {"names": {}}, "fields": [
         {"key": "film", "names": {"en": "Film", "it": "Cinema"}, "children": [
             {"key": "feature-films", "names": {"en": "Feature films", "it": "Film drammatici"}}]},
         {"key": "television", "names": {"en": "Television", "it": "Televisione"}}], "themes_root": {"names": {}}, "themes": []}
     qids, unmapped = calibration_qids(wikis, wikidata=wikidata, tree=tree)
-    assert qids == ["Q500", "Q501"]
+    assert qids == ["Q500", "Q501", "Q502"]
     assert unmapped == ["en:Lonely", "en:NoLink"]
     assert "Category:Film" in wikis["en"].asked and "Category:Cinema" in wikis["it"].asked
+    assert ("itwiki", ["Solo (film)"]) in wikidata.calls
+
+
+def test_bounded_queries_keep_the_most_linked_items():
+    query = film._bounded("  ?item wdt:P136 wd:Q1 .", film.FILM)
+    sub = query[query.index("{ SELECT DISTINCT"):query.index(f"LIMIT {film.LIMIT} }}") + 20]
+    assert "?item wikibase:sitelinks ?sitelinks" in sub
+    assert sub.index("ORDER BY DESC(?sitelinks)") < sub.index(f"LIMIT {film.LIMIT}")
 
 
 # ---- stage 4: the dossier ----

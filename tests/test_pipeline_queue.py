@@ -89,3 +89,21 @@ def test_queue_without_votes_column_is_migrated(tmp_path):
     db.commit(); db.close()
     q = Queue(tmp_path / "old.sqlite"); q.add("Q1", "film", "s", {}, {}); q.set_votes("Q1", 2)
     assert q.pending(1)[0].votes == 2
+
+
+def test_becoming_a_calibration_row_clears_its_non_pass_outcomes(tmp_path):
+    q = Queue(tmp_path / "q.sqlite")
+    q.add("Q1", "film", "facet", {}, {}, data={"count": 3})
+    q.set_outcome("Q1", 1, "pass", {})
+    q.set_outcome("Q1", 2, "drop", {"reason": "3 sitelinks"})
+    q.add("Q2", "film", "facet", {}, {})
+    q.set_outcome("Q2", 1, "translation", {"have": ["it"]})
+    q.add("Q1", "film", "calibration", {}, {}, calibration=True)
+    q.add("Q2", "film", "calibration", {}, {}, calibration=True)
+    rows = {r.qid: r for r in q._rows("1=1", ())}
+    assert rows["Q1"].outcomes == {0: "pass", 1: "pass"} and rows["Q1"].calibration
+    assert rows["Q2"].outcomes == {}
+    assert [r.qid for r in q.pending(2)] == ["Q1"] and [r.qid for r in q.pending(1)] == ["Q2"]
+    q.set_outcome("Q2", 1, "pass", {}); q.set_outcome("Q2", 2, "drop", {})
+    q.add("Q2", "film", "calibration", {}, {}, calibration=True)  # already a calibration row: kept
+    assert q._rows("qid=?", ("Q2",))[0].outcomes == {1: "pass", 2: "drop"}

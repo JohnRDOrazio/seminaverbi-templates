@@ -80,12 +80,24 @@ def place(client, node, candidates, data) -> Decision:
                     "applied" if confident(p, a.confidence) else "author")
 
 
+LEVEL_INSTRUCTIONS = ("`article` is about one work or one person. Which category describes the work's own medium "
+                      "or form, or the person's main domain of activity? Not its subject: a film about a saint is "
+                      "a film.")
+
+
+def level_criteria(data, parent_key) -> dict:
+    """The options `classify` offers under `parent_key` (None: the top-level fields)."""
+    return {c.key: _option(data, c) for c in field_children(data, parent_key)}
+
+
+def theme_instructions(theme) -> str:
+    return (f"Does `article` genuinely explore the theme of {theme.names['en']} "
+            f"({theme.definition.get('en', '')}), not merely mention it?")
+
+
 def _ask_level(client, text, data, parent_key):
-    children = field_children(data, parent_key)
-    criteria = {c.key: _option(data, c) for c in children}
-    q = Choice(instructions="`article` is about one work or one person. Which category describes the work's "
-                            "own medium or form, or the person's main domain of activity? Not its subject: a "
-                            "film about a saint is a film.", criteria=criteria)
+    criteria = level_criteria(data, parent_key)
+    q = Choice(instructions=LEVEL_INSTRUCTIONS, criteria=criteria)
     a = client.system_one(state={"article": text}, questions={"level": q}, model=MODEL).choices["level"]
     return criteria, a
 
@@ -124,11 +136,7 @@ def classify(client, text: str, data) -> Decision:
 
 def themes(client, text: str, data) -> dict:
     """theme key -> (probability, "applied" | "author" | "no"), one Noul per leaf theme, one request."""
-    questions = {
-        t.key: Noul(instructions=f"Does `article` genuinely explore the theme of {t.names['en']} "
-                                 f"({t.definition.get('en', '')}), not merely mention it?")
-        for t in leaf_themes(data)
-    }
+    questions = {t.key: Noul(instructions=theme_instructions(t)) for t in leaf_themes(data)}
     answers = client.system_one(state={"article": text}, questions=questions, model=MODEL).nouls
     out = {}
     for key in questions:

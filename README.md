@@ -54,6 +54,7 @@ python -m pipeline candidates|covered|triage|quick|dossier|adjudicate   # one st
 python -m pipeline run [--publish]    # stages 0-5, at most max_new_per_run entering stage 3; publish only with the flag
 python -m pipeline calibrate          # add the articles SeminaVerbi already has, run stages 1-5 on them, print the report
 python -m pipeline redo STAGE [--qid Q]   # clear that stage and later ones (STAGE 0 is refused)
+python -m pipeline skip QID --reason TEXT # drop a row that breaks a stage, at its next stage without an outcome
 python -m pipeline publish | votes | approved
 ```
 
@@ -65,7 +66,8 @@ The queue is one SQLite file, `data/pipeline.sqlite` (git-ignored; created on fi
 their outcomes per stage and Jev's cached answers.
 
 Commands that write to the wiki (`publish`, `run --publish`, `votes`) log in as the editor bot from
-`SV_EDITOR_USER` / `SV_EDITOR_PASSWORD`, so run them through `~/.config/seminaverbi/runeditor.py pipeline …`.
+`SV_EDITOR_USER` / `SV_EDITOR_PASSWORD`, so run them through `~/.config/seminaverbi/runeditor.py pipeline …`;
+`run --publish` checks those credentials before it runs any stage.
 Only `quick`, `adjudicate`, `run` and `calibrate` need `TYPESAFE_API_KEY` (Jev).
 
 **Vote timer.** `votes` counts the votes on open proposals and approves those at the threshold
@@ -76,6 +78,9 @@ A user timer runs it every 3 hours:
 systemctl --user link "$PWD"/deploy/systemd/sv-pipeline-votes.{service,timer}
 systemctl --user enable --now sv-pipeline-votes.timer
 ```
+
+The user timer needs systemd (on WSL2, `systemd=true` under `[boot]` in `/etc/wsl.conf`) and, to run while you are
+logged out, `loginctl enable-linger $USER`.
 
 **Sources and licences.** Wikidata (CC0) supplies the candidates. Wikipedia and Wikiquote are read as notes for the
 writer and Jev, never copied into articles. IMDb and TMDb are not used. The Arts & Faith Top 100 was dropped: it has

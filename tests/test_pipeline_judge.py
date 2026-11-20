@@ -125,3 +125,64 @@ def test_quick_without_wikipedia_sitelink(queue):
     assert quick(rows["Q3"], j, FakeWikipedia) == ("drop", {"reason": "no wikipedia sitelink"})
     assert quick(rows["Q4"], j, FakeWikipedia) == ("pass", {})
     assert j.seen == []
+
+
+class EmptyLead(FakeWikipedia):
+    def lead(self, title):
+        return ""
+
+
+def test_quick_drops_a_row_with_an_empty_lead_without_asking(queue):
+    j = FakeJudge(0.9)
+    assert quick(row(queue), j, EmptyLead) == ("drop", {"reason": "no lead"})
+    assert j.seen == []
+
+
+def asks_again(make_judge, ask, change, monkeypatch, answers):
+    """True when, after `change`, the same question is no longer answered from the cache."""
+    fake = FakeJev(*answers)
+    ask(make_judge(fake))
+    n = len(fake.calls)
+    change(monkeypatch)
+    ask(make_judge(fake))
+    return len(fake.calls) > n
+
+
+def test_cache_keys_follow_the_question_texts_and_model(queue, monkeypatch):
+    import copy
+    from pipeline import judge as judge_module
+    r = row(queue)
+    make = lambda fake: Judge(fake, queue, DATA)
+    conn = choice({"direct": 0.9, "seeds": 0.05, "entertainment": 0.03, "none": 0.02}, 0.9)
+    assert asks_again(make, lambda j: j.connection(r, "d"),
+                      lambda mp: mp.setitem(judge_module.CONNECTIONS, "none", "nothing at all"),
+                      monkeypatch, [{"connection": conn}, {"connection": conn}])
+    assert asks_again(make, lambda j: j.plausible(r, "s"), lambda mp: mp.setattr(jev, "MODEL", "jev-9"),
+                      monkeypatch, [{"plausible": 0.5}, {"plausible": 0.5}])
+    assert asks_again(make, lambda j: j.connection(r, "d"), lambda mp: mp.setattr(jev, "MODEL", "jev-10"),
+                      monkeypatch, [{"connection": conn}, {"connection": conn}])
+    ev = {"evidence": choice({"p0": 0.9, "p1": 0.1}, 0.9)}
+    assert asks_again(make, lambda j: j.evidence(r, "faith", ["a", "b"]), lambda mp: mp.setattr(jev, "MODEL", "jev-11"),
+                      monkeypatch, [ev, ev])
+    themes = {t.key: 0.5 for t in __import__("sync.categories", fromlist=["leaf_themes"]).leaf_themes(DATA)}
+    changed = copy.deepcopy(DATA)
+    holder = {"data": DATA}
+    make_t = lambda fake: Judge(fake, queue, holder["data"])
+
+    def edit_theme(mp):
+        changed["themes"][0]["children"][0]["definition"] = {"en": "A new definition."}
+        holder["data"] = changed
+    assert asks_again(make_t, lambda j: j.themes(r, "d"), edit_theme, monkeypatch, [themes, themes])
+    holder["data"] = DATA
+    changed_fields = copy.deepcopy(DATA)
+
+    def edit_field(mp):
+        changed_fields["fields"][0]["children"][0]["definition"] = {"en": "Moving pictures, redefined."}
+        holder["data"] = changed_fields
+    levels = [{"level": choice({"arts": 0.95, "religion": 0.05}, 0.9)},
+              {"level": choice({"film": 0.95, "music": 0.05}, 0.9)},
+              {"level": choice({"feature-films": 0.95, "short-films": 0.05}, 0.9)}]
+    assert asks_again(make, lambda j: j.field(r, "d"),
+                      lambda mp: mp.setattr(jev, "LEVEL_INSTRUCTIONS", "Which category? (reworded)"),
+                      monkeypatch, levels + levels)
+    assert asks_again(make_t, lambda j: j.field(r, "d"), edit_field, monkeypatch, levels + levels)

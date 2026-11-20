@@ -382,3 +382,72 @@ def test_set_status_param_changes_only_status(call):
     stripped_old = re.sub(r"\|status = open \n|\|status=open\n", "", call)
     stripped_new = re.sub(r"\|status ?= ?approved ?\n", "", new)
     assert stripped_new == stripped_old
+
+
+# ---- final review fixes ----
+
+def test_calibration_rows_with_missing_wikis_are_translation_suggestions(q):
+    q.add("Q7", "film", "calibration", {"en": "Ordet"}, {}, calibration=True)
+    q.set_outcome("Q7", 1, "pass", {"have": ["en", "it"], "missing": ["es", "fr", "de", "pt"]})
+    q.add("Q8", "film", "calibration", {"en": "Everywhere"}, {}, calibration=True)
+    q.set_outcome("Q8", 1, "pass", {"have": list(("en", "it", "es", "fr", "de", "pt")), "missing": []})
+    text = ranking(q)
+    suggestions = text[text.index("== Translation suggestions =="):]
+    assert "Ordet" in suggestions and "missing: es, fr, de, pt" in suggestions
+    assert "Everywhere" not in suggestions
+
+
+class FlakyEn(FakeEn):
+    def __init__(self, broken, **kw):
+        super().__init__(**kw)
+        self.broken = broken
+
+    def revision(self, title):
+        if title == self.broken:
+            raise SyncError("revision read failed")
+        return super().revision(title)
+
+
+def test_a_failed_page_read_skips_only_that_page(q, capsys):
+    add(q, "Q1", "One"); add(q, "Q2", "Two")
+    en = FlakyEn(PREFIX + "One")
+    assert publish_all(q, en, {}) == 2
+    assert [e["title"] for e in en.edits] == [PREFIX + "Two", RANK]
+    assert "revision read failed" in capsys.readouterr().err
+
+
+def test_publish_selects_the_domain(q):
+    add(q, "Q1", "One"); add(q, "Q2", "Song", domain="music")
+    en = FakeEn()
+    publish_all(q, en, {}, domain="music")
+    assert [e["title"] for e in en.edits] == [PREFIX + "Song", RANK]
+
+
+def test_failed_create_leaves_the_row_unopened(q, capsys):
+    add(q, "Q1", "One")
+    en = FakeEn(); en.fail.add(PREFIX + "One")
+    publish_all(q, en, {})
+    assert q.by_status("open") == []
+    assert q._rows("qid=?", ("Q1",))[0].status is None
+
+
+def test_status_with_a_comment_or_capitals_is_recognised(q):
+    r = add(q)
+    old = "{{SV proposal\n|qid=Q1\n|status=declined <!-- by hand -->\n|reason=no\n}}\n"
+    new = replace_call(old, proposal_call(r, r.data[5]))
+    assert "|status=open" not in new and "declined" in new
+    en = FakeEn({PREFIX + "Film One": "{{SV proposal\n|qid=Q1\n|status=Declined <!-- x -->\n|reason=no\n}}\n"})
+    publish_all(q, en, {})
+    assert q.by_status("declined")[0].qid == "Q1"
+
+
+def test_approved_report_has_the_dossier_notes(q):
+    q.add("Q1", "film", "s", {"en": "One"}, {"enwiki": "One"})
+    long_text = "a" * 400 + "TAIL"
+    q.set_outcome("Q1", 4, "pass", {"notes": [{"lang": "it", "url": "http://x/it", "heading": "Trama",
+                                               "text": long_text}], "languages": {"it": 1}})
+    q.set_outcome("Q1", 5, "pass", result())
+    q.set_status("Q1", "approved", page=PREFIX + "One")
+    report = approved_report(q)
+    assert "Trama" in report and "(it)" in report and "http://x/it" in report
+    assert "a" * 400 in report and "TAIL" not in report

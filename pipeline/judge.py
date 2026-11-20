@@ -1,4 +1,5 @@
-"""Jev questions for the pipeline, each cached in the queue by a hash of its wording and its input."""
+"""Jev questions for the pipeline, each cached in the queue by a hash of the model, every text the question
+sends (instructions, options, thresholds) and its input: a reworded question or a new model is asked afresh."""
 import hashlib
 import json
 from pathlib import Path
@@ -24,6 +25,31 @@ CONNECTIONS = {
 
 def qhash(name: str, instructions: str, state_text: str) -> str:
     return hashlib.sha256("\0".join((name, instructions, state_text)).encode("utf-8")).hexdigest()
+
+
+def _wording(*parts) -> str:
+    """The cache-key text of a question: the model and every text sent with it (dicts as sorted JSON)."""
+    return "\n".join([jev.MODEL] + [p if isinstance(p, str) else json.dumps(p, ensure_ascii=False, sort_keys=True)
+                                    for p in parts])
+
+
+def _field_wording(data) -> str:
+    """Every instruction and option text tools.jev.classify can send, and the thresholds that decide its answer."""
+    levels = {}
+    pending = [None]
+    while pending:
+        key = pending.pop(0)
+        criteria = jev.level_criteria(data, key)
+        if criteria:
+            levels[key or "root"] = criteria
+            pending += list(criteria)
+    return _wording(jev.LEVEL_INSTRUCTIONS, levels,
+                    {"choice": [jev.CHOICE_PROBABILITY, jev.CHOICE_CONFIDENCE], "tie": jev.BEAM_TIE})
+
+
+def _themes_wording(data) -> str:
+    return _wording({t.key: jev.theme_instructions(t) for t in leaf_themes(data)},
+                    {"apply": jev.THEME_APPLY, "ask": jev.THEME_ASK})
 
 
 class Judge:
@@ -57,22 +83,22 @@ class Judge:
             a = self.client.system_one(state={"text": synopsis}, questions={"plausible": Noul(instructions=PLAUSIBLE)},
                                        model=jev.MODEL)
             return {"p": float(a.nouls["plausible"].noul)}
-        return self._cached(row, "plausible", PLAUSIBLE, synopsis, ask)["p"]
+        return self._cached(row, "plausible", _wording(PLAUSIBLE), synopsis, ask)["p"]
 
     def connection(self, row, dossier_text: str) -> dict:
         q = Choice(instructions=CONNECTION, criteria={k: {"name": v} for k, v in CONNECTIONS.items()})
-        return self._cached(row, "connection", CONNECTION, dossier_text,
+        return self._cached(row, "connection", _wording(CONNECTION, CONNECTIONS), dossier_text,
                             lambda: self._choice("connection", q, {"text": dossier_text}))
 
     def field(self, row, dossier_text: str) -> dict:
-        return self._cached(row, "field", f"tools.jev.classify {jev.MODEL}", dossier_text,
+        return self._cached(row, "field", _field_wording(self.data), dossier_text,
                             lambda: jev.classify(self.client, dossier_text, self.data)._asdict())
 
     def themes(self, row, dossier_text: str) -> dict:
         def ask():
             result = jev.themes(self.client, dossier_text, self.data)
             return {key: {"p": p, "status": status} for key, (p, status) in result.items()}
-        return self._cached(row, "themes", f"tools.jev.themes {jev.MODEL}", dossier_text, ask)
+        return self._cached(row, "themes", _themes_wording(self.data), dossier_text, ask)
 
     def evidence(self, row, theme_key: str, paragraphs: list[str]) -> int:
         """Index of the paragraph that best supports the theme (its name and definition are looked up by key)."""
@@ -82,6 +108,6 @@ class Judge:
         instructions = (f"Which paragraph of the dossier best supports that the work genuinely explores the "
                         f"theme of {name} ({definition})?")
         q = Choice(instructions=instructions, criteria={f"p{i}": {"name": p} for i, p in enumerate(paragraphs)})
-        answer = self._cached(row, "evidence", instructions, json.dumps(paragraphs, ensure_ascii=False),
+        answer = self._cached(row, "evidence", _wording(instructions), json.dumps(paragraphs, ensure_ascii=False),
                               lambda: {"index": int(self._choice("evidence", q, {"theme": name})["choice"][1:])})
         return answer["index"]

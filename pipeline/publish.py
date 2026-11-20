@@ -13,6 +13,7 @@ _FORBIDDEN = re.compile(r"[#<>\[\]|{}]")
 _CALL = re.compile(r"\{\{\s*(?:Template\s*:\s*)?SV[ _]+proposal\s*(?=[|}])", re.IGNORECASE)
 _RANK = {"open": 0, "approved": 1, "created": 2}
 _MASK = re.compile(r"<!--.*?-->|<nowiki>.*?</nowiki>", re.DOTALL | re.IGNORECASE)
+_COMMENT = re.compile(r"<!--.*?(?:-->|$)", re.DOTALL)
 
 
 def page_title(row, queue=None) -> str:
@@ -32,7 +33,8 @@ def page_title(row, queue=None) -> str:
 
 
 def _escape(value) -> str:
-    value = " ".join(str(value).split())
+    """A value safe as a template parameter on a saved page; Module:SV/Proposal decodes the entities back."""
+    value = " ".join(str(value).split()).replace("&", "&amp;")  # so an entity in the text stays as typed
     value = value.replace("{{", "&#123;&#123;").replace("}}", "&#125;&#125;")
     value = value.replace("<", "&lt;").replace("~", "&#126;")  # no unclosed comment/ref/nowiki, no signature
     return value.replace("|", "{{!}}")
@@ -94,20 +96,21 @@ def _find_call(text: str) -> tuple[int, int] | None:
 
 
 def _split(call: str) -> list[tuple[str, str]]:
-    """Named parameters of a call, raw values (stripped), split on top-level pipes."""
+    """Named parameters of a call, raw values (stripped), split on top-level pipes (none inside a comment)."""
     body = call[2:-2]
-    parts, depth, cur, i = [], 0, "", 0
+    masked = _MASK.sub(lambda m: " " * len(m.group()), body)
+    parts, depth, start, i = [], 0, 0, 0
     while i < len(body):
-        two = body[i:i + 2]
+        two = masked[i:i + 2]
         if two in ("{{", "[["):
-            depth += 1; cur += two; i += 2
+            depth += 1; i += 2
         elif two in ("}}", "]]"):
-            depth = max(depth - 1, 0); cur += two; i += 2
-        elif body[i] == "|" and depth == 0:
-            parts.append(cur); cur = ""; i += 1
+            depth = max(depth - 1, 0); i += 2
+        elif masked[i] == "|" and depth == 0:
+            parts.append(body[start:i]); start = i + 1; i += 1
         else:
-            cur += body[i]; i += 1
-    parts.append(cur)
+            i += 1
+    parts.append(body[start:])
     out = []
     for part in parts[1:]:
         name, eq, value = part.partition("=")
@@ -116,9 +119,14 @@ def _split(call: str) -> list[tuple[str, str]]:
     return out
 
 
+def _fields(call: str) -> dict[str, str]:
+    """The parameters of a call as MediaWiki passes them: comments removed, stripped (what decisions read)."""
+    return {k: _COMMENT.sub("", v).strip() for k, v in _split(call)}
+
+
 def _carry(old_call: str, new_call: str) -> str:
     old, new = dict(_split(old_call)), _split(new_call)
-    status = old.get("status", "").strip().lower()
+    status = _fields(old_call).get("status", "").lower()
     mine = dict(new).get("status", "open")
     if status not in KEPT_STATUSES or (status != "declined" and _RANK.get(mine, 0) > _RANK[status]):
         return new_call  # the queue is further along than the page (declined on the page always wins)
@@ -162,7 +170,9 @@ def ranking(queue) -> str:
         lines += [f"== {status.capitalize()} =="] + listing(sorted((r for r in rows if r.status == status),
                                                                 key=lambda r: r.page))
     lines.append("== Translation suggestions ==")
-    suggestions = queue.with_outcome(1, "translation")
+    # existing articles (calibration rows) missing on some wikis are translation work too
+    suggestions = queue.with_outcome(1, "translation") + [
+        r for r in queue.with_outcome(1, "pass") if r.calibration and r.data.get(1, {}).get("missing")]
     if not suggestions:
         lines.append("''None.''")
     for r in suggestions:
@@ -194,12 +204,11 @@ def _write(en, title, build) -> bool:
 def _page_call(current) -> dict | None:
     """The parameters of the proposal call in a `(revid, text)` revision, or None."""
     span = _find_call(current[1]) if current else None
-    return dict(_split(current[1][span[0]:span[1]])) if span else None
+    return _fields(current[1][span[0]:span[1]]) if span else None
 
 
-def _read_back(queue, row, title, current) -> bool:
-    """Copy a hand-set or advanced status (declined, approved, created) from the page into the queue."""
-    params = _page_call(current) or {}
+def _read_back(queue, row, title, params: dict) -> bool:
+    """Copy a hand-set or advanced status (declined, approved, created) from the page's call into the queue."""
     status = params.get("status", "").lower()
     if status not in KEPT_STATUSES:
         return False
@@ -209,29 +218,39 @@ def _read_back(queue, row, title, current) -> bool:
     return True
 
 
-def publish(queue, en, cfg) -> int:
-    """Write the proposal page of every passing, non-calibration, non-declined row, then the ranking page."""
+def _publish_row(queue, en, row) -> int:
+    """Write one proposal page; 1 when it was written. A row becomes open only once its call is on the page."""
+    title = page_title(row, queue)
+    call = proposal_call(row, row.data[5])
+    existing = en.revision(title)
+    if existing:
+        params = _page_call(existing)
+        if params is None:
+            print(f"publish: {title} has no {{{{SV proposal}}}} call, left alone", file=sys.stderr)
+            return 0
+        if params.get("qid") != row.qid:
+            print(f"publish: {title} belongs to another QID, left alone", file=sys.stderr)
+            return 0
+    written = int(_write(en, title, lambda old: replace_call(old, call)))
+    params = _page_call(en.revision(title))
+    if params is None or params.get("qid") != row.qid:
+        return written  # not created (a failed edit, say): the row stays unopened and is tried next run
+    if not _read_back(queue, row, title, params) and row.status is None:
+        queue.set_status(row.qid, "open", page=title)
+    return written
+
+
+def publish(queue, en, cfg, domain: str | None = None) -> int:
+    """Write the proposal page of every passing, non-calibration, non-declined row (of `domain`, when given),
+    then the ranking page. A wiki error on one page skips it with a note; the others go on."""
     written = 0
     for row in queue.with_outcome(5, "pass"):
-        if row.calibration or row.status == "declined":
+        if row.calibration or row.status == "declined" or (domain is not None and row.domain != domain):
             continue
-        title = page_title(row, queue)
-        call = proposal_call(row, row.data[5])
-        existing = en.revision(title)
-        if existing:
-            span = _find_call(existing[1])
-            if span is None:
-                print(f"publish: {title} has no {{{{SV proposal}}}} call, left alone", file=sys.stderr)
-                continue
-            if dict(_split(existing[1][span[0]:span[1]])).get("qid") != row.qid:
-                print(f"publish: {title} belongs to another QID, left alone", file=sys.stderr)
-                continue
-        if _write(en, title, lambda old: replace_call(old, call)):
-            written += 1
-        current = en.revision(title)
-        if not _read_back(queue, row, title, current):
-            if row.status is None:
-                queue.set_status(row.qid, "open", page=title)
+        try:
+            written += _publish_row(queue, en, row)
+        except SyncError as e:
+            print(f"publish: {row.page or row.qid} skipped: {e}", file=sys.stderr)
     if _write(en, RANKING_TITLE, lambda old: ranking(queue)):
         written += 1
     return written
@@ -286,7 +305,7 @@ def _approver(qid: str):
         span = _find_call(old) if old is not None else None
         if span is None:
             return old
-        params = dict(_split(old[span[0]:span[1]]))
+        params = _fields(old[span[0]:span[1]])
         if params.get("qid") != qid or params.get("status", "").lower() not in ("", "open"):
             return old  # changed since it was read (declined by hand, say): leave it alone
         return _approve(old, span)
@@ -313,7 +332,7 @@ def sync_votes(queue, en, cfg) -> dict:
             continue
         status = params.get("status", "").lower()
         if status in KEPT_STATUSES:
-            _read_back(queue, row, row.page, current)
+            _read_back(queue, row, row.page, params)
             if status == "declined":
                 declined.append(row.qid)
         else:
@@ -329,8 +348,11 @@ def sync_votes(queue, en, cfg) -> dict:
     return {"approved": approved, "declined": declined}
 
 
+NOTE_CHARS = 400  # of each dossier note in the approved report
+
+
 def approved_report(queue) -> str:
-    """One block per approved row: what the article writer needs to start."""
+    """One block per approved row: what the article writer needs to start, the dossier notes included."""
     blocks = []
     for row in sorted(queue.by_status("approved"), key=lambda r: r.qid):
         data = row.data.get(5) or {}
@@ -348,5 +370,9 @@ def approved_report(queue) -> str:
                          f"{ev.get('excerpt') or ''} {ev.get('url') or ''}".rstrip())
         lines.append("  outline: " + " ; ".join(data.get("outline", [])))
         lines.append("  sources:" + "".join(f"\n    - {u}" for u in urls))
+        lines.append("  notes:")
+        for note in (row.data.get(4) or {}).get("notes", []):
+            text = " ".join(note["text"][:NOTE_CHARS].split())
+            lines.append(f"    - [{note['heading']}] ({note['lang']}) {note['url']}\n      {text}")
         blocks.append("\n".join(lines))
     return "\n\n".join(blocks) + ("\n" if blocks else "")

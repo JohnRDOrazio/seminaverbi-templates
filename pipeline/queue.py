@@ -59,7 +59,7 @@ class Queue:
         return added
 
     def _add(self, qid, domain, source, labels, sitelinks, calibration) -> bool:
-        row = self.db.execute("SELECT sources FROM candidates WHERE qid=?", (qid,)).fetchone()
+        row = self.db.execute("SELECT sources, calibration FROM candidates WHERE qid=?", (qid,)).fetchone()
         if row:
             sources = json.loads(row["sources"])
             if source not in sources:
@@ -67,8 +67,11 @@ class Queue:
                 self.db.execute("UPDATE candidates SET sources=? WHERE qid=?",
                                 (json.dumps(sources), qid))
                 self.db.commit()
-            if calibration:  # a film article first found by a facet must still be a calibration row
+            if calibration and not row["calibration"]:
+                # a film article first found by a facet must still be a calibration row, run through every
+                # stage: the drops and translations it had as a candidate are cleared
                 self.db.execute("UPDATE candidates SET calibration=1 WHERE qid=?", (qid,))
+                self.db.execute("DELETE FROM outcomes WHERE qid=? AND stage>=1 AND outcome!='pass'", (qid,))
                 self.db.commit()
             return False
         self.db.execute(
@@ -107,6 +110,10 @@ class Queue:
             where += " AND domain=?"
             args.append(domain)
         return self._rows(where, tuple(args), limit)
+
+    def row(self, qid) -> Row | None:
+        rows = self._rows("qid=?", (qid,))
+        return rows[0] if rows else None
 
     def set_outcome(self, qid, stage: int, outcome: str, data: dict | None = None):
         if outcome not in OUTCOMES:

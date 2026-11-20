@@ -53,8 +53,11 @@ def _query(pattern: str) -> str:
 
 
 def _bounded(pattern: str, cls: str) -> str:
-    return _query(f"  {{ SELECT DISTINCT ?item WHERE {{\n{_ORDERED}{pattern}\n  ?item wdt:P31/wdt:P279* wd:{cls} .\n"
-                  f"  }} LIMIT {LIMIT} }}")
+    """The query of `pattern` on items of class `cls`, at most LIMIT items: the most linked ones (sitelink
+    count), so a truncated result drops the least notable."""
+    return _query(f"  {{ SELECT DISTINCT ?item ?sitelinks WHERE {{\n{_ORDERED}{pattern}\n"
+                  f"  ?item wdt:P31/wdt:P279* wd:{cls} .\n  ?item wikibase:sitelinks ?sitelinks .\n"
+                  f"  }} ORDER BY DESC(?sitelinks) LIMIT {LIMIT} }}")
 
 
 def _values(qids) -> str:
@@ -158,6 +161,7 @@ def calibration_qids(wikis: dict, wikidata=None, tree: dict | None = None) -> tu
     for node in nodes:  # nodes come parent-first, so one pass collects every descendant
         if node.parent_key in keys:
             keys.add(node.key)
+    repo = wikis["en"]  # the farm's Wikibase repository: the client wikis have no wbgetentities
     qids: list[str] = []
     unmapped: list[str] = []
     for lang, wiki in wikis.items():
@@ -167,7 +171,7 @@ def calibration_qids(wikis: dict, wikidata=None, tree: dict | None = None) -> tu
             for title, ns in wiki.members(f"Category:{node.names[lang]}"):
                 if ns != 0:
                     continue
-                qid = _wikidata_qid(wiki, wikidata, lang, title)
+                qid = _wikidata_qid(repo, wikidata, lang, title)
                 if qid is None:
                     if f"{lang}:{title}" not in unmapped:
                         unmapped.append(f"{lang}:{title}")
@@ -176,11 +180,13 @@ def calibration_qids(wikis: dict, wikidata=None, tree: dict | None = None) -> tu
     return qids, unmapped
 
 
-def _wikidata_qid(wiki, wikidata, lang: str, title: str) -> str | None:
-    item = wiki.item_for(lang, title)
+def _wikidata_qid(repo, wikidata, lang: str, title: str) -> str | None:
+    """The Wikidata QID of the page `title` on the `lang` SeminaVerbi wiki (site id `lang`), through the local
+    item's Wikipedia sitelinks, asked of the repository."""
+    item = repo.item_for(lang, title)
     if not item:
         return None
-    links = wiki.item_sitelinks(item)[1]
+    links = repo.item_sitelinks(item)[1]
     sites = ["enwiki"] + sorted(s for s in links if s.endswith("wiki") and s != "enwiki")
     for site in sites:
         if site in links and site not in NON_WIKIPEDIA:

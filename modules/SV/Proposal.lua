@@ -10,10 +10,12 @@ local STATUSES = { open = true, approved = true, created = true, declined = true
 local CONNECTIONS = { direct = true, seeds = true, entertainment = true, none = true }
 local FARM_HOST = '.seminaverbi.bibleget.io/wiki/'
 
--- Text shown literally: no wiki markup can come out of it.
+-- Text shown literally: no wiki markup can come out of it. The bot writes &lt; &amp; &#123; &#126; ... into the
+-- page source (no comment, tag or signature can start there); they are decoded once, then every markup
+-- character is encoded again, so the reader sees the original text.
 local function plain(s)
-	-- nowiki leaves __MAGIC_WORDS__ alone
-	return (mw.text.nowiki(s):gsub('__', '_&#95;'))
+	-- nowiki leaves __MAGIC_WORDS__ and ~~~~ alone
+	return (mw.text.nowiki(mw.text.decode(s)):gsub('__', '_&#95;'):gsub('~', '&#126;'))
 end
 
 -- 0.83 -> "83%"; nil when it is not a number.
@@ -27,8 +29,9 @@ end
 
 -- A URL as an external link, or its text when it is not a plain http(s) URL.
 local function externalLink(url, label)
-	if url:match('^https?://[^%s%[%]<>"|{}]+$') then
-		return '[' .. url .. (label and (' ' .. label) or '') .. ']'
+	local decoded = mw.text.decode(url)
+	if decoded:match('^https?://[^%s%[%]<>"|{}]+$') then
+		return '[' .. decoded .. (label and (' ' .. label) or '') .. ']'
 	end
 	return plain(url)
 end
@@ -93,7 +96,7 @@ function p.main(frame)
 	local args = Args.get(frame)
 	local lang = Util.lang()
 	local categories = mw.loadData('Module:SV/Data').categories
-	local status = args.status
+	local status = args.status and mw.ustring.lower(args.status)
 	if not STATUSES[status] then
 		status = 'open'
 	end
