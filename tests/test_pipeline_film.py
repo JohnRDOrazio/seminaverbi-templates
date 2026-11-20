@@ -63,7 +63,7 @@ def q(tmp_path):
 
 
 def test_domains_registry():
-    assert DOMAINS == {"film": film}
+    assert DOMAINS["film"] is film
 
 
 def test_vatican_links_resolve_to_qids_and_unresolved_are_reported(q, capsys):

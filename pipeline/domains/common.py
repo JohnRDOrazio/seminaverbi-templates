@@ -160,3 +160,10 @@ def run_query(sparql, domain: str, label: str, query: str, limit: int | None = N
     if len(rows) >= (LIMIT if limit is None else limit):
         print(f"{domain} candidates: {label}: {len(rows)} rows is the query limit, results may be truncated")
     return rows
+
+
+def domain_config(cfg: dict, name: str) -> dict:
+    """A copy of `cfg` where every key of `cfg[name]` that also exists at the top level (the sitelink floor)
+    overrides it; the domain's block stays in the copy. `cfg` is not changed."""
+    block = cfg.get(name, {})
+    return {**cfg, **{key: value for key, value in block.items() if key in cfg}}
