@@ -583,3 +583,44 @@ def test_a_series_found_directly_gets_its_volumes_and_is_a_translation_suggestio
     assert s.data[0]["count"] == 90 and q.row("Q_V") is None
     repo = FakeRepo({("enwiki", "The Hobbit"): "Q9"}, {"Q9": {"en": "The Hobbit", "fr": "Le Hobbit"}})
     assert literature.covered(s, repo, wikis())[0] == "translation"
+
+
+# ---- PR re-review ----
+
+def test_a_known_volume_with_a_higher_count_clears_the_series_outcomes(q):
+    details = _failed_series(q)
+    folding(q, [vol("Q_V", "Volume", 10)], {"Q_V": ["Q_S"]}, details)
+    q.set_outcome("Q_S", 1, "pass")
+    q.set_outcome("Q_S", 2, "drop")
+    folding(q, [vol("Q_V", "Volume", 40)], {"Q_V": ["Q_S"]}, details, "facet")
+    s = q.row("Q_S")
+    assert s.outcomes == {0: "pass"} and s.data[0]["count"] == 40
+
+
+def _direct_series(q, members):
+    """A directly found series Q_S and the volumes query answer `members` (rows with series and shared)."""
+    class Sparql(FakeSparql):
+        def select(self, query):
+            self.queries.append(query)
+            return members if "VALUES ?series" in query else []
+
+    literature._insert(q, {"item": "Q_S", "n": "12", "types": "Q1667921"}, "facet", series=True)
+    sparql = Sparql()
+    literature.attach_volumes(q, sparql, ["Q_S"])
+    return sparql
+
+
+def test_a_member_with_another_author_is_recorded_but_not_folded(q):
+    q.add("Q_V", "literature", "author", {"en": "V"}, {"enwiki": "V"}, data={"count": 30})
+    q.set_outcome("Q_V", 2, "pass")
+    sparql = _direct_series(q, [{**vol("Q_V", "Volume", 30), "series": "Q_S", "shared": "false"}])
+    assert "wdt:P50" in sparql.queries[0]
+    assert set(q.row("Q_S").data[0]["volumes"]) == {"Q_V"}
+    v = q.row("Q_V")
+    assert "folded_into" not in v.data[0] and 2 in v.outcomes
+
+
+def test_a_member_sharing_an_author_is_folded(q):
+    q.add("Q_V", "literature", "author", {"en": "V"}, {"enwiki": "V"}, data={"count": 30})
+    _direct_series(q, [{**vol("Q_V", "Volume", 30), "series": "Q_S", "shared": "true"}])
+    assert q.row("Q_V").data[0]["folded_into"] == "Q_S"

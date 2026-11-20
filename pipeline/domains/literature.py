@@ -129,7 +129,9 @@ def _fold_into(queue, series_qid: str, series_row: dict, volumes: list[dict], so
 
 
 def _extend_series(queue, series_qid: str, labels: dict, sitelinks: dict, data: dict, volumes: list[dict],
-                   source: str) -> int:
+                   source: str, foldable: set[str] | None = None) -> int:
+    """`foldable`: the volumes whose standalone row may be marked folded (None: all of them; those of `fold` share
+    an author with the series by construction). The others are only recorded on the series, for coverage."""
     if _other_domain(queue, series_qid):
         return 0
     old = queue.row(series_qid)
@@ -139,9 +141,10 @@ def _extend_series(queue, series_qid: str, labels: dict, sitelinks: dict, data: 
     new_volume = False
     for volume in volumes:
         _, volume_sitelinks, volume_data = common.row_data(volume)
-        new_volume = new_volume or volume["item"] not in known
-        known[volume["item"]] = {"sitelinks": volume_sitelinks, "count": volume_data["count"]}
-        own = queue.row(volume["item"])
+        entry = {"sitelinks": volume_sitelinks, "count": volume_data["count"]}
+        new_volume = new_volume or known.get(volume["item"]) != entry  # new, or its count or pages changed
+        known[volume["item"]] = entry
+        own = queue.row(volume["item"]) if foldable is None or volume["item"] in foldable else None
         if own is not None and own.domain == "literature" and own.data.get(0, {}).get("folded_into") != series_qid:
             queue.add(volume["item"], "literature", own.sources[0], {}, {}, False, {"folded_into": series_qid})
             if own.status is None:
@@ -173,12 +176,14 @@ def attach_volumes(queue, sparql, qids: list[str]) -> None:
         chunk = todo[i:i + CHUNK]
         pattern = (f"  VALUES ?series {{ {common.values([r.qid for r in chunk])} }}\n"
                    "  { ?series wdt:P527 ?item } UNION { ?item wdt:P179 ?series }")
-        rows = _run(sparql, "volumes of series", common.query(pattern, "?series "))
+        # ?shared is bound only for a volume sharing an author with the series (a BIND(EXISTS) is left unbound)
+        pattern += "\n  OPTIONAL { ?item wdt:P50 ?a . ?series wdt:P50 ?a . BIND(\"true\" AS ?shared) }"
+        rows = _run(sparql, "volumes of series", common.query(pattern, "?series ?shared "))
         for row in chunk:
             mine = [r for r in rows if r["series"] == row.qid and r["item"] != row.qid]
             if mine:
                 _extend_series(queue, row.qid, row.labels, row.sitelinks, {"count": row.data[0].get("count", 0)},
-                               mine, row.sources[0])
+                               mine, row.sources[0], {r["item"] for r in mine if r.get("shared") == "true"})
 
 
 def fold(queue, sparql, rows: list[dict], source: str, cfg: dict) -> int:
