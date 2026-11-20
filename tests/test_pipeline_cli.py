@@ -389,3 +389,55 @@ def test_readme_documents_the_timer_checkout_path_and_its_override():
     assert "systemctl --user edit sv-pipeline-votes.service" in timer
     assert "WorkingDirectory=" in timer and "\nExecStart=\n" in timer  # the list is reset before the new command
     assert timer.index("systemctl --user edit") < timer.index("systemctl --user enable --now")
+
+
+TREE = {"fields": [{"key": "film", "item": "Q10", "names": {"en": "Film"},
+                    "children": [{"key": "feature-films", "item": "Q12", "names": {"en": "Feature films"}}]},
+                   {"key": "television", "item": "Q11", "names": {"en": "TV"}}],
+        "themes": [{"key": "mercy", "item": "Q20", "names": {"en": "Mercy"}},
+                   {"key": "grace", "item": "Q21", "names": {"en": "Grace"}}]}
+
+
+def calibration_row(q, labels, sitelinks, field="feature-films", themes=(("mercy", 0.7),), scores=None, quick=0.6):
+    q.add("Q1", "film", "calibration", labels, sitelinks, calibration=True)
+    q.set_outcome("Q1", 3, "pass", {"p": quick})
+    q.set_outcome("Q1", 5, "pass", {
+        "connection": {"choice": "seeds", "probabilities": {"seeds": 0.6}},
+        "field": {"choice": field},
+        "themes": [{"key": k, "p": p, "status": "author", "evidence": {}} for k, p in themes],
+        "theme_scores": scores or {k: p for k, p in themes}})
+
+
+def test_a_deeper_field_under_the_items_field_agrees():
+    q = Queue(":memory:")
+    calibration_row(q, {"en": "The Film"}, {"enwiki": "The Film"})
+    out = calibration.report(q, {"en": FakeWiki({SV_FIELD: ["Q10"], SV_THEME: ["Q20"]})}, tree=TREE)
+    assert "feature-films | film (agree, deeper) |" in out and "DISAGREE" not in out
+
+
+def test_a_row_without_an_english_label_is_named_by_another_label_or_its_sitelink():
+    q = Queue(":memory:")
+    calibration_row(q, {"it": "Il miglio verde"}, {"enwiki": "The Green Mile (film)"})
+    assert "### Il miglio verde (Q1)" in calibration.report(q, {"en": FakeWiki({})}, tree=TREE)
+    q = Queue(":memory:")
+    calibration_row(q, {}, {"enwiki": "Pulp Fiction"})
+    assert "### Pulp Fiction (Q1)" in calibration.report(q, {"en": FakeWiki({})}, tree=TREE)
+
+
+def test_a_missed_theme_shows_jevs_score():
+    q = Queue(":memory:")
+    calibration_row(q, {"en": "F"}, {"enwiki": "F"}, scores={"mercy": 0.7, "grace": 0.31})
+    out = calibration.report(q, {"en": FakeWiki({SV_FIELD: ["Q12"], SV_THEME: ["Q20", "Q21"]})}, tree=TREE)
+    assert "not found by Jev: grace (0.31)" in out
+
+
+@pytest.mark.parametrize("quick,themes,verdict", [
+    (0.6, (("mercy", 0.7),), "would be proposed"),
+    (0.2, (("mercy", 0.7),), "would be dropped: quick check 0.20 < 0.25"),
+    (0.6, (), "would be dropped: no theme at 0.50"),
+])
+def test_the_report_says_whether_a_new_candidate_would_be_proposed(quick, themes, verdict, monkeypatch):
+    monkeypatch.setattr(calibration, "load_config", lambda: {"quick_drop": 0.25})
+    q = Queue(":memory:")
+    calibration_row(q, {"en": "F"}, {}, themes=themes, quick=quick)
+    assert f"| verdict | {verdict} | |" in calibration.report(q, {"en": FakeWiki({})}, tree=TREE)

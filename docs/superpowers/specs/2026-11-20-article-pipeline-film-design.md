@@ -48,7 +48,7 @@ proposals without the author touching it.
   and only to the project namespace on en. Imports at stage 7 keep the 200 MB `seminaverbi_en` guard.
 - Wiki writes as **SV editor bot** (`runeditor.py`), never as administrator; never print its password.
 - Jev thresholds, as everywhere else: applied at probability ≥ 0.80 and confidence ≥ 0.60 for a
-  field, ≥ 0.75 for a theme; under 0.40 a theme is never kept.
+  field, ≥ 0.75 for a theme; a proposal lists a theme only at 0.50 or above.
 - Licences: Wikidata (CC0) and the Wikipedia/Wikiquote APIs (read as notes) only. **No IMDb datasets
   and no TMDb in phase 1.** The popularity floor is Wikidata's sitelink count.
 - Rate limits: Wikidata SPARQL queries batched, one at a time, with a descriptive generic
@@ -113,16 +113,26 @@ clears one row's stage for a deliberate re-run.
    candidates (the list already chose them). Drop non-fiction clips, trailers and episodes (episodes
    are judged through their series).
 3. **Quick judgment.** One Jev question on a short synopsis (the Wikipedia lead in the richest
-   language, as notes): does the work plausibly show the Gospel's influence or a seed of the Word?
-   Under 0.40: dropped, logged.
-4. **Dossier (film).** Research notes, never article text: the plot, themes and reception sections
-   of the Wikipedia articles in the languages it has (up to three: the original language, en, it),
-   the creators' statements on faith or meaning from Wikiquote where present; for a series, one
-   summary per season. Each note keeps its source URL and language.
+   language, as notes): does the work plausibly show the Gospel's influence or a seed of the Word,
+   even an implicit one in a single storyline, character arc or episode? Under `quick_drop` (0.25,
+   lowered from 0.40 after the first calibration put 4 of 18 existing articles under it): dropped,
+   logged.
+4. **Dossier (film).** Research notes, never article text: the lead and the plot, premise, story,
+   themes and reception sections of the Wikipedia articles in the languages it has (up to three: the
+   original language, en, it), the creators' statements on faith or meaning from Wikiquote where
+   present; for a series, the season sections of its article and its season pages (the P527 parts
+   that are a television series season, else its P1811 list of episodes), with the episode summaries
+   of their `{{Episode list}}` templates. Each note keeps its source URL and language.
 5. **Adjudication.** On the dossier: (a) connection type, a Jev Choice of *direct Christian or
-   biblical influence*, *implicit seeds of the Word*, *biblical imagery used for entertainment*, *no
-   real connection*; (b) field: `jev classify`; (c) themes: `jev themes`, each kept theme with the
-   dossier passage that supports it. *No real connection* drops the row. The decisions live in the
+   biblical influence*, *implicit seeds of the Word* (in the whole work or in one storyline,
+   character or episode), *biblical or Christian imagery used for entertainment*, *no connection,
+   not even an implicit one*; (b) field: `jev classify`, whose deepest confident node is kept;
+   (c) themes: `jev themes`, asked of each part of the dossier (parts of at most 20,000
+   characters, at most 5), each theme keeping its best probability, so one strong episode is
+   enough; at most 8 themes at 0.50 or above, best first, each with the passage that supports it,
+   from the part that scored it. A row with no kept theme is dropped; the connection type is
+   shown to the voters and drops nothing (the first calibration found Jev answering *no real
+   connection* for 7 of 18 existing articles, series whose ties are implicit or partial). The decisions live in the
    queue and on the proposal page (not in `config/`: `config/adjudications.json` is the tree's
    placement log and stays that).
 6. **Proposal.** For each survivor, the bot writes
@@ -183,7 +193,7 @@ Calls made for the builder (the author may overturn any):
   P411), biblical figures by a short curated list of classes in `config/pipeline.json`, not by
   enumerating QIDs. Each run takes at most `max_new_per_run` candidates into stage 3 (200 to start),
   so the Jev spend of one run is bounded.
-- **Evidence for a theme:** one Jev Choice per kept theme (≥ 0.40), choosing among the dossier's
+- **Evidence for a theme:** one Jev Choice per kept theme (≥ 0.50, at most 8), choosing among the dossier's
   paragraphs the one that best supports it. The proposal shows that paragraph's source link and an
   excerpt of at most 25 words, never more.
 - **Outline:** derived, not generated: the standard sections of `article-standard.md`, plus one

@@ -15,14 +15,19 @@ from tools import jev
 ROOT = Path(__file__).resolve().parent.parent
 
 PLAUSIBLE = ("Does the work described in `text` plausibly show the influence of the Gospel, or a seed of the "
-             "Word (a moral or philosophical truth that the Gospel brings to fulfilment)?")
-CONNECTION = ("`text` is a dossier on one work. How does the work relate to the Christian faith and the Bible? "
-              "Judge the work itself, not its marketing.")
+             "Word (a moral or spiritual truth that the Gospel brings to fulfilment)? The work need not be "
+             "religious: an implicit seed in one storyline, character arc or episode is enough.")
+CONNECTION = ("`text` is a dossier on one work (for a television series, possibly several seasons). How does "
+              "the work relate to the Gospel? A work need not be religious to carry seeds of the Word: a moral or "
+              "spiritual truth that the Gospel brings to fulfilment (mercy, forgiveness, sacrifice, conversion, "
+              "hope...) is enough, even when it is implicit and found in a single storyline, character arc or "
+              "episode. Judge the work itself, not its marketing.")
 CONNECTIONS = {
     "direct": "direct Christian or biblical influence",
-    "seeds": "implicit seeds of the Word (moral or philosophical truth)",
-    "entertainment": "biblical imagery used for entertainment",
-    "none": "no real connection",
+    "seeds": "implicit seeds of the Word: a truth the Gospel fulfils, in the whole work or in one storyline, "
+             "character or episode",
+    "entertainment": "biblical or Christian imagery used for entertainment",
+    "none": "no connection, not even an implicit one",
 }
 
 

@@ -153,7 +153,8 @@ class FakeJudge:
         return {"choice": "some-field", "outcome": "confident"}
 
     def themes(self, row, text):
-        return self._themes
+        self.theme_texts = getattr(self, "theme_texts", []) + [text]
+        return self._themes(text) if callable(self._themes) else self._themes
 
     def evidence(self, row, key, paragraphs):
         self.evidence_calls.append((key, paragraphs))
@@ -170,10 +171,17 @@ def make_row(q, **kw):
     return q.pending(5)[0]
 
 
-def test_none_connection_drops(q):
+def test_a_none_connection_with_a_theme_passes(q):
     r = make_row(q, notes=[note()], languages={"en": 1})
     outcome, result = adjudicate(r, FakeJudge("none", {T1: {"p": 0.9, "status": "applied"}}), DATA)
-    assert outcome == "drop" and result["connection"]["choice"] == "none"
+    assert outcome == "pass" and result["connection"]["choice"] == "none"
+
+
+def test_no_theme_at_050_drops_whatever_the_connection(q):
+    r = make_row(q, notes=[note()], languages={"en": 1})
+    outcome, result = adjudicate(r, FakeJudge("direct", {T1: {"p": 0.49, "status": "author"}}), DATA)
+    assert outcome == "drop" and result["themes"] == []
+    assert result["theme_scores"] == {T1: 0.49}
 
 
 def test_none_connection_on_calibration_row_passes_with_result(q):
@@ -182,9 +190,9 @@ def test_none_connection_on_calibration_row_passes_with_result(q):
     assert outcome == "pass" and result["first_wiki"] == "en"
 
 
-def test_themes_below_040_are_never_kept(q):
+def test_themes_below_050_are_never_kept(q):
     r = make_row(q, notes=[note()], languages={"en": 1})
-    judge = FakeJudge(themes={T1: {"p": 0.8, "status": "applied"}, T2: {"p": 0.39, "status": "author"},
+    judge = FakeJudge(themes={T1: {"p": 0.8, "status": "applied"}, T2: {"p": 0.49, "status": "author"},
                               T3: {"p": 0.9, "status": "no"}})
     outcome, result = adjudicate(r, judge, DATA)
     assert outcome == "pass"
@@ -244,3 +252,47 @@ def test_dossier_text_sent_to_jev_is_capped(q):
     assert len(j.text) <= 20000 and j.text.startswith("[H] (en)\nxxx")
     paragraphs = j.evidence_calls[0][1]
     assert sum(len(p) for p in paragraphs) <= 20000 and paragraphs[0] == "x" * 9000
+
+
+def test_at_most_eight_themes_are_kept_best_first(q):
+    keys = list(EN)[:10]
+    r = make_row(q, notes=[note()], languages={"en": 1})
+    judge = FakeJudge(themes={k: {"p": 0.9 - i / 100, "status": "applied"} for i, k in enumerate(keys)})
+    _, result = adjudicate(r, judge, DATA)
+    assert [t["key"] for t in result["themes"]] == keys[:8]
+
+
+def big_notes(n, size=15000):
+    return [note(text=f"part{i} " + "y" * size, url=f"http://x/{i}") for i in range(n)]
+
+
+def test_a_long_dossier_is_read_in_parts_and_each_theme_keeps_its_best(q):
+    r = make_row(q, notes=big_notes(3), languages={"en": 3})
+
+    def themes(text):
+        if "part1" in text:
+            return {T1: {"p": 0.3, "status": "no"}, T2: {"p": 0.9, "status": "applied"}}
+        return {T1: {"p": 0.7, "status": "author"}, T2: {"p": 0.2, "status": "no"}}
+    judge = FakeJudge(themes=themes)
+    outcome, result = adjudicate(r, judge, DATA)
+    assert len(judge.theme_texts) == 3 and all(len(t) <= 20000 for t in judge.theme_texts)
+    assert outcome == "pass"
+    assert [(t["key"], t["p"], t["status"]) for t in result["themes"]] == [(T2, 0.9, "applied"), (T1, 0.7, "author")]
+    assert result["themes"][0]["evidence"]["url"] == "http://x/1"  # from the part that scored it
+    assert "part0" in judge.text and "part1" not in judge.text  # connection and field read the first part
+
+
+def test_at_most_five_parts_are_read(q):
+    r = make_row(q, notes=big_notes(8), languages={"en": 8})
+    judge = FakeJudge(themes={T1: {"p": 0.8, "status": "applied"}})
+    adjudicate(r, judge, DATA)
+    assert len(judge.theme_texts) == 5
+
+
+def test_a_note_longer_than_a_part_is_split_at_paragraphs(q):
+    text = "\n\n".join(f"para{i} " + "z" * 9000 for i in range(5))
+    r = make_row(q, notes=[note(text=text)], languages={"en": 1})
+    judge = FakeJudge(themes={T1: {"p": 0.8, "status": "applied"}})
+    adjudicate(r, judge, DATA)
+    assert len(judge.theme_texts) == 3
+    assert all(f"para{i}" in "".join(judge.theme_texts) for i in range(5))

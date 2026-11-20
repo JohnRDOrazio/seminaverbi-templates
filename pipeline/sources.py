@@ -84,6 +84,17 @@ class Wikipedia:
             out.append((sec["line"], _plain_text(data["parse"]["wikitext"])))
         return out
 
+    def season(self, title: str) -> list[tuple[str, str]]:
+        """A season or episode-list page in one request: [(heading, plain text)], the lead under "", the
+        summaries of its {{Episode list}} templates as ("Episode: <title>", summary); [] for a missing page."""
+        try:
+            data = self._wiki._call("GET", action="parse", page=title, prop="wikitext", redirects=1)
+        except SyncError as exc:
+            if "missingtitle" in str(exc) or "nosuchpage" in str(exc):
+                return []
+            raise
+        return _season_sections(data.get("parse", {}).get("wikitext", ""))
+
 
 def _plain_text(wikitext: str) -> str:
     lines = wikitext.splitlines()
@@ -94,3 +105,43 @@ def _plain_text(wikitext: str) -> str:
             lines = lines[:i]
             break
     return mwparserfromhell.parse("\n".join(lines)).strip_code().strip()
+
+
+_EPISODE = re.compile(r"^episode list", re.I)
+_SUMMARY_PARAMS = ("ShortSummary", "Summary")
+
+
+def _episodes(code) -> list[tuple[str, str]]:
+    """("Episode: <title>", plain summary) for each {{Episode list…}} template, removed from `code`."""
+    out = []
+    for tpl in code.filter_templates(recursive=True):
+        if not _EPISODE.match(str(tpl.name).strip()):
+            continue
+        title = next((str(tpl.get(p).value) for p in ("Title", "RTitle") if tpl.has(p)), "")
+        summary = next((str(tpl.get(p).value) for p in _SUMMARY_PARAMS if tpl.has(p)), "")
+        title = mwparserfromhell.parse(title).strip_code().strip()
+        summary = mwparserfromhell.parse(summary).strip_code().strip()
+        if summary:
+            out.append((f"Episode: {title}".rstrip(": "), summary))
+    return out
+
+
+def _season_sections(wikitext: str) -> list[tuple[str, str]]:
+    """The lead (heading ""), each section's own text and the episode summaries, in page order; empty ones skipped."""
+    code = mwparserfromhell.parse(wikitext)
+    out = []
+    for section in code.get_sections(include_lead=True, flat=True):
+        headings = section.filter_headings(recursive=False)
+        heading = headings[0].title.strip_code().strip() if headings else ""
+        episodes = _episodes(section)
+        for tpl in section.filter_templates(recursive=False):
+            if episodes and any(_EPISODE.match(str(t.name).strip())
+                                for t in mwparserfromhell.parse(str(tpl)).filter_templates(recursive=True)):
+                section.remove(tpl)
+        for h in headings:
+            section.remove(h)
+        text = section.strip_code().strip()
+        if text:
+            out.append((heading, text))
+        out.extend(episodes)
+    return out

@@ -109,3 +109,41 @@ def test_links_follow_continuation_and_redirects():
     params = session.calls[0][1]["params"]
     assert params["prop"] == "links" and params["plnamespace"] == 0 and params["redirects"] == 1
     assert session.calls[1][1]["params"]["plcontinue"] == "x|1"
+
+
+SEASON_WIKITEXT = """Intro of the season.
+== Cast ==
+* Anna Torv
+== Episodes ==
+{{Episode table |episodes=
+{{Episode list
+ |EpisodeNumber=1 |Title=Pilot
+ |ShortSummary=A flight lands, its '''crew''' dead. Olivia asks [[Walter Bishop|Walter]] for help.
+}}
+{{Episode list/sublist|Fringe season 1
+ |EpisodeNumber=2 |Title=The Same Old Story
+ |ShortSummary=A woman gives birth to a child that ages rapidly.
+}}
+}}
+=== Notes ===
+x
+== La redenzione ==
+Walter asks forgiveness.
+== References ==
+{{reflist}}
+"""
+
+
+def test_season_reads_episode_summaries_and_story_sections_in_one_request():
+    s = FakeSession(Resp({"parse": {"wikitext": SEASON_WIKITEXT}}))
+    out = Wikipedia("en", s).season("Fringe season 1")
+    assert out == [("", "Intro of the season."), ("Cast", "Anna Torv"),
+                   ("Episode: Pilot", "A flight lands, its crew dead. Olivia asks Walter for help."),
+                   ("Episode: The Same Old Story", "A woman gives birth to a child that ages rapidly."),
+                   ("Notes", "x"), ("La redenzione", "Walter asks forgiveness.")]
+    assert len(s.calls) == 1 and s.calls[0][1]["params"]["prop"] == "wikitext"
+
+
+def test_season_of_a_missing_page_is_empty():
+    s = FakeSession(Resp({"error": {"code": "missingtitle", "info": "The page you specified doesn't exist."}}))
+    assert Wikipedia("en", s).season("Nope") == []
