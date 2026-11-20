@@ -1,6 +1,9 @@
 import pytest
 
-from pipeline.publish import page_title, proposal_call, publish as publish_all, ranking, replace_call
+import re
+
+from pipeline.publish import (approved_report, count_votes, page_title, proposal_call, publish as publish_all,
+                              ranking, replace_call, sync_votes)
 from pipeline.queue import Queue
 from sync.wiki import SyncError
 
@@ -13,6 +16,16 @@ class FakeEn:
         self.pages = {t: (1, text) for t, text in (pages or {}).items()}
         self.edits = []
         self.fail = set()
+        self.votes = {}
+        self.parses = []
+
+    def parse(self, title, text):
+        self.parses.append((title, text))
+        out = []
+        for m in re.finditer(r"SVV(\d+):\{\{NUMBEROFVOTESPAGE:(.*?)\}\}:SVV", text):
+            if m.group(2) in self.votes:
+                out.append(f"<p>SVV{m.group(1)}:{self.votes[m.group(2)]}:SVV</p>")
+        return {"text": "\n".join(out)}
 
     def revision(self, title):
         return self.pages.get(title)
@@ -223,3 +236,97 @@ def test_page_further_along_than_queue_is_kept(q):
 def test_trailing_whitespace_does_not_trigger_an_edit(q):
     en = FakeEn({RANK: ranking(q).rstrip() + "\n\n\n"})
     assert publish_all(q, en, {}) == 0
+
+
+CFG = {"vote_threshold": 3}
+
+
+def open_page(q, en, qid, title, status="open", extra=""):
+    add(q, qid, title)
+    en.pages[PREFIX + title] = (1, f"{{{{SV proposal\n|qid={qid}\n|status={status}\n{extra}}}}}\n\nhuman text\n")
+    q.set_page(qid, PREFIX + title)
+    q.set_status(qid, "open", page=PREFIX + title)
+
+
+def test_threshold_promotes_to_approved(q):
+    en = FakeEn()
+    open_page(q, en, "Q1", "One")
+    en.votes["Semina Verbi:Article proposals/One"] = 3
+    out = sync_votes(q, en, CFG)
+    assert out == {"approved": ["Q1"], "declined": []}
+    assert q.by_status("approved")[0].votes == 3
+    edit = [e for e in en.edits if e["title"] == PREFIX + "One"][0]
+    assert edit["baserevid"] == 1
+    assert edit["text"] == "{{SV proposal\n|qid=Q1\n|status=approved\n}}\n\nhuman text\n"
+    assert any(e["title"] == RANK for e in en.edits)
+
+
+def test_below_threshold_stays_open(q):
+    en = FakeEn()
+    open_page(q, en, "Q1", "One")
+    en.votes[PREFIX + "One"] = 2
+    assert sync_votes(q, en, CFG) == {"approved": [], "declined": []}
+    row = q.by_status("open")[0]
+    assert row.votes == 2
+    assert not [e for e in en.edits if e["title"] == PREFIX + "One"]
+
+
+def test_hand_declined_is_read_back_and_never_reproposed(q):
+    en = FakeEn()
+    open_page(q, en, "Q1", "One", status="declined", extra="|reason=off topic\n")
+    en.votes[PREFIX + "One"] = 9
+    assert sync_votes(q, en, CFG) == {"approved": [], "declined": ["Q1"]}
+    assert q.by_status("declined")[0].qid == "Q1"
+    before = en.pages[PREFIX + "One"]
+    publish_all(q, en, {})
+    assert en.pages[PREFIX + "One"] == before
+    assert "declined" in en.pages[PREFIX + "One"][1]
+
+
+def test_votes_are_counted_in_one_parse_per_50_pages(q):
+    en = FakeEn()
+    titles = [f"{PREFIX}T{i}" for i in range(120)]
+    en.votes = {t: i for i, t in enumerate(titles) if i != 7}
+    counts = count_votes(en, titles)
+    assert len(en.parses) == 3
+    assert counts[titles[5]] == 5 and counts[titles[119]] == 119 and counts[titles[7]] == 0
+    assert all(t == RANK for t, _ in en.parses)
+
+
+def test_missing_count_warns(q, capsys):
+    en = FakeEn()
+    assert count_votes(en, [PREFIX + "X"]) == {PREFIX + "X": 0}
+    assert "X" in capsys.readouterr().err
+
+
+def test_page_of_another_qid_or_without_call_is_not_approved(q, capsys):
+    en = FakeEn()
+    open_page(q, en, "Q1", "One")
+    open_page(q, en, "Q2", "Two")
+    en.pages[PREFIX + "One"] = (1, "{{SV proposal\n|qid=Q9\n|status=open\n}}\n")
+    en.pages[PREFIX + "Two"] = (1, "just text")
+    en.votes = {PREFIX + "One": 5, PREFIX + "Two": 5}
+    assert sync_votes(q, en, CFG)["approved"] == []
+    assert not q.by_status("approved")
+    assert capsys.readouterr().err.count("left alone") == 2
+
+
+def test_only_open_rows_are_synced(q):
+    en = FakeEn()
+    open_page(q, en, "Q1", "One")
+    q.set_status("Q1", "created")
+    en.votes[PREFIX + "One"] = 5
+    sync_votes(q, en, CFG)
+    assert not [p for p in en.parses if "One" in p[1]]
+
+
+def test_approved_report(q):
+    en = FakeEn()
+    open_page(q, en, "Q1", "One")
+    q.set_status("Q1", "approved")
+    report = approved_report(q)
+    for needle in ("One (Q1)", "Q1", "en", "direct", "cinema", "mercy", "He forgave | them }} all",
+                   "Lead", "http://x/a", "http://x/b"):
+        assert needle in report
+    q.set_status("Q1", "open")
+    assert approved_report(q) == ""

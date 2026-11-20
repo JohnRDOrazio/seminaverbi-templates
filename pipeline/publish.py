@@ -191,6 +191,24 @@ def _write(en, title, build) -> bool:
     return True
 
 
+def _page_call(current) -> dict | None:
+    """The parameters of the proposal call in a `(revid, text)` revision, or None."""
+    span = _find_call(current[1]) if current else None
+    return dict(_split(current[1][span[0]:span[1]])) if span else None
+
+
+def _read_back(queue, row, title, current) -> bool:
+    """Copy a hand-set or advanced status (declined, approved, created) from the page into the queue."""
+    params = _page_call(current) or {}
+    status = params.get("status", "").lower()
+    if status not in KEPT_STATUSES:
+        return False
+    fields = {"reason": params.get("reason", "")} if status == "declined" else {}
+    if row.status != status:
+        queue.set_status(row.qid, status, page=title, **fields)
+    return True
+
+
 def publish(queue, en, cfg) -> int:
     """Write the proposal page of every passing, non-calibration, non-declined row, then the ranking page."""
     written = 0
@@ -211,15 +229,110 @@ def publish(queue, en, cfg) -> int:
         if _write(en, title, lambda old: replace_call(old, call)):
             written += 1
         current = en.revision(title)
-        found = _find_call(current[1]) if current else None
-        status = dict(_split(current[1][found[0]:found[1]])).get("status", "").lower() if found else ""
-        if status in KEPT_STATUSES:
-            fields = {"reason": dict(_split(current[1][found[0]:found[1]])).get("reason", "")} \
-                if status == "declined" else {}
-            if row.status != status:
-                queue.set_status(row.qid, status, page=title, **fields)
-        elif row.status is None:
-            queue.set_status(row.qid, "open", page=title)
+        if not _read_back(queue, row, title, current):
+            if row.status is None:
+                queue.set_status(row.qid, "open", page=title)
     if _write(en, RANKING_TITLE, lambda old: ranking(queue)):
         written += 1
     return written
+
+
+_VOTES = re.compile(r"SVV(\d+):\s*([\d,.]+)\s*:SVV")
+BATCH = 50
+
+
+def count_votes(en, titles: list[str]) -> dict[str, int]:
+    """Vote counts of `titles`: one action=parse per 50 pages, each line `{{NUMBEROFVOTESPAGE:<title>}}`."""
+    counts = {}
+    for start in range(0, len(titles), BATCH):
+        chunk = titles[start:start + BATCH]
+        text = "\n".join(f"SVV{start + i}:{{{{NUMBEROFVOTESPAGE:{t}}}}}:SVV" for i, t in enumerate(chunk))
+        html = en.parse(RANKING_TITLE, text)["text"]
+        found = {int(m.group(1)): int(re.sub(r"\D", "", m.group(2)) or 0) for m in _VOTES.finditer(html)}
+        for i, title in enumerate(chunk):
+            if start + i not in found:
+                print(f"votes: no count for {title}, taken as 0", file=sys.stderr)
+            counts[title] = found.get(start + i, 0)
+    return counts
+
+
+def _set_status_param(call: str, value: str) -> str:
+    """`call` with only its `status` parameter replaced; everything else stays byte-identical."""
+    body_start, end = 2, len(call) - 2
+    depth, i, start = 0, body_start, body_start
+    while i <= end:
+        two = call[i:i + 2]
+        if i < end and two in ("{{", "[["):
+            depth += 1; i += 2
+        elif i < end and two in ("}}", "]]"):
+            depth = max(depth - 1, 0); i += 2
+        elif i == end or (call[i] == "|" and depth == 0):
+            part = call[start:i]
+            name, eq, _ = part.partition("=")
+            if eq and name.strip().lower() == "status" and start > body_start:
+                lead = part[:len(part) - len(part.lstrip())]
+                trail = part[len(part.rstrip()):]
+                return call[:start] + lead + f"status={value}" + trail + call[i:]
+            start = i + 1
+            i += 1
+        else:
+            i += 1
+    return call[:end].rstrip("\n") + f"\n|status={value}\n" + call[end:]
+
+
+def _approve(old: str) -> str:
+    span = _find_call(old)
+    return old[:span[0]] + _set_status_param(old[span[0]:span[1]], "approved") + old[span[1]:]
+
+
+def sync_votes(queue, en, cfg) -> dict:
+    """Count votes on open proposals, promote those at the threshold, read declines back, rewrite the ranking."""
+    approved, declined, voting = [], [], []
+    for row in queue.by_status("open"):
+        if not row.page or row.calibration:
+            continue
+        current = en.revision(row.page)
+        params = _page_call(current)
+        if params is None:
+            print(f"votes: {row.page} has no {{{{SV proposal}}}} call, left alone", file=sys.stderr)
+            continue
+        if params.get("qid") != row.qid:
+            print(f"votes: {row.page} belongs to another QID, left alone", file=sys.stderr)
+            continue
+        if params.get("status", "").lower() == "declined":
+            _read_back(queue, row, row.page, current)
+            declined.append(row.qid)
+        else:
+            voting.append(row)
+    counts = count_votes(en, [r.page for r in voting]) if voting else {}
+    for row in voting:
+        n = counts[row.page]
+        queue.set_votes(row.qid, n)
+        if n >= cfg["vote_threshold"] and _write(en, row.page, _approve):
+            queue.set_status(row.qid, "approved")
+            approved.append(row.qid)
+    _write(en, RANKING_TITLE, lambda old: ranking(queue))
+    return {"approved": approved, "declined": declined}
+
+
+def approved_report(queue) -> str:
+    """One block per approved row: what the article writer needs to start."""
+    blocks = []
+    for row in sorted(queue.by_status("approved"), key=lambda r: r.qid):
+        data = row.data.get(5) or {}
+        urls = []
+        for note in (row.data.get(4) or {}).get("notes", []):
+            if note["url"] not in urls:
+                urls.append(note["url"])
+        lines = [f"{_display(row.page) if row.page else row.qid} ({row.qid})",
+                 f"  first wiki: {data.get('first_wiki', '')}",
+                 f"  connection: {data.get('connection', {}).get('choice', '')}",
+                 f"  field: {data.get('field', {}).get('choice', '')}", "  themes:"]
+        for theme in data.get("themes", []):
+            ev = theme.get("evidence") or {}
+            lines.append(f"    - {theme['key']} ({theme['p']:.2f}, {theme['status']}): "
+                         f"{ev.get('excerpt') or ''} {ev.get('url') or ''}".rstrip())
+        lines.append("  outline: " + " ; ".join(data.get("outline", [])))
+        lines.append("  sources:" + "".join(f"\n    - {u}" for u in urls))
+        blocks.append("\n".join(lines))
+    return "\n\n".join(blocks) + ("\n" if blocks else "")
