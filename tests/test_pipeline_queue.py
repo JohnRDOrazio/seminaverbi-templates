@@ -61,3 +61,12 @@ def test_stage_zero_data_round_trips_and_merges(q):
     assert row.data[0] == {"count": 3, "instance_of": ["Q11424"]}
     q.add("Q2", "film", "a", {}, {})
     assert 0 not in q.pending(1)[1].data
+
+
+def test_repeat_add_with_calibration_sets_the_flag(q):
+    q.add("Q1", "film", "facet", {}, {})
+    assert q.pending(1)[0].calibration is False
+    assert q.add("Q1", "film", "calibration", {}, {}, calibration=True) is False
+    assert q.pending(1)[0].calibration is True
+    q.add("Q1", "film", "facet", {}, {})  # a later plain add never clears it
+    assert q.pending(1)[0].calibration is True

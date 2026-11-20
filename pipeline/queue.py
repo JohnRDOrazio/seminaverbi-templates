@@ -62,6 +62,9 @@ class Queue:
                 self.db.execute("UPDATE candidates SET sources=? WHERE qid=?",
                                 (json.dumps(sources), qid))
                 self.db.commit()
+            if calibration:  # a film article first found by a facet must still be a calibration row
+                self.db.execute("UPDATE candidates SET calibration=1 WHERE qid=?", (qid,))
+                self.db.commit()
             return False
         self.db.execute(
             "INSERT INTO candidates (qid, domain, sources, labels, sitelinks, calibration, added_at)"
