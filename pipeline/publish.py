@@ -10,7 +10,8 @@ SUMMARY = "Article proposal (pipeline)"
 LANGS = ("en", "it", "es", "fr", "de", "pt")
 KEPT_STATUSES = ("approved", "created", "declined")
 _FORBIDDEN = re.compile(r"[#<>\[\]|{}]")
-_CALL = re.compile(r"\{\{\s*SV[ _]proposal\s*(?=[|}])", re.IGNORECASE)
+_CALL = re.compile(r"\{\{\s*(?:Template\s*:\s*)?SV[ _]+proposal\s*(?=[|}])", re.IGNORECASE)
+_RANK = {"open": 0, "approved": 1, "created": 2}
 _MASK = re.compile(r"<!--.*?-->|<nowiki>.*?</nowiki>", re.DOTALL | re.IGNORECASE)
 
 
@@ -23,6 +24,9 @@ def page_title(row, queue=None) -> str:
     name = " ".join(_FORBIDDEN.sub("", name).split()).lstrip(":").strip() or row.qid
     row.page = PREFIX + name
     if queue is not None:
+        owner = queue.page_owner(row.page)
+        if owner and owner != row.qid:  # another candidate's title: keep both pages
+            row.page = f"{row.page} ({row.qid})"
         queue.set_page(row.qid, row.page)
     return row.page
 
@@ -30,6 +34,7 @@ def page_title(row, queue=None) -> str:
 def _escape(value) -> str:
     value = " ".join(str(value).split())
     value = value.replace("{{", "&#123;&#123;").replace("}}", "&#125;&#125;")
+    value = value.replace("<", "&lt;").replace("~", "&#126;")  # no unclosed comment/ref/nowiki, no signature
     return value.replace("|", "{{!}}")
 
 
@@ -114,8 +119,9 @@ def _split(call: str) -> list[tuple[str, str]]:
 def _carry(old_call: str, new_call: str) -> str:
     old, new = dict(_split(old_call)), _split(new_call)
     status = old.get("status", "").strip().lower()
-    if status not in KEPT_STATUSES:
-        return new_call
+    mine = dict(new).get("status", "open")
+    if status not in KEPT_STATUSES or (status != "declined" and _RANK.get(mine, 0) > _RANK[status]):
+        return new_call  # the queue is further along than the page (declined on the page always wins)
     carried = ["status"] + {"declined": ["reason"], "created": ["article"]}.get(status, [])
     params = [(k, old[k] if k in carried and k in old else v) for k, v in new]
     names = {k for k, _ in params}
@@ -128,7 +134,7 @@ def replace_call(old_text: str | None, call: str) -> str:
         return call + "\n"
     span = _find_call(old_text)
     if span is None:
-        return call + "\n" + old_text
+        raise ValueError("the page has no {{SV proposal}} call")
     return old_text[:span[0]] + _carry(old_text[span[0]:span[1]], call) + old_text[span[1]:]
 
 
@@ -172,7 +178,7 @@ def _write(en, title, build) -> bool:
     current = en.revision(title)
     old = current[1] if current else None
     text = build(old)
-    if text == old:
+    if old is not None and text.rstrip() == old.rstrip():
         return False
     try:
         if current:
@@ -193,6 +199,15 @@ def publish(queue, en, cfg) -> int:
             continue
         title = page_title(row, queue)
         call = proposal_call(row, row.data[5])
+        existing = en.revision(title)
+        if existing:
+            span = _find_call(existing[1])
+            if span is None:
+                print(f"publish: {title} has no {{{{SV proposal}}}} call, left alone", file=sys.stderr)
+                continue
+            if dict(_split(existing[1][span[0]:span[1]])).get("qid") != row.qid:
+                print(f"publish: {title} belongs to another QID, left alone", file=sys.stderr)
+                continue
         if _write(en, title, lambda old: replace_call(old, call)):
             written += 1
         current = en.revision(title)

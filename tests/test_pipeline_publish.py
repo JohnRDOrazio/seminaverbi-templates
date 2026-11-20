@@ -167,3 +167,59 @@ def test_ranking_sections(q):
     heads = [text.index(h) for h in ("== Open", "== Approved", "== Created", "== Declined", "== Translation")]
     assert heads == sorted(heads)
     assert "Trans" in text and "it" in text and "fr" in text
+
+
+def test_colliding_titles_get_the_qid(q):
+    q.add("Q1", "film", "s", {}, {"enwiki": "A|B"}); q.add("Q2", "film", "s", {}, {"enwiki": "AB"})
+    a, b = q.pending(1)
+    assert page_title(a, q) == PREFIX + "AB" and page_title(b, q) == PREFIX + "AB (Q2)"
+
+
+def test_page_of_another_qid_is_left_alone(q, capsys):
+    add(q, "Q1", "One")
+    other = "{{SV proposal\n|qid=Q9\n|status=declined\n|reason=x\n}}\n"
+    en = FakeEn({PREFIX + "One": other})
+    assert publish_all(q, en, {}) == 1 and [e["title"] for e in en.edits] == [RANK]
+    assert "another QID" in capsys.readouterr().err and q.by_status("declined") == []
+
+
+def test_values_cannot_open_comments_or_sign():
+    q = Queue(":memory:"); r = add(q)
+    res = result(); res["themes"][0]["evidence"]["excerpt"] = "a <!-- b <ref> ~~~~"
+    call = proposal_call(r, res)
+    assert "<" not in call and "~" not in call
+
+
+@pytest.mark.parametrize("text", ["#REDIRECT [[Elsewhere]]\n", "{{SV proposal|qid=Q1\n", "plain\n"])
+def test_page_without_a_recognisable_call_is_skipped(q, capsys, text):
+    add(q, "Q1", "One")
+    en = FakeEn({PREFIX + "One": text})
+    publish_all(q, en, {})
+    assert [e["title"] for e in en.edits] == [RANK] and "no {{SV proposal}}" in capsys.readouterr().err
+
+
+def test_template_prefix_and_spacing_are_recognised(q):
+    r = add(q)
+    old = "{{ Template:sv_proposal |qid=Q1\n|status=open}}\nkeep\n"
+    new = replace_call(old, proposal_call(r, r.data[5]))
+    assert new.count("SV proposal") == 1 and new.endswith("}}\nkeep\n")
+
+
+def test_queue_further_along_advances_the_page(q):
+    add(q, "Q1", "One"); q.set_status("Q1", "approved", page=PREFIX + "One")
+    en = FakeEn({PREFIX + "One": "{{SV proposal\n|qid=Q1\n|status=open\n}}\n"})
+    publish_all(q, en, {})
+    assert "|status=approved" in en.edits[0]["text"]
+
+
+def test_page_further_along_than_queue_is_kept(q):
+    add(q, "Q1", "One"); q.set_status("Q1", "approved", page=PREFIX + "One")
+    en = FakeEn({PREFIX + "One": "{{SV proposal\n|qid=Q1\n|status=created\n|article=Foo\n}}\n"})
+    publish_all(q, en, {})
+    assert "|status=created" in en.edits[0]["text"] and "|article=Foo" in en.edits[0]["text"]
+    assert q.by_status("created")[0].qid == "Q1"
+
+
+def test_trailing_whitespace_does_not_trigger_an_edit(q):
+    en = FakeEn({RANK: ranking(q).rstrip() + "\n\n\n"})
+    assert publish_all(q, en, {}) == 0

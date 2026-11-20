@@ -159,3 +159,7 @@ class Queue:
     def by_status_in(self, statuses) -> list[Row]:
         marks = ",".join("?" * len(statuses))
         return self._rows(f"status IN ({marks})", tuple(statuses))
+
+    def page_owner(self, title: str) -> str | None:
+        r = self.db.execute("SELECT qid FROM candidates WHERE page=?", (title,)).fetchone()
+        return r["qid"] if r else None
