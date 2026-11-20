@@ -72,10 +72,30 @@ Only `quick`, `adjudicate`, `run` and `calibrate` need `TYPESAFE_API_KEY` (Jev).
 
 **Vote timer.** `votes` counts the votes on open proposals and approves those at the threshold
 (`vote_threshold` in `config/pipeline.json`, now 3; `max_new_per_run` and the other cut-offs live there too).
-A user timer runs it every 3 hours:
+A user timer runs it every 3 hours.
+
+The service assumes this checkout is at `~/development/seminaverbi-templates`: both its `WorkingDirectory` and
+its Python (`.venv/bin/python` in the checkout) point there, and a missing `WorkingDirectory` stops the service
+from starting. Link the units from the checkout:
 
 ```
 systemctl --user link "$PWD"/deploy/systemd/sv-pipeline-votes.{service,timer}
+```
+
+For a checkout elsewhere, override both paths before enabling the timer, with
+`systemctl --user edit sv-pipeline-votes.service` and this drop-in (the empty `ExecStart=` clears the original
+command; without it both would run):
+
+```
+[Service]
+WorkingDirectory=/path/to/seminaverbi-templates
+ExecStart=
+ExecStart=/path/to/seminaverbi-templates/.venv/bin/python %h/.config/seminaverbi/runeditor.py pipeline votes
+```
+
+Then enable the timer:
+
+```
 systemctl --user enable --now sv-pipeline-votes.timer
 ```
 

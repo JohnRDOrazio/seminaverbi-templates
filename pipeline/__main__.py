@@ -189,8 +189,9 @@ def build_parser() -> argparse.ArgumentParser:
     common = argparse.ArgumentParser(add_help=False, argument_default=argparse.SUPPRESS)
     common.add_argument("--db")
     common.add_argument("--domain", choices=sorted(DOMAINS))
+    # no set_defaults here: it would change the shared actions, and the subcommand's default would then
+    # overwrite a value given before the command; parse_args fills the defaults afterwards
     parser = argparse.ArgumentParser(prog="python -m pipeline", parents=[common])
-    parser.set_defaults(db=DEFAULT_DB, domain="film")
     sub = parser.add_subparsers(dest="command", required=True)
     for name in ("candidates", "covered", "triage", "quick", "dossier", "adjudicate", "publish", "calibrate",
                  "votes", "approved"):
@@ -206,6 +207,18 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+DEFAULTS = {"db": DEFAULT_DB, "domain": "film"}
+
+
+def parse_args(argv=None, parser=None) -> argparse.Namespace:
+    """The arguments, the common options defaulted after parsing (given before or after the command)."""
+    args = (parser or build_parser()).parse_args(argv)
+    for name, value in DEFAULTS.items():
+        if not hasattr(args, name):
+            setattr(args, name, value)
+    return args
+
+
 COMMANDS = {"candidates": cmd_candidates, "publish": cmd_publish, "run": cmd_run, "calibrate": cmd_calibrate,
             "votes": cmd_votes, "approved": cmd_approved, "redo": cmd_redo, "skip": cmd_skip,
             **{n: cmd_stage for n in NAMES.values()}}
@@ -213,7 +226,7 @@ COMMANDS = {"candidates": cmd_candidates, "publish": cmd_publish, "run": cmd_run
 
 def main(argv=None) -> int:
     parser = build_parser()
-    args = parser.parse_args(argv)
+    args = parse_args(argv, parser)
     if args.command == "redo" and args.stage < 1:
         parser.error("redo 0 is refused: stage 0 holds the data the later stages need; run candidates again instead")
     cfg = load_config()

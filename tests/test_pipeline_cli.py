@@ -353,3 +353,39 @@ def test_run_publish_checks_credentials_before_the_stages(wired, monkeypatch, ca
     assert cli.main(["run", "--publish", "--db", str(path)]) == 1
     assert count(path, 0) == 0 and calls["publish"] == 0
     assert "SV_EDITOR_USER" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("argv", [["--db", "X.sqlite", "redo", "3"], ["redo", "3", "--db", "X.sqlite"],
+                                  ["--db", "X.sqlite", "--domain", "film", "votes"]])
+def test_common_options_before_or_after_the_command(argv):
+    """CodeRabbit 4640187363: `--db X redo 3` must use X, not the default database."""
+    args = cli.parse_args(argv)
+    assert args.db == "X.sqlite" and args.domain == "film"
+
+
+def test_omitted_common_options_take_the_defaults():
+    args = cli.parse_args(["redo", "3"])
+    assert args.db == cli.DEFAULT_DB and args.domain == "film"
+
+
+def test_redo_with_db_before_the_command_clears_that_database(base, tmp_path):
+    other = tmp_path / "other.sqlite"
+    q = Queue(other)
+    q.add("Q1", "film", "wikidata", {"en": "A"}, {"enwiki": "A"})
+    q.set_outcome("Q1", 1, "pass", {})
+    assert cli.main(["--db", str(other), "redo", "1"]) == 0
+    assert 1 not in Queue(other).row("Q1").outcomes
+
+
+def test_readme_documents_the_timer_checkout_path_and_its_override():
+    """CodeRabbit 4640187439: the unit hard-codes the checkout; the README must say so and how to override it."""
+    import re
+    from conftest import ROOT
+    unit = (ROOT / "deploy" / "systemd" / "sv-pipeline-votes.service").read_text(encoding="utf-8")
+    workdir = re.search(r"^WorkingDirectory=(.+)$", unit, re.M).group(1)
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    timer = readme[readme.index("**Vote timer.**"):readme.index("**Sources and licences.**")]
+    assert workdir.replace("%h", "~") in timer
+    assert "systemctl --user edit sv-pipeline-votes.service" in timer
+    assert "WorkingDirectory=" in timer and "\nExecStart=\n" in timer  # the list is reset before the new command
+    assert timer.index("systemctl --user edit") < timer.index("systemctl --user enable --now")
