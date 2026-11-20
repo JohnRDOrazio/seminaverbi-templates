@@ -299,3 +299,21 @@ def test_an_unknown_domain_uses_film_wording(queue):
     fake = FakeJev({"connection": choice({"direct": 1.0, "seeds": 0.0, "entertainment": 0.0, "none": 0.0}, 0.9)})
     Judge(fake, queue, DATA).connection(r, "t")
     assert fake.calls[0]["questions"]["connection"].instructions == film.QUESTIONS["connection"]
+
+
+def test_quick_reads_a_borrowed_lead(queue):
+    queue.add("Q5", "literature", "author", {}, {}, data={"lead_sitelinks": {"enwiki": "Best volume"}})
+    r = next(x for x in queue.pending(1) if x.qid == "Q5")
+    r.data = {0: {"lead_sitelinks": {"enwiki": "Best volume"}}}
+    j = FakeJudge(0.9)
+    assert quick(r, j, FakeWikipedia) == ("pass", {"p": 0.9})
+    assert j.seen == ["en:Best volume"]
+
+
+def test_quick_prefers_the_rows_own_wikipedia_over_a_borrowed_lead(queue):
+    queue.add("Q6", "literature", "author", {}, {"itwiki": "Own"})
+    r = next(x for x in queue.pending(1) if x.qid == "Q6")
+    r.data = {0: {"lead_sitelinks": {"enwiki": "Best volume"}}}
+    j = FakeJudge(0.9)
+    quick(r, j, FakeWikipedia)
+    assert j.seen == ["it:Own"]

@@ -181,8 +181,130 @@ def test_facets_run_for_works_and_series(q):
 
 def test_every_source_goes_through_add_rows(q, monkeypatch):
     seen = []
-    monkeypatch.setattr(literature, "_add_rows", lambda queue, rows, source, series=False: seen.append(source) or 0)
+    monkeypatch.setattr(literature, "_add_rows", lambda queue, rows, source, series=False, **_: seen.append(source) or 0)
     wikidata = FakeWikidata({"Charles Dickens": "Q_D"})
     run(q, {"VALUES ?author": [item("Q_1")], "VALUES ?entry": [item("Q_2")], "VALUES ?subject": [item("Q_3")]},
         titles=["Charles Dickens"], wikidata=wikidata)
     assert {"author", "illustrissimi:author", "francis:author", "francis", "facet"} <= set(seen)
+
+
+class FoldSparql:
+    """series_of answers (`?volume` queries) from `links` {volume: [series]}; the series details (`VALUES ?item`)
+    from `details` {series: row}."""
+
+    def __init__(self, links, details):
+        self.links, self.details, self.queries = links, details, []
+
+    def select(self, query):
+        self.queries.append(query)
+        if "?volume" in query:
+            return [{"volume": v, "series": s} for v, ss in self.links.items() for s in ss if f"wd:{v}" in query]
+        return [r for qid, r in self.details.items() if f"wd:{qid}" in query]
+
+
+def vol(qid, label, n):
+    return item(qid, label, n, "Q7725634")
+
+
+FCFG = {"literature": {"series_classes": ["Q1667921", "Q277759"]}}
+
+
+def folding(q, volumes, links, details, source="author"):
+    sparql = FoldSparql(links, details)
+    return literature.fold(q, sparql, volumes, source, FCFG), sparql
+
+
+def test_a_volume_becomes_its_series(q):
+    n, sparql = folding(q, [vol("Q_V", "Volume", 30)], {"Q_V": ["Q_S"]}, {"Q_S": item("Q_S", "Saga", 12, "Q1667921")})
+    assert n == 1 and q.row("Q_V") is None
+    s = q.row("Q_S")
+    assert s.sources == ["author"]
+    assert s.data[0]["series"] is True and s.data[0]["count"] == 30
+    assert s.data[0]["volumes"] == {"Q_V": {"sitelinks": {"enwiki": "Volume"}, "count": 30}}
+    assert sum("?volume" in x for x in sparql.queries) == 1 and sum("VALUES ?item" in x for x in sparql.queries) == 1
+
+
+def test_a_later_volume_extends_the_series(q):
+    details = {"Q_S": item("Q_S", "Saga", 12, "Q1667921")}
+    folding(q, [vol("Q_V", "Volume", 30)], {"Q_V": ["Q_S"]}, details)
+    n, _ = folding(q, [vol("Q_V2", "Volume two", 50)], {"Q_V2": ["Q_S"]}, details, "facet")
+    s = q.row("Q_S")
+    assert n == 0 and s.sources == ["author", "facet"]
+    assert set(s.data[0]["volumes"]) == {"Q_V", "Q_V2"} and s.data[0]["count"] == 50
+
+
+def test_a_publisher_series_does_not_fold(q):
+    n, _ = folding(q, [vol("Q_V", "Volume", 30)], {}, {})
+    assert n == 1 and q.row("Q_V").sources == ["author"] and "volumes" not in q.row("Q_V").data[0]
+
+
+def test_a_volume_in_two_series_stays_itself_and_is_reported(q, capsys):
+    n, _ = folding(q, [vol("Q_V", "Volume", 30)], {"Q_V": ["Q_S", "Q_T"]},
+                   {"Q_S": item("Q_S"), "Q_T": item("Q_T")})
+    assert n == 1 and q.row("Q_V") is not None and q.row("Q_S") is None
+    assert "literature candidates: Q_V in 2 series, kept on its own" in capsys.readouterr().out
+
+
+def test_a_volume_in_no_series_is_silent(q, capsys):
+    folding(q, [vol("Q_V", "Volume", 30)], {}, {})
+    assert capsys.readouterr().out == ""
+
+
+def test_an_existing_volume_row_is_marked_folded(q):
+    q.add("Q_V", "literature", "author", {"en": "V"}, {"enwiki": "V"}, data={"count": 30})
+    n, _ = folding(q, [vol("Q_V", "Volume", 30)], {"Q_V": ["Q_S"]}, {"Q_S": item("Q_S", "Saga", 12, "Q1667921")},
+                   "facet")
+    v = q.row("Q_V")
+    assert v.data[0]["folded_into"] == "Q_S" and v.data[0]["count"] == 30 and v.sources == ["author"]
+    assert q.row("Q_S").data[0]["volumes"]["Q_V"]["count"] == 30 and n == 1
+
+
+@pytest.mark.parametrize("status", ["approved", "created", "declined"])
+def test_a_closed_series_absorbs_nothing(q, status):
+    details = {"Q_S": item("Q_S", "Saga", 12, "Q1667921")}
+    folding(q, [vol("Q_V", "Volume", 30)], {"Q_V": ["Q_S"]}, details)
+    q.set_status("Q_S", status)
+    n, _ = folding(q, [vol("Q_V2", "Volume two", 50)], {"Q_V2": ["Q_S"]}, details)
+    assert n == 0 and q.row("Q_V2") is None
+    assert set(q.row("Q_S").data[0]["volumes"]) == {"Q_V"} and q.row("Q_S").data[0]["count"] == 30
+
+
+def test_a_series_without_wikipedia_borrows_its_best_volume(q):
+    bare = {"item": "Q_S", "n": "12", "types": "Q1667921"}
+    folding(q, [vol("Q_A", "Minor volume", 10), vol("Q_B", "Best volume", 30)],
+            {"Q_A": ["Q_S"], "Q_B": ["Q_S"]}, {"Q_S": bare})
+    s = q.row("Q_S").data[0]
+    assert s["lead_sitelinks"] == {"enwiki": "Best volume"} and s["count"] == 30
+
+
+def test_a_series_with_its_own_wikipedia_borrows_nothing(q):
+    folding(q, [vol("Q_V", "Volume", 30)], {"Q_V": ["Q_S"]}, {"Q_S": item("Q_S", "Saga", 12, "Q1667921")})
+    assert "lead_sitelinks" not in q.row("Q_S").data[0]
+
+
+def test_series_of_asks_for_a_shared_author_and_a_series_class():
+    sparql = FoldSparql({"Q_V": ["Q_S"]}, {})
+    assert literature.series_of(sparql, ["Q_V"], ["Q1667921", "Q277759"]) == {"Q_V": ["Q_S"]}
+    query = sparql.queries[0]
+    assert "wdt:P179" in query and "wdt:P50" in query and "wd:Q1667921" in query and "wd:Q277759" in query
+
+
+def test_a_work_query_folds_its_volumes(q):
+    class Sparql(FoldSparql):
+        def select(self, query):
+            if "?volume" in query or "VALUES ?item" in query:
+                return super().select(query)
+            return [vol("Q_V", "Volume", 30)] if "VALUES ?author { wd:Q_SEED }" in query \
+                and "wd:Q7725634 ." in query else []
+
+    sparql = Sparql({"Q_V": ["Q_S"]}, {"Q_S": item("Q_S", "Saga", 12, "Q1667921")})
+    literature.candidates(q, sparql, FakeWikipedia([]), {**CFG_FULL, "_it_wikipedia": FakeItWikipedia([])},
+                          FakeWikidata({}))
+    assert q.row("Q_V") is None and q.row("Q_S").data[0]["volumes"]["Q_V"]["count"] == 30
+
+
+def test_rows_from_a_series_query_are_not_folded(q):
+    sparql = FoldSparql({"Q_S": ["Q_T"]}, {})
+    literature._add_rows(q, [item("Q_S", "Saga", 50, "Q1667921")], "author", sparql=sparql,
+                         series_classes=["Q1667921"], series=True)
+    assert q.row("Q_S").data[0]["series"] is True and sparql.queries == []

@@ -20,7 +20,9 @@ from sync.wikidata import WikidataClient
 from pipeline.sources import Wikipedia
 
 from . import common
-from .common import CHUNK, LIMIT  # noqa: F401
+from .common import CHUNK, LANGS, LIMIT  # noqa: F401
+
+CLOSED = ("approved", "created", "declined")  # a series with one of these statuses absorbs nothing
 
 WORK, EDITION = "Q7725634", "Q3331189"  # literary work; version, edition or translation
 DIRECT = {"illustrissimi", "francis"}  # sources that name a work directly: no sitelink floor
@@ -50,26 +52,104 @@ def _run(sparql, label: str, query: str) -> list[dict]:
     return common.run_query(sparql, "literature", label, query)
 
 
-def _add_rows(queue, rows: list[dict], source: str, series: bool = False) -> int:
+def _insert(queue, row: dict, source: str, series: bool = False) -> int:
+    labels, sitelinks, data = common.row_data(row)
+    if series:
+        data["series"] = True
+    return queue.add(row["item"], "literature", source, labels, sitelinks, False, data)
+
+
+def _add_rows(queue, rows: list[dict], source: str, series: bool = False, sparql=None,
+              series_classes: list[str] | None = None) -> int:
     """Add the rows under `source`; `series`: they came from a query bounded to a series class (P31 may hold only
     a subclass of it), kept as data[0]["series"]. Never written False, so a work query on the same item does not
-    clear it. Every source goes through here."""
+    clear it. Every source goes through here. Rows of a work query are folded into their series (`fold`) when
+    `sparql` is given; rows of a series query are series themselves and are added as they are."""
+    if series or sparql is None:
+        return sum(_insert(queue, row, source, series) for row in rows)
+    return fold(queue, sparql, rows, source, {"literature": {"series_classes": series_classes or []}})
+
+
+def series_of(sparql, qids: list[str], series_classes: list[str]) -> dict[str, list[str]]:
+    """Volume QID -> the literary series (P179) it is part of: an instance of (a subclass of) one of
+    `series_classes` that shares an author (P50) with the volume, which keeps publisher series out. One query
+    per CHUNK of volumes."""
+    found: dict[str, list[str]] = {}
+    for i in range(0, len(qids), CHUNK):
+        rows = _run(sparql, "series of volumes", (
+            "SELECT DISTINCT ?volume ?series WHERE {\n"
+            f"  VALUES ?volume {{ {common.values(qids[i:i + CHUNK])} }}\n"
+            f"  VALUES ?class {{ {common.values(series_classes)} }}\n"
+            "  ?volume wdt:P179 ?series .\n  ?volume wdt:P50 ?author .\n  ?series wdt:P50 ?author .\n"
+            f"  ?series wdt:P31/wdt:P279* ?class .\n}}\nLIMIT {LIMIT}"))
+        for row in rows:
+            if row["series"] not in found.setdefault(row["volume"], []):
+                found[row["volume"]].append(row["series"])
+    return found
+
+
+def _series_rows(sparql, qids: list[str]) -> dict[str, dict]:
+    """Labels, sitelinks and count of the series `qids`, as `common.query` rows keyed by QID."""
+    rows: dict[str, dict] = {}
+    for i in range(0, len(qids), CHUNK):
+        pattern = f"  VALUES ?item {{ {common.values(qids[i:i + CHUNK])} }}"
+        rows.update({r["item"]: r for r in _run(sparql, "series details", common.query(pattern))})
+    return rows
+
+
+def _has_wikipedia(sitelinks: dict) -> bool:
+    return any(f"{lang}wiki" in sitelinks for lang in LANGS)
+
+
+def _fold_into(queue, series_qid: str, series_row: dict, volumes: list[dict], source: str) -> int:
+    """Add or extend the series row with `volumes` (common.query rows); the volume rows already in the queue
+    are marked folded (their own sources untouched). A series already approved, created or declined gets
+    nothing."""
+    old = queue.row(series_qid)
+    if old and old.status in CLOSED:
+        return 0
+    known = dict(old.data.get(0, {}).get("volumes", {})) if old else {}
+    for volume in volumes:
+        _, sitelinks, data = common.row_data(volume)
+        known[volume["item"]] = {"sitelinks": sitelinks, "count": data["count"]}
+        if (own := queue.row(volume["item"])) is not None:
+            queue.add(volume["item"], "literature", own.sources[0], {}, {}, False, {"folded_into": series_qid})
+    labels, sitelinks, data = common.row_data(series_row)
+    data.update(series=True, volumes=known, count=max([data["count"], *(v["count"] for v in known.values())]))
+    if not _has_wikipedia(sitelinks):
+        data["lead_sitelinks"] = max(known.values(), key=lambda v: v["count"])["sitelinks"]
+    return queue.add(series_qid, "literature", source, labels, sitelinks, False, data)
+
+
+def fold(queue, sparql, rows: list[dict], source: str, cfg: dict) -> int:
+    """Add the work rows (`common.query` rows), each volume of a literary series replaced by its series: the
+    series row carries the source and a `volumes` entry for the volume (see the module docstring). A volume in
+    no series, or in several (reported), is added as itself. Returns the rows added to the queue."""
+    in_series = series_of(sparql, [r["item"] for r in rows], cfg["literature"]["series_classes"])
+    details = _series_rows(sparql, sorted({s[0] for s in in_series.values() if len(s) == 1}))
+    grouped: dict[str, list[dict]] = {}
     added = 0
     for row in rows:
-        labels, sitelinks, data = common.row_data(row)
-        if series:
-            data["series"] = True
-        added += queue.add(row["item"], "literature", source, labels, sitelinks, False, data)
+        found = in_series.get(row["item"], [])
+        if len(found) > 1:
+            print(f"literature candidates: {row['item']} in {len(found)} series, kept on its own")
+        if len(found) == 1 and found[0] in details:
+            grouped.setdefault(found[0], []).append(row)
+        else:
+            added += _insert(queue, row, source)
+    for series_qid, volumes in grouped.items():
+        added += _fold_into(queue, series_qid, details[series_qid], volumes, source)
     return added
 
 
 def _bounded_rows(queue, sparql, pattern: str, label: str, source: str, classes: list[str]) -> tuple[int, int]:
     """Run `pattern` bounded to each class and add the rows: (rows added to the queue, rows found)."""
     added = found = 0
+    series_classes = [c for c in classes if c != WORK]
     for cls in classes:
         rows = _run(sparql, f"{label} ({cls})", common.bounded(pattern, cls))
         found += len(rows)
-        added += _add_rows(queue, rows, source, series=cls != WORK)
+        added += _add_rows(queue, rows, source, series=cls != WORK, sparql=sparql, series_classes=series_classes)
     return added, found
 
 
