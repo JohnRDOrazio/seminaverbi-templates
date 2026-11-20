@@ -1,0 +1,15 @@
+{
+  "vote_threshold": 3,
+  "max_new_per_run": 200,
+  "sitelink_floor": 15,
+  "quick_drop": 0.40,
+  "dossier_languages": 3,
+  "film": {
+    "seeds": {
+      "vatican_page": "Vatican list of films",
+      "awards": ["Q2503453", "Q7390339"]
+    },
+    "biblical_classes": [],
+    "subjects": []
+  }
+}
