@@ -6,14 +6,16 @@ Sources, tagged on each queue row: ``vatican`` (the films linked from the en.wik
 Christianity, or in a Christian, biblical or religious genre) and ``calibration`` (the films and series
 SeminaVerbi already has articles on).
 
-A row's ``sitelinks`` holds the Wikipedia article URL per language, plus ``count`` (the item's total
-number of sitelinks) and ``instance_of`` (its P31 QIDs), which triage reads.
+A row's ``sitelinks`` maps site ids (enwiki, itwiki, ...) to article titles; the item's total number of
+sitelinks (``count``) and its P31 QIDs (``instance_of``) are kept in the row's stage-0 data, which
+triage reads.
 
 Arts & Faith dropped (no machine-readable list).
 """
 from __future__ import annotations
 
 from pathlib import Path
+from urllib.parse import unquote
 
 from sync import categories
 from sync.wikidata import WikidataClient
@@ -57,12 +59,15 @@ def _values(qids) -> str:
     return " ".join(f"wd:{q}" for q in qids)
 
 
-def _row_data(row: dict) -> tuple[dict, dict]:
+def _title(url: str) -> str:
+    return unquote(url.rsplit("/wiki/", 1)[-1]).replace("_", " ")
+
+
+def _row_data(row: dict) -> tuple[dict, dict, dict]:
     labels = {l: row[f"l_{l}"] for l in LANGS if row.get(f"l_{l}")}
-    sitelinks = {l: row[f"s_{l}"] for l in LANGS if row.get(f"s_{l}")}
-    sitelinks["count"] = int(row.get("n") or len(sitelinks))
-    sitelinks["instance_of"] = row.get("types", "").split()
-    return labels, sitelinks
+    sitelinks = {f"{l}wiki": _title(row[f"s_{l}"]) for l in LANGS if row.get(f"s_{l}")}
+    data = {"count": int(row.get("n") or len(sitelinks)), "instance_of": row.get("types", "").split()}
+    return labels, sitelinks, data
 
 
 def _facet_patterns(cfg: dict) -> list[tuple[str, str]]:
@@ -82,17 +87,20 @@ def _facet_patterns(cfg: dict) -> list[tuple[str, str]]:
 
 def _run(sparql, label: str, query: str) -> list[dict]:
     try:
-        return sparql.select(query)
+        rows = sparql.select(query)
     except Exception as exc:  # logged, then re-raised: a failed source must stop the run, not shrink it
         print(f"film candidates: {label} failed: {exc}")
         raise
+    if len(rows) >= LIMIT:
+        print(f"film candidates: {label}: {len(rows)} rows is the query limit, results may be truncated")
+    return rows
 
 
 def _take(queue, rows: list[dict], source: str, calibration: bool = False) -> int:
     added = 0
     for row in rows:
-        labels, sitelinks = _row_data(row)
-        added += queue.add(row["item"], "film", source, labels, sitelinks, calibration)
+        labels, sitelinks, data = _row_data(row)
+        added += queue.add(row["item"], "film", source, labels, sitelinks, calibration, data)
     return added
 
 
@@ -181,12 +189,17 @@ def _wikidata_qid(wiki, wikidata, lang: str, title: str) -> str | None:
 
 
 def triage(row, cfg: dict) -> tuple[str, str]:
-    """Stage 2: ('drop', reason) for an episode, trailer or clip, or a facet-only row under the sitelink floor."""
-    for qid in row.sitelinks.get("instance_of", []):
+    """Stage 2: ('drop', reason) for an episode, trailer or clip, or a facet-only row under the sitelink floor.
+
+    A calibration row always passes: it is an article SeminaVerbi already has."""
+    if row.calibration:
+        return "pass", "calibration"
+    data = row.data.get(0, {})
+    for qid in data.get("instance_of", []):
         if qid in NON_WORKS:
             return "drop", f"a {NON_WORKS[qid]}, not a work of its own"
     if set(row.sources) == {"facet"}:
-        count = row.sitelinks.get("count", 0)
+        count = data.get("count", 0)
         if count < cfg["sitelink_floor"]:
             return "drop", f"{count} sitelinks, under the floor of {cfg['sitelink_floor']}"
     return "pass", ""

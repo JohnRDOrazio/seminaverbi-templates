@@ -52,3 +52,12 @@ def test_status_page_and_domain_filter_and_data(q):
 def test_config_has_the_pipeline_defaults():
     c = load_config()
     assert c["vote_threshold"] == 3 and c["film"]["seeds"]["awards"] == ["Q2503453", "Q23011208"]
+
+
+def test_stage_zero_data_round_trips_and_merges(q):
+    q.add("Q1", "film", "a", {}, {}, data={"count": 3})
+    assert q.add("Q1", "film", "b", {}, {}, data={"instance_of": ["Q11424"]}) is False
+    row = q.pending(1)[0]
+    assert row.data[0] == {"count": 3, "instance_of": ["Q11424"]}
+    q.add("Q2", "film", "a", {}, {})
+    assert 0 not in q.pending(1)[1].data

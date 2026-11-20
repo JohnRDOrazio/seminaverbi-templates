@@ -44,7 +44,16 @@ class Queue:
         self.db.executescript(SCHEMA)
         self.db.commit()
 
-    def add(self, qid, domain, source, labels, sitelinks, calibration=False) -> bool:
+    def add(self, qid, domain, source, labels, sitelinks, calibration=False, data: dict | None = None) -> bool:
+        """Add a candidate or a source to an existing one; `data` is kept as the stage-0 data (merged on a repeat)."""
+        added = self._add(qid, domain, source, labels, sitelinks, calibration)
+        if data is not None:
+            old = self.db.execute("SELECT data_json FROM outcomes WHERE qid=? AND stage=0", (qid,)).fetchone()
+            merged = {**(json.loads(old["data_json"]) if old else {}), **data}
+            self.set_outcome(qid, 0, "pass", merged)
+        return added
+
+    def _add(self, qid, domain, source, labels, sitelinks, calibration) -> bool:
         row = self.db.execute("SELECT sources FROM candidates WHERE qid=?", (qid,)).fetchone()
         if row:
             sources = json.loads(row["sources"])

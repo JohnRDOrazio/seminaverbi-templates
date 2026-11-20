@@ -76,7 +76,8 @@ def test_vatican_links_resolve_to_qids_and_unresolved_are_reported(q, capsys):
     rows = q.pending(1)
     assert [(r.qid, r.sources) for r in rows] == [("Q1", ["vatican"])]
     assert rows[0].labels == {"en": "Ben-Hur"}
-    assert rows[0].sitelinks["count"] == 2 and rows[0].sitelinks["instance_of"] == ["Q11424"]
+    assert rows[0].sitelinks == {"enwiki": "Ben-Hur"}
+    assert rows[0].data[0] == {"count": 2, "instance_of": ["Q11424"]}
     out = capsys.readouterr().out
     assert "Nosuch" in out and "Ben-Hur" not in out
     vatican_query = next(s for s in sparql.queries if "VALUES ?item" in s)
@@ -111,8 +112,9 @@ def test_a_failing_query_is_logged_and_propagates(q, capsys):
     assert "award" in capsys.readouterr().out
 
 
-def row(sources, n, instance_of=("Q11424",), qid="Q1"):
-    return Row(qid, "film", sources, {}, {"count": n, "instance_of": list(instance_of)}, False)
+def row(sources, n, instance_of=("Q11424",), qid="Q1", calibration=False):
+    return Row(qid, "film", sources, {}, {}, calibration,
+               data={0: {"count": n, "instance_of": list(instance_of)}})
 
 
 def test_triage_floor_applies_to_facet_rows_only():
@@ -127,6 +129,26 @@ def test_triage_drops_episodes():
     assert outcome == "drop" and "episode" in reason
     assert triage(row(["facet"], 40, instance_of=["Q128696755"]), CFG)[0] == "drop"
     assert triage(row(["facet"], 40, instance_of=["Q622550"]), CFG)[0] == "drop"
+
+
+def test_site_ids_and_decoded_titles(q):
+    r = item("Q1", "X")
+    r["s_it"] = "https://it.wikipedia.org/wiki/Mission_(film_1986)"
+    r["s_en"] = "https://en.wikipedia.org/wiki/Am%C3%A9lie_(film)"
+    sparql = FakeSparql({"wdt:P921": [r]})
+    candidates(q, sparql, FakeWikipedia([]), CFG, wikidata=FakeWikidata({}))
+    assert q.pending(1)[0].sitelinks == {"enwiki": "Amélie (film)", "itwiki": "Mission (film 1986)"}
+
+
+def test_a_full_result_warns_of_truncation(q, capsys, monkeypatch):
+    monkeypatch.setattr(film, "LIMIT", 1)
+    candidates(q, FakeSparql({"wd:Q2503453": [item("Q1")]}), FakeWikipedia([]), CFG, wikidata=FakeWikidata({}))
+    out = capsys.readouterr().out
+    assert "award Q2503453" in out and "truncated" in out
+
+
+def test_calibration_rows_always_pass_triage():
+    assert triage(row(["calibration"], 1, instance_of=["Q21191270"], calibration=True), CFG) == ("pass", "calibration")
 
 
 def test_calibration_rows_are_flagged(q):
