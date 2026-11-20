@@ -13,6 +13,7 @@ from sync.wikidata import _OwnHeaders
 
 SPARQL_ENDPOINT = "https://query.wikidata.org/sparql"
 SPARQL_RETRIES = 3
+RETRY_STATUSES = (429, 502, 503, 504)  # rate limit, and the gateway errors of a busy endpoint
 _ENTITY = "http://www.wikidata.org/entity/"
 _TAG = re.compile(r"<[^>]+>")
 _HEADING = re.compile(r"^(=+)[^=].*\1\s*$")
@@ -37,7 +38,7 @@ class Sparql:
                 time.sleep(_retry_wait(None, retries))
                 retries += 1
                 continue
-            if r.status_code not in (429, 503):
+            if r.status_code not in RETRY_STATUSES:
                 break
             if retries >= SPARQL_RETRIES:
                 raise SyncError(f"sparql: HTTP {r.status_code} after {SPARQL_RETRIES} retries")

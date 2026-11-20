@@ -63,6 +63,13 @@ def test_select_retries_503_and_gives_up_after_three():
     assert len(s.calls) == 4
 
 
+@pytest.mark.parametrize("status", [502, 504])
+def test_select_retries_a_gateway_error_then_succeeds(status):
+    s = FakeSession(Resp(status=status), bindings({"n": {"value": "1"}}))
+    assert Sparql(s).select("q") == [{"n": "1"}]
+    assert len(s.calls) == 2
+
+
 def test_select_retries_a_read_timeout_then_succeeds():
     import requests
     s = FakeSession(requests.exceptions.ReadTimeout("slow"), bindings({"n": {"value": "1"}}))
