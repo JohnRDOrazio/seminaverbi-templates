@@ -130,7 +130,8 @@ clears one row's stage for a deliberate re-run.
    (c) themes: `jev themes`, asked of each part of the dossier (parts of at most 20,000
    characters, at most 5), each theme keeping its best probability, so one strong episode is
    enough; at most 8 themes at 0.50 or above, best first, each with the passage that supports it,
-   from the part that scored it. A row with no kept theme is dropped; the connection type is
+   from the part that scored it. A row with no kept theme is dropped, unless Jev finds a *direct*
+   influence at 0.80 or above (Gospel Road had none at 0.50 in its short pages); the connection type is
    shown to the voters and drops nothing (the first calibration found Jev answering *no real
    connection* for 7 of 18 existing articles, series whose ties are implicit or partial). The decisions live in the
    queue and on the proposal page (not in `config/`: `config/adjudications.json` is the tree's

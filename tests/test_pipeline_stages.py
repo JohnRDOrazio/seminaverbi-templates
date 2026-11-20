@@ -296,3 +296,12 @@ def test_a_note_longer_than_a_part_is_split_at_paragraphs(q):
     adjudicate(r, judge, DATA)
     assert len(judge.theme_texts) == 3
     assert all(f"para{i}" in "".join(judge.theme_texts) for i in range(5))
+
+
+@pytest.mark.parametrize("choice,p,outcome", [("direct", 0.8, "pass"), ("direct", 0.79, "drop"),
+                                              ("seeds", 0.95, "drop")])
+def test_a_confident_direct_connection_passes_without_a_theme(q, choice, p, outcome):
+    r = make_row(q, notes=[note()], languages={"en": 1})
+    judge = FakeJudge(choice, {T1: {"p": 0.3, "status": "no"}})
+    judge.connection = lambda row, text: {"choice": choice, "probabilities": {choice: p}, "confidence": 0.9}
+    assert adjudicate(r, judge, DATA)[0] == outcome

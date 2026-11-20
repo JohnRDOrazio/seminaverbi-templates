@@ -106,6 +106,7 @@ def quick(row, judge, wikipedia_for) -> tuple[str, dict]:
 
 THEME_KEEP = 0.50  # a theme is proposed at this probability or above
 MAX_THEMES = 8  # the most themes one proposal lists, best first
+DIRECT_PASS = 0.80  # a direct Christian or biblical influence this probable is proposed even with no kept theme
 EXCERPT_WORDS = 25
 MAX_DOSSIER_CHARS = 20_000  # the most dossier text one Jev question is sent
 MAX_PARTS = 5  # a longer dossier is read in parts of MAX_DOSSIER_CHARS for the themes, at most this many
@@ -180,14 +181,21 @@ def _first_wiki(languages: dict[str, int]) -> str:
     return max(LANGS, key=lambda lang: (languages.get(lang, 0), -LANGS.index(lang))) if languages else "en"
 
 
+def direct(connection: dict) -> bool:
+    """Jev finds a direct Christian or biblical influence at DIRECT_PASS or above."""
+    return (connection.get("choice") == "direct"
+            and connection.get("probabilities", {}).get("direct", 0) >= DIRECT_PASS)
+
+
 def adjudicate(row, judge, data) -> tuple[str, dict]:
     """Stage 5: connection type, field, kept themes with evidence, outline and first wiki for the proposal.
 
     The themes are asked of each part of the dossier (see _parts) and each keeps its best probability, so a
     seed of the Word in one storyline or episode counts; connection and field are asked of the first part.
     A theme is kept when its status is applied or author and its probability is at least THEME_KEEP; the best
-    MAX_THEMES are listed. A row with no kept theme is dropped (calibration rows pass with the result kept);
-    the connection type is shown on the proposal and never drops a row."""
+    MAX_THEMES are listed. A row with no kept theme is dropped unless Jev finds a direct Christian or biblical
+    influence at DIRECT_PASS or above (calibration rows pass with the result kept); the connection type is
+    shown on the proposal and never drops a row."""
     dossier = row.data.get(4, {"notes": [], "languages": {}})
     parts = _parts(dossier["notes"])
     text = _dossier_text(parts[0])
@@ -215,6 +223,6 @@ def adjudicate(row, judge, data) -> tuple[str, dict]:
     result = {"connection": connection, "field": field, "themes": themes, "outline": outline,
               "first_wiki": _first_wiki(dossier["languages"]),
               "theme_scores": {k: v["p"] for k, (v, _) in best.items()}}
-    if not themes and not row.calibration:
+    if not themes and not direct(connection) and not row.calibration:
         return "drop", result
     return "pass", result

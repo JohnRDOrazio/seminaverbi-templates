@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 from pipeline import load_config
-from pipeline.stages import THEME_KEEP, _local_item
+from pipeline.stages import THEME_KEEP, _local_item, direct
 from sync import categories
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -59,6 +59,8 @@ def _verdict(row, result: dict, quick_drop: float) -> str:
     if quick is not None and quick < quick_drop:
         return f"would be dropped: quick check {quick:.2f} < {quick_drop:.2f}"
     if not result.get("themes"):
+        if direct(result.get("connection", {})):
+            return "would be proposed (direct connection)"
         return f"would be dropped: no theme at {THEME_KEEP:.2f}"
     return "would be proposed"
 

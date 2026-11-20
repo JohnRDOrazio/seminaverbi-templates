@@ -46,7 +46,7 @@ Stages (each records its outcome per candidate, so a run resumes where it stoppe
 4. `dossier`: notes from the Wikipedia lead and sections (for a series, its season pages with their episode
    summaries) and Wikiquote, in up to three languages.
 5. `adjudicate`: Jev decides connection, field and themes (themes read over the whole dossier, in parts), picks
-   evidence and builds the outline; a candidate with no theme at 0.50 is dropped, the connection drops nothing.
+   evidence and builds the outline; a candidate with no theme at 0.50 is dropped unless Jev is confident (0.80) of a direct Christian influence.
 6. `publish`: writes the `{{SV proposal}}` pages and the ranking page.
 
 Commands (options `--db PATH`, default `data/pipeline.sqlite`, and `--domain`, default `film`, go before or after the command):

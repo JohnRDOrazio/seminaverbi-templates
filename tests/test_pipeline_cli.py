@@ -441,3 +441,12 @@ def test_the_report_says_whether_a_new_candidate_would_be_proposed(quick, themes
     q = Queue(":memory:")
     calibration_row(q, {"en": "F"}, {}, themes=themes, quick=quick)
     assert f"| verdict | {verdict} | |" in calibration.report(q, {"en": FakeWiki({})}, tree=TREE)
+
+
+def test_the_verdict_of_a_confident_direct_connection_without_a_theme(monkeypatch):
+    monkeypatch.setattr(calibration, "load_config", lambda: {"quick_drop": 0.25})
+    q = Queue(":memory:")
+    calibration_row(q, {"en": "F"}, {}, themes=())
+    q.set_outcome("Q1", 5, "pass", {**q.row("Q1").data[5],
+                                    "connection": {"choice": "direct", "probabilities": {"direct": 0.99}}})
+    assert "| verdict | would be proposed (direct connection) | |" in calibration.report(q, {"en": FakeWiki({})}, tree=TREE)
