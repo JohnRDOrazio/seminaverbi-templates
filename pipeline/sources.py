@@ -60,6 +60,18 @@ class Wikipedia:
         pages = data.get("query", {}).get("pages", [])
         return (pages[0].get("extract") or "").strip() if pages else ""
 
+    def links(self, title: str) -> list[str]:
+        """Titles of the articles (main namespace) the page links to, in page order; redirects are followed."""
+        params = dict(action="query", prop="links", plnamespace=0, pllimit="max", redirects=1, titles=title)
+        out: list[str] = []
+        while True:
+            data = self._wiki._call("GET", **params)
+            for page in data.get("query", {}).get("pages", []):
+                out.extend(link["title"] for link in page.get("links", []))
+            if "continue" not in data:
+                return list(dict.fromkeys(out))
+            params.update(data["continue"])
+
     def sections(self, title: str) -> list[tuple[str, str]]:
         """(heading, plain text) for each numbered section; subsection text is left to its own entry."""
         listing = self._wiki._call("GET", action="parse", page=title, prop="sections", redirects=1)

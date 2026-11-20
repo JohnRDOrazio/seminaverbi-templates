@@ -2,14 +2,29 @@
   "vote_threshold": 3,
   "max_new_per_run": 200,
   "sitelink_floor": 15,
-  "quick_drop": 0.40,
+  "quick_drop": 0.4,
   "dossier_languages": 3,
   "film": {
     "seeds": {
-      "vatican_page": "Vatican list of films",
-      "awards": ["Q2503453", "Q7390339"]
+      "vatican_page": "Vatican's list of films",
+      "awards": [
+        "Q2503453",
+        "Q23011208"
+      ]
     },
-    "biblical_classes": [],
-    "subjects": []
+    "biblical_classes": [
+      "Q12405827"
+    ],
+    "subjects": [
+      "Q302",
+      "Q1845",
+      "Q5043"
+    ],
+    "book_class": "Q29154430",
+    "genres": [
+      "Q115122793",
+      "Q7717463",
+      "Q9259727"
+    ]
   }
 }

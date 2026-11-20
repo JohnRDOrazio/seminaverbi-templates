@@ -98,3 +98,14 @@ def test_user_agent_has_no_email():
     for _, kw in s.calls:
         assert "User-Agent" in kw["headers"] and "@" not in kw["headers"]["User-Agent"]
     assert "@" not in str(s.headers)
+
+
+def test_links_follow_continuation_and_redirects():
+    first = Resp({"continue": {"plcontinue": "x|1", "continue": "||"},
+                  "query": {"pages": [{"title": "T", "links": [{"ns": 0, "title": "A"}, {"ns": 0, "title": "B"}]}]}})
+    second = Resp({"query": {"pages": [{"title": "T", "links": [{"ns": 0, "title": "C"}]}]}})
+    session = FakeSession(first, second)
+    assert Wikipedia("en", session=session).links("T") == ["A", "B", "C"]
+    params = session.calls[0][1]["params"]
+    assert params["prop"] == "links" and params["plnamespace"] == 0 and params["redirects"] == 1
+    assert session.calls[1][1]["params"]["plcontinue"] == "x|1"

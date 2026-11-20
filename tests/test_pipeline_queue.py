@@ -51,4 +51,4 @@ def test_status_page_and_domain_filter_and_data(q):
 
 def test_config_has_the_pipeline_defaults():
     c = load_config()
-    assert c["vote_threshold"] == 3 and c["film"]["seeds"]["awards"] == ["Q2503453", "Q7390339"]
+    assert c["vote_threshold"] == 3 and c["film"]["seeds"]["awards"] == ["Q2503453", "Q23011208"]
