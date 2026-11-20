@@ -154,3 +154,23 @@ def test_season_accepts_underscores_in_the_episode_template_name(name):
     wikitext = f"== Episodes ==\n{{{{{name}\n |Title=Pilot\n |ShortSummary=Walter asks forgiveness.\n}}}}\n"
     out = Wikipedia("en", FakeSession(Resp({"parse": {"wikitext": wikitext}}))).season("S")
     assert out == [("Episode: Pilot", "Walter asks forgiveness.")]
+
+
+def test_section_links_reads_one_section():
+    sections = Resp({"parse": {"sections": [{"index": "1", "line": "Storia"},
+                                            {"index": "2", "line": "<b>I personaggi di Illustrissimi</b>"},
+                                            {"index": "3", "line": "I personaggi di Illustrissimi"}]}})
+    links = Resp({"parse": {"links": [{"ns": 0, "title": "Charles Dickens"}, {"ns": 0, "title": "Pinocchio (romanzo)"},
+                                      {"ns": 14, "title": "Categoria:X"}, {"ns": 0, "title": "Charles Dickens"}]}})
+    resolved = Resp({"query": {"redirects": [{"from": "Pinocchio (romanzo)", "to": "Le avventure di Pinocchio"}]}})
+    session = FakeSession(sections, links, resolved)
+    out = Wikipedia("it", session=session).section_links("Illustrissimi", "I personaggi di Illustrissimi")
+    assert out == ["Charles Dickens", "Le avventure di Pinocchio"]
+    assert session.calls[1][1]["params"]["section"] == "2" and session.calls[1][1]["params"]["prop"] == "links"
+    assert session.calls[2][1]["params"]["redirects"] == 1
+
+
+def test_section_links_without_the_section_is_empty():
+    session = FakeSession(Resp({"parse": {"sections": [{"index": "1", "line": "Storia"}]}}))
+    assert Wikipedia("it", session=session).section_links("Illustrissimi", "Nope") == []
+    assert len(session.calls) == 1

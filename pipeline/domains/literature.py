@@ -17,6 +17,8 @@ from pathlib import Path
 from sync import categories
 from sync.wikidata import WikidataClient
 
+from pipeline.sources import Wikipedia
+
 from . import common
 from .common import CHUNK, LIMIT  # noqa: F401
 
@@ -44,8 +46,97 @@ QUESTIONS = {
 }
 
 
+def _run(sparql, label: str, query: str) -> list[dict]:
+    return common.run_query(sparql, "literature", label, query)
+
+
+def _add_rows(queue, rows: list[dict], source: str, series: bool = False) -> int:
+    """Add the rows under `source`; `series`: they came from a query bounded to a series class (P31 may hold only
+    a subclass of it), kept as data[0]["series"]. Never written False, so a work query on the same item does not
+    clear it. Every source goes through here."""
+    added = 0
+    for row in rows:
+        labels, sitelinks, data = common.row_data(row)
+        if series:
+            data["series"] = True
+        added += queue.add(row["item"], "literature", source, labels, sitelinks, False, data)
+    return added
+
+
+def _bounded_rows(queue, sparql, pattern: str, label: str, source: str, classes: list[str]) -> tuple[int, int]:
+    """Run `pattern` bounded to each class and add the rows: (rows added to the queue, rows found)."""
+    added = found = 0
+    for cls in classes:
+        rows = _run(sparql, f"{label} ({cls})", common.bounded(pattern, cls))
+        found += len(rows)
+        added += _add_rows(queue, rows, source, series=cls != WORK)
+    return added, found
+
+
+def _works_of(queue, sparql, qids: list[str], source: str, label: str, classes: list[str]) -> int:
+    """Works (P50) of the authors `qids`, one chunk of authors at a time."""
+    added = 0
+    for i in range(0, len(qids), CHUNK):
+        pattern = f"  VALUES ?author {{ {common.values(qids[i:i + CHUNK])} }}\n  ?item wdt:P50 ?author ."
+        added += _bounded_rows(queue, sparql, pattern, label, source, classes)[0]
+    return added
+
+
+def _direct_pattern(qids: list[str]) -> str:
+    """The entries themselves, or the work of each one that is a fictional character (P1441, present in work)."""
+    return (f"  VALUES ?entry {{ {common.values(qids)} }}\n"
+            "  { ?entry wdt:P1441 ?item } UNION { BIND(?entry AS ?item) }")
+
+
+def _direct(queue, sparql, qids: list[str], source: str, label: str, classes: list[str]) -> int:
+    added = 0
+    for i in range(0, len(qids), CHUNK):
+        added += _bounded_rows(queue, sparql, _direct_pattern(qids[i:i + CHUNK]), label, source, classes)[0]
+    return added
+
+
+def _illustrissimi(queue, sparql, cfg: dict, wikidata, classes: list[str]) -> int:
+    """The works of the people and characters the Illustrissimi letters are addressed to. One entry at a time,
+    so that an addressee yielding nothing can be reported; the direct query runs only when the addressee has no
+    work by P50, to spare the endpoint (40 addressees)."""
+    lit = cfg["literature"]
+    wikipedia = cfg.get("_it_wikipedia") or Wikipedia("it")
+    titles = wikipedia.section_links(lit["illustrissimi_page"], lit["illustrissimi_section"])
+    resolved = wikidata.by_sitelink("itwiki", titles)
+    added = 0
+    for title in titles:
+        qid = resolved.get(title)
+        if not qid:
+            print(f"illustrissimi: no Wikidata item for {title!r}")
+            continue
+        pattern = f"  VALUES ?author {{ wd:{qid} }}\n  ?item wdt:P50 ?author ."
+        n, found = _bounded_rows(queue, sparql, pattern, f"illustrissimi {title}", "illustrissimi:author", classes)
+        if not found:
+            n, found = _bounded_rows(queue, sparql, _direct_pattern([qid]), f"illustrissimi {title}",
+                                     "illustrissimi", classes)
+        if not found:
+            print(f"illustrissimi: no literary work for {title!r}")
+        added += n
+    return added
+
+
 def candidates(queue, sparql, wikipedia, cfg: dict, wikidata=None) -> int:
-    raise NotImplementedError("Task 4")
+    """Stage 0: add the seed-author, Illustrissimi, Francis-letter and facet candidates; returns the rows added.
+    `wikipedia` (en) is unused here: the Illustrissimi page is read from it.wikipedia (cfg["_it_wikipedia"] in
+    tests)."""
+    wikidata = wikidata or WikidataClient()
+    lit = cfg["literature"]
+    classes = [WORK, *lit["series_classes"]]
+    added = _works_of(queue, sparql, [a["qid"] for a in lit["authors"]], "author", "authors", classes)
+    added += _illustrissimi(queue, sparql, cfg, wikidata, classes)
+    francis = lit["francis_2024"]
+    added += _works_of(queue, sparql, [e["qid"] for e in francis if e["kind"] == "author"], "francis:author",
+                       "francis authors", classes)
+    added += _direct(queue, sparql, [e["qid"] for e in francis if e["kind"] == "work"], "francis",
+                     "francis works", classes)
+    for description, pattern in common.facet_patterns(lit):
+        added += _bounded_rows(queue, sparql, pattern, f"facet {description}", "facet", classes)[0]
+    return added
 
 
 def dossier(row, cfg: dict, wiki_for, wikidata) -> dict:

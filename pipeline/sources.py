@@ -14,6 +14,7 @@ from sync.wikidata import _OwnHeaders
 SPARQL_ENDPOINT = "https://query.wikidata.org/sparql"
 SPARQL_RETRIES = 3
 _ENTITY = "http://www.wikidata.org/entity/"
+_TAG = re.compile(r"<[^>]+>")
 _HEADING = re.compile(r"^(=+)[^=].*\1\s*$")
 
 
@@ -71,6 +72,24 @@ class Wikipedia:
             if "continue" not in data:
                 return list(dict.fromkeys(out))
             params.update(data["continue"])
+
+    def section_links(self, title: str, heading: str) -> list[str]:
+        """Titles of the articles (main namespace) linked from the first section headed `heading`, in page
+        order, redirects followed; [] when the page has no such section."""
+        listing = self._wiki._call("GET", action="parse", page=title, prop="sections", redirects=1)
+        index = next((sec["index"] for sec in listing.get("parse", {}).get("sections", [])
+                      if _TAG.sub("", sec.get("line", "")).strip() == heading and str(sec.get("index", "")).isdigit()),
+                     None)
+        if index is None:
+            return []
+        data = self._wiki._call("GET", action="parse", page=title, prop="links", section=index, redirects=1)
+        found = list(dict.fromkeys(link["title"] for link in data.get("parse", {}).get("links", [])
+                                   if link.get("ns") == 0))
+        target: dict[str, str] = {}
+        for i in range(0, len(found), 50):  # the API takes 50 titles at a time
+            resolved = self._wiki._call("GET", action="query", redirects=1, titles="|".join(found[i:i + 50]))
+            target.update({r["from"]: r["to"] for r in resolved.get("query", {}).get("redirects", [])})
+        return list(dict.fromkeys(target.get(t, t) for t in found))
 
     def sections(self, title: str) -> list[tuple[str, str]]:
         """(heading, plain text) for each numbered section; subsection text is left to its own entry."""

@@ -91,7 +91,20 @@
         "name": "Fyodor Dostoevsky"
       }
     ],
-    "francis_2024": [],
+    "francis_2024": [
+      {"qid": "Q909", "name": "Jorge Luis Borges", "kind": "author"},
+      {"qid": "Q7199", "name": "Marcel Proust", "kind": "author"},
+      {"qid": "Q464928", "name": "In Search of Lost Time", "kind": "work"},
+      {"qid": "Q41408", "name": "Federico García Lorca", "kind": "author"},
+      {"qid": "Q320713", "name": "Cantar de mio Cid", "kind": "work"},
+      {"qid": "Q37767", "name": "T. S. Eliot", "kind": "author"},
+      {"qid": "Q153905", "name": "Paul Celan", "kind": "author"},
+      {"qid": "Q83158", "name": "Jean Cocteau", "kind": "author"},
+      {"qid": "Q9204", "name": "C. S. Lewis", "kind": "author"},
+      {"qid": "Q180671", "name": "Aratus", "kind": "author"},
+      {"qid": "Q42194191", "name": "Phaenomena", "kind": "work"},
+      {"qid": "Q319406", "name": "Epimenides of Crete", "kind": "author"}
+    ],
     "subjects": [
       "Q302",
       "Q1845",
