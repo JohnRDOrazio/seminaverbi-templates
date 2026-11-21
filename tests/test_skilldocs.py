@@ -21,6 +21,17 @@ def template_files():
             for p in (ROOT / "templates").glob("*.wikitext")}
 
 
+def reads_placeholder(body, param):
+    """True when the wikitext reads {{{param}}} or {{{param|default}}}, not a longer name such as {{{10}}} for 1."""
+    return re.search(r"\{\{\{\s*" + re.escape(param) + r"\s*(\||\}\}\})", body) is not None
+
+
+def test_reads_placeholder_needs_the_whole_name():
+    assert reads_placeholder("{{{1}}}", "1") and reads_placeholder("{{{1|x}}}", "1")
+    assert reads_placeholder("{{{ 1 }}}", "1")
+    assert not reads_placeholder("{{{10}}}", "1") and not reads_placeholder("{{{titles}}}", "title")
+
+
 def test_every_template_documented():
     documented = set(load("config/templates.json"))
     assert documented == set(template_files()) - {"SV managed"}
@@ -31,7 +42,15 @@ def test_documented_params_are_read():
     for name, text in template_files().items():
         if name not in docs:
             continue
-        module = re.search(r"#invoke:SV/(\w+)\|", text).group(1)
+        invoke = re.search(r"#invoke:SV/(\w+)\|", text)
+        if invoke is None:
+            # a plain wikitext template: each documented parameter is a {{{param}}} placeholder in the
+            # transcluded part (its <noinclude> documentation does not count)
+            body = re.sub(r"<noinclude>.*?</noinclude>", "", text, flags=re.S)
+            for param in docs[name]["params"]:
+                assert reads_placeholder(body, param), f"{name}: {param} is documented but the template never reads it"
+            continue
+        module = invoke.group(1)
         source = (ROOT / "modules" / "SV" / f"{module}.lua").read_text(encoding="utf-8")
         for param in docs[name]["params"]:
             placeholder = re.match(r"^(\w*?)(N|LANG)(_\w+)?$", param)

@@ -130,5 +130,11 @@
     "params": {
       "group": "a reference group name"
     }
+  },
+  "Youtube": {
+    "summary": "Embeds a YouTube video, centred (EmbedVideo). Call it as {{youtube|ID}} on every wiki.",
+    "params": {
+      "1": "(required) the YouTube video ID"
+    }
   }
 }
