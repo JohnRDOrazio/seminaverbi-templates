@@ -36,7 +36,8 @@ templates or `Module:SV/…` on a wiki: they are overwritten by the sync. Change
      `categories.md`; the SV templates' own maintenance and tracking categories (`{{SV WIP}}`,
      `{{SV cathopedia}}`, the infobox's tracking categories…) are fine;
    - every Gospel theme on the item is argued in the text (see Categories);
-   - every Bible verse named or alluded to is quoted with `{{SV Bible quote|ref=…}}`;
+   - every Bible verse named or alluded to is quoted with `{{SV Bible quote|ref=…}}`, with book
+     abbreviations BibleGet resolves (see Bible references);
    - red links only for articles that are planned; say which ones you left.
 4. If a tree category the page needs does not exist yet on that wiki, create it with the helper (below),
    never by hand.
@@ -140,6 +141,32 @@ ask the author instead of guessing.
   "instance of" (with the Jev routine above), unless the
   author asks in this session for another statement change: other statements feed the infoboxes and are
   filled from Wikidata by `EnrichItems.php`.
+
+## Bible references
+
+`{{SV Bible quote|ref=…}}` sends the reference to BibleGet as written. Write it in the wiki's language,
+with its usual abbreviations and punctuation (en `Mk 10:51-52`, it/es/fr/pt `Mc 10,51-52`, de `Mk 10,51-52`).
+BibleGet keeps one table of abbreviations for every language, so a few tokens that one language uses
+for a book already mean another book in another language. Never write these; write the form on the
+right:
+
+| Wiki | Never write | Book | It already means | Write instead |
+|---|---|---|---|---|
+| pt | `Gl` | Galatians | Joel (Italian) | `Gál` (or `Gal`) |
+| pt | `Jo` | John | Joel (Hungarian) | `Jn`; numbered `1 Jo`, `2 Jo`, `3 Jo` are fine |
+| pt | `Jn` | Jonah | John (many languages) | `Jon` |
+| fr | `He` | Hebrews | Acts (Spanish) | `Hé` (or `Heb`) |
+| fr | `Jc` | James | Judges (Spanish) | `Jac` |
+| fr | `Ab` | Obadiah | Habakkuk (Italian) | `Abd` |
+| pt | `Ab` | Obadiah | Habakkuk (Italian) | `Abd` |
+| pt | `Br` | Baruch | Numbers (Croatian) | `Bar` |
+| fr | `Sg` | Wisdom | Song of Songs (English…) | `Sag` |
+
+`Jo 3,16` on pt is the dangerous one: it silently returns Joel 3:16, a real verse, with no error. On
+the other wikis the usual abbreviations resolve (es/fr `1 R`, `1 S`; de `Joh`, `Offb`, `Jes`…; pt
+`Sl`, `Tg`, `1 Pd`…). Psalms keep the Hebrew numbering everywhere, Nova Vulgata included (`Ps 51,3`
+is the Miserere). The verse text loads in the reader's browser, so a preview does not show it: when
+unsure of a form, open the saved page and look.
 
 ## Old templates (cleanup tool)
 
