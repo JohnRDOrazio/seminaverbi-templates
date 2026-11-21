@@ -31,7 +31,13 @@ def test_documented_params_are_read():
     for name, text in template_files().items():
         if name not in docs:
             continue
-        module = re.search(r"#invoke:SV/(\w+)\|", text).group(1)
+        invoke = re.search(r"#invoke:SV/(\w+)\|", text)
+        if invoke is None:
+            # a plain wikitext template: each documented parameter is a {{{param}}} placeholder in it
+            for param in docs[name]["params"]:
+                assert "{{{" + param in text, f"{name}: {param} is documented but the template never reads it"
+            continue
+        module = invoke.group(1)
         source = (ROOT / "modules" / "SV" / f"{module}.lua").read_text(encoding="utf-8")
         for param in docs[name]["params"]:
             placeholder = re.match(r"^(\w*?)(N|LANG)(_\w+)?$", param)

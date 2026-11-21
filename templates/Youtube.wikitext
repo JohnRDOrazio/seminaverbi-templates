@@ -1,0 +1,7 @@
+<includeonly>{{#ev:youtube
+|{{{1}}}
+||center
+|||rel=0&modestbranding=1&showinfo=0&widgetid=1&enablejsapi=1&origin={{SERVER}}
+}}</includeonly><noinclude>
+Embeds a YouTube video, centred. One unnamed parameter: the video's ID, e.g. <nowiki>{{youtube|oCghUlTLKVA}}</nowiki>.
+</noinclude>

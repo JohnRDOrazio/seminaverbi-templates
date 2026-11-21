@@ -203,3 +203,11 @@ Aliases: it: `SV note`, es: `SV referencias`, fr: `SV références`, de: `SV Ein
 | parameter | meaning |
 |---|---|
 | `group` | a reference group name |
+
+## Youtube
+
+Embeds a YouTube video, centred (EmbedVideo). Call it as {{youtube|ID}} on every wiki.
+
+| parameter | meaning |
+|---|---|
+| `1` | (required) the YouTube video ID |
