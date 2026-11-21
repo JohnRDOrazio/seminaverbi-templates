@@ -16,6 +16,32 @@ local function isSupported(bible, version)
 	return false
 end
 
+-- The reference as BibleGet should receive it: each ';'-separated part whose book abbreviation the
+-- wiki uses but BibleGet does not resolve (bible.query_books[lang]) gets the form BibleGet knows.
+-- The longest matching abbreviation wins ("1 Joh" before "Joh"); it must end at a space or a digit.
+local function queryRef(ref, map)
+	if not map then
+		return ref
+	end
+	local parts = {}
+	for part in (ref .. ';'):gmatch('([^;]*);') do
+		local lead, rest = part:match('^(%s*)(.*)$')
+		local best
+		for abbr, book in pairs(map) do
+			if rest:sub(1, #abbr) == abbr and (#rest == #abbr or rest:sub(#abbr + 1, #abbr + 1):match('[%s%d]'))
+				and (not best or #abbr > #best) then
+				best = abbr
+			end
+		end
+		if best then
+			local nextChar = rest:sub(#best + 1, #best + 1)
+			rest = map[best] .. (nextChar:match('%s') and ' ' or '') .. rest:sub(#best + 1):gsub('^%s+', '')
+		end
+		parts[#parts + 1] = lead .. rest
+	end
+	return table.concat(parts, ';')
+end
+
 local function isInline(value)
 	return not (value == '0' or value == 'false' or value == 'no')
 end
@@ -28,7 +54,8 @@ function p._render(args, lang)
 	local ref = Util.escape(args.ref)
 	local version = args.version or bible.defaults[lang] or bible.defaults.en
 	local inline = isInline(args.inline)
-	local attrs = ' data-ref="' .. ref .. '" data-version="' .. Util.escape(version)
+	local query = Util.escape(queryRef(args.ref, bible.query_books and bible.query_books[lang]))
+	local attrs = ' data-ref="' .. query .. '" data-version="' .. Util.escape(version)
 		.. '" data-inline="' .. (inline and 'true' or 'false') .. '"'
 
 	if not isSupported(bible, version) then

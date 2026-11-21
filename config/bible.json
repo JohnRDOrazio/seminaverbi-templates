@@ -24,5 +24,59 @@
     "fr": "NVBSE",
     "de": "NVBSE",
     "pt": "NVBSE"
-  }
+  },
+  "query_books": {
+    "es": {
+      "1 R": "1Re",
+      "2 R": "2Re",
+      "1 S": "1Sam",
+      "2 S": "2Sam"
+    },
+    "fr": {
+      "1 R": "1Rois",
+      "2 R": "2Rois",
+      "1 S": "1Samuel",
+      "2 S": "2Samuel",
+      "He": "Heb",
+      "Jc": "Jas"
+    },
+    "de": {
+      "Joh": "Johannes",
+      "1 Joh": "1Johannes",
+      "2 Joh": "2Johannes",
+      "3 Joh": "3Johannes",
+      "Offb": "Offenbarung",
+      "Hebr": "Hebräer",
+      "Apg": "Apostelgeschichte",
+      "1 Petr": "1Petrus",
+      "2 Petr": "2Petrus",
+      "Jes": "Jesaja",
+      "Spr": "Sprichwörter",
+      "Hld": "Hoheslied",
+      "1 Kön": "1Könige",
+      "2 Kön": "2Könige",
+      "Dtn": "Deuteronomium",
+      "Klgl": "Klagelieder",
+      "Sach": "Sacharja"
+    },
+    "pt": {
+      "Gl": "Gálatas",
+      "1 Pd": "1Pedro",
+      "2 Pd": "2Pedro",
+      "Jo": "João",
+      "1 Jo": "1João",
+      "2 Jo": "2João",
+      "3 Jo": "3João",
+      "Jn": "Jonas",
+      "Sl": "Salmos",
+      "Mq": "Miqueias",
+      "Fl": "Filipenses",
+      "1 Rs": "1Reis",
+      "2 Rs": "2Reis",
+      "Tg": "Tiago",
+      "Jó": "Job",
+      "Eclo": "Eclesiástico"
+    }
+  },
+  "_query_books": "Book abbreviations used on a wiki that BibleGet does not resolve (or resolves to another book), with the form sent to it instead; the reader still sees the wiki's own. Each target tested against the API on 2026-11-21."
 }

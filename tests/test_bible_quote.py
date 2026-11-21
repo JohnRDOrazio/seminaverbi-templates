@@ -65,3 +65,31 @@ def test_missing_ref_is_error():
     out = render("it")
     assert out.startswith('<strong class="error">')
     assert "manca il parametro ref" in out
+
+
+@pytest.mark.parametrize("lang,ref,query", [
+    ("de", "Joh 10,11", "Johannes 10,11"),
+    ("de", "1 Joh 4,2-3", "1Johannes 4,2-3"),
+    ("de", "Offb 3,20", "Offenbarung 3,20"),
+    ("pt", "2 Rs 23,29; 2 Cr 35,20-27", "2Reis 23,29; 2 Cr 35,20-27"),
+    ("pt", "Jn 3,10", "Jonas 3,10"),
+    ("pt", "Jo 4,14", "João 4,14"),
+    ("pt", "Jó 15,35", "Job 15,35"),
+    ("fr", "He 4,13", "Heb 4,13"),
+    ("fr", "Jc 5,16", "Jas 5,16"),
+    ("es", "1 R 19,4-8", "1Re 19,4-8"),
+])
+def test_book_names_bibleget_does_not_know_are_sent_in_a_form_it_does(lang, ref, query):
+    out = render(lang, ref=ref)
+    assert f'data-ref="{query}"' in out
+    assert f">{ref}</span>" in out  # the reader still sees the wiki's own abbreviation
+
+
+@pytest.mark.parametrize("lang,ref", [
+    ("de", "Joel 2,28"),   # starts with "Jo" but is its own book
+    ("pt", "Joel 2,28"),
+    ("de", "Mk 1,1"),
+    ("en", "Jn 3:16"),
+])
+def test_other_references_are_sent_unchanged(lang, ref):
+    assert f'data-ref="{ref}"' in render(lang, ref=ref)
