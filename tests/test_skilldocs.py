@@ -23,11 +23,12 @@ def template_files():
 
 def reads_placeholder(body, param):
     """True when the wikitext reads {{{param}}} or {{{param|default}}}, not a longer name such as {{{10}}} for 1."""
-    return re.search(r"\{\{\{" + re.escape(param) + r"\s*(\||\}\}\})", body) is not None
+    return re.search(r"\{\{\{\s*" + re.escape(param) + r"\s*(\||\}\}\})", body) is not None
 
 
 def test_reads_placeholder_needs_the_whole_name():
     assert reads_placeholder("{{{1}}}", "1") and reads_placeholder("{{{1|x}}}", "1")
+    assert reads_placeholder("{{{ 1 }}}", "1")
     assert not reads_placeholder("{{{10}}}", "1") and not reads_placeholder("{{{titles}}}", "title")
 
 
