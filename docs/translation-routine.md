@@ -44,7 +44,8 @@ from the item: never add category lines.
   the Italian").
 - **References:** keep the same sources; point to the target-language edition of a document when it exists
   (vatican.va `/it/`, `/es/`…); translate `date`, `publisher`; add `language=` for a source in another
-  language. Wikipedia citations point to the target-language Wikipedia article when it exists.
+  language. A Wikipedia citation points to the target-language Wikipedia article only when that article
+  supports the same claim; otherwise keep the original citation, with `language=`.
 - **Links:** every `[[w:en:…]]` becomes `[[w:<lang>:<that language's title>]]`, using the en Wikipedia
   langlinks (API: `prop=langlinks&lllang=<lang>`). No equivalent: leave the text unlinked (or `w:en:` with a
   note to the author). On **it**, Catholic topics link inline to Cathopedia when it has the page (check it:
@@ -65,8 +66,14 @@ from the item: never add category lines.
 3. Write the full wikitext to a scratch file.
 4. `parse-wikitext` on the target wiki with `title=` the target title, temporarily using `{{SV infobox|item=Q…}}`
    and `{{SV bio|item=Q…|…}}` (the page is not connected yet): check that every template exists, the Bible
-   quotes render in the wiki's version, the categories appear, no red interwiki, the opening sentence reads
+   quotes carry the wiki's version, the categories appear, no red interwiki, the opening sentence reads
    well. Remove the temporary `item=` before saving.
+   The preview does not show the passage text (the reader's browser fetches it), so it cannot prove that a
+   reference names the right book. For each `{{SV Bible quote}}`, check the `data-ref` in the preview
+   against the passage you mean: the book name it sends must be that book's in the wiki's language, and no
+   abbreviation from the "never write" table in the skill's Bible references section may appear (pt `Jo 3,16`
+   is Joel). Once the BibleGet extension renders quotes at parse time, the preview shows the passage text:
+   then compare that text with the cited passage instead.
 5. `create-page` with a summary in the target language naming the source page.
 6. `wikibase-edit-entity` on en: add the sitelink for the target wiki to the item.
 7. Report: the URL, anything left unlinked, any quotation translated by us, any fix made to the source.
