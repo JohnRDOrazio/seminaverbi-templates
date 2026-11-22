@@ -1,0 +1,23 @@
+{{SV managed}}
+Les citations bibliques de {{SITENAME}} proviennent de '''[https://www.bibleget.io BibleGet]''', un projet de la [https://catholicdigitalcommons.org Catholic Digital Commons Foundation]. Le wiki demande chaque citation à BibleGet et l’affiche telle que BibleGet la fournit. La ligne sous chaque citation indique l’édition dont provient le texte et renvoie à cette page.
+
+== Éditions et droits d’auteur ==
+BibleGet fournit les éditions protégées par le droit d’auteur en vertu d’accords entre BibleGet et leurs titulaires de droits. Les mentions de copyright requises par ces accords figurent sur le [https://www.bibleget.io site de BibleGet]. Les autres éditions sont dans le domaine public.
+
+{| class="wikitable"
+! Édition !! Sigle !! Langue !! Année !! Droits d’auteur
+|-
+| New American Bible - Revised Edition || NABRE || anglais || 2011 || © United States Conference of Catholic Bishops
+|-
+| Douay–Rheims Challoner Revision || DRB || anglais || 1752 || Domaine public
+|-
+| Conferenza Episcopale Italiana || CEI2008 || italien || 2008 || © Fondazione di Religione “Santi Francesco d’Assisi e Caterina da Siena”
+|-
+| Riveduta - Luzzi || LUZZI || italien || 1924 || Domaine public
+|-
+| Libro del Pueblo de Dios || BLPD || espagnol || 2015 || © Fundación Palabra de Vida y Editorial Verbo Divino
+|-
+| Nova Vulgata - Bibliorum Sacrorum Editio || NVBSE || latin || 1986 || © Libreria Editrice Vaticana
+|-
+| Vulgata Clementina || VGCL || latin || 1592 || Domaine public
+|}

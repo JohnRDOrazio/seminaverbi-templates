@@ -15,7 +15,7 @@ def test_titles_for_wiki():
 
 def test_same_content_every_wiki():
     shared = [{t: c for t, c in desired_pages(ROOT, lang, "x").items()
-               if not c.startswith("#REDIRECT") and not t.startswith("Category:")}
+               if not c.startswith("#REDIRECT") and not t.startswith(("Category:", "Project:"))}
               for lang in LANGS]
     assert all(s == shared[0] for s in shared)
 
@@ -33,7 +33,7 @@ def test_sha_not_in_content():
 
 
 def test_other_files_in_templates_are_ignored(tmp_path):
-    for d in ("modules", "templates", "config", "i18n"):
+    for d in ("modules", "templates", "config", "i18n", "project"):
         shutil.copytree(ROOT / d, tmp_path / d)
     (tmp_path / "templates" / ".DS_Store").write_bytes(b"\x00\x05\x16\x07\xff\xfe")
     assert desired_pages(tmp_path, "it", "x") == desired_pages(ROOT, "it", "x")
@@ -59,3 +59,15 @@ def test_cathopedia_category_is_created_hidden_on_every_wiki():
         assert text.startswith("__HIDDENCAT__") and "{{SV managed}}" in text
         assert msgs["cathopedia_category_text"] in text
         assert msgs["tracking_category_text"] not in text
+
+
+def test_bibleget_source_page_on_every_wiki():
+    # The page each quote's source line links to (BibleGet's bibleget-source-page): where the quotes
+    # come from, in the wiki's language, with the links off the wiki kept to this one page.
+    for lang in LANGS:
+        text = desired_pages(ROOT, lang, "x")["Project:BibleGet"]
+        assert text.startswith("{{SV managed}}\n"), lang
+        assert "https://www.bibleget.io" in text, lang
+        assert "https://catholicdigitalcommons.org" in text, lang
+        for sigla in ("NABRE", "CEI2008", "BLPD", "NVBSE", "DRB", "LUZZI", "VGCL"):
+            assert f"|| {sigla} ||" in text, (lang, sigla)
