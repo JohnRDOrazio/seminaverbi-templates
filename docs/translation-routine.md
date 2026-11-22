@@ -31,8 +31,9 @@ from the item: never add category lines.
   sentence in the preview (it must read as one grammatical sentence).
 - **Bible quotes:** same passages, book names and punctuation of the target language
   (en `Mk 10:51-52`, it `Mc 10,51-52`, es `Mc 10,51-52`, fr `Mc 10,51-52`, de `Mk 10,51-52`, pt `Mc 10,51-52`).
-  Avoid the tokens another language holds (pt `Gl`, `Jo`, `Jn`, `Ab`, `Br`; fr `He`, `Jc`, `Ab`, `Sg`): the
-  forms to write instead are in the skill's Bible references section.
+  The wiki translates most clashing abbreviations before sending; the few it does not (fr/pt `Ab` for
+  Obadiah, pt `Br` for Baruch, fr `Sg` for Wisdom) and the forms to write instead are in the skill's Bible
+  references section.
 - **Quotations (`{{SV quote}}`):** use the **official text in the target language** when one exists
   (vatican.va publishes papal documents and councils in most of these languages): fetch it and copy it
   verbatim. Only when no official text exists, translate it yourself and say so in the source line
@@ -70,9 +71,10 @@ from the item: never add category lines.
    well. Remove the temporary `item=` before saving.
    The preview does not show the passage text (the reader's browser fetches it), so it cannot prove that a
    reference names the right book. For each `{{SV Bible quote}}`, check the `data-ref` in the preview
-   against the passage you mean: the book name it sends must be that book's in the wiki's language, and no
-   abbreviation from the "never write" table in the skill's Bible references section may appear (pt `Jo 3,16`
-   is Joel). Once the BibleGet extension renders quotes at parse time, the preview shows the passage text:
+   against the passage you mean: the book it sends must be the book you intend (the wiki's mapping turns
+   pt `Jo` into `João`, fr `He` into `Heb`…), and no token from the skill's "never write" table may stand
+   for the book named in that table's "Book" column (fr/pt `Ab` for Obadiah, pt `Br` for Baruch, fr `Sg`
+   for Wisdom). Once the BibleGet extension renders quotes at parse time, the preview shows the passage text:
    then compare that text with the cited passage instead.
 5. `create-page` with a summary in the target language naming the source page.
 6. `wikibase-edit-entity` on en: add the sitelink for the target wiki to the item.

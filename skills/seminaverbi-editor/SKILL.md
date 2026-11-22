@@ -147,24 +147,22 @@ ask the author instead of guessing.
 `{{SV Bible quote|ref=…}}` sends the reference to BibleGet as written. Write it in the wiki's language,
 with its usual abbreviations and punctuation (en `Mk 10:51-52`, it/es/fr/pt `Mc 10,51-52`, de `Mk 10,51-52`).
 BibleGet keeps one table of abbreviations for every language, so a few tokens that one language uses
-for a book already mean another book in another language. Never write these; write the form on the
-right:
+for a book already mean another book in another language. The wikis translate the known ones before
+sending (`query_books` in `config/bible.json`): on pt `Gl`, `Jo` (João), `Jn` (Jonas), `Sl`, `Tg`, `1 Pd`…;
+on fr `He`, `Jc`, `1 R`, `1 S`; on es `1 R`, `1 S`; on de `Joh`, `Offb`, `Jes`, `Apg`…; so write each
+language's usual abbreviations. These few are not translated and still mean another book; never write
+them for the book in the "Book" column, write the form on the right:
 
-| Wiki | Never write | Book | It already means | Write instead |
+| Wiki | Never write | Book | BibleGet reads it as | Write instead |
 |---|---|---|---|---|
-| pt | `Gl` | Galatians | Joel (Italian) | `Gál` (or `Gal`) |
-| pt | `Jo` | John | Joel (Hungarian) | `Jn`; numbered `1 Jo`, `2 Jo`, `3 Jo` are fine |
-| pt | `Jn` | Jonah | John (many languages) | `Jon` |
-| fr | `He` | Hebrews | Acts (Spanish) | `Hé` (or `Heb`) |
-| fr | `Jc` | James | Judges (Spanish) | `Jac` |
 | fr | `Ab` | Obadiah | Habakkuk (Italian) | `Abd` |
 | pt | `Ab` | Obadiah | Habakkuk (Italian) | `Abd` |
 | pt | `Br` | Baruch | Numbers (Croatian) | `Bar` |
 | fr | `Sg` | Wisdom | Song of Songs (English…) | `Sag` |
 
-`Jo 3,16` on pt is the dangerous one: it silently returns Joel 3:16, a real verse, with no error. On
-the other wikis the usual abbreviations resolve (es/fr `1 R`, `1 S`; de `Joh`, `Offb`, `Jes`…; pt
-`Sl`, `Tg`, `1 Pd`…). Psalms keep the Hebrew numbering everywhere, Nova Vulgata included (`Ps 51,3`
+A wrong book is silent: before the mapping, pt `Jo 3,16` returned Joel 3:16, a real verse, with no
+error. A new abbreviation that is neither in `query_books` nor a full book name must be checked before
+use (ask the author, or add it to `query_books` with a test). Psalms keep the Hebrew numbering everywhere, Nova Vulgata included (`Ps 51,3`
 is the Miserere). The verse text loads in the reader's browser, so a preview does not show it: when
 unsure of a form, open the saved page and look.
 
