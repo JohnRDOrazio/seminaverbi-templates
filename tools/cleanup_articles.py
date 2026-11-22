@@ -57,7 +57,7 @@ BULLETS = {"*", "#", ":", ";"}
 CATEGORY_NS = {"category", "categoria", "categoría", "catégorie", "kategorie"}
 MAGIC = ("DEFAULTSORT:", "DISPLAYTITLE:")
 ERROR_ELEMENT = re.compile(r'<\w+[^>]*?\bclass="([^"]*)"[^>]*>([^<]*)')
-ERROR_CLASSES = ("error", "bibleQuoteRefBroken")
+ERROR_CLASSES = ("error", "bibleget-failed", "bibleQuoteRefBroken")  # BibleGet 2.0, then 1.0
 BOOK = re.compile(r"\s*((?:[1-4]\s*)?[^\W\d_][^\d]*)")
 CONTINUATION = re.compile(r"\s*\d(?:[\d\s:,.\-–—]|(?<=\d)[a-c])*")  # "4", "13:10", "5:1-3,7a"
 
