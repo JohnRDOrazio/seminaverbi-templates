@@ -148,8 +148,9 @@ ask the author instead of guessing.
 with its usual abbreviations and punctuation (en `Mk 10:51-52`, it/es/fr/pt `Mc 10,51-52`, de `Mk 10,51-52`).
 BibleGet keeps one table of abbreviations for every language, so a few tokens that one language uses
 for a book already mean another book in another language. The wikis translate the known ones before
-sending (`query_books` in `config/bible.json`): on pt `Gl`, `Jo` (João), `Jn` (Jonas), `Sl`, `Tg`, `1 Pd`…;
-on fr `He`, `Jc`, `1 R`, `1 S`; on es `1 R`, `1 S`; on de `Joh`, `Offb`, `Jes`, `Apg`…; so write each
+sending (`query_books` in `config/bible.json`): on pt `Gl`, `Jo` (João), `Jn` (Jonas), `Sl`, `Tg`, `1 Pd`,
+`Atos`…; on fr `He`, `Jc`, `1 R`, `1 S`, `Actes des Apôtres`; on es `1 R`, `1 S`; on de `Joh`, `Offb`, `Jes`,
+`Apg`…; on en `1 Thes`, `2 Thes`; so write each
 language's usual abbreviations. These few are not translated and still mean another book; never write
 them for the book in the "Book" column, write the form on the right:
 
