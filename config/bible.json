@@ -26,10 +26,6 @@
     "pt": "NVBSE"
   },
   "query_books": {
-    "en": {
-      "1 Thes": "1Thess",
-      "2 Thes": "2Thess"
-    },
     "es": {
       "1 R": "1Re",
       "2 R": "2Re",
@@ -42,8 +38,7 @@
       "1 S": "1Samuel",
       "2 S": "2Samuel",
       "He": "Heb",
-      "Jc": "Jas",
-      "Actes des Apôtres": "Actes"
+      "Jc": "Jas"
     },
     "de": {
       "Joh": "Johannes",
@@ -80,9 +75,7 @@
       "2 Rs": "2Reis",
       "Tg": "Tiago",
       "Jó": "Job",
-      "Eclo": "Eclesiástico",
-      "Atos dos Apóstolos": "At",
-      "Atos": "At"
+      "Eclo": "Eclesiástico"
     }
   },
   "_query_books": "Book abbreviations used on a wiki that BibleGet does not resolve (or resolves to another book), with the form sent to it instead; the reader still sees the wiki's own. Each target tested against the API on 2026-11-21."
