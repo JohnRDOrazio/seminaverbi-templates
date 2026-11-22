@@ -1,18 +1,24 @@
 import pytest
 
-from lua_env import LuaEnv
+from lua_env import LuaEnv, tag
 
 
 def render(lang, **args):
     env = LuaEnv(lang=lang)
-    return env.call("Module:SV/BibleQuote", "_render", env.lua.table_from(args), lang)
+    return env.call("Module:SV/BibleQuote", "_render", env.lua.table_from(args), lang, env.frame())
 
 
-@pytest.mark.parametrize("lang,version", [
-    ("en", "NABRE"), ("it", "CEI2008"), ("es", "BLPD"), ("fr", "NVBSE"), ("de", "NVBSE"), ("pt", "NVBSE"),
-])
+def biblequote(ref, version, inline="true", query=None):
+    """What the module emits for a quote: the BibleGet extension's tag, shown text in the body."""
+    return tag("biblequote", ref, ref=query or ref, version=version, inline=inline)
+
+
+DEFAULTS = {"en": "NABRE", "it": "CEI2008", "es": "BLPD", "fr": "NVBSE", "de": "NVBSE", "pt": "NVBSE"}
+
+
+@pytest.mark.parametrize("lang,version", DEFAULTS.items())
 def test_default_version_per_wiki(lang, version):
-    assert f'data-version="{version}"' in render(lang, ref="Jn 3,16")
+    assert f"version={version}" in render(lang, ref="Jn 3,16")
 
 
 def test_note_only_when_language_differs():
@@ -31,34 +37,43 @@ def test_no_note_once_a_native_version_is_the_default():
         data.bible.defaults.fr = "TOB"
 
     env = LuaEnv(lang="fr", patch_data=add_french)
-    out = env.call("Module:SV/BibleQuote", "_render", env.lua.table_from({"ref": "Jean 3,16"}), "fr")
-    assert 'data-version="TOB"' in out
+    out = env.call("Module:SV/BibleQuote", "_render", env.lua.table_from({"ref": "Jean 3,16"}), "fr", env.frame())
+    assert "version=TOB" in out
     assert "sv-bible-note" not in out
 
 
-def test_inline_markup_matches_bibleget_js():
-    assert render("en", ref="Jn 3:16") == (
-        '<span class="bibleQuoteRef" data-ref="Jn 3:16" data-version="NABRE" data-inline="true">Jn 3:16</span>'
+def test_inline_is_the_extension_tag():
+    assert render("en", ref="Jn 3:16") == biblequote("Jn 3:16", "NABRE")
+
+
+@pytest.mark.parametrize("value", ["0", "false", "no"])
+def test_block_is_the_extension_tag(value):
+    assert render("en", ref="Jn 3:16", inline=value) == biblequote("Jn 3:16", "NABRE", inline="false")
+
+
+def test_note_follows_the_tag():
+    assert render("fr", ref="Jean 3,16").startswith(biblequote("Jean 3,16", "NVBSE") + ' <small class="sv-bible-note">')
+
+
+def test_unsupported_version_is_the_extension_fallback_without_a_request():
+    out = render("en", ref="Jn 3:16", version="KJV")
+    assert "TAG:" not in out
+    assert out == (
+        '<span class="bibleget-failed">Jn 3:16</span><sup class="bibleget-failed-marker"'
+        " title=\"The Bible version 'KJV' is not supported by BibleGet.\">[!]</sup>"
     )
 
 
-def test_block_markup_matches_bibleget_js():
-    out = render("en", ref="Jn 3:16", inline="0")
-    assert out.startswith('<div class="bibleQuoteRef" data-ref="Jn 3:16" data-version="NABRE" data-inline="false">')
-    assert out.count("<div></div>") == 12
-
-
-def test_unsupported_version():
-    out = render("en", ref="Jn 3:16", version="KJV")
-    assert 'class="bibleQuoteRefBroken"' in out
-    assert "[!]" in out
-    assert "The Bible version 'KJV' is not supported by BibleGet." in out
-
-
-def test_ref_is_escaped():
-    out = render("en", ref='Jn 3,16"><b>')
-    assert 'data-ref="Jn 3,16&quot;&gt;&lt;b&gt;"' in out
+def test_unsupported_version_escapes_the_ref():
+    out = render("en", ref='Jn 3,16"><b>', version="KJV")
     assert "<b>" not in out
+    assert "Jn 3,16&quot;&gt;&lt;b&gt;" in out
+
+
+def test_ref_goes_to_the_extension_unescaped():
+    # frame:extensionTag hands values to the extension as they are; the extension escapes them.
+    out = render("en", ref='Jn 3,16"><b>')
+    assert out == biblequote('Jn 3,16"><b>', "NABRE")
 
 
 def test_missing_ref_is_error():
@@ -81,8 +96,8 @@ def test_missing_ref_is_error():
 ])
 def test_book_names_bibleget_does_not_know_are_sent_in_a_form_it_does(lang, ref, query):
     out = render(lang, ref=ref)
-    assert f'data-ref="{query}"' in out
-    assert f">{ref}</span>" in out  # the reader still sees the wiki's own abbreviation
+    # BibleGet gets the form it resolves; the reader still sees the wiki's own abbreviation (the body)
+    assert out.startswith(biblequote(ref, DEFAULTS[lang], query=query))
 
 
 @pytest.mark.parametrize("lang,ref", [
@@ -92,4 +107,4 @@ def test_book_names_bibleget_does_not_know_are_sent_in_a_form_it_does(lang, ref,
     ("en", "Jn 3:16"),
 ])
 def test_other_references_are_sent_unchanged(lang, ref):
-    assert f'data-ref="{ref}"' in render(lang, ref=ref)
+    assert f"ref={ref}," in render(lang, ref=ref)

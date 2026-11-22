@@ -1,11 +1,10 @@
--- {{SV Bible quote}}: markup filled in by MediaWiki:BibleGet.js (classes and data-* attributes
--- must stay compatible with it). Default version and supported versions come from Module:SV/Data.
+-- {{SV Bible quote}}: the BibleGet extension's <biblequote> tag (BibleGet 2.0), which fetches the
+-- quote at parse time. The tag's ref is the form BibleGet resolves; its body is what readers see.
+-- Default version and supported versions come from Module:SV/Data.
 local Args = require('Module:SV/Args')
 local Util = require('Module:SV/Util')
 
 local p = {}
-
-local SPINNER = '<div class="lds-spinner">' .. string.rep('<div></div>', 12) .. '</div>'
 
 local function isSupported(bible, version)
 	for _, v in ipairs(bible.versions) do
@@ -46,30 +45,27 @@ local function isInline(value)
 	return not (value == '0' or value == 'false' or value == 'no')
 end
 
-function p._render(args, lang)
+function p._render(args, lang, frame)
 	local bible = mw.loadData('Module:SV/Data').bible
 	if not args.ref then
 		return '<strong class="error">' .. Util.escape(Util.msg('bible_missing_ref', lang)) .. '</strong>'
 	end
-	local ref = Util.escape(args.ref)
 	local version = args.version or bible.defaults[lang] or bible.defaults.en
-	local inline = isInline(args.inline)
-	local query = Util.escape(queryRef(args.ref, bible.query_books and bible.query_books[lang]))
-	local attrs = ' data-ref="' .. query .. '" data-version="' .. Util.escape(version)
-		.. '" data-inline="' .. (inline and 'true' or 'false') .. '"'
 
 	if not isSupported(bible, version) then
+		-- The extension's fallback markup, without a request to BibleGet.
 		local reason = Util.escape(Util.msg('bible_unsupported', lang, version))
-		return '<span class="bibleQuoteRefBroken"' .. attrs .. ' title="' .. reason .. '">' .. ref
-			.. '</span><sup class="bibleQuoteRefBrokenReason" title="' .. reason .. '">[!]</sup>'
+		return '<span class="bibleget-failed">' .. Util.escape(args.ref)
+			.. '</span><sup class="bibleget-failed-marker" title="' .. reason .. '">[!]</sup>'
 	end
 
-	local out
-	if inline then
-		out = '<span class="bibleQuoteRef"' .. attrs .. '>' .. ref .. '</span>'
-	else
-		out = '<div class="bibleQuoteRef"' .. attrs .. '>' .. SPINNER .. '</div>'
-	end
+	-- A tag returned as a string is shown as text; it has to go through extensionTag, which hands the
+	-- values to the extension as they are (the extension escapes them).
+	local out = frame:extensionTag('biblequote', args.ref, {
+		ref = queryRef(args.ref, bible.query_books and bible.query_books[lang]),
+		version = version,
+		inline = isInline(args.inline) and 'true' or 'false',
+	})
 	local versionLang = bible.version_lang[version]
 	if versionLang and versionLang ~= lang then
 		local name = Util.msg('langname_' .. versionLang, lang)
@@ -79,7 +75,7 @@ function p._render(args, lang)
 end
 
 function p.main(frame)
-	return p._render(Args.get(frame), Util.lang())
+	return p._render(Args.get(frame), Util.lang(), frame)
 end
 
 return p

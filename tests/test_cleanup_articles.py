@@ -270,6 +270,12 @@ def test_checks_count_what_can_break():
     assert c.tracking == {"Pages with reference errors", "Articles with short description"}
 
 
+def test_a_failed_bibleget_quote_is_an_error_mark():
+    c = ca.checks(parsed(html='<span class="bibleget-failed">Jn 3,16</span><sup class="bibleget-failed-marker"'
+                              ' title="BibleGet does not know this Bible version.">[!]</sup>'), CONF)
+    assert dict(c.error_marks) == {("bibleget-failed", "Jn 3,16"): 1}
+
+
 def test_regressions():
     old = ca.checks(parsed(links=[("A", False)], categories=[("Bible quote template", False)]), CONF)
     same = ca.checks(parsed(links=[("A", False)]), CONF)

@@ -1,8 +1,9 @@
 <includeonly>{{#invoke:SV/BibleQuote|main}}</includeonly><noinclude>
-Quotes a Bible passage through BibleGet. Parameters:
+Quotes a Bible passage through the BibleGet extension (<code><nowiki><biblequote></nowiki></code>), which fetches it when the page is saved or re-parsed. Parameters:
 * <code>ref</code> (required): the reference, in any notation BibleGet accepts, with book names in the wiki's language (e.g. <code>Jn 3:16</code>, <code>Gv 3,16</code>, <code>Jean 3,16</code>).
 * <code>version</code>: a BibleGet version code; defaults to the wiki's version (NABRE, CEI2008, BLPD; Nova Vulgata on fr/de/pt, with a note).
 * <code>inline</code>: <code>0</code> shows the passage as a block instead of a hover quote.
+Readers see the reference as written; book abbreviations BibleGet does not know are sent in a form it does. A quote BibleGet cannot give shows the reference with a [!] marker whose tooltip gives the reason.
 
 <code><nowiki>{{SV Bible quote|ref=Jn 3:16}}</nowiki></code>
 </noinclude>
