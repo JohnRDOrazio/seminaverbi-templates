@@ -93,6 +93,11 @@ def test_missing_ref_is_error():
     ("fr", "He 4,13", "Heb 4,13"),
     ("fr", "Jc 5,16", "Jas 5,16"),
     ("es", "1 R 19,4-8", "1Re 19,4-8"),
+    ("en", "1 Thes 4:13-14", "1Thess 4:13-14"),
+    ("en", "2 Thes 3:10", "2Thess 3:10"),
+    ("fr", "Actes des Apôtres 17,16-34", "Actes 17,16-34"),
+    ("pt", "Atos dos Apóstolos 17,16-34", "At 17,16-34"),
+    ("pt", "Atos 2,1-4", "At 2,1-4"),
 ])
 def test_book_names_bibleget_does_not_know_are_sent_in_a_form_it_does(lang, ref, query):
     out = render(lang, ref=ref)
@@ -105,6 +110,7 @@ def test_book_names_bibleget_does_not_know_are_sent_in_a_form_it_does(lang, ref,
     ("pt", "Joel 2,28"),
     ("de", "Mk 1,1"),
     ("en", "Jn 3:16"),
+    ("en", "1 Thessalonians 5:18"),  # the full name, not "1 Thes"
 ])
 def test_other_references_are_sent_unchanged(lang, ref):
     assert f"ref={ref}," in render(lang, ref=ref)
