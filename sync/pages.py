@@ -50,9 +50,8 @@ def _template(name: str, text: str) -> str:
 
 
 def desired_pages(root: Path, lang: str, sha: str) -> dict[str, str]:
-    """Title -> content for one wiki. Identical on every wiki except the alias redirects, the
-    tracking categories (their names are in the wiki's language) and the Project: pages (each
-    written in the wiki's language).
+    """Title -> content for one wiki. Identical on every wiki except the alias redirects and the
+    tracking categories (their names are in the wiki's language).
 
     The sha is accepted for symmetry with the edit summary but never written into content,
     so syncing an unchanged repository twice edits nothing.
@@ -73,9 +72,6 @@ def desired_pages(root: Path, lang: str, sha: str) -> dict[str, str]:
             pages["Template:" + name] = _template(name, path.read_text(encoding="utf-8"))
         elif path.suffix == ".css":
             pages["Template:" + rel] = f"/* {NOTICE} */\n" + path.read_text(encoding="utf-8")
-    # project/<Page>/<lang>.wikitext: the wiki's own Project:<Page>, written in its language
-    for path in sorted((root / "project").glob(f"*/{lang}.wikitext")):
-        pages["Project:" + path.parent.name] = path.read_text(encoding="utf-8")
     msgs = json.loads((root / "i18n" / f"{lang}.json").read_text(encoding="utf-8"))
     for key in TRACKING:
         pages["Category:" + msgs[key]] = f"__HIDDENCAT__\n{MANAGED}\n{msgs['tracking_category_text']}\n"
