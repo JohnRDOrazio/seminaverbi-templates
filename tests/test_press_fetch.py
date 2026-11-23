@@ -216,3 +216,41 @@ def test_a_redirect_targets_trouble_does_not_spoil_that_host_for_its_own_outlet(
         pc.get("o", "https://x.example/a")
     assert pc.get("blob", f"{BLOB}/q") is None  # its own robots 403: blocked for the run, as before
     assert pc.refused == {"blob": "robots 403"} and pc._blocked == {"blob"}
+
+
+def test_robots_redirects_are_followed_by_hand_and_paced():
+    routes = {ROBOTS: Resp(status=301, headers={"Location": f"{BLOB}/robots.txt"}),
+              f"{BLOB}/robots.txt": Resp("User-agent: *\nDisallow: /private\n"), "https://x.example/a": Resp("A")}
+    pc, s, c = client(routes)
+    assert pc.get("o", "https://x.example/a").text == "A"
+    assert pc.get("o", "https://x.example/private/b") is None
+    assert [u for u, _ in s.calls] == [ROBOTS, f"{BLOB}/robots.txt", "https://x.example/a"]
+    assert all(kw.get("allow_redirects") is False for _, kw in s.calls)
+    assert len(c.sleeps) == 2 and all(x >= 10 for x in c.sleeps)  # before the hop and before the article
+
+
+def test_robots_redirects_stop_after_five_hops():
+    routes = {ROBOTS: Resp(status=302, headers={"Location": "/r0"}), "https://x.example/a": Resp("A")}
+    for i in range(7):
+        routes[f"https://x.example/r{i}"] = Resp(status=302, headers={"Location": f"/r{i + 1}"})
+    pc, s, _ = client(routes)
+    with pytest.raises(Refused) as e:
+        pc.get("o", "https://x.example/a")
+    assert e.value.reason == "robots unreachable"
+    assert len(s.calls) == 1 + 5  # robots.txt and five hops, never the article
+
+
+def test_a_redirect_to_a_new_host_waits_the_outlets_delay():
+    pc, s, c = client({ROBOTS: Resp(""), "https://x.example/a": Resp(status=302, headers={"Location": f"{BLOB}/p"}),
+                       f"{BLOB}/robots.txt": Resp(""), f"{BLOB}/p": Resp("P")})
+    assert pc.get("o", "https://x.example/a").text == "P"
+    assert len(c.sleeps) == 3 and all(x >= 10 for x in c.sleeps)  # before x/a, blob's robots and blob/p
+
+
+def test_a_robots_refusal_on_one_of_the_outlets_hosts_stops_its_other_hosts():
+    it = "https://it.x.example"
+    pc, s, _ = client({ROBOTS: Resp(status=403), f"{it}/robots.txt": Resp(""), f"{it}/a": Resp("A")})
+    assert pc.get("o", "https://x.example/a") is None
+    assert pc.get("o", f"{it}/a") is None
+    assert [u for u, _ in s.calls] == [ROBOTS]
+    assert pc.refused == {"o": "robots 403"}

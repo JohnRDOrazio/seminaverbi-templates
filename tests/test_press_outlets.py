@@ -201,3 +201,42 @@ def test_an_index_keeps_no_validators_while_a_child_fails():
     assert discover(s, c, [outlet()], 10) == {"o": 1}
     assert s.feed_cache("https://o.example/feed") == (None, None)  # the failed child is read again next run
     assert s.feed_cache("https://o.example/sitemap-2.xml") == ('"c2"', None)
+
+
+def test_an_index_is_fetched_unconditionally_and_keeps_no_validators():
+    """A child may hold new articles while its index is unchanged: a 304 on the index must never hide them."""
+    s = store()
+    c, session = polite({"https://o.example/feed": FResp(INDEX, etag='"i"'),
+                         "https://o.example/sitemap-1.xml": FResp(urlset("o.example", 1), etag='"c1"'),
+                         "https://o.example/sitemap-2.xml": FResp(urlset("o.example", 1), etag='"c2"')}, s)
+    discover(s, c, [outlet()], 10)
+    assert s.feed_cache("https://o.example/feed") == (None, None)
+    assert s.feed_cache("https://o.example/sitemap-1.xml") == ('"c1"', None)
+    session.calls.clear()
+    discover(s, c, [outlet()], 10)
+    sent = {u: kw["headers"] for u, kw in session.calls}
+    assert "If-None-Match" not in sent["https://o.example/feed"]
+    assert sent["https://o.example/sitemap-1.xml"]["If-None-Match"] == '"c1"'
+
+
+ATOM_REL = ('<feed xmlns="http://www.w3.org/2005/Atom">'
+            '<entry><link rel="alternate" href="/cultura/a"/></entry>'
+            '<entry xml:base="https://y.example/base/"><link href="b"/></entry>'
+            '<entry><link href="https://z.example/c"/></entry></feed>')
+
+
+def test_relative_links_resolve_against_the_response_and_xml_base():
+    assert entry_urls(ATOM_REL, "https://x.example/feed") == [
+        ("https://x.example/cultura/a", None), ("https://y.example/base/b", None), ("https://z.example/c", None)]
+    rss = '<rss><channel><item><link>/cultura/r</link></item></channel></rss>'
+    assert entry_urls(rss, "https://x.example/rss") == [("https://x.example/cultura/r", None)]
+
+
+def test_discover_stores_relative_links_as_absolute_urls():
+    s = store()
+    r = Resp(ATOM_REL)
+    r.url = "https://moved.example/feed"  # the response's effective URL
+    c = FakeClient({"https://o.example/feed": r})
+    discover(s, c, [outlet()], 10)
+    assert {a.url for a in s.articles("found")} == {
+        "https://moved.example/cultura/a", "https://y.example/base/b", "https://z.example/c"}

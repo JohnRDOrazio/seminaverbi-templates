@@ -3,7 +3,7 @@ import re
 import sys
 import xml.etree.ElementTree as ET
 from email.utils import parsedate_to_datetime
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 
 import requests
 
@@ -11,6 +11,7 @@ DROPPED_PARAMS = ("utm_", "fbclid", "gclid")
 DATE_TAGS = ("publication_date", "pubDate", "date", "published", "updated", "lastmod")
 MAX_BODY = 10 * 1024 * 1024
 ITEM_TAGS = ("item", "entry", "url", "sitemap")
+XML_BASE = "{http://www.w3.org/XML/1998/namespace}base"
 
 
 def canonical(url: str) -> str:
@@ -34,15 +35,24 @@ def _iso(text: str | None) -> str | None:
         return None
 
 
-def _link(item) -> str | None:
+def _base(el, base: str) -> str:
+    return urljoin(base, el.get(XML_BASE).strip()) if el.get(XML_BASE) else base
+
+
+def _resolve(ref: str, base: str) -> str:
+    """A relative reference resolved against `base`; an absolute one unchanged."""
+    return ref if urlsplit(ref).scheme or not base else urljoin(base, ref)
+
+
+def _link(item, base: str = "") -> str | None:
     for child in item:
         if _local(child.tag) not in ("link", "loc"):
             continue
         if child.get("href") is not None:
             if child.get("rel") in (None, "alternate"):
-                return child.get("href").strip()
+                return _resolve(child.get("href").strip(), _base(child, base))
         elif (child.text or "").strip():
-            return child.text.strip()
+            return _resolve(child.text.strip(), _base(child, base))
     return None
 
 
@@ -54,8 +64,9 @@ def _item_date(item) -> str | None:
     return None
 
 
-def _parse(xml_text: str) -> tuple[str, list[tuple[str, str | None]]]:
-    """(kind, entries); kind is 'index' for a sitemap index, else 'entries'. ValueError if not XML."""
+def _parse(xml_text: str, base: str = "") -> tuple[str, list[tuple[str, str | None]]]:
+    """(kind, entries); kind is 'index' for a sitemap index, else 'entries'. ValueError if not XML. Relative links
+    resolve against `base` (the response's URL) and any xml:base on the way down."""
     if len(xml_text) > MAX_BODY:
         raise ValueError("body too large")
     if re.search(r"<!(DOCTYPE|ENTITY)", xml_text, re.IGNORECASE):
@@ -65,17 +76,21 @@ def _parse(xml_text: str) -> tuple[str, list[tuple[str, str | None]]]:
     except ET.ParseError as e:
         raise ValueError(str(e)) from e
     out = []
-    for el in root.iter():
+    stack = [(root, base)]
+    while stack:  # document order, each element with its xml:base
+        el, b = stack.pop()
+        b = _base(el, b)
         if _local(el.tag) in ITEM_TAGS:
-            url = _link(el)
+            url = _link(el, b)
             if url:
                 out.append((url, _item_date(el)))
+        stack.extend((child, b) for child in reversed(el))
     return ("index" if _local(root.tag) == "sitemapindex" else "entries"), out
 
 
-def entry_urls(xml_text: str) -> list[tuple[str, str | None]]:
+def entry_urls(xml_text: str, base: str = "") -> list[tuple[str, str | None]]:
     """(url, ISO date or None) of an RSS, Atom, urlset or news sitemap, or the child sitemaps of an index."""
-    return _parse(xml_text)[1]
+    return _parse(xml_text, base)[1]
 
 
 def _has_lang(url: str, lang: str) -> bool:
@@ -115,7 +130,8 @@ def _candidates(client, outlet: dict):
     """Lazily yield (url, date, lang) for one outlet; stops quietly when the outlet is refused.
 
     The feeds' validators (ETag, Last-Modified) are stored only when the stream is read to its end, and not for
-    a feed that failed or an index with a child that failed: the next run reads them again in full."""
+    a feed that failed. A sitemap index keeps none: it is fetched in full every run, since a child can hold new
+    articles while the index is unchanged."""
     from pipeline.press.fetch import Refused
     langs = outlet.get("langs") or ["en"]
     pending = []
@@ -145,12 +161,11 @@ def _candidates(client, outlet: dict):
             if r is None:
                 continue
             try:
-                kind, items = _parse(r.text)
+                kind, items = _parse(r.text, getattr(r, "url", None) or url)
             except ValueError:
                 print(f"press: {outlet['id']} {url}: not a feed or sitemap", file=sys.stderr)
                 fail(url)
                 continue
-            read[url] = r
             if kind == "index":
                 for child, _ in items:
                     if lang or len(langs) == 1:
@@ -160,6 +175,7 @@ def _candidates(client, outlet: dict):
                     if child_lang:
                         pending.append((child, child_lang, url))
                 continue
+            read[url] = r
             for item_url, date in items:
                 yield item_url, date, lang or _lang_of(item_url, langs, langs[0])
     except Refused as e:

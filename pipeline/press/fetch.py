@@ -1,10 +1,10 @@
 """Polite HTTP for the press pipeline: the one place the politeness rules live.
 
-One request at a time per host, at least `delay` seconds apart (more when
+One request at a time per host and per outlet, at least `delay` seconds apart (more when a host's
 robots.txt asks for a larger Crawl-delay), robots.txt read each run, our own
 honest user agent. A 401/403/429 stops that outlet for the run: it is recorded
-in `refused` and never retried around. Redirects are followed by hand (at most five hops), each new host with
-its own robots.txt and delay.
+in `refused` and never retried around. Redirects, robots.txt's own included, are followed by hand (at most five
+hops, each paced), each new host with its own robots.txt and delay.
 """
 import json
 import time
@@ -42,6 +42,7 @@ class PoliteClient:
         self.store, self.clock, self.sleep = store, clock, sleep
         self.refused: dict[str, str] = {}
         self._last: dict[str, float] = {}
+        self._last_outlet: dict[str, float] = {}
         self._robots: dict[str, RobotFileParser] = {}
         self._blocked: set[str] = set()  # recorded in `refused` but answered None, not raised
         self._foreign_down: dict[str, str] = {}  # redirect targets' hosts whose robots.txt failed this run
@@ -50,22 +51,35 @@ class PoliteClient:
         self.refused[outlet] = reason
         raise Refused(outlet, reason)
 
-    def _wait(self, host: str, delay: float) -> None:
-        last = self._last.get(host)
-        if last is not None:
-            gap = delay - (self.clock() - last)
+    def _wait(self, outlet: str, host: str, delay: float) -> None:
+        """Sleep until the later of the host's deadline (its own delay) and the outlet's (the configured one)."""
+        deadlines = [self._last[host] + delay] if host in self._last else []
+        if outlet in self._last_outlet:
+            deadlines.append(self._last_outlet[outlet] + self.delay)
+        if deadlines:
+            gap = max(deadlines) - self.clock()
             if gap > 0:
                 self.sleep(gap)
-        self._last[host] = self.clock()
+        self._last[host] = self._last_outlet[outlet] = self.clock()
 
-    def _request(self, host: str, url: str, delay: float, headers: dict | None = None, follow: bool = True):
-        self._wait(host, delay)
+    def _request(self, outlet: str, host: str, url: str, delay: float, headers: dict | None = None):
+        self._wait(outlet, host, delay)
         h = {"User-Agent": self.user_agent, **(headers or {})}
-        extra = {} if follow else {"allow_redirects": False}
         try:
-            return self.session.get(url, headers=h, timeout=TIMEOUT, **extra)
+            return self.session.get(url, headers=h, timeout=TIMEOUT, allow_redirects=False)
         finally:
-            self._last[host] = self.clock()
+            self._last[host] = self._last_outlet[outlet] = self.clock()
+
+    def _robots_txt(self, outlet: str, scheme: str, host: str):
+        """The robots.txt response, its redirects followed by hand and paced; None after MAX_HOPS redirects."""
+        url = f"{scheme}://{host}/robots.txt"
+        for _ in range(MAX_HOPS + 1):
+            r = self._request(outlet, urlsplit(url).netloc, url, self.delay)
+            location = r.headers.get("Location") if r.status_code in REDIRECTS else None
+            if not location:
+                return r
+            url = urljoin(url, location)
+        return None
 
     def _rules(self, outlet: str, scheme: str, host: str, foreign: bool = False) -> RobotFileParser:
         """The host's robots.txt rules. On the outlet's own host, trouble refuses or blocks the outlet; on a
@@ -77,7 +91,7 @@ class PoliteClient:
             return self._robots[host]
         rp = RobotFileParser()
         try:
-            r = self._request(host, f"{scheme}://{host}/robots.txt", self.delay)
+            r = self._robots_txt(outlet, scheme, host)
         except Exception:
             r = None
         code = r.status_code if r is not None else None
@@ -100,8 +114,11 @@ class PoliteClient:
         return rp
 
     def get(self, outlet: str, url: str, conditional: bool = False):
-        """Response, or None (disallowed by robots.txt, or 304 on a conditional get)."""
-        if outlet in self.refused and outlet not in self._blocked:
+        """Response, or None (disallowed by robots.txt, the outlet's robots.txt refused us on one of its own
+        hosts this run, or 304 on a conditional get)."""
+        if outlet in self._blocked:
+            return None
+        if outlet in self.refused:
             raise Refused(outlet, self.refused[outlet])
         headers = {}
         if conditional and self.store:
@@ -117,7 +134,7 @@ class PoliteClient:
             if not rp.can_fetch(self.user_agent, target):
                 return None
             delay = max(self.delay, float(rp.crawl_delay(self.user_agent) or 0))
-            r = self._request(parts.netloc, target, delay, headers, follow=False)
+            r = self._request(outlet, parts.netloc, target, delay, headers)
             location = r.headers.get("Location") if r.status_code in REDIRECTS else None
             if not location:
                 break
