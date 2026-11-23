@@ -237,3 +237,20 @@ def test_a_short_query_that_encodes_long_goes_by_post():
     s = FakeSession(bindings())
     Sparql(s).select(heavy)
     assert s.calls[0][1]["method"] == "POST"
+
+
+def test_select_retries_a_dropped_connection_then_succeeds():
+    """WDQS closes a connection now and then (RemoteDisconnected): asked again with the bounded backoff."""
+    import requests
+    s = FakeSession(requests.exceptions.ConnectionError("Remote end closed connection without response"),
+                    bindings({"n": {"value": "1"}}))
+    assert Sparql(s).select("q") == [{"n": "1"}]
+    assert len(s.calls) == 2
+
+
+def test_select_gives_up_after_three_dropped_connections():
+    import requests
+    s = FakeSession(*[requests.exceptions.ConnectionError("dropped") for _ in range(4)])
+    with pytest.raises(requests.exceptions.ConnectionError):
+        Sparql(s).select("q")
+    assert len(s.calls) == 4

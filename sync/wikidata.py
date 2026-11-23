@@ -1,13 +1,17 @@
 """Read-only Wikidata client: requests carry only titles and QIDs, with the repository's User-Agent."""
 from __future__ import annotations
 
+import time
+
 import requests
 
-from sync.wiki import USER_AGENT, WikiClient
+from sync.wiki import RETRIES, USER_AGENT, SyncError, WikiClient, _retry_wait
 
 API = "https://www.wikidata.org/w/api.php"
 BATCH = 50
 LANGS = "en|it|es|fr|de|pt"
+BUSY = ("cirrussearch-too-busy-error",)  # search's own "try again later": transient, like a dropped connection
+TRANSIENT = (requests.exceptions.ConnectionError, requests.exceptions.Timeout)
 
 
 class _OwnHeaders:
@@ -36,7 +40,20 @@ class WikidataClient:
         self.resolved: dict[tuple[str, str], str] = {}  # (site, title) -> the title a redirect led to
 
     def _get(self, **params) -> dict:
-        return self._wiki._call("GET", **params)
+        """One API call; a dropped connection, a timeout or a busy search is asked again (RETRIES times, with
+        sync.wiki's bounded backoff), then raised."""
+        attempt = 0
+        while True:
+            try:
+                return self._wiki._call("GET", **dict(params))
+            except TRANSIENT:
+                if attempt >= RETRIES:
+                    raise
+            except SyncError as exc:
+                if exc.code not in BUSY or attempt >= RETRIES:
+                    raise
+            time.sleep(_retry_wait(None, attempt))
+            attempt += 1
 
     def by_sitelink(self, site: str, titles: list[str]) -> dict[str, str]:
         """title -> QID of the Wikidata item linked to `title` on `site` (e.g. enwiki).

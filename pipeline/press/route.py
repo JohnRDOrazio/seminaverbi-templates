@@ -10,11 +10,22 @@ from __future__ import annotations
 
 import sys
 
+import requests
+
+from sync.wiki import SyncError
+
 from pipeline import domains, stages
 from pipeline.domains import common
 from pipeline.queue import Row
 
 WAITING = "waiting:"
+# a lookup still failing after the clients' own retries (Wikidata, WDQS): that mention stays unrouted, the run goes on
+LOOKUP_ERRORS = (requests.RequestException, OSError, SyncError)
+
+
+def lookup_failed(mention, e) -> None:
+    print(f"press: {mention.qid} in {mention.url}: lookup failed ({e}), left unrouted for the next run",
+          file=sys.stderr)
 
 
 def _outlet(store, url: str) -> str | None:
@@ -98,27 +109,34 @@ def decide(mention, domain: str, entity: dict, repo, wikis, sparql=None) -> tupl
     return ("enrichment" if outcome in ("drop", "translation") else "candidate"), stage0
 
 
+def _route_one(store, queue, mention, outlet: str, repo, wikis, wikidata, sparql) -> str | None:
+    if mention.domain.startswith(WAITING):
+        store.set_route(mention.url, mention.qid, "waiting")
+        return "waiting"
+    if mention.domain not in domains.DOMAINS:
+        print(f"press: {mention.qid} in {mention.url}: unknown domain {mention.domain!r}, not routed",
+              file=sys.stderr)
+        return None
+    return _route(store, queue, mention, outlet, mention.domain, wikidata.entity(mention.qid), repo, wikis, sparql)
+
+
 def route(store, queue, repo, wikis, wikidata, sparql=None) -> dict[str, int]:
-    """Route every unrouted mention; the count of each route taken. `sparql` feeds the domains' press_stage0."""
+    """Route every unrouted mention; the count of each route taken, and `errors`: the mentions whose lookup still
+    failed after the clients' retries (reported, left unrouted for the next run). `sparql` feeds the domains'
+    press_stage0."""
     counts: dict[str, int] = {}
     for mention in store.unrouted():
         outlet = _outlet(store, mention.url)
         if outlet is None:
             print(f"press: mention of {mention.qid} in {mention.url}: no stored article, not routed", file=sys.stderr)
             continue
-        entity = wikidata.entity(mention.qid)
-        if mention.domain.startswith(WAITING):
-            kind = "waiting"
-            store.set_route(mention.url, mention.qid, kind)
-        elif mention.domain not in domains.DOMAINS:
-            print(f"press: {mention.qid} in {mention.url}: unknown domain {mention.domain!r}, not routed",
-                  file=sys.stderr)
-            continue
-        else:
-            kind = _route(store, queue, mention, outlet, mention.domain, entity, repo, wikis, sparql)
-            if kind is None:
-                continue
-        counts[kind] = counts.get(kind, 0) + 1
+        try:
+            kind = _route_one(store, queue, mention, outlet, repo, wikis, wikidata, sparql)
+        except LOOKUP_ERRORS as e:
+            lookup_failed(mention, e)
+            kind = "errors"
+        if kind is not None:
+            counts[kind] = counts.get(kind, 0) + 1
     return counts
 
 

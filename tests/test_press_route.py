@@ -1,10 +1,12 @@
 import pytest
+import requests
 
 from pipeline import stages
 from pipeline.domains import common, film, literature
 from pipeline.press.route import release_waiting, route
 from pipeline.press.store import Mention, PressStore
 from pipeline.queue import Queue, Row
+from sync.wiki import SyncError
 
 URL = "https://example.org/a"
 
@@ -402,3 +404,61 @@ def test_a_second_article_of_the_same_outlet_rebuilds_the_dossier(q, store, unco
     store.add_mention(mention(p=0.6, url=URL + "3"))  # same outlet, lower p: the press map is unchanged
     route(store, q, None, {}, FakeWikidata({"Q9": ent()}))
     assert 4 not in q.row("Q9").outcomes
+
+
+class FailingWikidata(FakeWikidata):
+    """A Wikidata whose lookups of `failing` still fail after the client's retries."""
+
+    def __init__(self, entities, failing, error):
+        super().__init__(entities)
+        self.failing, self.error = failing, error
+
+    def entity(self, qid):
+        if qid in self.failing:
+            self.asked.append(qid)
+            raise self.error
+        return super().entity(qid)
+
+
+@pytest.mark.parametrize("error", [
+    requests.exceptions.ConnectionError("Remote end closed connection without response"),
+    SyncError("sparql: HTTP 503 after 3 retries"),
+])
+def test_a_failed_lookup_leaves_that_mention_unrouted_and_routes_the_next(q, store, uncovered, capsys, error):
+    store.add_mention(mention("Q8"))
+    store.add_mention(mention("Q9"))
+    counts = route(store, q, None, {}, FailingWikidata({"Q9": ent()}, {"Q8"}, error))
+    assert counts == {"candidate": 1, "errors": 1}
+    assert [m.qid for m in store.unrouted()] == ["Q8"]
+    assert q.row("Q8") is None and q.row("Q9") is not None
+    assert "Q8" in capsys.readouterr().err
+
+
+def test_a_failed_stage0_query_leaves_that_mention_unrouted(q, store, uncovered, capsys, monkeypatch):
+    """A domain's press_stage0 runs WDQS (literature: a series' volumes); its failure is that mention's alone."""
+    from pipeline import domains
+    calls = []
+
+    def stage0(qid, entity, sparql):
+        calls.append(qid)
+        if qid == "Q8":
+            raise requests.exceptions.ConnectionError("dropped")
+        return {}
+    monkeypatch.setattr(domains.DOMAINS["film"], "press_stage0", stage0, raising=False)
+    store.add_mention(mention("Q8"))
+    store.add_mention(mention("Q9"))
+    assert route(store, q, None, {}, FakeWikidata({"Q8": ent(), "Q9": ent()}), sparql=object()) == \
+        {"candidate": 1, "errors": 1}
+    assert calls == ["Q8", "Q9"]
+    assert [m.qid for m in store.unrouted()] == ["Q8"]
+
+
+def test_the_dry_run_preview_goes_on_past_a_failed_lookup(q, store, uncovered, capsys):
+    from pipeline.press.stages import preview
+    store.add_mention(mention("Q8"))
+    store.add_mention(mention("Q9"))
+    lines = preview(store, None, {}, FailingWikidata({"Q9": ent()}, {"Q8"},
+                                                     requests.exceptions.ConnectionError("dropped")), queue=q)
+    assert any("candidate" in l and "Q9" in l for l in lines)
+    assert not any("Q8" in l for l in lines)
+    assert "Q8" in capsys.readouterr().err

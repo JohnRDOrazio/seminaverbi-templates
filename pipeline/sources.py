@@ -37,8 +37,9 @@ class Sparql:
                 else:
                     r = self.session.get(SPARQL_ENDPOINT, params={"query": query, "format": "json"},
                                          headers=headers, timeout=60)
-            except requests.exceptions.ReadTimeout:
-                # the endpoint stalls now and then on a query it answers in a second on the next try
+            except (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError):
+                # the endpoint stalls now and then on a query it answers in a second on the next try, or closes
+                # the connection without an answer (RemoteDisconnected)
                 if retries >= SPARQL_RETRIES:
                     raise
                 time.sleep(_retry_wait(None, retries))

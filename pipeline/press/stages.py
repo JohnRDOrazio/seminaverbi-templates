@@ -22,7 +22,7 @@ from pipeline.press.extract import Page, extract, opening
 from pipeline.press.fetch import Refused
 from pipeline.press.link import link_article
 from pipeline.press.outlets import discover
-from pipeline.press.route import WAITING, _provisional, decide, owner
+from pipeline.press.route import LOOKUP_ERRORS, WAITING, _provisional, decide, lookup_failed, owner
 
 GONE = (404, 410)
 # one article's failure (SyncError: Wikidata or WDQS still failing after the retries); the run goes on
@@ -131,7 +131,8 @@ def run_link(store, pages: Pages, judge, wikidata, sparql, pcfg: dict) -> dict[s
 
 def would_route(store, repo, wikis, wikidata, sparql=None, queue=None) -> list[tuple[object, str]]:
     """(mention, route it would take) for every unrouted mention, by route()'s own decision (under the domain of
-    the QID's row in `queue`, when it has one); reads the wikis, writes nothing."""
+    the QID's row in `queue`, when it has one); reads the wikis, writes nothing. A mention whose lookup still fails
+    after the clients' retries is reported and left out."""
     out = []
     for m in store.unrouted():
         if m.domain.startswith(WAITING):
@@ -140,8 +141,12 @@ def would_route(store, repo, wikis, wikidata, sparql=None, queue=None) -> list[t
             kind = "unknown"
         else:
             under = owner(queue, m.qid, m.domain)
-            kind = (decide(m, under, wikidata.entity(m.qid), repo, wikis, sparql)[0] if under in domains.DOMAINS
-                    else "unknown")
+            try:
+                kind = (decide(m, under, wikidata.entity(m.qid), repo, wikis, sparql)[0]
+                        if under in domains.DOMAINS else "unknown")
+            except LOOKUP_ERRORS as e:
+                lookup_failed(m, e)
+                continue
         out.append((m, kind))
     return out
 
