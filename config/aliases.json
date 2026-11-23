@@ -1,5 +1,7 @@
 {
-  "en": {},
+  "en": {
+    "Template:Bible quote": "Template:SV Bible quote"
+  },
   "it": {
     "Template:SV citazione bibbia": "Template:SV Bible quote",
     "Template:SV cita": "Template:SV cite",
@@ -9,7 +11,8 @@
     "Template:SV note": "Template:SV references",
     "Template:SV lavori in corso": "Template:SV WIP",
     "Template:SV albero categorie": "Template:SV category tree",
-    "Template:SV citazione": "Template:SV quote"
+    "Template:SV citazione": "Template:SV quote",
+    "Template:Citazione bibbia": "Template:SV Bible quote"
   },
   "es": {
     "Template:SV cita bíblica": "Template:SV Bible quote",
