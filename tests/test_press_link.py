@@ -334,3 +334,33 @@ def test_a_scholarly_article_does_not_route_to_literature(cache):
     assert class_route(["Q13442814"], FakeSparql(), CFG, cache) is None
     assert literature.owns(["Q13442814", "Q8261"], FakeSparql(), cache) is True
     assert literature.owns(["Q8242"], FakeSparql(), cache) is True  # literature itself is not stopped
+
+
+class PickByWindow(FakeJudge):
+    """Takes the first option only where the passage speaks of a film; none of them elsewhere."""
+
+    def pick(self, url, passage, label, options):
+        super().pick(url, passage, label, options)
+        return (next(iter(options)), 0.95, 0.9) if "regista" in passage else (None, 0.95, 0.9)
+
+
+def test_a_rejected_pick_is_asked_again_in_another_window_and_never_twice_in_one(store, cache):
+    filler = " ".join(f"parola{i}" for i in range(200))
+    pg = page([f"Il Free Climbing nasce in parete: «Free Climbing». {filler}", filler, filler,
+               f"Free Climbing, del regista francese, racconta una cordata. {filler}", filler, filler,
+               f"Ancora Free Climbing del regista. {filler}"],
+              [Span("Free Climbing", 0, "italic"), Span("Free Climbing", 0, "quoted"),
+               Span("Free Climbing", 3, "italic"), Span("Free Climbing", 6, "italic")])
+    wd = FakeWikidata({"Q1": entity(["Q11424"])}, search={("Free Climbing", "it"): ["Q1"]})
+    judge = PickByWindow()
+    assert [m.qid for m in run(pg, store, judge, wd, cache)] == ["Q1"]
+    # window 0 once (two spans), window 3 taken, then memoised: window 6 is not asked
+    assert len(judge.picks) == 2
+    assert wd.searches == [("Free Climbing", "it")]
+
+
+def test_a_title_without_hits_is_searched_once(store, cache):
+    pg = page(["Nulla qui.", "x", "x", "Nulla anche qui."], [Span("Nulla", 0, "italic"), Span("Nulla", 3, "italic")])
+    wd = FakeWikidata({})
+    assert run(pg, store, FakeJudge(), wd, cache) == []
+    assert wd.searches == [("Nulla", "it"), ("Nulla", "en")]
