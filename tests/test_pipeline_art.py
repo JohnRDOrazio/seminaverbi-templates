@@ -325,3 +325,19 @@ def test_a_benchmark_qid_held_by_another_domain_is_not_held_back(q):
     art._hold_benchmark(q, [{"qid": "Q1", "name": "x", "kind": "strong"}])
     row = q.row("Q1")
     assert row.domain == "music" and row.calibration is False and "benchmark" not in row.data[0]
+
+
+# --- query shape for WDQS (measured 2026-11-23) ---
+
+def test_art_candidate_queries_keep_the_floor_before_the_class(q):
+    sparql = FakeSparql()
+    art.candidates(q, sparql, None, load_config())
+    bounded = [x for x in sparql.queries if "ORDER BY DESC(?sitelinks)" in x]
+    assert bounded and all("FILTER(?sitelinks >= 15)" in x for x in bounded)
+
+
+def test_depicts_saints_starts_from_the_saints(q):
+    sparql = FakeSparql()
+    art.candidates(q, sparql, None, load_config())
+    saints = [x for x in sparql.queries if "wdt:P411" in x]
+    assert saints and all(x.index("?d wdt:P411 [] .") < x.index("?item wdt:P180 ?d .") for x in saints)

@@ -172,7 +172,7 @@ def test_bounded_with_a_closure_lists_the_classes_instead_of_a_path():
     plain = common.bounded("  ?item wdt:P1 ?x .", "Q1")
     listed = common.bounded("  ?item wdt:P1 ?x .", "Q1", ["Q2", "Q3"])
     assert "wdt:P31/wdt:P279* wd:Q1" in plain
-    assert "P279*" not in listed and "VALUES ?cls { wd:Q1 wd:Q2 wd:Q3 }" in listed and "LIMIT 500" in listed
+    assert "P279*" not in listed and "FILTER(?cls IN (wd:Q1, wd:Q2, wd:Q3))" in listed and "LIMIT 500" in listed
 
 
 def test_a_part_held_by_another_domain_is_reported_and_not_folded(q, no_closure_cache, capsys):
@@ -183,3 +183,55 @@ def test_a_part_held_by_another_domain_is_reported_and_not_folded(q, no_closure_
     row = q.row("Q1")
     assert set(row.data[0]["parts"]) == {"Q10"} and row.data[0]["count"] == 40
     assert q.row("Q8").domain == "literature" and "Q8 is already a literature candidate" in capsys.readouterr().out
+
+
+# --- a large closure is a path, not a VALUES list (the endpoint refuses a 2 MB query with HTTP 413) ---
+
+def _closure(n):
+    return [f"Q{1000 + i}" for i in range(n)]
+
+
+def test_bounded_lists_a_closure_of_up_to_500_classes():
+    listed = common.bounded("  ?item wdt:P1 ?x .", "Q1", _closure(499))  # 500 with Q1
+    assert "?item wdt:P31 ?cls . FILTER(?cls IN (wd:Q1, wd:Q1000," in listed and "P279*" not in listed
+    assert "VALUES ?cls" not in listed  # joined before the pattern, a VALUES list of classes timed out on WDQS
+
+
+def test_bounded_uses_the_path_above_500_classes():
+    big = common.bounded("  ?item wdt:P1 ?x .", "Q1", _closure(500))  # 501 with Q1
+    assert "?cls" not in big and "wd:Q1499" not in big
+    assert "?item wdt:P31/wdt:P279* wd:Q1 . hint:Prior hint:gearing \"forward\"" in big and "LIMIT 500" in big
+
+
+def _fold_queries(q, closures, stop=()):
+    sparql = FakeSparql({f"wd:{cls} . }}": [{"sub": s} for s in subs] for cls, subs in closures.items()})
+    common.fold_parts(q, sparql, [part_row("Q10", 25)], "form", "music", ["Q1"], list(stop))
+    return [s for s in sparql.queries if "wdt:P361" in s]
+
+
+def test_fold_lists_a_small_closure_of_wholes_and_stops(q, no_closure_cache):
+    folds = _fold_queries(q, {"Q1": _closure(10), "Q2": _closure(3)}, ["Q2"])
+    assert folds and all("?whole wdt:P31 ?cls . FILTER(?cls IN (wd:Q1, wd:Q1000," in s for s in folds)
+    assert all("?whole wdt:P31 ?stop . FILTER(?stop IN (wd:Q1000," in s for s in folds)
+    assert not any("P279*" in s for s in folds)
+
+
+def test_fold_uses_the_path_for_a_large_closure_of_wholes_or_stops(q, no_closure_cache):
+    folds = _fold_queries(q, {"Q1": _closure(600), "Q2": _closure(700)}, ["Q2"])
+    assert folds and all("wd:Q1500" not in s for s in folds)
+    assert all("?whole wdt:P31/wdt:P279* ?cls" in s and "VALUES ?cls { wd:Q1 }" in s for s in folds)
+    assert all("?whole wdt:P31/wdt:P279* ?stop" in s and "VALUES ?stop { wd:Q2 }" in s for s in folds)
+    assert all(s.count('hint:gearing "forward"') == 2 for s in folds)
+
+
+def test_bounded_with_a_floor_filters_on_sitelinks_before_the_class():
+    query = common.bounded("  ?item wdt:P1 ?x .", "Q1", ["Q2"], floor=15)
+    inner = query.split("ORDER BY")[0]
+    assert "?item wikibase:sitelinks ?sitelinks . FILTER(?sitelinks >= 15)" in inner
+    assert inner.index("?item wdt:P1 ?x") < inner.index("FILTER(?sitelinks >= 15)") < inner.index("?item wdt:P31 ?cls")
+
+
+def test_bounded_without_a_floor_is_unchanged():
+    query = common.bounded("  ?item wdt:P1 ?x .", "Q1")
+    assert "FILTER(?sitelinks" not in query
+    assert "  ?item wdt:P31/wdt:P279* wd:Q1 .\n  ?item wikibase:sitelinks ?sitelinks .\n  } ORDER BY" in query

@@ -84,12 +84,12 @@ def _skippable(row: dict) -> bool:
     return PERSON in classes or (not classes & set(WORK_CLASSES) and bool(classes & GROUPS))
 
 
-def _gather(sparql, pattern: str, label: str) -> list[dict]:
-    """The rows of `pattern` bounded to each work class (its subclasses a VALUES list from the closure), one
-    row per item; people and groups are reported and left out."""
+def _gather(sparql, pattern: str, label: str, floor: int) -> list[dict]:
+    """The rows of `pattern` bounded to each work class (its closure, see common.bounded) with at least `floor`
+    sitelinks, one row per item; people and groups are reported and left out."""
     found: dict[str, dict] = {}
     for cls in WORK_CLASSES:
-        query = common.bounded(pattern, cls, common.class_closure(sparql, [cls]))
+        query = common.bounded(pattern, cls, common.class_closure(sparql, [cls]), floor)
         for row in common.run_query(sparql, "music", f"{label} ({cls})", query):
             if _skippable(row):
                 print(f"music candidates: {row['item']} is a person or group, skipped")
@@ -100,8 +100,10 @@ def _gather(sparql, pattern: str, label: str) -> list[dict]:
 
 def candidates(queue, sparql, wikipedia, cfg: dict, wikidata=None) -> int:
     """Stage 0: add the form, genre, facet and seed-artist candidates to the queue; returns the rows added.
-    Parts fold into their composition (never a song into its album); `wikipedia` and `wikidata` are unused."""
+    Parts fold into their composition (never a song into its album); `wikipedia` and `wikidata` are unused. The
+    queries keep only works at the floor of their source (the artist floor for the artists), as triage does."""
     music = cfg["music"]
+    floors = {"artist": music["artist_sitelink_floor"]}
     patterns: list[tuple[str, str, str]] = []
     forms = common.values(sorted(common.class_closure(sparql, music["forms"])))
     patterns.append(("form", "forms", f"  VALUES ?f {{ {forms} }}\n  ?item wdt:P7937|wdt:P136|wdt:P31 ?f ."))
@@ -115,7 +117,7 @@ def candidates(queue, sparql, wikipedia, cfg: dict, wikidata=None) -> int:
                          f"  VALUES ?a {{ {chunk} }}\n  ?item wdt:P175|wdt:P86|wdt:P676 ?a ."))
     added = 0
     for source, label, pattern in patterns:
-        rows = _gather(sparql, pattern, label)
+        rows = _gather(sparql, pattern, label, floors.get(source, music["sitelink_floor"]))
         added += common.fold_parts(queue, sparql, rows, source, "music", FOLD_WHOLES, FOLD_STOP)
     return added
 

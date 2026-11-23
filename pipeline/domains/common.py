@@ -18,6 +18,11 @@ LIMIT = 500  # per query: keeps each one well under the endpoint's 60 s timeout
 CHUNK = 50
 CLOSURE_CACHE = Path("data/class_closure.json")  # git-ignored with the rest of data/
 CLOSURE_DAYS = 30
+# a closure up to this many classes goes into a query as a VALUES list; a larger one as the P31/P279* path (sculpture's
+# 145,420 classes made a 2 MB query, which the endpoint refused with HTTP 413)
+VALUES_MAX = 500
+# walk such a path up from the item, not down from the class through every subclass (timeouts otherwise)
+_FORWARD = " hint:Prior hint:gearing \"forward\" ."
 NON_WIKIPEDIA = {"commonswiki", "wikidatawiki", "metawiki", "specieswiki", "mediawikiwiki"}
 
 # keep the patterns in the order written: left to the optimizer, the wide joins time out on WDQS
@@ -43,15 +48,30 @@ def query(pattern: str, key: str = "") -> str:
             f"GROUP BY {key}?item\nLIMIT {LIMIT}")
 
 
-def bounded(pattern: str, cls: str, subclasses: Iterable[str] | None = None) -> str:
+def bounded(pattern: str, cls: str, subclasses: Iterable[str] | None = None, floor: int | None = None) -> str:
     """The query of `pattern` on items of class `cls`, at most LIMIT items: the most linked ones (sitelink
-    count), so a truncated result drops the least notable. `subclasses` (a class closure) replaces the
-    `P31/P279*` path by a VALUES list of classes, which the endpoint answers faster."""
-    kind = (f"  VALUES ?cls {{ {values(sorted(set(subclasses) | {cls}))} }}\n  ?item wdt:P31 ?cls .\n"
-            if subclasses is not None else f"  ?item wdt:P31/wdt:P279* wd:{cls} .\n")
-    return query(f"  {{ SELECT DISTINCT ?item ?sitelinks WHERE {{\n{_ORDERED}{pattern}\n"
-                  f"{kind}  ?item wikibase:sitelinks ?sitelinks .\n"
-                  f"  }} ORDER BY DESC(?sitelinks) LIMIT {LIMIT} }}")
+    count), so a truncated result drops the least notable. `subclasses` (a class closure) of up to VALUES_MAX
+    classes replaces the `P31/P279*` path by a list of classes (`FILTER IN`: a VALUES list, joined before the
+    pattern, timed out on WDQS); a larger closure keeps the path, walked up from the item. `floor` keeps only
+    items with at least that many sitelinks, tested right after the pattern, before the class."""
+    listed = None if subclasses is None else set(subclasses) | {cls}
+    if listed is None:
+        kind = f"  ?item wdt:P31/wdt:P279* wd:{cls} .\n"
+    elif len(listed) <= VALUES_MAX:
+        kind = f"  ?item wdt:P31 ?cls . FILTER(?cls IN ({one_of(listed)}))\n"
+    else:
+        kind = f"  ?item wdt:P31/wdt:P279* wd:{cls} .{_FORWARD}\n"
+    if floor is None:
+        body = f"{pattern}\n{kind}  ?item wikibase:sitelinks ?sitelinks .\n"
+    else:
+        body = f"{pattern}\n  ?item wikibase:sitelinks ?sitelinks . FILTER(?sitelinks >= {int(floor)})\n{kind}"
+    return query(f"  {{ SELECT DISTINCT ?item ?sitelinks WHERE {{\n{_ORDERED}{body}"
+                 f"  }} ORDER BY DESC(?sitelinks) LIMIT {LIMIT} }}")
+
+
+def one_of(qids: Iterable[str]) -> str:
+    """The QIDs as the list of a SPARQL `IN (...)`, sorted."""
+    return ", ".join(f"wd:{q}" for q in sorted(set(qids)))
 
 
 def values(qids) -> str:
@@ -242,18 +262,25 @@ def other_domain(queue, qid: str, domain: str) -> str | None:
 CLOSED = ("approved", "created", "declined")  # a whole with one of these statuses absorbs nothing
 
 
-def _wholes_of(sparql, qids: list[str], classes: set[str], stop: set[str]) -> dict[str, list[str]]:
-    """Part QID -> the wholes (P361) of it that are instances of one of `classes` and of none of `stop`; one
-    query per CHUNK of parts."""
+def _instance_of(var: str, roots: Iterable[str], closure: set[str]) -> str:
+    """`?whole` is an instance of a class bound to `?var`: one of `closure` (`FILTER IN`) when it has at most
+    VALUES_MAX classes, else one of the `roots` through the P31/P279* path, walked up from the whole."""
+    if len(closure) <= VALUES_MAX:
+        return f"?whole wdt:P31 ?{var} . FILTER(?{var} IN ({one_of(closure)}))"
+    return f"VALUES ?{var} {{ {values(sorted(set(roots)))} }} ?whole wdt:P31/wdt:P279* ?{var} .{_FORWARD}"
+
+
+def _wholes_of(sparql, qids: list[str], classes: tuple[Iterable[str], set[str]],
+               stop: tuple[Iterable[str], set[str]]) -> dict[str, list[str]]:
+    """Part QID -> the wholes (P361) of it that are instances of one of `classes` and of none of `stop` (each
+    a pair of root classes and their closure); one query per CHUNK of parts."""
     found: dict[str, list[str]] = {}
+    exclude = f"  FILTER NOT EXISTS {{ {_instance_of('stop', *stop)} }}\n" if stop[1] else ""
     for i in range(0, len(qids), CHUNK):
-        exclude = (f"  FILTER NOT EXISTS {{ VALUES ?stop {{ {values(sorted(stop))} }} ?whole wdt:P31 ?stop . }}\n"
-                   if stop else "")
         rows = run_query(sparql, "parts", "wholes of parts", (
             "SELECT DISTINCT ?item ?whole WHERE {\n"
             f"  VALUES ?item {{ {values(qids[i:i + CHUNK])} }}\n"
-            f"  VALUES ?cls {{ {values(sorted(classes))} }}\n"
-            f"  ?item wdt:P361 ?whole .\n  ?whole wdt:P31 ?cls .\n{exclude}}}\nLIMIT {LIMIT}"))
+            f"  ?item wdt:P361 ?whole .\n  {_instance_of('cls', *classes)}\n{exclude}}}\nLIMIT {LIMIT}"))
         for row in rows:
             if row["whole"] not in found.setdefault(row["item"], []):
                 found[row["item"]].append(row["whole"])
@@ -320,9 +347,10 @@ def fold_parts(queue, sparql, rows: list[dict], source: str, domain: str, whole_
     one in the closure of `whole_classes` and outside that of `stop_classes`: the whole carries the source and
     a stage-0 `parts` entry for the part. A part with no such whole, or with several (reported), is added as
     itself. Returns the rows added to the queue."""
+    whole_classes, stop_classes = tuple(whole_classes), tuple(stop_classes)
     classes = class_closure(sparql, whole_classes)
     stop = class_closure(sparql, stop_classes) if stop_classes else set()
-    in_whole = _wholes_of(sparql, [r["item"] for r in rows], classes, stop)
+    in_whole = _wholes_of(sparql, [r["item"] for r in rows], (whole_classes, classes), (stop_classes, stop))
     details = _whole_rows(sparql, sorted({w[0] for w in in_whole.values() if len(w) == 1}))
     grouped: dict[str, list[dict]] = {}
     added = 0

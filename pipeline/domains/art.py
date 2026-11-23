@@ -80,12 +80,12 @@ def triage(row, cfg: dict) -> tuple[str, str]:
     return "pass", ""
 
 
-def _gather(sparql, pattern: str, label: str) -> list[dict]:
-    """The rows of `pattern` bounded to each work class (its subclasses a VALUES list from the closure), one
-    row per item; people are reported and left out."""
+def _gather(sparql, pattern: str, label: str, floor: int) -> list[dict]:
+    """The rows of `pattern` bounded to each work class (its closure, see common.bounded) with at least `floor`
+    sitelinks, one row per item; people are reported and left out."""
     found: dict[str, dict] = {}
     for cls in WORK_CLASSES:
-        query = common.bounded(pattern, cls, common.class_closure(sparql, [cls]))
+        query = common.bounded(pattern, cls, common.class_closure(sparql, [cls]), floor)
         for row in common.run_query(sparql, "art", f"{label} ({cls})", query):
             if PERSON in row.get("types", "").split():
                 print(f"art candidates: {row['item']} is a person, skipped")
@@ -111,13 +111,15 @@ def _listed(sparql, qids: list[str]) -> list[dict]:
 def candidates(queue, sparql, wikipedia, cfg: dict, wikidata=None) -> int:
     """Stage 0: add the depicts, Iconclass, genre and curated-list candidates to the queue; returns the rows
     added. Panels and scenes fold into their altarpiece or cycle (never into a building); `wikipedia` and
-    `wikidata` are unused."""
+    `wikidata` are unused. The queries keep only works at the sitelink floor, which triage applies anyway: on
+    WDQS the floor is what keeps them under the timeout."""
     art = cfg["art"]
+    floor = art.get("sitelink_floor", cfg["sitelink_floor"])
     shown = common.values([*art["depicts"], *art["scene_classes"]])  # scenes are events: depicted, not P31
     link = "?item wdt:P180 ?d ."
     patterns: list[tuple[str, str, str]] = [
         ("depicts", "depicts", f"  VALUES ?d {{ {shown} }}\n  {link}"),
-        ("depicts", "depicts saints", f"  {link}\n  ?d wdt:{common.SAINT_PROPERTY} [] ."),
+        ("depicts", "depicts saints", f"  ?d wdt:{common.SAINT_PROPERTY} [] .\n  {link}"),  # the saints first
         ("depicts", "depicts biblical characters",
          f"  VALUES ?class {{ {common.values(art['biblical_classes'])} }}\n  ?d wdt:P31 ?class .\n  {link}"),
     ]
@@ -127,7 +129,7 @@ def candidates(queue, sparql, wikipedia, cfg: dict, wikidata=None) -> int:
                      f"  VALUES ?genre {{ {common.values(art['genres'])} }}\n  ?item wdt:P136 ?genre ."))
     added = 0
     for source, label, pattern in patterns:
-        rows = _gather(sparql, pattern, label)
+        rows = _gather(sparql, pattern, label, floor)
         added += common.fold_parts(queue, sparql, rows, source, "art", WORK_CLASSES, STOP_CLASSES)
     listed = _listed(sparql, [w["qid"] for w in art["works"]])
     added += common.fold_parts(queue, sparql, listed, "list", "art", WORK_CLASSES, STOP_CLASSES)

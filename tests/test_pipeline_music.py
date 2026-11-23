@@ -235,3 +235,17 @@ def test_calibration_roots_are_music_theatre_and_opera(monkeypatch):
     monkeypatch.setattr(common, "calibration_qids", lambda wikis, wd, tree, roots: seen.update(roots=roots) or ([], []))
     music.calibration_qids({}, wikidata=object(), tree={})
     assert seen["roots"] == {"music", "musical-theatre", "opera"}
+
+
+def test_music_candidate_queries_keep_the_floor_of_their_source(tmp_path, monkeypatch):
+    from pipeline import load_config
+    from pipeline.domains import common
+    from pipeline.queue import Queue
+    from test_pipeline_film import FakeSparql
+    monkeypatch.setattr(common, "CLOSURE_CACHE", tmp_path / "closure.json")
+    sparql = FakeSparql()
+    music.candidates(Queue(tmp_path / "q.db"), sparql, None, load_config())
+    bounded = [x for x in sparql.queries if "ORDER BY DESC(?sitelinks)" in x]
+    artists = [x for x in bounded if "wdt:P175|wdt:P86|wdt:P676" in x]
+    assert artists and all("FILTER(?sitelinks >= 20)" in x for x in artists)
+    assert all("FILTER(?sitelinks >= 10)" in x for x in bounded if x not in artists)
