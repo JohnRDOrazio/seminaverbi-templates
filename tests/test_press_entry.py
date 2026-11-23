@@ -96,3 +96,9 @@ def test_utf8_html_without_a_charset_is_not_read_as_latin1(ctype, body):
 def test_latin1_bytes_stay_latin1():
     p, art = pages(Bytes("<html><body><p>perché</p></body></html>".encode("latin-1"), "text/html"), outlets=())
     assert p.get(art)[0].paragraphs == ["perché"]
+
+
+def test_a_self_closing_block_ends_a_paragraph():
+    page = extract_entry(entry("Prima<hr/>Seconda<p/><i>Terza</i>"), URL, "it")
+    assert page.paragraphs == ["Prima", "Seconda", "Terza"]
+    assert [(s.text, s.paragraph) for s in page.spans] == [("Terza", 2)]

@@ -158,7 +158,7 @@ class _Parser(HTMLParser):
                 self._flush()
 
     def handle_startendtag(self, tag: str, attrs: list) -> None:
-        if tag in ("meta", "link", "br"):
+        if tag in ("meta", "link", "br") or (self.fragment and tag in BLOCKS):
             self.handle_starttag(tag, attrs)
 
     def handle_endtag(self, tag: str) -> None:
