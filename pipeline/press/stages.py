@@ -123,19 +123,39 @@ def _angle(page: Page, url: str, judge, cut: float) -> dict[str, float]:
     return {"angle": best, "angle_opening": first}
 
 
+def _turns(articles: list, limit: int, caps: dict[str, int]) -> list:
+    """The articles in the order they are attempted: each capped outlet's share first (its cap, or its part of half
+    the run), so a backlog of the others cannot starve it, then all the rest as they come. The caps themselves are
+    applied by the caller."""
+    room = {oid: min(cap, limit // 2 // len(caps)) for oid, cap in caps.items()}
+    first, rest = [], []
+    for art in articles:
+        mine = room.get(art.outlet, 0) > 0
+        if mine:
+            room[art.outlet] -= 1
+        (first if mine else rest).append(art)
+    return first + rest
+
+
 def run_filter(store, pages: Pages, judge, pcfg: dict) -> dict[str, int]:
     """Jev's culture question on each found article's title and opening, then, for those it keeps, the faith or
     values angle (below angle_drop: dropped, reason "angle", counted apart). At most max_articles_per_run articles are
     attempted (fetched or judged, failures included; a refused outlet's articles are not asked, so not counted):
-    the never-attempted first, then the oldest attempt, so failures cannot starve the new articles."""
+    the never-attempted first, then the oldest attempt, so failures cannot starve the new articles. An outlet's
+    `max_per_run` bounds its own attempts, within the same total."""
     counts: dict[str, int] = {}
     attempted = 0
     outlets = {o["id"]: o for o in pcfg.get("outlets", ())}
-    for art in store.articles("found", tried_last=True):
+    caps = {oid: o["max_per_run"] for oid, o in outlets.items() if "max_per_run" in o}
+    tried: dict[str, int] = {}
+    for art in _turns(store.articles("found", tried_last=True), pcfg["max_articles_per_run"], caps):
         if attempted >= pcfg["max_articles_per_run"]:
             break
         if art.outlet in pages.client.refused:
             continue  # refused for the run (or its robots.txt refused us): nothing asked, tried again next run
+        if art.outlet in caps and tried.get(art.outlet, 0) >= caps[art.outlet]:
+            continue
+        tried[art.outlet] = tried.get(art.outlet, 0) + 1
         attempted += 1
         store.attempted(art.url)
         page, skip = pages.get(art)

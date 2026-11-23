@@ -220,3 +220,46 @@ def test_the_angle_is_not_asked_below_culture_drop():
     assert run_filter(store, Pages(client({ROBOTS: Resp(""), "https://x.example/a": Resp(_long("x"))})), judge,
                       {**ANGLE_CFG, "culture_drop": 0.95}) == {"drop": 1}
     assert judge.texts == [] and store.article("https://x.example/a").data == {"culture": 0.9}
+
+
+CAP_CFG = {"max_articles_per_run": 5, "culture_drop": 0.5, "angle_drop": 0.4,
+           "outlets": [{"id": "blog", "max_per_run": 2}, {"id": "o"}]}
+
+
+def _cap_store():
+    store = PressStore(sqlite3.connect(":memory:"))
+    for i in range(6):
+        store.add_article(f"https://x.example/b{i}", "blog", "it")
+    for i in range(6):
+        store.add_article(f"https://x.example/n{i}", "o", "it")
+    return store
+
+
+def _run(store, status=200):
+    routes = {ROBOTS: Resp(""), **{a.url: Resp("<p>Testo</p>", status=status) for a in store.articles("found")}}
+    pc = client(routes)
+    run_filter(store, Pages(pc), Judge(), CAP_CFG)
+    return [u.rsplit("/", 1)[1] for u, _ in pc.session.calls if not u.endswith("robots.txt")]
+
+
+def test_an_outlets_cap_leaves_the_rest_of_the_run_to_the_others_and_takes_its_turn_each_run():
+    store = _cap_store()
+    assert _run(store) == ["b0", "b1", "n0", "n1", "n2"]
+    assert _run(store) == ["b2", "b3", "n3", "n4", "n5"]
+    assert _run(store) == ["b4", "b5"]
+
+
+def test_failures_count_toward_an_outlets_cap_and_do_not_starve_its_other_articles():
+    store = _cap_store()
+    assert _run(store, 503) == ["b0", "b1", "n0", "n1", "n2"]
+    assert _run(store, 503) == ["b2", "b3", "n3", "n4", "n5"]
+
+
+def test_a_backlog_of_other_outlets_does_not_starve_a_capped_outlet():
+    """Its articles found after a large backlog still get their share of the first run."""
+    store = PressStore(sqlite3.connect(":memory:"))
+    for i in range(20):
+        store.add_article(f"https://x.example/n{i}", "o", "it")
+    for i in range(6):
+        store.add_article(f"https://x.example/b{i}", "blog", "it")
+    assert _run(store) == ["b0", "b1", "n0", "n1", "n2"]

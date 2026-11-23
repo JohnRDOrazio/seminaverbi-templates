@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS press_mentions (
   url TEXT, qid TEXT, label TEXT, kind TEXT, domain TEXT, p REAL,
   passages_json TEXT, route TEXT, stance REAL, critical INTEGER, PRIMARY KEY (url, qid));
 CREATE TABLE IF NOT EXISTS press_feeds (url TEXT PRIMARY KEY, etag TEXT, last_modified TEXT);
+CREATE TABLE IF NOT EXISTS press_walks (url TEXT PRIMARY KEY, data_json TEXT);
 """
 
 
@@ -166,4 +167,13 @@ class PressStore:
 
     def set_feed_cache(self, url, etag, last_modified) -> None:
         self.db.execute("INSERT OR REPLACE INTO press_feeds VALUES (?,?,?)", (url, etag, last_modified))
+        self.db.commit()
+
+    def walk(self, url) -> dict:
+        """How far the walk of a feed's archive has come (see outlets._walk); {} before it begins."""
+        r = self.db.execute("SELECT data_json FROM press_walks WHERE url=?", (url,)).fetchone()
+        return json.loads(r[0]) if r else {}
+
+    def set_walk(self, url, data: dict) -> None:
+        self.db.execute("INSERT OR REPLACE INTO press_walks VALUES (?,?)", (url, json.dumps(data)))
         self.db.commit()
