@@ -186,11 +186,13 @@ def _read_closure_cache(cache: Path) -> dict:
 
 
 def _fresh_entry(entry) -> list[str] | None:
-    """The cached subclasses of an entry younger than CLOSURE_DAYS; None when it is missing, old or malformed."""
+    """The cached subclasses of an entry younger than CLOSURE_DAYS (and not dated in the future); None when it is missing, stale or malformed
+    (including a subclass that is not a string)."""
     try:
-        if date.today() - date.fromisoformat(entry["date"]) < timedelta(days=CLOSURE_DAYS):
+        age = date.today() - date.fromisoformat(entry["date"])
+        if timedelta(0) <= age < timedelta(days=CLOSURE_DAYS):
             subclasses = entry["subclasses"]
-            if isinstance(subclasses, list):
+            if isinstance(subclasses, list) and all(isinstance(sub, str) for sub in subclasses):
                 return subclasses
     except (KeyError, TypeError, ValueError):
         pass
