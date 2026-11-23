@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import re
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from typing import Literal
@@ -16,6 +17,10 @@ from urllib.parse import unquote, urljoin, urlparse
 SKIPPED = {"nav", "footer", "aside", "script", "style", "noscript", "template"}
 SKIPPED_BLOCKS = {"nav", "footer", "aside"}  # end the paragraph; the others are left out of it
 ITALIC = {"em", "i"}
+# what ends a paragraph in a feed entry's content, where the text sits in any element or in none
+BLOCKS = {"p", "div", "li", "ul", "ol", "dl", "dt", "dd", "blockquote", "pre", "table", "tr", "td", "th", "section",
+          "article", "figure", "figcaption", "hr", "h1", "h2", "h3", "h4", "h5", "h6"}
+MAX_FEED = 10 * 1024 * 1024
 WIKI_HOST = re.compile(r"^(?:([a-z]{2,3}(?:-[a-z]+)?)\.)(?:m\.)?wikipedia\.org$")
 QUOTED = re.compile(r"«([^»]+)»|“([^”]+)”|\"([^\"]+)\"")
 # schema.org types of a page that is one article (Article and its subtypes) or one programme (KTO's video pages)
@@ -62,8 +67,12 @@ def wiki_target(href: str) -> tuple[str, str] | None:
 
 
 class _Parser(HTMLParser):
-    def __init__(self) -> None:
+    def __init__(self, fragment: bool = False) -> None:
+        """`fragment`: the markup is an article's body alone (a feed entry's content): all its text counts, and any
+        block element or a double line break ends a paragraph."""
         super().__init__(convert_charrefs=True)
+        self.fragment = fragment
+        self.breaks = 0
         self.meta: dict[str, str] = {}
         self.title_tag = ""
         self.time_datetime: str | None = None
@@ -77,18 +86,32 @@ class _Parser(HTMLParser):
         self.in_jsonld = False
         # raw paragraphs: (text, in_article, [(kind, text, wiki)])
         self.raw: list[tuple[str, bool, list[tuple[str, str, tuple[str, str] | None]]]] = []
-        self.buf: list[str] | None = None
+        self.buf: list[str] | None = [] if fragment else None
         self.buf_article = False
         self.buf_spans: list[tuple[str, str, tuple[str, str] | None]] = []
         self.open_inline: list[list] = []  # [tag, kind, wiki, start_index_in_text_parts]
         self.parts: list[str] = []
 
     def _flush(self) -> None:
+        if self.fragment:  # an inline element may stay open over several paragraphs: its part in each is a span
+            for item in self.open_inline:
+                self._span(item[1], item[2], item[3])
+                item[3] = 0
+            if not "".join(self.buf or []).strip():
+                self.buf, self.buf_spans = [], []
+                return
         if self.buf is not None:
             self.raw.append(("".join(self.buf), self.buf_article, self.buf_spans))
-        self.buf = None
+        self.buf = [] if self.fragment else None
         self.buf_spans = []
-        self.open_inline = []
+        if not self.fragment:
+            self.open_inline = []
+
+    def _span(self, kind: str, wiki: tuple[str, str] | None, start: int) -> None:
+        if kind and self.buf is not None:
+            text = _clean("".join(self.buf[start:]))
+            if text:
+                self.buf_spans.append((kind, text, wiki))
 
     def handle_starttag(self, tag: str, attrs: list) -> None:
         a = {k.lower(): (v or "") for k, v in attrs}
@@ -114,7 +137,9 @@ class _Parser(HTMLParser):
             return
         if self.skip:
             return
-        if tag == "article":
+        if self.fragment and tag in BLOCKS:
+            self._flush()
+        elif tag == "article":
             self.article += 1
             self.seen_article = True
         elif tag == "p":
@@ -128,6 +153,9 @@ class _Parser(HTMLParser):
             self.open_inline.append([tag, "wikilink" if wiki else "", wiki, len(self.buf)])
         elif self.buf is not None and tag == "br":
             self.buf.append(" ")
+            self.breaks += 1
+            if self.fragment and self.breaks == 2:
+                self._flush()
 
     def handle_startendtag(self, tag: str, attrs: list) -> None:
         if tag in ("meta", "link", "br"):
@@ -144,7 +172,9 @@ class _Parser(HTMLParser):
             return
         if self.skip:
             return
-        if tag == "article":
+        if self.fragment and tag in BLOCKS:
+            self._flush()
+        elif tag == "article":
             self._flush()
             self.article = max(0, self.article - 1)
         elif tag == "p":
@@ -156,10 +186,7 @@ class _Parser(HTMLParser):
         for i in range(len(self.open_inline) - 1, -1, -1):
             if self.open_inline[i][0] == tag:
                 _, kind, wiki, start = self.open_inline.pop(i)
-                if kind and self.buf is not None:
-                    text = _clean("".join(self.buf[start:]))
-                    if text:
-                        self.buf_spans.append((kind, text, wiki))
+                self._span(kind, wiki, start)
                 return
 
     def handle_data(self, data: str) -> None:
@@ -169,6 +196,8 @@ class _Parser(HTMLParser):
             self.jsonld[-1] += data
         if self.skip:
             return
+        if data.strip():
+            self.breaks = 0
         if self.buf is not None:
             self.buf.append(data)
 
@@ -366,13 +395,18 @@ def quoted_spans(paragraph: str) -> list[str]:
     return found
 
 
-def extract(html: str, url: str, default_lang: str) -> Page:
-    parser = _Parser()
+def _parsed(html: str, fragment: bool = False) -> _Parser:
+    parser = _Parser(fragment)
     try:
         parser.feed(html or "")
         parser.close()
     except Exception:  # noqa: BLE001 - best effort on hostile markup
         parser._flush()
+    return parser
+
+
+def _body(parser: _Parser) -> tuple[list[str], list[Span]]:
+    """The article's paragraphs and the spans in them."""
     use = [r for r in parser.raw if r[1]] if parser.seen_article and any(r[1] for r in parser.raw) else parser.raw
 
     paragraphs: list[str] = []
@@ -387,7 +421,12 @@ def extract(html: str, url: str, default_lang: str) -> Page:
             spans.append(Span(stext, idx, kind, wiki))  # type: ignore[arg-type]
         for q in quoted_spans(clean):
             spans.append(Span(q, idx, "quoted"))
+    return paragraphs, spans
 
+
+def extract(html: str, url: str, default_lang: str) -> Page:
+    parser = _parsed(html)
+    paragraphs, spans = _body(parser)
     title = _clean(parser.meta.get("og:title", "")) or _clean(parser.title_tag)
     published = (parser.meta.get("article:published_time", "").strip()
                  or (parser.time_datetime or "").strip()
@@ -397,6 +436,30 @@ def extract(html: str, url: str, default_lang: str) -> Page:
     return Page(title, published or None, lang if lang.isalpha() and len(lang) == 2 else default_lang,
                 canonical, paragraphs, spans,
                 is_article(_ld_types(parser.jsonld, {url, canonical}, canonical), parser.meta.get("og:type", "")))
+
+
+def extract_entry(xml: str, url: str, lang: str) -> Page | None:
+    """The article at `url` from an Atom feed that holds its entry (or from the entry alone), None when it is not
+    there. ValueError when the text is not such a feed. The whole content is the article's body."""
+    if len(xml) > MAX_FEED or re.search(r"<!(DOCTYPE|ENTITY)", xml, re.IGNORECASE):
+        raise ValueError("not a feed")
+    try:
+        root = ET.fromstring(re.sub(r"^\s*<\?xml[^>]*\?>", "", xml.lstrip("\ufeff")).strip())
+    except ET.ParseError as e:
+        raise ValueError(f"not a feed: {e}") from e
+    atom = "{http://www.w3.org/2005/Atom}"
+    if root.tag not in (atom + "feed", atom + "entry"):
+        raise ValueError("not a feed")
+    for item in root.iter(atom + "entry"):
+        links = [link.get("href", "") for link in item.findall(atom + "link")
+                 if link.get("rel", "alternate") == "alternate"]
+        if _address(url) not in {_address(link) for link in links}:
+            continue
+        # escaped HTML; a title or content typed xhtml (its markup inline) is not read: Blogger has none
+        paragraphs, spans = _body(_parsed(item.findtext(atom + "content") or "", fragment=True))
+        title = _clean(item.findtext(atom + "title") or "")
+        return Page(title, (item.findtext(atom + "published") or "").strip() or None, lang, url, paragraphs, spans)
+    return None
 
 
 def _norm(token: str) -> str:

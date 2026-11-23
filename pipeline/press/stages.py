@@ -10,6 +10,7 @@ outlet or a robots.txt answering 401/403 leaves the article where it was, for th
 from __future__ import annotations
 
 import sys
+from urllib.parse import quote, urlsplit
 
 import requests
 from typesafe_sdk import TypeSafeError
@@ -18,7 +19,7 @@ from sync.wiki import SyncError
 
 from pipeline import domains
 from pipeline import stages as pipeline_stages
-from pipeline.press.extract import Page, extract, mention_texts, opening
+from pipeline.press.extract import Page, extract, extract_entry, mention_texts, opening
 from pipeline.press.fetch import Refused
 from pipeline.press.link import link_article
 from pipeline.press.outlets import discover
@@ -43,18 +44,33 @@ def run_discover(store, client, pcfg: dict) -> dict[str, int]:
     return discover(store, client, pcfg["outlets"], pcfg["max_articles_per_run"])
 
 
+def _text(r) -> str:
+    """The page's text; HTML served with no charset is read as UTF-8 when its bytes are UTF-8 (requests would take
+    it for Latin-1)."""
+    if "charset" not in r.headers.get("Content-Type", "").lower():
+        try:
+            return r.content.decode("utf-8-sig")
+        except (AttributeError, UnicodeDecodeError):
+            pass
+    return r.text
+
+
 class Pages:
     """Articles fetched in this run, parsed; `get` answers (page, None), (None, reason to skip for good) or
-    (None, None) for a failure worth trying again next run."""
+    (None, None) for a failure worth trying again next run. An outlet with an `article_feed` (a URL with {path}) is
+    read there, from the article's own entry: its pages are drawn by script and hold no text."""
 
-    def __init__(self, client):
+    def __init__(self, client, outlets=()):
         self.client, self._pages = client, {}
+        self._feeds = {o["id"]: o["article_feed"] for o in outlets if o.get("article_feed")}
 
     def get(self, art) -> tuple[Page | None, str | None]:
         if art.url in self._pages:
             return self._pages[art.url], None
+        feed = self._feeds.get(art.outlet)
+        url = feed.replace("{path}", quote(urlsplit(art.url).path, safe="/%")) if feed else art.url
         try:
-            r = self.client.get(art.outlet, art.url)
+            r = self.client.get(art.outlet, url)
         except Refused:
             return None, None  # the outlet is refused for the run: in client.refused, reported once
         except (requests.RequestException, OSError) as e:  # timeouts and connection errors included
@@ -65,7 +81,13 @@ class Pages:
         if not 200 <= r.status_code < 300:
             print(f"press: {art.outlet} {art.url}: HTTP {r.status_code}", file=sys.stderr)
             return None, (f"HTTP {r.status_code}" if r.status_code in GONE else None)
-        page = extract(r.text, art.url, art.lang)
+        try:
+            page = extract_entry(r.text, art.url, art.lang) if feed else extract(_text(r), art.url, art.lang)
+        except ValueError as e:
+            print(f"press: {art.outlet} {url}: {e}", file=sys.stderr)
+            return None, None
+        if page is None:
+            return None, "not in the feed"
         if not page.article:  # a section or index page the outlet's sitemap lists among its articles
             print(f"press: {art.outlet} {art.url}: not an article, skipped", file=sys.stderr)
             return None, NOT_ARTICLE

@@ -276,7 +276,7 @@ def cmd_press(args, queue, cfg):
         if action == "discover" and dry:  # a throwaway store: no articles, no feed caches kept
             store = PressStore(sqlite3.connect(":memory:"))
         client = _press_client(pcfg, store)
-    pages = press_stages.Pages(client) if client is not None else None
+    pages = press_stages.Pages(client, pcfg["outlets"]) if client is not None else None
     judge = _press_judge(queue) if action in ("filter", "link", "run") else None
     lazy: dict = {}
 
