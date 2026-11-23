@@ -34,7 +34,8 @@ as its own domain". This is that domain.
 
 - **Classes (`WORK_CLASSES`).** The closure of church building (Q16970), cathedral (Q2977), basilica (Q163687),
   chapel (Q108325), abbey (Q160742) and monastery (Q44613), with `common.owns` as art does. Measured on
-  2026-11-23: about 920 items of the direct classes have ≥ 15 Wikipedia sitelinks; 24 have ≥ 50 (Notre-Dame
+  2026-11-23: 951 items typed directly with one of these classes have ≥ 15 sitelinks (all Wikimedia sites);
+  23 have ≥ 50 (Notre-Dame
   de Paris 125, Sagrada Família 110, Sistine Chapel 90...).
 - **Candidates (stage 0).** Buildings of those classes with a Christian religion (P140) or a Christian
   dedication, above `sitelink_floor` (15, like art), ordered by sitelinks, in bounded queries as art's; plus
