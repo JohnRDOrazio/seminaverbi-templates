@@ -151,3 +151,77 @@ def test_triage_exempts_a_kept_press_mention(domain, mod):
 def test_triage_floor_applies_below_the_exemption(domain, mod):
     assert mod.triage(frow(["press:sir"], {"sir": 0.55}, 3, domain), {"sitelink_floor": 15})[0] == "drop"
     assert mod.triage(frow(["facet", "press:sir"], {"sir": 0.55}, 3, domain), {"sitelink_floor": 15})[0] == "drop"
+
+
+class SeriesSparql:
+    """Closure queries answer the class itself; the volumes query answers V1 as a part of S1."""
+
+    def __init__(self):
+        self.queries = []
+
+    def select(self, query):
+        self.queries.append(query)
+        if "SELECT ?sub WHERE" in query:
+            import re
+            return [{"sub": re.search(r"wd:(Q\d+)", query).group(1)}]
+        if "P527" in query:
+            return [{"series": "S1", "item": "V1", "s_en": "https://en.wikipedia.org/wiki/Volume_One", "n": "4",
+                     "types": "Q7725634"}]
+        return []
+
+
+def series_ent():
+    return {"labels": {"en": {"value": "Saga"}},
+            "claims": {"P31": [{"mainsnak": {"datavalue": {"value": {"id": "Q277759"}}}}]},
+            "sitelinks": {"frwiki": {"title": "Saga"}}}
+
+
+@pytest.fixture
+def closure_cache(tmp_path, monkeypatch):
+    monkeypatch.setattr(common, "CLOSURE_CACHE", tmp_path / "closure.json")
+
+
+def test_a_series_covered_through_a_volume_goes_to_enrichment(q, store, monkeypatch, closure_cache):
+    """literature.covered (stage 1) calls a series covered when one of its volumes is: routing must agree, so a
+    series SeminaVerbi covers through a volume is never proposed."""
+    seen = []
+
+    def covered(row, repo, wikis):
+        seen.append(row.qid)
+        return ("drop", {"have": ["en", "it", "es", "fr", "de", "pt"]}) if row.qid == "V1" else ("pass", {})
+    monkeypatch.setattr(stages, "covered", covered)
+    store.add_mention(mention("S1", "literature"))
+    assert route(store, q, None, {}, FakeWikidata({"S1": series_ent()}), SeriesSparql()) == {"enrichment": 1}
+    assert q.row("S1") is None and seen == ["S1", "V1"]
+    assert [m.qid for m in store.mentions(route="enrichment")] == ["S1"]
+
+
+def test_a_new_series_candidate_carries_its_volumes(q, store, uncovered, closure_cache):
+    store.add_mention(mention("S1", "literature"))
+    assert route(store, q, None, {}, FakeWikidata({"S1": series_ent()}), SeriesSparql()) == {"candidate": 1}
+    stage0 = q.row("S1").data[0]
+    assert stage0["series"] is True and stage0["volumes"] == {"V1": {"sitelinks": {"enwiki": "Volume One"},
+                                                                     "count": 4}}
+    assert stage0["press"] == {"sir": 0.8}
+
+
+def test_a_domain_without_its_own_covered_uses_stages_covered(q, store, uncovered, monkeypatch):
+    import types
+    from pipeline import domains
+    bare = types.SimpleNamespace(__name__="bare")
+    monkeypatch.setattr(domains, "DOMAINS", {**domains.DOMAINS, "bare": bare})
+    store.add_mention(mention("Q5", "bare"))
+    assert route(store, q, None, {}, FakeWikidata({"Q5": ent()}), SeriesSparql()) == {"candidate": 1}
+    assert [r.qid for r in uncovered] == ["Q5"]
+
+
+def test_release_uses_the_domains_own_covered(q, store, uncovered, monkeypatch):
+    import types
+    from pipeline import domains
+    asked = []
+    music = types.SimpleNamespace(covered=lambda row, repo, wikis: (asked.append(row.domain) or ("translation", {})))
+    monkeypatch.setattr(domains, "DOMAINS", {**domains.DOMAINS, "music": music})
+    store.add_mention(mention("Q7", "waiting:music"))
+    store.set_route(URL, "Q7", "waiting")
+    assert release_waiting(store, q, "music", None, {}, FakeWikidata({"Q7": ent()})) == {"enrichment": 1}
+    assert asked == ["music"] and uncovered == [] and q.row("Q7") is None

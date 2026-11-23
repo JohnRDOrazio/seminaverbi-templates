@@ -22,7 +22,7 @@ from pipeline.press.extract import Page, extract, opening
 from pipeline.press.fetch import Refused
 from pipeline.press.link import link_article
 from pipeline.press.outlets import discover
-from pipeline.press.route import WAITING, _provisional
+from pipeline.press.route import WAITING, _provisional, decide
 
 GONE = (404, 410)
 # one article's failure (SyncError: Wikidata or WDQS still failing after the retries); the run goes on
@@ -124,8 +124,9 @@ def run_link(store, pages: Pages, judge, wikidata, sparql, pcfg: dict) -> dict[s
     return counts
 
 
-def would_route(store, repo, wikis, wikidata) -> list[tuple[object, str]]:
-    """(mention, route it would take) for every unrouted mention; reads the wikis, writes nothing."""
+def would_route(store, repo, wikis, wikidata, sparql=None) -> list[tuple[object, str]]:
+    """(mention, route it would take) for every unrouted mention, by route()'s own decision; reads the wikis,
+    writes nothing."""
     out = []
     for m in store.unrouted():
         if m.domain.startswith(WAITING):
@@ -133,16 +134,15 @@ def would_route(store, repo, wikis, wikidata) -> list[tuple[object, str]]:
         elif m.domain not in domains.DOMAINS:
             kind = "unknown"
         else:
-            outcome = pipeline_stages.covered(_provisional(m, wikidata.entity(m.qid)), repo, wikis)[0]
-            kind = "enrichment" if outcome in ("drop", "translation") else "candidate"
+            kind = decide(m, m.domain, wikidata.entity(m.qid), repo, wikis, sparql)[0]
         out.append((m, kind))
     return out
 
 
-def preview(store, repo, wikis, wikidata) -> list[str]:
+def preview(store, repo, wikis, wikidata, sparql=None) -> list[str]:
     """The dry-run report: each mention's would-be route with its probabilities, then the share that hits an
     existing SeminaVerbi article."""
-    routed = would_route(store, repo, wikis, wikidata)
+    routed = would_route(store, repo, wikis, wikidata, sparql)
     lines = []
     for m, kind in routed:
         art = store.article(m.url)

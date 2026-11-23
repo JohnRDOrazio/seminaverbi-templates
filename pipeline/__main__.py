@@ -169,7 +169,7 @@ def cmd_candidates(args, queue, cfg):
     if not any(m.domain == waiting for m in press.mentions(route="waiting")):
         return
     wikis = _wikis()
-    released = release_waiting(press, queue, args.domain, wikis["en"], wikis, _wikidata())
+    released = release_waiting(press, queue, args.domain, wikis["en"], wikis, _wikidata(), _sparql())
     if released:
         print(f"candidates: press mentions released from waiting: {released.get('candidate', 0)} as candidates, "
               f"{released.get('enrichment', 0)} to the enrichment list")
@@ -287,9 +287,9 @@ def cmd_press(args, queue, cfg):
         print("press link: " + _counts(press_stages.run_link(store, pages, judge, wikidata(), _sparql(), pcfg)))
     if action in ("route", "run"):
         if dry:
-            print("\n".join(press_stages.preview(store, wikis()["en"], wikis(), wikidata())))
+            print("\n".join(press_stages.preview(store, wikis()["en"], wikis(), wikidata(), _sparql())))
         else:
-            print("press route: " + _counts(route(store, queue, wikis()["en"], wikis(), wikidata())))
+            print("press route: " + _counts(route(store, queue, wikis()["en"], wikis(), wikidata(), _sparql())))
     if action in ("enrich", "run") and not dry:
         titles = press_stages.titles(store, wikis()["en"], wikidata())
         written = publish_enrichment(store, editor, outlets, titles)
