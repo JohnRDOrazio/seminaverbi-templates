@@ -4,7 +4,8 @@ enrichment page's links.
 An article is fetched when a stage needs it and kept in memory (as a parsed Page, never stored) for that run only,
 so `press run` fetches each article once for filter and link. Article stages in press_articles: `found` (from
 discovery) -> `filtered` (outcome `keep`, `drop` below culture_drop, or `skip` when the article is gone or robots.txt
-forbids it) -> `linked`. A timeout, a 5xx or a refused outlet leaves the article where it was, for the next run.
+forbids its path) -> `linked`. A timeout, a 5xx, a refused outlet or a robots.txt answering 401/403 leaves the article
+where it was, for the next run.
 """
 from __future__ import annotations
 
@@ -54,8 +55,8 @@ class Pages:
         except (requests.RequestException, OSError) as e:  # timeouts and connection errors included
             print(f"press: {art.outlet} {art.url}: {e}", file=sys.stderr)
             return None, None
-        if r is None:
-            return None, "robots.txt"
+        if r is None:  # a robots.txt answering 401/403 blocks the outlet for this run only: try again next run
+            return None, (None if art.outlet in self.client._blocked else "robots.txt")
         if not 200 <= r.status_code < 300:
             print(f"press: {art.outlet} {art.url}: HTTP {r.status_code}", file=sys.stderr)
             return None, (f"HTTP {r.status_code}" if r.status_code in GONE else None)
