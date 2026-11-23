@@ -1,3 +1,6 @@
+import json
+from datetime import date, timedelta
+
 import pytest
 
 from pipeline.domains import common, film
@@ -65,3 +68,23 @@ def test_other_domain_row_is_reported_and_skipped(q, capsys):
     assert "already a literature candidate" in capsys.readouterr().out
     assert common.other_domain(q, "Q1", "literature") is None
     assert common.other_domain(q, "Q9", "music") is None
+
+
+def _write_closure_cache(cache, cls, date_text, subclasses):
+    cache.write_text(json.dumps({cls: {"date": date_text, "subclasses": subclasses}}), encoding="utf-8")
+
+
+def test_cache_entry_with_non_string_subclass_is_refetched(tmp_path):
+    cache = tmp_path / "closure.json"
+    _write_closure_cache(cache, "Q7366", date.today().isoformat(), [[]])
+    sparql = FakeSparql({"wd:Q7366": [{"sub": "Q7366"}]})
+    assert common.class_closure(sparql, ["Q7366"], cache) == {"Q7366"}
+    assert len(sparql.queries) == 1
+
+
+def test_future_dated_cache_entry_is_stale(tmp_path):
+    cache = tmp_path / "closure.json"
+    _write_closure_cache(cache, "Q7366", (date.today() + timedelta(days=5)).isoformat(), ["Q999"])
+    sparql = FakeSparql({"wd:Q7366": [{"sub": "Q7366"}]})
+    assert common.class_closure(sparql, ["Q7366"], cache) == {"Q7366"}
+    assert len(sparql.queries) == 1

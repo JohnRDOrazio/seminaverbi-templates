@@ -140,6 +140,7 @@ def test_closed_whole_absorbs_nothing(q):
 
 `part_row`/`whole_row` are small helpers in the test file returning `common.query`-shaped dicts (`item`, `n`, `types`, `l_en`, `s_en`). The closure is stubbed by passing a FakeSparql answer for the closure query, or by monkeypatching `common.class_closure` to return the class itself.
 
+```python
 def test_whole_is_a_translation_suggestion_when_a_part_is_covered():
     # FakeRepo/FakeWiki from test_pipeline_film: the part Q10 has a local item with an `it` sitelink
     outcome, data = common.covered_with_parts(row_with_parts({"Q10": {"sitelinks": {"itwiki": "Kyrie"}, "count": 5}}), repo, wikis)
@@ -496,7 +497,7 @@ Expected: FAIL.
 
 - [ ] **Step 3: Implement `art.candidates`**
 
-Patterns: `depicts`: `VALUES ?d { <depicts> } ?item wdt:P180 ?d .`, plus `?item wdt:P180 ?d . ?d wdt:P411 [] .` (a saint), plus biblical figures and scene classes; `iconclass`: `?item wdt:P1257 ?ic . FILTER(STRSTARTS(STR(?ic), "7") || STRSTARTS(STR(?ic), "11"))` from `iconclass_prefixes`; `genre`: `VALUES ?genre { <genres> } ?item wdt:P136 ?genre .`; `list`: `VALUES ?item { <works> }` unbounded by class (a listed work need not be in `WORK_CLASSES`, but is reported if it is a person). All through `common.bounded` per class and `common.fold_parts(…, "art", WORK_CLASSES, STOP_CLASSES)`.
+Patterns: `depicts`: `VALUES ?d { <depicts> } ?item wdt:P180 ?d .`, plus `?item wdt:P180 ?d . ?d wdt:P411 [] .` (a saint), plus biblical figures and scene classes; `iconclass`: `?item wdt:P1257 ?ic . FILTER(STRSTARTS(STR(?ic), "7") || STRSTARTS(STR(?ic), "11"))` from `iconclass_prefixes`; `genre`: `VALUES ?genre { <genres> } ?item wdt:P136 ?genre .`; `list`: its own query, `VALUES ?item { <works> }` with the query LIMIT kept but no class filter and not run through `common.bounded` (a listed work need not be in `WORK_CLASSES`, but is reported if it is a person). The other three sources go through `common.bounded` per class; all four are then folded by `common.fold_parts(…, "art", WORK_CLASSES, STOP_CLASSES)`.
 
 - [ ] **Step 4: Run the full suite**
 
@@ -540,8 +541,8 @@ def test_benchmark_rows_are_flagged(q):
 
 def test_benchmark_rows_are_not_translation_suggestions(q):   # in test_pipeline_publish.py
     q.add("Q2", "art", "calibration", {"en": "Trinity"}, {}, calibration=True, data={"benchmark": True})
-    q.set_outcome("Q2", 1, "pass", {"have": [], "missing": ["en", "it", "es", "fr", "de", "pt"]})
-    assert "Trinity" not in ranking(q)
+    q.set_outcome("Q2", 1, "translation", {"have": ["it"], "missing": ["en", "es", "fr", "de", "pt"]})   # covered in a language: would be a suggestion
+    assert "Trinity" not in ranking(q)   # the translation suggestions omit the benchmark title
 
 def test_release_turns_one_benchmark_row_into_a_candidate(q):   # in test_pipeline_cli.py
     ...  # run the CLI on Q2; then q.row("Q2").calibration is False and publish() writes its page
