@@ -3,8 +3,9 @@
 A span (italic or quoted title, Wikipedia link) becomes a list of Wikidata hits: a link through its sitelink, any
 other span through Wikidata search in the page's language, then in English. Hits whose class routes to no domain
 are discarded; one routed hit is taken, several go to Jev's `pick`, taken only above the configured cut. Jev then
-judges, on the paragraphs around the mention (at most 150 words), whether the article discusses the item
-substantively; a kept mention is stored with up to three passages of at most 25 words.
+judges, on the paragraphs around the mention (at most 150 words, centred on it), whether the article discusses the
+item substantively, asking again at each later mention in another window until one is kept; a kept mention is stored
+with up to three passages of at most 25 words.
 
 Class membership comes only from the domains' `owns()` and `common.owns()`, backed by the cached subclass closure:
 this module runs no SPARQL of its own.
@@ -122,24 +123,28 @@ def link_article(page: Page, outlet: str, store, judge, wikidata, sparql, cfg: d
     closure cache (default: common.CLOSURE_CACHE); `routes` is the run's memo of class_route by set of P31
     classes, shared across the run's articles (default: one for this article)."""
     linker = _Linker(page, outlet, url, judge, wikidata, sparql, cfg, cache, routes)
-    seen_spans: set[tuple[str, tuple[str, str] | None]] = set()
-    judged: set[str] = set()
+    resolved: dict[tuple[str, tuple[str, str] | None], str | None] = {}  # span key -> item, resolved once
+    judged: set[tuple[str, str]] = set()  # (item, window) already asked
+    done: set[str] = set()  # items kept
     kept: list[Mention] = []
     for span in page.spans:
-        key = (span.text.casefold(), span.wiki)
-        if key in seen_spans or not span.text.strip():
+        if not span.text.strip():
             continue
-        seen_spans.add(key)
         context = window(page.paragraphs, span.paragraph, needle=span.text)
         if not context:  # a span outside the paragraphs: nothing for Jev to read
             continue
-        qid = linker.resolve(span, context)
-        if qid is None or qid in judged:
+        key = (span.text.casefold(), span.wiki)
+        if key not in resolved:
+            resolved[key] = linker.resolve(span, context)
+        qid = resolved[key]
+        # an item is done only once kept: a passing first mention does not hide a later substantive one
+        if qid is None or qid in done or (qid, context) in judged:
             continue
-        judged.add(qid)
+        judged.add((qid, context))
         p = judge.substantive(url, span.text, context)
         if p < cfg["mention_keep"]:
             continue
+        done.add(qid)
         domain, instance_of = linker.route_of(qid)
         mention = Mention(url, qid, span.text, "person" if PERSON in instance_of else "work", domain, p,
                           linker.passages(span))

@@ -276,3 +276,20 @@ def test_class_route_is_asked_once_per_set_of_classes_in_a_run(store, cache, mon
     link_article(pg, "sir", PressStore(sqlite3.connect(":memory:")), FakeJudge(), wd, FakeSparql(), CFG,
                  cache=cache, url="https://example.org/b", routes=routes)
     assert calls == [["Q7366"]]
+
+
+def test_a_passing_first_mention_does_not_hide_a_later_substantive_one(store, cache):
+    filler = " ".join(f"parola{i}" for i in range(200))
+    pg = page([f"Di passaggio Silence. {filler}", filler, filler, f"Silence racconta il dubbio. {filler}"],
+              [Span("Silence", 0, "italic"), Span("Silence", 3, "italic")])
+    wd = FakeWikidata({"Q9": entity(["Q11424"]), "Q3": entity(["Q11424"])}, search={("Silence", "it"): ["Q9", "Q3"]})
+
+    class ByWindow(FakeJudge):
+        def substantive(self, url, label, passage):
+            super().substantive(url, label, passage)
+            return 0.9 if "dubbio" in passage else 0.2
+    judge = ByWindow(pick=("Q9", 0.9, 0.9))
+    out = run(pg, store, judge, wd, cache)
+    assert [(m.qid, m.p) for m in out] == [("Q9", 0.9)]
+    assert len(judge.substantives) == 2
+    assert len(judge.picks) == 1  # the same title is resolved once
