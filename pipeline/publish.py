@@ -167,10 +167,16 @@ def ranking(queue) -> str:
         return [f"* [[{r.page}|{_display(r.page)}]]" + (f" ({r.votes or 0})" if votes else "") for r in items] + [""]
 
     opened = [r for r in rows if r.status == "open"]
+    domains = sorted({r.domain for r in opened})
+    # one line of links to the sections, with their counts, so a reader can jump to the domain they follow
+    links = [f"[[#{d.capitalize()}|{d.capitalize()}]] ({sum(r.domain == d for r in opened)})" for d in domains]
+    links += [f"[[#{s.capitalize()}|{s.capitalize()}]] ({sum(r.status == s for r in rows)})" for s in KEPT_STATUSES]
+    links.append("[[#Translation suggestions|Translation suggestions]]")
+    lines += ["Go to: " + " · ".join(links), ""]
     lines.append("== Open ==")
-    for domain in sorted({r.domain for r in opened}) or []:
+    for domain in domains:
         group = sorted((r for r in opened if r.domain == domain), key=lambda r: (-(r.votes or 0), r.page))
-        lines += [f"=== {domain} ==="] + listing(group, votes=True)
+        lines += [f"=== {domain.capitalize()} ==="] + listing(group, votes=True)
     if not opened:
         lines += listing([])
     for status in KEPT_STATUSES:

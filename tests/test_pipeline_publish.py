@@ -182,6 +182,19 @@ def test_ranking_sections(q):
     assert "Trans" in text and "it" in text and "fr" in text
 
 
+def test_ranking_links_to_each_section_with_its_count(q):
+    for qid, t, domain in (("Q1", "A", "film"), ("Q2", "B", "film"), ("Q3", "C", "literature")):
+        add(q, qid, t, domain=domain); q.set_status(qid, "open", page=PREFIX + t)
+    add(q, "Q4", "D"); q.set_status("Q4", "declined", page=PREFIX + "D")
+    text = ranking(q)
+    nav = text.splitlines()[2]
+    assert nav == ("Go to: [[#Film|Film]] (2) · [[#Literature|Literature]] (1) · [[#Approved|Approved]] (0) · "
+                   "[[#Created|Created]] (0) · [[#Declined|Declined]] (1) · "
+                   "[[#Translation suggestions|Translation suggestions]]")
+    assert "=== Film ===" in text and "=== Literature ===" in text
+    assert text.index(nav) < text.index("== Open ==")
+
+
 def test_colliding_titles_get_the_qid(q):
     q.add("Q1", "film", "s", {}, {"enwiki": "A|B"}); q.add("Q2", "film", "s", {}, {"enwiki": "AB"})
     a, b = q.pending(1)
