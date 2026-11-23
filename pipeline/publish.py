@@ -159,7 +159,9 @@ def _display(title: str) -> str:
 
 def ranking(queue) -> str:
     rows = [r for r in queue.by_status_in(KEPT_STATUSES + ("open",)) if r.page and not r.calibration]
-    lines = ["Article proposals of the SeminaVerbi pipeline, by votes. Vote on the proposal page.", ""]
+    # "every three hours": the schedule of deploy/systemd/sv-pipeline-votes.timer, which rewrites this page
+    lines = ["Article proposals of the SeminaVerbi pipeline, by votes. Vote on the proposal page: your vote is "
+             "counted as soon as you cast it, but the counts on this list are updated every three hours.", ""]
 
     def listing(items, votes=False):
         if not items:
