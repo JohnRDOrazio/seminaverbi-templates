@@ -232,3 +232,125 @@ def other_domain(queue, qid: str, domain: str) -> str | None:
         print(f"{domain} candidates: {qid} is already a {old.domain} candidate, skipped")
         return old.domain
     return None
+
+
+CLOSED = ("approved", "created", "declined")  # a whole with one of these statuses absorbs nothing
+
+
+def _wholes_of(sparql, qids: list[str], classes: set[str], stop: set[str]) -> dict[str, list[str]]:
+    """Part QID -> the wholes (P361) of it that are instances of one of `classes` and of none of `stop`; one
+    query per CHUNK of parts."""
+    found: dict[str, list[str]] = {}
+    for i in range(0, len(qids), CHUNK):
+        exclude = (f"  FILTER NOT EXISTS {{ VALUES ?stop {{ {values(sorted(stop))} }} ?whole wdt:P31 ?stop . }}\n"
+                   if stop else "")
+        rows = run_query(sparql, "parts", "wholes of parts", (
+            "SELECT DISTINCT ?item ?whole WHERE {\n"
+            f"  VALUES ?item {{ {values(qids[i:i + CHUNK])} }}\n"
+            f"  VALUES ?cls {{ {values(sorted(classes))} }}\n"
+            f"  ?item wdt:P361 ?whole .\n  ?whole wdt:P31 ?cls .\n{exclude}}}\nLIMIT {LIMIT}"))
+        for row in rows:
+            if row["whole"] not in found.setdefault(row["item"], []):
+                found[row["item"]].append(row["whole"])
+    return found
+
+
+def _whole_rows(sparql, qids: list[str]) -> dict[str, dict]:
+    """Labels, sitelinks and count of the wholes `qids`, as `query` rows keyed by QID."""
+    rows: dict[str, dict] = {}
+    for i in range(0, len(qids), CHUNK):
+        pattern = f"  VALUES ?item {{ {values(qids[i:i + CHUNK])} }}"
+        rows.update({r["item"]: r for r in run_query(sparql, "parts", "whole details", query(pattern))})
+    return rows
+
+
+def _insert_row(queue, row: dict, source: str, domain: str) -> int:
+    if other_domain(queue, row["item"], domain):
+        return 0
+    labels, sitelinks, data = row_data(row)
+    old = queue.row(row["item"])
+    stored = old.data.get(0, {}) if old else {}
+    if stored.get("parts") and "count" in stored:
+        data["count"] = max(data["count"], stored["count"])  # a whole folded earlier counts its best part
+    return queue.add(row["item"], domain, source, labels, sitelinks, False, data)
+
+
+def _fold_into_whole(queue, whole_qid: str, whole_row: dict, parts: list[dict], source: str, domain: str) -> int:
+    """Add or extend the whole's row with `parts` (`query` rows); the part rows already in the queue are marked
+    `folded_into` (triage then drops them). A whole already closed gets nothing."""
+    if other_domain(queue, whole_qid, domain):
+        return 0
+    old = queue.row(whole_qid)
+    if old and old.status in CLOSED:
+        return 0
+    labels, sitelinks, data = row_data(whole_row)
+    known = dict(old.data.get(0, {}).get("parts", {})) if old else {}
+    new_part = False
+    for part in parts:
+        _, part_sitelinks, part_data = row_data(part)
+        entry = {"sitelinks": part_sitelinks, "count": part_data["count"]}
+        new_part = new_part or known.get(part["item"]) != entry
+        known[part["item"]] = entry
+        own = queue.row(part["item"])
+        if own is not None and own.domain == domain and own.data.get(0, {}).get("folded_into") != whole_qid:
+            queue.add(part["item"], domain, own.sources[0], {}, {}, False, {"folded_into": whole_qid})
+            if own.status is None:
+                queue.redo(2, part["item"])
+            else:
+                print(f"{domain} candidates: {part['item']} folded into {whole_qid} but already "
+                      f"{own.status}, left alone")
+    data.update(parts=known, count=max([data["count"], *(p["count"] for p in known.values())]))
+    added = queue.add(whole_qid, domain, source, labels, sitelinks, False, data)
+    if new_part and old and old.status is None:
+        queue.redo(1, whole_qid)  # coverage, triage and the later stages saw the previous parts
+    return added
+
+
+def fold_parts(queue, sparql, rows: list[dict], source: str, domain: str, whole_classes: Iterable[str],
+               stop_classes: Iterable[str] = ()) -> int:
+    """Add the `query` rows under `domain`/`source`, each part replaced by its whole (P361) when it has exactly
+    one in the closure of `whole_classes` and outside that of `stop_classes`: the whole carries the source and
+    a stage-0 `parts` entry for the part. A part with no such whole, or with several (reported), is added as
+    itself. Returns the rows added to the queue."""
+    classes = class_closure(sparql, whole_classes)
+    stop = class_closure(sparql, stop_classes) if stop_classes else set()
+    in_whole = _wholes_of(sparql, [r["item"] for r in rows], classes, stop)
+    details = _whole_rows(sparql, sorted({w[0] for w in in_whole.values() if len(w) == 1}))
+    grouped: dict[str, list[dict]] = {}
+    added = 0
+    for row in rows:
+        found = in_whole.get(row["item"], [])
+        if len(found) > 1:
+            print(f"{domain} candidates: {row['item']} has {len(found)} wholes, kept on its own")
+        if len(found) == 1 and found[0] in details:
+            grouped.setdefault(found[0], []).append(row)
+        else:
+            added += _insert_row(queue, row, source, domain)
+    for whole_qid, parts in grouped.items():
+        added += _fold_into_whole(queue, whole_qid, details[whole_qid], parts, source, domain)
+    return added
+
+
+def _part_title(qid: str, sitelinks: dict) -> str:
+    return sitelinks.get("enwiki") or next(iter(sitelinks.values()), None) or qid
+
+
+def covered_with_parts(row, repo, wikis) -> tuple[str, dict]:
+    """Stage 1: `stages.covered` on the whole; a whole it passes is still a translation suggestion when one of
+    its parts is covered on some wiki (the first such part sets `have` and the `note`)."""
+    from types import SimpleNamespace
+
+    from pipeline import stages
+
+    outcome, data = stages.covered(row, repo, wikis)
+    if outcome != "pass" or row.calibration or data.get("have"):
+        return outcome, data
+    for qid, part in row.data.get(0, {}).get("parts", {}).items():
+        sitelinks = part.get("sitelinks", {})
+        stand_in = SimpleNamespace(qid=qid, sitelinks=sitelinks, labels={}, calibration=False, data={})
+        part_outcome, part_data = stages.covered(stand_in, repo, wikis)
+        if part_outcome != "pass":
+            have = part_data["have"]
+            return "translation", {"have": have, "missing": [lang for lang in LANGS if lang not in have],
+                                   "note": f"covered through {_part_title(qid, sitelinks)}"}
+    return outcome, data
