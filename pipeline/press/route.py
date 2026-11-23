@@ -39,8 +39,7 @@ def _add_candidate(queue, mention, outlet: str, entity: dict, domain: str, stage
     """Add the mention's item to the queue under `domain`, or its source and press probability to the row it has.
     `stage0`: the domain's own stage-0 data for a new row (e.g. a literature series' volumes)."""
     existing = queue.row(mention.qid)
-    old = existing.data.get(0, {}).get("press", {}) if existing else {}
-    press = dict(old)
+    press = dict(existing.data.get(0, {}).get("press", {})) if existing else {}
     press[outlet] = max(mention.p, press.get(outlet, 0.0))
     data = {"press": press}
     sitelinks = _sitelinks(entity)
@@ -52,8 +51,8 @@ def _add_candidate(queue, mention, outlet: str, entity: dict, domain: str, stage
         return
     if row.outcomes.get(2) == "drop" and common.press_exempt(row):
         queue.redo(2, mention.qid)  # dropped (under the sitelink floor) before this evidence: triaged again
-    elif press != old and 4 in row.outcomes:
-        queue.redo(4, mention.qid)  # a dossier built without this evidence: built again with its press notes
+    elif 4 in row.outcomes:  # a mention is routed once: its passages are new to the stored dossier
+        queue.redo(4, mention.qid)
 
 
 def owner(queue, qid: str, domain: str) -> str:

@@ -370,10 +370,10 @@ def test_new_press_evidence_rebuilds_a_passed_dossier(q, store, uncovered, p, ur
     assert 4 not in r.outcomes and r.outcomes[3] == "pass"
 
 
-@pytest.mark.parametrize("p,status", [(0.5, None), (0.9, "open")])
-def test_a_dossier_stays_without_new_evidence_or_with_a_status(q, store, uncovered, p, status):
+@pytest.mark.parametrize("status", ["open", "declined"])
+def test_a_dossier_stays_with_a_status(q, store, uncovered, status):
     _passed(q, status)
-    store.add_mention(mention(p=p))
+    store.add_mention(mention(p=0.9))
     route(store, q, None, {}, FakeWikidata({"Q9": ent()}))
     assert q.row("Q9").outcomes[4] == "pass"
 
@@ -394,3 +394,11 @@ def test_an_interrupted_release_leaves_the_mention_waiting(q, store, uncovered, 
     assert release_waiting(store, q, "music", None, {}, FakeWikidata({"Q7": ent()})) == {"candidate": 1}
     m = store.mentions()[0]
     assert (m.domain, m.route) == ("art", "candidate")
+
+
+def test_a_second_article_of_the_same_outlet_rebuilds_the_dossier(q, store, uncovered):
+    store.add_article(URL + "3", "sir", "it", "Terzo", "2026-11-22")
+    _passed(q)  # press {"sir": 0.7}
+    store.add_mention(mention(p=0.6, url=URL + "3"))  # same outlet, lower p: the press map is unchanged
+    route(store, q, None, {}, FakeWikidata({"Q9": ent()}))
+    assert 4 not in q.row("Q9").outcomes
