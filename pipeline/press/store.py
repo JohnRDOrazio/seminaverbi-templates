@@ -14,7 +14,7 @@ MAX_PASSAGE_WORDS = 25
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS press_articles (
   url TEXT PRIMARY KEY, outlet TEXT, lang TEXT, title TEXT, published TEXT,
-  found_at REAL, stage TEXT DEFAULT 'found', outcome TEXT, data_json TEXT);
+  found_at REAL, stage TEXT DEFAULT 'found', outcome TEXT, data_json TEXT, attempted_at REAL);
 CREATE TABLE IF NOT EXISTS press_mentions (
   url TEXT, qid TEXT, label TEXT, kind TEXT, domain TEXT, p REAL,
   passages_json TEXT, route TEXT, PRIMARY KEY (url, qid));
@@ -50,6 +50,8 @@ class PressStore:
     def __init__(self, db: sqlite3.Connection):
         self.db = db
         db.executescript(SCHEMA)
+        if "attempted_at" not in {r[1] for r in db.execute("PRAGMA table_info(press_articles)")}:
+            db.execute("ALTER TABLE press_articles ADD COLUMN attempted_at REAL")  # a store made before it
         db.commit()
 
     @classmethod
@@ -63,12 +65,14 @@ class PressStore:
         self.db.commit()
         return cur.rowcount == 1
 
-    def articles(self, stage: str, outlet: str | None = None, limit: int | None = None) -> list[Article]:
+    def articles(self, stage: str, outlet: str | None = None, limit: int | None = None,
+                 tried_last: bool = False) -> list[Article]:
+        """In discovery order; `tried_last`: the articles never attempted first, then the oldest attempt first."""
         sql, args = "SELECT url, outlet, lang, title, published, stage, outcome, data_json " \
                     "FROM press_articles WHERE stage=?", [stage]
         if outlet is not None:
             sql += " AND outlet=?"; args.append(outlet)
-        sql += " ORDER BY found_at, rowid"
+        sql += " ORDER BY " + ("attempted_at IS NOT NULL, attempted_at, " if tried_last else "") + "found_at, rowid"
         if limit is not None:
             sql += " LIMIT ?"; args.append(limit)
         return [Article(r[0], r[1], r[2], r[3], r[4], r[5], r[6], json.loads(r[7]) if r[7] else {})
@@ -78,6 +82,10 @@ class PressStore:
         r = self.db.execute("SELECT url, outlet, lang, title, published, stage, outcome, data_json "
                             "FROM press_articles WHERE url=?", (url,)).fetchone()
         return Article(r[0], r[1], r[2], r[3], r[4], r[5], r[6], json.loads(r[7]) if r[7] else {}) if r else None
+
+    def attempted(self, url: str) -> None:
+        self.db.execute("UPDATE press_articles SET attempted_at=? WHERE url=?", (time.time(), url))
+        self.db.commit()
 
     def set_article(self, url, stage, outcome, data: dict) -> None:
         self.db.execute("UPDATE press_articles SET stage=?, outcome=?, data_json=? WHERE url=?",
@@ -112,6 +120,10 @@ class PressStore:
 
     def unrouted(self) -> list[Mention]:
         return self._mentions(" WHERE route IS NULL", [])
+
+    def set_mention_domain(self, url, qid, domain) -> None:
+        self.db.execute("UPDATE press_mentions SET domain=? WHERE url=? AND qid=?", (domain, url, qid))
+        self.db.commit()
 
     def set_route(self, url, qid, route) -> None:
         self.db.execute("UPDATE press_mentions SET route=? WHERE url=? AND qid=?", (route, url, qid))

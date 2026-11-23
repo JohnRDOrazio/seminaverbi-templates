@@ -3,6 +3,8 @@ candidate of the mention's domain (source `press:<outlet>`), or to `waiting` (it
 later with the same coverage decision).
 
 A mention keeps its route once set, so routing twice adds neither a second candidate nor a second enrichment entry.
+The queue is keyed by QID alone: a mention of a QID that is already a row of another domain is decided and recorded
+under that row's domain, and its evidence goes to that row.
 """
 from __future__ import annotations
 
@@ -44,6 +46,35 @@ def _add_candidate(queue, mention, outlet: str, entity: dict, domain: str, stage
     if existing is None:  # what triage reads of a row the domain's own queries did not make
         data |= {"count": len(sitelinks), "instance_of": common.qids(entity, "P31")} | (stage0 or {})
     queue.add(mention.qid, domain, f"press:{outlet}", _labels(entity), sitelinks, data=data)
+    row = queue.row(mention.qid)
+    if existing and row.status is None and row.outcomes.get(2) == "drop" and common.press_exempt(row):
+        queue.redo(2, mention.qid)  # dropped (under the sitelink floor) before this evidence: triaged again
+
+
+def owner(queue, qid: str, domain: str) -> str:
+    """The domain a mention of `qid` is routed under: the domain of the QID's queue row when it has one, else
+    `domain`."""
+    row = queue.row(qid) if queue is not None else None
+    return row.domain if row is not None else domain
+
+
+def _route(store, queue, mention, outlet: str, domain: str, entity: dict, repo, wikis, sparql) -> str | None:
+    """Route one mention under `domain`, or under the domain of the row its QID already has (the mention's stored
+    domain follows it); the route taken, or None (reported) when that domain has no module here."""
+    under = owner(queue, mention.qid, domain)
+    if under not in domains.DOMAINS:
+        print(f"press: {mention.qid} in {mention.url}: already a {under} candidate, a domain not loaded here; "
+              "not routed", file=sys.stderr)
+        return None
+    kind, stage0 = decide(mention, under, entity, repo, wikis, sparql)
+    if under != domain:
+        print(f"press: {mention.qid} in {mention.url}: already a {under} candidate, routed as {under}",
+              file=sys.stderr)
+        store.set_mention_domain(mention.url, mention.qid, under)
+    if kind == "candidate":
+        _add_candidate(queue, mention, outlet, entity, under, stage0)
+    store.set_route(mention.url, mention.qid, kind)
+    return kind
 
 
 def decide(mention, domain: str, entity: dict, repo, wikis, sparql=None) -> tuple[str, dict]:
@@ -74,15 +105,15 @@ def route(store, queue, repo, wikis, wikidata, sparql=None) -> dict[str, int]:
         entity = wikidata.entity(mention.qid)
         if mention.domain.startswith(WAITING):
             kind = "waiting"
+            store.set_route(mention.url, mention.qid, kind)
         elif mention.domain not in domains.DOMAINS:
             print(f"press: {mention.qid} in {mention.url}: unknown domain {mention.domain!r}, not routed",
                   file=sys.stderr)
             continue
         else:
-            kind, stage0 = decide(mention, mention.domain, entity, repo, wikis, sparql)
-            if kind == "candidate":
-                _add_candidate(queue, mention, outlet, entity, mention.domain, stage0)
-        store.set_route(mention.url, mention.qid, kind)
+            kind = _route(store, queue, mention, outlet, mention.domain, entity, repo, wikis, sparql)
+            if kind is None:
+                continue
         counts[kind] = counts.get(kind, 0) + 1
     return counts
 
@@ -96,10 +127,7 @@ def release_waiting(store, queue, domain: str, repo, wikis, wikidata, sparql=Non
         outlet = _outlet(store, mention.url)
         if mention.domain != WAITING + domain or outlet is None:
             continue
-        entity = wikidata.entity(mention.qid)
-        kind, stage0 = decide(mention, domain, entity, repo, wikis, sparql)
-        if kind == "candidate":
-            _add_candidate(queue, mention, outlet, entity, domain, stage0)
-        store.set_route(mention.url, mention.qid, kind)
-        counts[kind] = counts.get(kind, 0) + 1
+        kind = _route(store, queue, mention, outlet, domain, wikidata.entity(mention.qid), repo, wikis, sparql)
+        if kind is not None:
+            counts[kind] = counts.get(kind, 0) + 1
     return counts

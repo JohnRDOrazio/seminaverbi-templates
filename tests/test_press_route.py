@@ -288,3 +288,66 @@ def test_an_item_that_is_no_whole_gets_no_parts(closure_cache, domain, classes):
     sparql = PartsSparql()
     assert domains.DOMAINS[domain].press_stage0("W1", whole_ent(*classes), sparql) == {}
     assert not any("P361" in qy for qy in sparql.queries)
+
+
+def test_a_qid_of_another_domains_row_is_routed_under_that_domain(q, store, uncovered):
+    """The queue is keyed by QID alone: a press 'film' mention of a literature row is that row's evidence, decided
+    and recorded under literature, never a film candidate without a film row."""
+    q.add("Q9", "literature", "category", {"en": "Ordet"}, {"enwiki": "Ordet"}, data={"count": 20})
+    store.add_mention(mention())
+    assert route(store, q, None, {}, FakeWikidata({"Q9": ent()})) == {"candidate": 1}
+    r = q.row("Q9")
+    assert r.domain == "literature" and r.sources == ["category", "press:sir"]
+    assert r.data[0]["press"] == {"sir": 0.8} and r.data[0]["count"] == 20
+    assert [row.domain for row in uncovered] == ["literature"]
+    m = store.mentions()[0]
+    assert (m.domain, m.route) == ("literature", "candidate")
+
+
+def test_a_qid_of_an_unloaded_domains_row_is_left_unrouted(q, store, uncovered, capsys):
+    q.add("Q9", "nowhere", "category", {"en": "Ordet"}, {"enwiki": "Ordet"}, data={"count": 20})
+    store.add_mention(mention())
+    assert route(store, q, None, {}, FakeWikidata({"Q9": ent()})) == {}
+    assert q.row("Q9").sources == ["category"] and store.mentions()[0].route is None
+    assert "nowhere" in capsys.readouterr().err
+
+
+def test_a_released_mention_of_another_domains_row_goes_to_that_row(q, store, uncovered):
+    q.add("Q7", "art", "category", {"en": "Canto"}, {"enwiki": "Canto"}, data={"count": 20})
+    store.add_mention(mention("Q7", "waiting:music"))
+    store.set_route(URL, "Q7", "waiting")
+    assert release_waiting(store, q, "music", None, {}, FakeWikidata({"Q7": ent()})) == {"candidate": 1}
+    assert q.row("Q7").domain == "art" and q.row("Q7").sources == ["category", "press:sir"]
+    assert store.mentions()[0].domain == "art"
+
+
+def test_press_evidence_reopens_a_floor_dropped_row_for_triage(q, store, uncovered):
+    q.add("Q9", "film", "facet", {"en": "Ordet"}, {"enwiki": "Ordet"}, data={"count": 3, "instance_of": ["Q11424"]})
+    q.set_outcome("Q9", 1, "pass")
+    q.set_outcome("Q9", 2, "drop", {"reason": "3 sitelinks, under the floor of 15"})
+    store.add_mention(mention(p=0.8))
+    route(store, q, None, {}, FakeWikidata({"Q9": ent()}))
+    r = q.row("Q9")
+    assert 2 not in r.outcomes and r.outcomes[1] == "pass"
+    assert [row.qid for row in q.pending(2)] == ["Q9"]
+
+
+@pytest.mark.parametrize("p,status", [(0.5, None), (0.8, "declined"), (0.8, "open")])
+def test_a_drop_stays_without_exemption_or_with_a_status(q, store, uncovered, p, status):
+    q.add("Q9", "film", "facet", {"en": "Ordet"}, {"enwiki": "Ordet"}, data={"count": 3, "instance_of": ["Q11424"]})
+    q.set_outcome("Q9", 1, "pass")
+    q.set_outcome("Q9", 2, "drop")
+    if status:
+        q.set_status("Q9", status)
+    store.add_mention(mention(p=p))
+    route(store, q, None, {}, FakeWikidata({"Q9": ent()}))
+    assert q.row("Q9").outcomes[2] == "drop"
+
+
+def test_the_dry_run_decides_under_the_rows_domain(q, store, uncovered):
+    from pipeline.press.stages import would_route
+    q.add("Q9", "literature", "category", {"en": "Ordet"}, {"enwiki": "Ordet"}, data={"count": 20})
+    store.add_mention(mention())
+    assert [k for _, k in would_route(store, None, {}, FakeWikidata({"Q9": ent()}), queue=q)] == ["candidate"]
+    assert [row.domain for row in uncovered] == ["literature"]
+    assert store.mentions()[0].domain == "film" and q.row("Q9").sources == ["category"]  # writes nothing

@@ -61,3 +61,71 @@ def test_a_wikidata_failure_after_retries_skips_only_that_article(monkeypatch, c
     assert [a.url for a in store.articles("filtered")] == ["https://x.example/a"]
     assert seen[0][1] is seen[1][1] and isinstance(seen[0][1], dict)  # one class_route memo for the run
     assert "HTTP 429" in capsys.readouterr().err
+
+
+def _found(store, *names):
+    for n in names:
+        store.add_article(f"https://x.example/{n}", "o", "it")
+
+
+def test_failed_fetches_count_toward_the_limit_and_retry_oldest_attempt_last():
+    """A backlog of failing articles cannot keep a run fetching, nor starve the articles never tried."""
+    store = PressStore(sqlite3.connect(":memory:"))
+    _found(store, "a", "b", "c")
+    routes = {ROBOTS: Resp(""), **{f"https://x.example/{n}": Resp(status=503) for n in "abc"}}
+    pc = client(routes)
+    cfg = {"max_articles_per_run": 2, "culture_drop": 0.5}
+    run_filter(store, Pages(pc), Judge(), cfg)
+    asked = [u for u, _ in pc.session.calls if not u.endswith("robots.txt")]
+    assert asked == ["https://x.example/a", "https://x.example/b"]
+    pc = client(routes)
+    run_filter(store, Pages(pc), Judge(), cfg)
+    asked = [u for u, _ in pc.session.calls if not u.endswith("robots.txt")]
+    assert asked == ["https://x.example/c", "https://x.example/a"]
+
+
+def test_judge_failures_count_toward_the_limit():
+    from typesafe_sdk import TypeSafeError
+
+    class Failing:
+        def __init__(self):
+            self.n = 0
+
+        def culture(self, url, text):
+            self.n += 1
+            raise TypeSafeError("down")
+    store = PressStore(sqlite3.connect(":memory:"))
+    _found(store, "a", "b", "c")
+    page = "<html><body><p>Testo</p></body></html>"
+    j = Failing()
+    run_filter(store, Pages(client({ROBOTS: Resp(""), **{f"https://x.example/{n}": Resp(page) for n in "abc"}})),
+               j, {"max_articles_per_run": 2, "culture_drop": 0.5})
+    assert j.n == 2
+
+
+def test_a_refused_outlets_articles_use_none_of_the_budget():
+    store = PressStore(sqlite3.connect(":memory:"))
+    _found(store, "a", "b")
+    store.add_article("https://y.example/c", "p", "it")
+    pc = client({ROBOTS: Resp(status=429), "https://y.example/robots.txt": Resp(""),
+                 "https://y.example/c": Resp("<p>Testo</p>")})
+    assert run_filter(store, Pages(pc), Judge(), {"max_articles_per_run": 2, "culture_drop": 0.5}) == {"keep": 1}
+
+
+def test_the_pages_language_is_stored():
+    store = PressStore(sqlite3.connect(":memory:"))
+    _found(store, "a")
+    html = '<html lang="en"><head><title>T</title></head><body><p>Text</p></body></html>'
+    run_filter(store, Pages(client({ROBOTS: Resp(""), "https://x.example/a": Resp(html)})), Judge(),
+               {"max_articles_per_run": 2, "culture_drop": 0.5})
+    assert store.article("https://x.example/a").lang == "en"
+
+
+def test_an_old_press_store_gains_the_attempt_column():
+    db = sqlite3.connect(":memory:")
+    db.execute("CREATE TABLE press_articles (url TEXT PRIMARY KEY, outlet TEXT, lang TEXT, title TEXT, "
+               "published TEXT, found_at REAL, stage TEXT DEFAULT 'found', outcome TEXT, data_json TEXT)")
+    db.execute("INSERT INTO press_articles (url, outlet, lang, found_at) VALUES ('https://x.example/a', 'o', 'it', 1)")
+    store = PressStore(db)
+    assert [a.url for a in store.articles("found")] == ["https://x.example/a"]
+    assert "attempted_at" in {r[1] for r in db.execute("PRAGMA table_info(press_articles)")}

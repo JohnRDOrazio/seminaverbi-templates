@@ -22,7 +22,7 @@ from pipeline.press.extract import Page, extract, opening
 from pipeline.press.fetch import Refused
 from pipeline.press.link import link_article
 from pipeline.press.outlets import discover
-from pipeline.press.route import WAITING, _provisional, decide
+from pipeline.press.route import WAITING, _provisional, decide, owner
 
 GONE = (404, 410)
 # one article's failure (SyncError: Wikidata or WDQS still failing after the retries); the run goes on
@@ -69,19 +69,25 @@ class Pages:
 
 
 def _set_meta(store, url: str, page: Page) -> None:
-    """Fill the article's title and date from its page where discovery had none."""
-    store.db.execute("UPDATE press_articles SET title=COALESCE(title, ?), published=COALESCE(published, ?) "
-                     "WHERE url=?", (page.title or None, page.published, url))
+    """Fill the article's title and date from its page where discovery had none; its language is the page's."""
+    store.db.execute("UPDATE press_articles SET title=COALESCE(title, ?), published=COALESCE(published, ?), "
+                     "lang=COALESCE(?, lang) WHERE url=?", (page.title or None, page.published, page.lang or None, url))
     store.db.commit()
 
 
 def run_filter(store, pages: Pages, judge, pcfg: dict) -> dict[str, int]:
-    """Jev's culture question on each found article's title and opening (at most max_articles_per_run judged)."""
+    """Jev's culture question on each found article's title and opening. At most max_articles_per_run articles are
+    attempted (fetched or judged, failures included; a refused outlet's articles are not asked, so not counted):
+    the never-attempted first, then the oldest attempt, so failures cannot starve the new articles."""
     counts: dict[str, int] = {}
-    judged = 0
-    for art in store.articles("found"):
-        if judged >= pcfg["max_articles_per_run"]:
+    attempted = 0
+    for art in store.articles("found", tried_last=True):
+        if attempted >= pcfg["max_articles_per_run"]:
             break
+        if art.outlet in pages.client.refused:
+            continue  # refused for the run (or its robots.txt refused us): nothing asked, tried again next run
+        attempted += 1
+        store.attempted(art.url)
         page, skip = pages.get(art)
         if page is None:
             if skip:
@@ -94,7 +100,6 @@ def run_filter(store, pages: Pages, judge, pcfg: dict) -> dict[str, int]:
         except ARTICLE_ERRORS as e:
             _error(art, e, counts)
             continue
-        judged += 1
         outcome = "drop" if p < pcfg["culture_drop"] else "keep"
         store.set_article(art.url, "filtered", outcome, {"culture": p})
         counts[outcome] = counts.get(outcome, 0) + 1
@@ -124,9 +129,9 @@ def run_link(store, pages: Pages, judge, wikidata, sparql, pcfg: dict) -> dict[s
     return counts
 
 
-def would_route(store, repo, wikis, wikidata, sparql=None) -> list[tuple[object, str]]:
-    """(mention, route it would take) for every unrouted mention, by route()'s own decision; reads the wikis,
-    writes nothing."""
+def would_route(store, repo, wikis, wikidata, sparql=None, queue=None) -> list[tuple[object, str]]:
+    """(mention, route it would take) for every unrouted mention, by route()'s own decision (under the domain of
+    the QID's row in `queue`, when it has one); reads the wikis, writes nothing."""
     out = []
     for m in store.unrouted():
         if m.domain.startswith(WAITING):
@@ -134,15 +139,17 @@ def would_route(store, repo, wikis, wikidata, sparql=None) -> list[tuple[object,
         elif m.domain not in domains.DOMAINS:
             kind = "unknown"
         else:
-            kind = decide(m, m.domain, wikidata.entity(m.qid), repo, wikis, sparql)[0]
+            under = owner(queue, m.qid, m.domain)
+            kind = (decide(m, under, wikidata.entity(m.qid), repo, wikis, sparql)[0] if under in domains.DOMAINS
+                    else "unknown")
         out.append((m, kind))
     return out
 
 
-def preview(store, repo, wikis, wikidata, sparql=None) -> list[str]:
+def preview(store, repo, wikis, wikidata, sparql=None, queue=None) -> list[str]:
     """The dry-run report: each mention's would-be route with its probabilities, then the share that hits an
     existing SeminaVerbi article."""
-    routed = would_route(store, repo, wikis, wikidata, sparql)
+    routed = would_route(store, repo, wikis, wikidata, sparql, queue)
     lines = []
     for m, kind in routed:
         art = store.article(m.url)

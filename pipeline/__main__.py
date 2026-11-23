@@ -297,7 +297,7 @@ def cmd_press(args, queue, cfg):
         print("press link: " + _counts(press_stages.run_link(store, pages, judge, wikidata(), _sparql(), pcfg)))
     if action in ("route", "run"):
         if dry:
-            print("\n".join(press_stages.preview(store, wikis()["en"], wikis(), wikidata(), _sparql())))
+            print("\n".join(press_stages.preview(store, wikis()["en"], wikis(), wikidata(), _sparql(), queue)))
         else:
             print("press route: " + _counts(route(store, queue, wikis()["en"], wikis(), wikidata(), _sparql())))
     if action in ("enrich", "run") and not dry:
