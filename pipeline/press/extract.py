@@ -293,8 +293,13 @@ def passage(paragraph: str, needle: str, words: int = 25) -> str:
     lo = max(0, hi - words)
     if start >= hi:  # needle longer than window: anchor on it
         lo, hi = start, min(len(toks), start + words)
-    text = " ".join(toks[lo:hi])
-    return ("… " if lo > 0 else "") + text + (" …" if hi < len(toks) else "")
+    cut = toks[lo:hi]
+    # The ellipsis is attached to the neighbouring word, never a token of its own.
+    if lo > 0:
+        cut[0] = "…" + cut[0]
+    if hi < len(toks):
+        cut[-1] = cut[-1] + "…"
+    return " ".join(cut)
 
 
 def opening(page: Page, words: int = 150) -> str:

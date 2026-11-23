@@ -85,15 +85,41 @@ def test_window_never_exceeds_150_words():
 
 def test_passage_is_at_most_25_words_and_keeps_the_needle():
     p = passage(" ".join(["w"] * 100 + ["Silence"] + ["w"] * 100), "Silence")
-    assert len(p.replace("…", "").split()) <= 25 and "Silence" in p
+    assert len(p.split()) <= 25 and "Silence" in p
     assert p.startswith("…") and p.endswith("…")
+    assert len(p.replace("…", "").split()) == 25
     assert passage("Silence is short", "Silence") == "Silence is short"
     assert passage(" ".join(["w"] * 100), "absent").replace("…", "").split() == ["w"] * 25
     long_needle = " ".join(f"n{i}" for i in range(40))
-    assert len(passage("x " + long_needle, long_needle).replace("…", "").split()) <= 25
+    assert len(passage("x " + long_needle, long_needle).split()) <= 25
 
 
 def test_opening_is_title_plus_first_words():
     page = Page("Titolo", None, "it", "u", [" ".join(["w"] * 200)], [])
     o = opening(page)
     assert o.startswith("Titolo ") and len(o.split()) == 150
+
+
+def test_every_cut_stays_within_25_raw_whitespace_tokens():
+    body = ["w"] * 60
+    cases = [
+        " ".join(["Silence"] + body),            # cut at the end only
+        " ".join(body + ["Silence"]),            # cut at the start only
+        " ".join(body + ["Silence"] + body),     # both ends
+        "Silence w w",                           # no cut
+    ]
+    for para in cases:
+        p = passage(para, "Silence")
+        assert len(p.split()) <= 25 and "Silence" in p
+
+
+def test_passage_is_accepted_by_the_store():
+    import sqlite3
+
+    from pipeline.press.store import Mention, PressStore
+    from pipeline.queue import Queue  # noqa: F401
+
+    s = PressStore(sqlite3.connect(":memory:"))
+    s.add_article("u", "sir", "it")
+    p = passage(" ".join(["w"] * 100 + ["Silence"] + ["w"] * 100), "Silence")
+    s.add_mention(Mention("u", "Q1", "Silence", "work", "film", 0.7, [p], "candidate"))
