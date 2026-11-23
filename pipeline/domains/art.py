@@ -129,6 +129,8 @@ def candidates(queue, sparql, wikipedia, cfg: dict, wikidata=None, covered=None)
                      f"  VALUES ?genre {{ {common.values(art['genres'])} }}\n  ?item wdt:P136 ?genre ."))
     added = 0
     try:
+        if covered is not None:
+            common.recheck_pending(queue, "art", covered)
         for source, label, pattern in patterns:
             rows = _gather(sparql, pattern, label, floor)
             added += common.fold_parts(queue, sparql, rows, source, "art", WORK_CLASSES, STOP_CLASSES,

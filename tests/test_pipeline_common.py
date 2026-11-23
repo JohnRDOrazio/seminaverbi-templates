@@ -315,3 +315,53 @@ def test_an_open_whole_with_no_new_part_is_not_rechecked(q, no_closure_cache):
     common.fold_parts(q, sparql, [part_row("Q10", 25)], "form", "music", ["Q105543609"],
                       recheck=lambda row: (seen.append(row.qid), ("drop", {}))[1])
     assert seen == []
+
+
+def failing_recheck(row):
+    raise RuntimeError("wiki down")
+
+
+@pytest.mark.parametrize("outcome, retired", [("translation", True), ("pass", False)])
+def test_a_failed_recheck_stays_pending_until_a_later_run_succeeds(q, no_closure_cache, capsys, outcome, retired):
+    open_whole(q)
+    with pytest.raises(RuntimeError, match="wiki down"):
+        common.fold_parts(q, FakeSparql(NEW_PART), [part_row("Q11", 25)], "form", "music", ["Q105543609"],
+                          recheck=failing_recheck)
+    row = q.row("Q1")
+    assert set(row.data[0]["parts"]) == {"Q10", "Q11"} and row.data[0]["recheck_pending"] is True
+    assert "retired" not in row.data[0]
+    seen = []
+    common.recheck_pending(q, "music", lambda r: (seen.append(r.qid), (outcome, {}))[1])  # no new parts this run
+    row = q.row("Q1")
+    assert seen == ["Q1"] and row.data[0]["recheck_pending"] is False
+    assert bool(row.data[0].get("retired")) is retired and row.outcomes == {s: "pass" for s in range(6)}
+
+
+def test_a_successful_recheck_clears_the_mark(q, no_closure_cache):
+    open_whole(q)
+    common.fold_parts(q, FakeSparql(NEW_PART), [part_row("Q11", 25)], "form", "music", ["Q105543609"],
+                      recheck=lambda row: ("pass", {}))
+    assert q.row("Q1").data[0]["recheck_pending"] is False
+
+
+def test_only_open_unretired_wholes_of_the_domain_are_rechecked_when_pending(q, no_closure_cache):
+    for qid, domain, status, extra in (("Q1", "music", "open", {}), ("Q2", "music", "open", {"retired": True}),
+                                       ("Q3", "art", "open", {}), ("Q4", "music", "approved", {}),
+                                       ("Q5", "music", "open", {"recheck_pending": False})):
+        q.add(qid, domain, "s", {}, {}, data={"recheck_pending": True, **extra})
+        q.set_status(qid, status)
+    seen = []
+    common.recheck_pending(q, "music", lambda r: (seen.append(r.qid), ("pass", {}))[1])
+    assert seen == ["Q1"]
+
+
+@pytest.mark.parametrize("domain", ["music", "art"])
+def test_candidates_recheck_pending_wholes_when_covered_is_given(q, no_closure_cache, domain, monkeypatch):
+    from pipeline import load_config
+    from pipeline.domains import DOMAINS
+    seen = []
+    monkeypatch.setattr(common, "recheck_pending", lambda queue, d, recheck: seen.append((d, recheck)))
+    marker = lambda row: ("pass", {})
+    DOMAINS[domain].candidates(q, FakeSparql(), None, load_config(), covered=marker)
+    DOMAINS[domain].candidates(q, FakeSparql(), None, load_config())
+    assert seen == [(domain, marker)]

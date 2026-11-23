@@ -344,23 +344,37 @@ def _fold_into_whole(queue, whole_qid: str, whole_row: dict, parts: list[dict], 
                 print(f"{domain} candidates: {part['item']} folded into {whole_qid} but already "
                       f"{own.status}, left alone")
     data.update(parts=known, count=max([data["count"], *(p["count"] for p in known.values())]))
+    pending = bool(new_part and old and old.status == "open" and not old.data.get(0, {}).get("retired"))
+    if pending:
+        data["recheck_pending"] = True  # stored with the new parts: cleared only once a check succeeds
     added = queue.add(whole_qid, domain, source, labels, sitelinks, False, data)
     if new_part and old and old.status is None:
         queue.redo(1, whole_qid)  # coverage, triage and the later stages saw the previous parts
-    elif new_part and old and old.status == "open" and recheck is not None and not old.data.get(0, {}).get("retired"):
-        _recheck_open_whole(queue, whole_qid, domain, recheck, old.page)
+    elif pending and recheck is not None:
+        _recheck_open_whole(queue, whole_qid, domain, recheck)
     return added
 
 
-def _recheck_open_whole(queue, whole_qid: str, domain: str, recheck, page) -> None:
-    """A published whole is covered through a part it just gained: it leaves publication and the ranking (its
-    page is live, with votes: nothing is deleted, and the page is the author's to decline or redirect)."""
+def _recheck_open_whole(queue, whole_qid: str, domain: str, recheck) -> None:
+    """A published whole is covered through a part it gained: it leaves publication and the ranking (its page
+    is live, with votes: nothing is deleted, and the page is the author's to decline or redirect). The
+    `recheck_pending` mark is cleared only after `recheck` returns; a failure leaves it for the next run."""
     row = queue.row(whole_qid)
     outcome, _ = recheck(row)
-    if outcome in ("translation", "drop"):
-        queue.add(whole_qid, domain, row.sources[0], {}, {}, False, {"retired": True})
+    covered = outcome in ("translation", "drop")
+    queue.add(whole_qid, domain, row.sources[0], {}, {}, False,
+              {"recheck_pending": False, **({"retired": True} if covered else {})})
+    if covered:
         print(f"{domain} candidates: {whole_qid} gained parts and is now covered ({outcome}) but already open: "
-              f"retired; decline or redirect {page} by hand")
+              f"retired; decline or redirect {row.page} by hand")
+
+
+def recheck_pending(queue, domain: str, recheck) -> None:
+    """Re-check every open, unretired whole of `domain` whose earlier check did not complete."""
+    for row in queue.by_status("open"):
+        stage0 = row.data.get(0, {})
+        if row.domain == domain and stage0.get("recheck_pending") and not stage0.get("retired"):
+            _recheck_open_whole(queue, row.qid, domain, recheck)
 
 
 def fold_parts(queue, sparql, rows: list[dict], source: str, domain: str, whole_classes: Iterable[str],

@@ -116,6 +116,8 @@ def candidates(queue, sparql, wikipedia, cfg: dict, wikidata=None, covered=None)
         patterns.append(("artist", f"artists {i // common.CHUNK + 1}",
                          f"  VALUES ?a {{ {chunk} }}\n  ?item wdt:P175|wdt:P86|wdt:P676 ?a ."))
     added = 0
+    if covered is not None:
+        common.recheck_pending(queue, "music", covered)
     for source, label, pattern in patterns:
         rows = _gather(sparql, pattern, label, floors.get(source, music["sitelink_floor"]))
         added += common.fold_parts(queue, sparql, rows, source, "music", FOLD_WHOLES, FOLD_STOP,
