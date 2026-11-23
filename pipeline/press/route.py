@@ -30,8 +30,9 @@ def lookup_failed(mention, e) -> None:
 
 
 def _outlet(store, url: str) -> str | None:
-    found = store.db.execute("SELECT outlet FROM press_articles WHERE url=?", (url,)).fetchone()
-    return found[0] if found else None
+    """The outlet the article's evidence counts for."""
+    found = store.article(url)
+    return found.evidence_outlet if found else None
 
 
 def _labels(entity: dict) -> dict:

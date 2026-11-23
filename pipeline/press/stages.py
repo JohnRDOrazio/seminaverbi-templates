@@ -19,6 +19,7 @@ from sync.wiki import SyncError
 
 from pipeline import domains
 from pipeline import stages as pipeline_stages
+from pipeline.press.credit import credit_date
 from pipeline.press.extract import Page, extract, extract_entry, mention_texts, opening
 from pipeline.press.fetch import Refused
 from pipeline.press.link import link_article
@@ -102,6 +103,15 @@ def _set_meta(store, url: str, page: Page) -> None:
     store.db.commit()
 
 
+def _set_credit(store, art, page: Page, outlets: dict[str, dict]) -> None:
+    """Attribute a republished article to the outlet it says it first appeared in, with that date."""
+    outlet = outlets.get(art.outlet, {})
+    first = outlets.get(outlet.get("republishes"))
+    published = credit_date(page.paragraphs, first["name"]) if first else None
+    if published:
+        store.set_credit(art.url, f"{outlet['author']}, {first['name']}", published, first["id"])
+
+
 def _angle(page: Page, url: str, judge, cut: float) -> dict[str, float]:
     """The article's best angle score, and its opening's: the title and opening first, then, below `cut`, at most
     ANGLE_WINDOWS texts around its mentions, until one reaches it."""
@@ -120,6 +130,7 @@ def run_filter(store, pages: Pages, judge, pcfg: dict) -> dict[str, int]:
     the never-attempted first, then the oldest attempt, so failures cannot starve the new articles."""
     counts: dict[str, int] = {}
     attempted = 0
+    outlets = {o["id"]: o for o in pcfg.get("outlets", ())}
     for art in store.articles("found", tried_last=True):
         if attempted >= pcfg["max_articles_per_run"]:
             break
@@ -134,6 +145,7 @@ def run_filter(store, pages: Pages, judge, pcfg: dict) -> dict[str, int]:
                 counts["skip"] = counts.get("skip", 0) + 1
             continue
         _set_meta(store, art.url, page)
+        _set_credit(store, art, page, outlets)
         try:
             data: dict = {"culture": judge.culture(art.url, opening(page))}
             outcome = "drop" if data["culture"] < pcfg["culture_drop"] else "keep"

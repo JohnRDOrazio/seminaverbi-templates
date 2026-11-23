@@ -1,5 +1,5 @@
 """Press notes for the stage-4 dossier: the stored passages of each mention, never the article."""
-
+from pipeline.press.credit import outlet_name
 
 MAX_PASSAGES = 3
 
@@ -15,7 +15,7 @@ def press_notes(store, qid: str, outlets: dict[str, str]) -> list[dict]:
         art = store.article(m.url)
         if art is None or not m.passages or m.critical:  # only critical: no support for a proposal
             continue
-        name = outlets.get(art.outlet, art.outlet)
+        name = outlet_name(art, outlets)
         head = f"{name} ({art.published}): {art.title}" if art.published else f"{name}: {art.title}"
         notes.append((art.published or "", {"lang": art.lang, "url": m.url, "heading": head, "label": head,
                                             "text": " … ".join(m.passages[:MAX_PASSAGES])}))

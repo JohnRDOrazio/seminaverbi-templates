@@ -32,6 +32,13 @@ class Article:
     stage: str = "found"
     outcome: str | None = None
     data: dict = field(default_factory=dict)
+    attribution: str | None = None  # who it is cited as, when not its outlet (a republished article)
+    counts_as: str | None = None  # the outlet that published it first, when not its own
+
+    @property
+    def evidence_outlet(self) -> str:
+        """The outlet its evidence counts for."""
+        return self.counts_as or self.outlet
 
 
 @dataclass
@@ -48,12 +55,24 @@ class Mention:
     critical: bool = False  # stance below stance_drop when asked
 
 
+ARTICLE = ("SELECT url, outlet, lang, title, published, stage, outcome, data_json, attribution, counts_as "
+           "FROM press_articles")
+
+
+def _article(r) -> Article:
+    return Article(r[0], r[1], r[2], r[3], r[4], r[5], r[6], json.loads(r[7]) if r[7] else {}, *r[8:])
+
+
 class PressStore:
     def __init__(self, db: sqlite3.Connection):
         self.db = db
         db.executescript(SCHEMA)
         if "attempted_at" not in {r[1] for r in db.execute("PRAGMA table_info(press_articles)")}:
             db.execute("ALTER TABLE press_articles ADD COLUMN attempted_at REAL")  # a store made before it
+        columns = {r[1] for r in db.execute("PRAGMA table_info(press_articles)")}
+        for name in ("attribution", "counts_as"):
+            if name not in columns:
+                db.execute(f"ALTER TABLE press_articles ADD COLUMN {name} TEXT")
         columns = {r[1] for r in db.execute("PRAGMA table_info(press_mentions)")}
         for name, kind in (("stance", "REAL"), ("critical", "INTEGER")):
             if name not in columns:
@@ -74,20 +93,23 @@ class PressStore:
     def articles(self, stage: str, outlet: str | None = None, limit: int | None = None,
                  tried_last: bool = False) -> list[Article]:
         """In discovery order; `tried_last`: the articles never attempted first, then the oldest attempt first."""
-        sql, args = "SELECT url, outlet, lang, title, published, stage, outcome, data_json " \
-                    "FROM press_articles WHERE stage=?", [stage]
+        sql, args = ARTICLE + " WHERE stage=?", [stage]
         if outlet is not None:
             sql += " AND outlet=?"; args.append(outlet)
         sql += " ORDER BY " + ("attempted_at IS NOT NULL, attempted_at, " if tried_last else "") + "found_at, rowid"
         if limit is not None:
             sql += " LIMIT ?"; args.append(limit)
-        return [Article(r[0], r[1], r[2], r[3], r[4], r[5], r[6], json.loads(r[7]) if r[7] else {})
-                for r in self.db.execute(sql, args).fetchall()]
+        return [_article(r) for r in self.db.execute(sql, args).fetchall()]
 
     def article(self, url: str) -> Article | None:
-        r = self.db.execute("SELECT url, outlet, lang, title, published, stage, outcome, data_json "
-                            "FROM press_articles WHERE url=?", (url,)).fetchone()
-        return Article(r[0], r[1], r[2], r[3], r[4], r[5], r[6], json.loads(r[7]) if r[7] else {}) if r else None
+        r = self.db.execute(ARTICLE + " WHERE url=?", (url,)).fetchone()
+        return _article(r) if r else None
+
+    def set_credit(self, url, attribution: str, published: str, counts_as: str) -> None:
+        """The article first appeared in `counts_as`, on `published`."""
+        self.db.execute("UPDATE press_articles SET attribution=?, published=?, counts_as=? WHERE url=?",
+                        (attribution, published, counts_as, url))
+        self.db.commit()
 
     def attempted(self, url: str) -> None:
         self.db.execute("UPDATE press_articles SET attempted_at=? WHERE url=?", (time.time(), url))

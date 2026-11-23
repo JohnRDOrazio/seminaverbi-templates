@@ -8,6 +8,7 @@ from __future__ import annotations
 import re
 from urllib.parse import quote
 
+from pipeline.press.credit import outlet_name
 from pipeline.press.notes import MAX_PASSAGES
 from pipeline.publish import _write
 
@@ -93,7 +94,7 @@ def enrichment(store, outlets: dict[str, str], old_text: str | None, titles: dic
     for qid, items in groups:
         lines.append(f"* {_item(items[0][1].label, (titles or {}).get(qid))}")
         for published, m, art in sorted(items, key=lambda e: e[0], reverse=True):
-            name = _text(outlets.get(art.outlet, art.outlet))
+            name = _text(outlet_name(art, outlets))
             date = f", {_text(published)}" if published else ""
             quotes = " ".join(_quote(p) for p in m.passages[:MAX_PASSAGES])
             lines.append(f"** {name}{date}, [{_url(m.url)} {_text(art.title or m.url)}] ({_text(art.lang)}{', critical' if m.critical else ''})" + (f": {quotes}" if quotes else ""))
