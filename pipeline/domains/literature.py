@@ -29,12 +29,13 @@ from .common import CHUNK, LANGS, LIMIT  # noqa: F401
 CLOSED = ("approved", "created", "declined")  # a series with one of these statuses absorbs nothing
 
 WORK, EDITION = "Q7725634", "Q3331189"  # literary work; version, edition or translation
-# literary work, written work, and the config's series_classes (literary and book series)
-WORK_CLASSES: tuple[str, ...] = (WORK, "Q47461344", "Q1667921", "Q277759")
+# literary work and the config's series_classes (literary and book series): what literature itself queries. Not
+# written work (Q47461344): its closure takes in encyclicals, letters and scholarly articles.
+WORK_CLASSES: tuple[str, ...] = (WORK, "Q1667921", "Q277759")
 
 
 def owns(instance_of: Iterable[str], sparql, cache: Path | None = None) -> bool:
-    """True when an item of these P31 classes is a literary or written work or series (or of a subclass)."""
+    """True when an item of these P31 classes is a literary work or series (or of a subclass)."""
     return common.owns(instance_of, WORK_CLASSES, sparql, cache)
 
 

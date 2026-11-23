@@ -194,7 +194,7 @@ def test_film_wins_over_a_broader_class(cache):
 
 def test_domain_classes_and_owns(cache):
     assert film.WORK_CLASSES == ("Q11424", "Q5398426")
-    assert literature.WORK_CLASSES == ("Q7725634", "Q47461344", "Q1667921", "Q277759")
+    assert literature.WORK_CLASSES == ("Q7725634", "Q1667921", "Q277759")
     assert film.owns(["Q24862"], FakeSparql(), cache) is True
     assert film.owns(["Q8261"], FakeSparql(), cache) is False
     assert literature.owns(["Q8261"], FakeSparql(), cache) is True
@@ -255,3 +255,10 @@ def test_url_is_a_required_keyword(store, cache):
         link_article(pg, "sir", store, FakeJudge(), FakeWikidata({}), FakeSparql(), CFG, cache=cache)
     with pytest.raises(TypeError):
         link_article(pg, "sir", store, FakeJudge(), FakeWikidata({}), FakeSparql(), CFG, URL)
+
+
+def test_a_written_work_only_item_does_not_route_to_literature(cache):
+    """Written work (Q47461344) covers encyclicals, letters and scholarly articles: they must not reach
+    literature, which itself queries literary works and series only."""
+    assert literature.owns(["Q47461344"], FakeSparql(), cache) is False
+    assert class_route(["Q47461344"], FakeSparql(), CFG, cache) is None
