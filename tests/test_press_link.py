@@ -75,8 +75,8 @@ class FakeJudge:
         self.picks.append({"url": url, "passage": passage, "label": label, "options": options})
         return self._pick if self._pick is not None else (next(iter(options)), 0.95, 0.9)
 
-    def substantive(self, url, label, passage):
-        self.substantives.append({"url": url, "label": label, "passage": passage})
+    def substantive(self, url, label, passage, item):
+        self.substantives.append({"url": url, "label": label, "passage": passage, "item": item})
         return self._substantive
 
 
@@ -123,6 +123,8 @@ def test_one_typed_hit_is_still_asked_whether_the_passage_means_it(store, cache)
     out = run(pg, store, judge, wd, cache)
     assert [p["options"] for p in judge.picks] == [{"Q15228": "Il Signore degli Anelli — romanzo di Tolkien"}]
     assert [(m.qid, m.domain, m.p) for m in out] == [("Q15228", "literature", 0.75)]
+    # the substantive question names the item, as the pick's option does
+    assert [s["item"] for s in judge.substantives] == ["Il Signore degli Anelli — romanzo di Tolkien"]
     assert wd.searches == [("Il Signore degli Anelli", "it")]  # a routed hit in the page's lang: no en search
 
 
@@ -313,8 +315,8 @@ def test_a_passing_first_mention_does_not_hide_a_later_substantive_one(store, ca
     wd = FakeWikidata({"Q9": entity(["Q11424"]), "Q3": entity(["Q11424"])}, search={("Silence", "it"): ["Q9", "Q3"]})
 
     class ByWindow(FakeJudge):
-        def substantive(self, url, label, passage):
-            super().substantive(url, label, passage)
+        def substantive(self, url, label, passage, item):
+            super().substantive(url, label, passage, item)
             return 0.9 if "dubbio" in passage else 0.2
     judge = ByWindow(pick=("Q9", 0.9, 0.9))
     out = run(pg, store, judge, wd, cache)

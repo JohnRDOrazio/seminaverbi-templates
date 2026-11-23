@@ -3,9 +3,9 @@
 A span (italic or quoted title, Wikipedia link) becomes a list of Wikidata hits: a link through its sitelink, any
 other span through Wikidata search in the page's language, then in English. Hits whose class routes to no domain
 are discarded; a link's item is taken, a search's routed hits (one or several) go to Jev's `pick` (those items
-or none), taken only above the configured cut. Jev then
-judges, on the paragraphs around the mention (at most 150 words, centred on it), whether the article discusses the
-item substantively, asking again at each later mention in another window until one is kept; a kept mention is stored
+or none), taken only above the configured cut. Jev then judges, on the paragraphs around the mention (at most 150
+words, centred on it), whether the item (named by its label and description) is one of the subjects the article
+discusses, asking again at each later mention in another window until one is kept; a kept mention is stored
 with up to three passages of at most 25 words.
 
 Class membership comes only from the domains' `owns()` and `common.owns()`, backed by the cached subclass closure:
@@ -145,7 +145,7 @@ def link_article(page: Page, outlet: str, store, judge, wikidata, sparql, cfg: d
         if qid is None or qid in done or (qid, context) in judged:
             continue
         judged.add((qid, context))
-        p = judge.substantive(url, span.text, context)
+        p = judge.substantive(url, span.text, context, _option(qid, wikidata.entity(qid), page.lang))
         if p < cfg["mention_keep"]:
             continue
         done.add(qid)

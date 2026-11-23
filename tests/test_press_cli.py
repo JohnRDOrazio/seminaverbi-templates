@@ -79,7 +79,7 @@ class FakeJudge:
         assert len(options) == 1, "one hit per title"
         return next(iter(options)), 0.9, 0.9
 
-    def substantive(self, url, label, passage):
+    def substantive(self, url, label, passage, item):
         self.asked.append(("substantive", url))
         return 0.8
 
