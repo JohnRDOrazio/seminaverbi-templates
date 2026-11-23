@@ -3,7 +3,7 @@ import pytest
 from pipeline import load_config
 from pipeline.domains import DOMAINS, common, music
 from pipeline.queue import Queue, Row
-from test_pipeline_film import FakeSparql, item
+from test_pipeline_film import (FakeSparql, FakeWikidataEntities, claim, entity, item, wiki_for_pages)
 
 CFG = {"sitelink_floor": 10, "artist_sitelink_floor": 20}
 
@@ -129,3 +129,109 @@ def test_an_item_of_another_domain_is_reported_and_left(q, capsys):
     sparql = FakeSparql({"wdt:P7937": [item("Q8", "Libretto", 90, "Q7366")]})
     music.candidates(q, sparql, None, load_config())
     assert q.row("Q8").domain == "literature" and "literature" in capsys.readouterr().out
+
+
+# --- stage 4: the dossier ---
+
+DC = {"dossier_languages": 3}
+
+
+def drow(sitelinks, parts=None, calibration=False):
+    data = {"count": 30, "instance_of": ["Q105543609"]}
+    if parts is not None:
+        data["parts"] = parts
+    return Row("Q1", "music", ["form"], {}, sitelinks, calibration, data={0: data})
+
+
+def test_dossier_reads_the_wanted_sections_and_the_parts():
+    parts = {"P1": {"sitelinks": {"enwiki": "Kyrie"}, "count": 9}}
+    pages = {("en", "wikipedia"): {"Mass": [("Background", "b"), ("Lyrics", "l"), ("Track listing", "t")],
+                                   "Kyrie": [("Structure", "s"), ("Personnel", "x")], "#lead:Kyrie": "kyrie lead"}}
+    d = music.dossier(drow({"enwiki": "Mass"}, parts), DC, wiki_for_pages(pages), FakeWikidataEntities({"Q1": entity()}))
+    assert [n["heading"] for n in d["notes"]] == ["Background", "Lyrics", "Kyrie", "Kyrie / Structure"]
+    assert d["languages"] == {"en": 4}
+
+
+def test_a_whole_with_no_stored_parts_reads_its_parts_from_wikidata():
+    wd = FakeWikidataEntities({"Q1": entity(P527=["P1"]), "P1": entity(sitelinks={"enwiki": "Kyrie"})})
+    pages = {("en", "wikipedia"): {"Mass": [], "Kyrie": [("Music", "m")]}}
+    d = music.dossier(drow({"enwiki": "Mass"}), DC, wiki_for_pages(pages), wd)
+    assert [n["heading"] for n in d["notes"]] == ["Kyrie / Music"]
+
+
+def test_the_original_language_comes_first():
+    wd = FakeWikidataEntities({"Q1": entity(P407=["Q188"])})
+    pages = {("en", "wikipedia"): {"M": [("Background", "e")]}, ("de", "wikipedia"): {"M de": [("Hintergrund", "d")]}}
+    d = music.dossier(drow({"enwiki": "M", "dewiki": "M de"}), DC, wiki_for_pages(pages), wd)
+    assert list(d["languages"]) == ["de", "en"]
+
+
+def test_every_language_has_its_headings():
+    assert set(music.HEADINGS) == set(common.LANGS)
+    assert all(len(words) == len(music.HEADINGS["en"]) or len(words) >= 10 for words in music.HEADINGS.values())
+
+
+def time_claim(year):
+    return {"mainsnak": {"datavalue": {"value": {"time": f"+{year}-00-00T00:00:00Z"}}}}
+
+
+def test_wikidata_note_names_the_psalm_it_sets():
+    ent = entity("Miserere", P86=["Q100"], P144=["Q200"], P676=["Q300"], P175=["Q400"])
+    ent["claims"]["P577"] = [time_claim(1638)]
+    labels = {"Q100": "Allegri", "Q200": "Psalm 51", "Q300": "Anon", "Q400": "Choir"}
+    note = music.wikidata_note({**ent, "id": "Q1"}, labels.get, is_bible_book=lambda qid: qid == "Q200")
+    assert note["lang"] == "en" and note["heading"] == "Wikidata"
+    assert note["url"] == "https://www.wikidata.org/wiki/Q1"
+    for word in ("Allegri", "Anon", "Choir", "1638", "Psalm 51", "a book of the Bible"):
+        assert word in note["text"]
+
+
+def test_wikidata_note_without_facts_is_none():
+    assert music.wikidata_note({"id": "Q1", **entity()}, {}.get) is None
+
+
+def test_the_dossier_carries_one_wikidata_note_and_no_lyrics():
+    ent = {"id": "Q1", **entity(P86=["Q100"], P921=["Q200"])}
+    wd = FakeWikidataEntities({"Q1": ent, "Q100": entity("Allegri"), "Q200": entity("Gospel of John", P31=["Q29154430"])})
+    d = music.dossier(drow({"enwiki": "M", "itwiki": "M it"}),
+                      DC, wiki_for_pages({("en", "wikipedia"): {"M": [("Lyrics", "l")]},
+                                          ("it", "wikipedia"): {"M it": [("Testo", "t")]}}), wd)
+    wikidata_notes = [n for n in d["notes"] if n["heading"] == "Wikidata"]
+    assert len(wikidata_notes) == 1 and "a book of the Bible" in wikidata_notes[0]["text"]
+    assert d["languages"] == {"en": 1, "it": 1}
+
+
+def test_dossier_stage_drops_an_empty_dossier_but_not_calibration():
+    wd = FakeWikidataEntities({"Q1": entity(P86=["Q100"]), "Q100": entity("Bach")})
+    pages = wiki_for_pages({("en", "wikipedia"): {"M": []}})
+    assert music.dossier_stage(drow({"enwiki": "M"}), DC, pages, wd) == ("drop", {"reason": "empty dossier"})
+    assert music.dossier_stage(drow({"enwiki": "M"}, calibration=True), DC, pages, wd)[0] == "pass"
+
+
+def test_wikiquote_keeps_sections_naming_the_composer():
+    wd = FakeWikidataEntities({"Q1": entity(P86=["Q100"]), "Q100": entity("Bach")})
+    pages = {("en", "wikipedia"): {"M": []}, ("en", "wikiquote"): {"M": [("Bach", "q"), ("Other", "n")]}}
+    d = music.dossier(drow({"enwiki": "M"}), DC, wiki_for_pages(pages), wd)
+    assert [n["heading"] for n in d["notes"] if n["heading"] != "Wikidata"] == ["Bach"]
+
+
+# --- calibration ---
+
+def test_calibration_skips_people(q, capsys):
+    sparql = FakeSparql({"VALUES ?item": [item("Q1", "Song", 20, "Q7366")]})  # Q2 (Bach) answers to no work class
+    assert music.add_calibration(q, sparql, ["Q1", "Q2"]) == 1
+    assert q.row("Q1").calibration and q.row("Q1").sources == ["calibration"] and q.row("Q2") is None
+    assert "music calibration: Q2 skipped (a person or group)" in capsys.readouterr().out
+
+
+def test_calibration_skips_a_person_the_query_returns(q, capsys):
+    sparql = FakeSparql({"VALUES ?item": [item("Q2", "Bach", 90, "Q5")]})
+    assert music.add_calibration(q, sparql, ["Q2"]) == 0
+    assert "Q2 skipped" in capsys.readouterr().out
+
+
+def test_calibration_roots_are_music_theatre_and_opera(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(common, "calibration_qids", lambda wikis, wd, tree, roots: seen.update(roots=roots) or ([], []))
+    music.calibration_qids({}, wikidata=object(), tree={})
+    assert seen["roots"] == {"music", "musical-theatre", "opera"}
