@@ -3,9 +3,11 @@
   "delay_seconds": 10,
   "max_articles_per_run": 200,
   "culture_drop": 0.4,
+  "angle_drop": 0.4,
   "pick_p": 0.8,
   "pick_confidence": 0.6,
   "mention_keep": 0.6,
+  "stance_drop": 0.4,
   "press_exempt": 0.6,
   "waiting_classes": {
     "music": [

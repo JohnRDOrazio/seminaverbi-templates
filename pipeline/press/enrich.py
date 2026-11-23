@@ -96,7 +96,7 @@ def enrichment(store, outlets: dict[str, str], old_text: str | None, titles: dic
             name = _text(outlets.get(art.outlet, art.outlet))
             date = f", {_text(published)}" if published else ""
             quotes = " ".join(_quote(p) for p in m.passages[:MAX_PASSAGES])
-            lines.append(f"** {name}{date}, [{_url(m.url)} {_text(art.title or m.url)}] ({_text(art.lang)})" + (f": {quotes}" if quotes else ""))
+            lines.append(f"** {name}{date}, [{_url(m.url)} {_text(art.title or m.url)}] ({_text(art.lang)}{', critical' if m.critical else ''})" + (f": {quotes}" if quotes else ""))
     block = "\n".join(lines)
     return f"{INTRO}\n\n{BEGIN}\n{block}\n{END}" + (_tail(old_text) or "\n")
 

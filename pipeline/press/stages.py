@@ -3,7 +3,7 @@ enrichment page's links.
 
 An article is fetched when a stage needs it and kept in memory (as a parsed Page, never stored) for that run only,
 so `press run` fetches each article once for filter and link. Article stages in press_articles: `found` (from
-discovery) -> `filtered` (outcome `keep`, `drop` below culture_drop, or `skip` when the article is gone, robots.txt
+discovery) -> `filtered` (outcome `keep`, `drop` below culture_drop or angle_drop, or `skip` when the article is gone, robots.txt
 forbids its path or the page is a section or index page, not an article) -> `linked`. A timeout, a 5xx, a refused
 outlet or a robots.txt answering 401/403 leaves the article where it was, for the next run.
 """
@@ -18,13 +18,14 @@ from sync.wiki import SyncError
 
 from pipeline import domains
 from pipeline import stages as pipeline_stages
-from pipeline.press.extract import Page, extract, opening
+from pipeline.press.extract import Page, extract, mention_texts, opening
 from pipeline.press.fetch import Refused
 from pipeline.press.link import link_article
 from pipeline.press.outlets import discover
 from pipeline.press.route import LOOKUP_ERRORS, WAITING, _provisional, decide, lookup_failed, owner
 
 GONE = (404, 410)
+ANGLE_WINDOWS = 3  # texts around mentions asked when the opening does not show the angle
 NOT_ARTICLE = "not an article"
 # one article's failure (SyncError: Wikidata or WDQS still failing after the retries); the run goes on
 ARTICLE_ERRORS = (requests.RequestException, OSError, TypeSafeError, SyncError)
@@ -79,8 +80,20 @@ def _set_meta(store, url: str, page: Page) -> None:
     store.db.commit()
 
 
+def _angle(page: Page, url: str, judge, cut: float) -> dict[str, float]:
+    """The article's best angle score, and its opening's: the title and opening first, then, below `cut`, at most
+    ANGLE_WINDOWS texts around its mentions, until one reaches it."""
+    first = best = judge.angle(url, opening(page))
+    for text in mention_texts(page, ANGLE_WINDOWS) if best < cut else ():
+        best = max(best, judge.angle(url, text))
+        if best >= cut:
+            break
+    return {"angle": best, "angle_opening": first}
+
+
 def run_filter(store, pages: Pages, judge, pcfg: dict) -> dict[str, int]:
-    """Jev's culture question on each found article's title and opening. At most max_articles_per_run articles are
+    """Jev's culture question on each found article's title and opening, then, for those it keeps, the faith or
+    values angle (below angle_drop: dropped, reason "angle", counted apart). At most max_articles_per_run articles are
     attempted (fetched or judged, failures included; a refused outlet's articles are not asked, so not counted):
     the never-attempted first, then the oldest attempt, so failures cannot starve the new articles."""
     counts: dict[str, int] = {}
@@ -100,13 +113,18 @@ def run_filter(store, pages: Pages, judge, pcfg: dict) -> dict[str, int]:
             continue
         _set_meta(store, art.url, page)
         try:
-            p = judge.culture(art.url, opening(page))
+            data: dict = {"culture": judge.culture(art.url, opening(page))}
+            outcome = "drop" if data["culture"] < pcfg["culture_drop"] else "keep"
+            if outcome == "keep":
+                data |= _angle(page, art.url, judge, pcfg["angle_drop"])
         except ARTICLE_ERRORS as e:
             _error(art, e, counts)
             continue
-        outcome = "drop" if p < pcfg["culture_drop"] else "keep"
-        store.set_article(art.url, "filtered", outcome, {"culture": p})
-        counts[outcome] = counts.get(outcome, 0) + 1
+        label = outcome
+        if "angle" in data and data["angle"] < pcfg["angle_drop"]:
+            outcome, label, data["reason"] = "drop", "drop (angle)", "angle"
+        store.set_article(art.url, "filtered", outcome, data)
+        counts[label] = counts.get(label, 0) + 1
     return counts
 
 
@@ -162,8 +180,10 @@ def preview(store, repo, wikis, wikidata, sparql=None, queue=None) -> list[str]:
     lines = []
     for m, kind in routed:
         art = store.article(m.url)
-        culture = (art.data.get("culture") if art else None)
-        c = f" culture={culture:.2f}" if isinstance(culture, (int, float)) else ""
+        scores = {"culture": art.data.get("culture"), "angle": art.data.get("angle")} if art else {}
+        scores["stance"] = m.stance
+        c = "".join(f" {k}={v:.2f}" for k, v in scores.items() if isinstance(v, (int, float)))
+        c += " critical" if m.critical else ""
         lines.append(f"  {kind:<10} {m.qid} {m.label!r} ({m.domain}) p={m.p:.2f}{c} {m.url}")
     hits = sum(1 for _, kind in routed if kind == "enrichment")
     share = f"{100 * hits / len(routed):.0f}%" if routed else "-"

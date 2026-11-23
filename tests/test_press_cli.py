@@ -37,7 +37,8 @@ PAGES = {
 }
 
 PRESS = {"user_agent": "SeminaVerbi-press/1.0 (+test)", "delay_seconds": 0, "max_articles_per_run": 200,
-         "culture_drop": 0.4, "pick_p": 0.8, "pick_confidence": 0.6, "mention_keep": 0.6, "press_exempt": 0.6,
+         "culture_drop": 0.4, "pick_p": 0.8, "pick_confidence": 0.6, "mention_keep": 0.6,
+         "angle_drop": 0.4, "stance_drop": 0.4, "press_exempt": 0.6,
          "waiting_classes": {"music": ["Q7366"]},
          "outlets": [{"id": "sir", "name": "SIR", "base": "https://news.example", "langs": ["it"],
                       "entries": [FEED], "culture_paths": ["/cultura/"], "since": None},
@@ -74,6 +75,14 @@ class FakeJudge:
     def culture(self, url, text):
         self.asked.append(("culture", url))
         return 0.1 if url == A3 else 0.9
+
+    def angle(self, url, text):
+        self.asked.append(("angle", url))
+        return 0.7
+
+    def stance(self, url, label, passage, item, title):
+        self.asked.append(("stance", url))
+        return 0.8
 
     def pick(self, url, passage, label, options):
         assert len(options) == 1, "one hit per title"
@@ -171,7 +180,8 @@ def test_dry_run_writes_nothing_to_queue_or_wiki(press, monkeypatch, capsys):
     store = PressStore.of(Queue(db))
     assert store.unrouted() and all(m.route is None for m in store.mentions())
     assert "enrichment" in out and "candidate" in out and "Q1" in out and "Q2" in out
-    assert "p=0.80" in out and "culture=0.90" in out
+    assert "p=0.80" in out and "culture=0.90" in out and "angle=0.70" in out and "stance=0.80" in out
+    assert ("angle", A3) not in fakes["judge"].asked  # below culture_drop: not asked
     assert "1/2" in out  # share of mentions hitting existing SeminaVerbi articles
     assert store.article(A3).outcome == "drop"
 

@@ -122,3 +122,12 @@ def test_press_notes_count_in_the_languages_of_a_passing_dossier(store, queue, m
     assert data["languages"] == {"en": 1, "de": 0, "it": 2}
     from pipeline import stages
     assert stages._first_wiki(data["languages"]) == "it"
+
+
+def test_a_critical_mention_gives_no_note():
+    store = PressStore.of(Queue(":memory:"))
+    for u, crit in (("https://x/a", False), ("https://x/b", True)):
+        store.add_article(u, "sir", "it", "T", "2026-11-20")
+        store.add_mention(Mention(u, "Q1", "x", "work", "film", 0.9, ["parole"], stance=0.1 if crit else 0.9,
+                                  critical=crit))
+    assert [n["url"] for n in press_notes(store, "Q1", {})] == ["https://x/a"]

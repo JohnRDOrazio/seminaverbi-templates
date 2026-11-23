@@ -17,6 +17,9 @@ class Judge:
     def culture(self, url, text):
         return 0.9
 
+    def angle(self, url, text):
+        return 0.9
+
 
 def test_robots_403_leaves_the_article_for_the_next_run():
     """A robots.txt that answers 401/403 one day stops the outlet for the run only: its articles stay `found`."""
@@ -24,7 +27,7 @@ def test_robots_403_leaves_the_article_for_the_next_run():
     store.add_article("https://x.example/a", "o", "it")
     pages = Pages(client({ROBOTS: Resp(status=403)}))
     assert pages.get(store.article("https://x.example/a")) == (None, None)
-    assert run_filter(store, pages, Judge(), {"max_articles_per_run": 10, "culture_drop": 0.5}) == {}
+    assert run_filter(store, pages, Judge(), {"max_articles_per_run": 10, "culture_drop": 0.5, "angle_drop": 0.4}) == {}
     assert [a.url for a in store.articles("found")] == ["https://x.example/a"]
 
 
@@ -74,7 +77,7 @@ def test_failed_fetches_count_toward_the_limit_and_retry_oldest_attempt_last():
     _found(store, "a", "b", "c")
     routes = {ROBOTS: Resp(""), **{f"https://x.example/{n}": Resp(status=503) for n in "abc"}}
     pc = client(routes)
-    cfg = {"max_articles_per_run": 2, "culture_drop": 0.5}
+    cfg = {"max_articles_per_run": 2, "culture_drop": 0.5, "angle_drop": 0.4}
     run_filter(store, Pages(pc), Judge(), cfg)
     asked = [u for u, _ in pc.session.calls if not u.endswith("robots.txt")]
     assert asked == ["https://x.example/a", "https://x.example/b"]
@@ -99,7 +102,7 @@ def test_judge_failures_count_toward_the_limit():
     page = "<html><body><p>Testo</p></body></html>"
     j = Failing()
     run_filter(store, Pages(client({ROBOTS: Resp(""), **{f"https://x.example/{n}": Resp(page) for n in "abc"}})),
-               j, {"max_articles_per_run": 2, "culture_drop": 0.5})
+               j, {"max_articles_per_run": 2, "culture_drop": 0.5, "angle_drop": 0.4})
     assert j.n == 2
 
 
@@ -109,7 +112,7 @@ def test_a_refused_outlets_articles_use_none_of_the_budget():
     store.add_article("https://y.example/c", "p", "it")
     pc = client({ROBOTS: Resp(status=429), "https://y.example/robots.txt": Resp(""),
                  "https://y.example/c": Resp("<p>Testo</p>")})
-    assert run_filter(store, Pages(pc), Judge(), {"max_articles_per_run": 2, "culture_drop": 0.5}) == {"keep": 1}
+    assert run_filter(store, Pages(pc), Judge(), {"max_articles_per_run": 2, "culture_drop": 0.5, "angle_drop": 0.4}) == {"keep": 1}
 
 
 def test_the_pages_language_is_stored():
@@ -117,7 +120,7 @@ def test_the_pages_language_is_stored():
     _found(store, "a")
     html = '<html lang="en"><head><title>T</title></head><body><p>Text</p></body></html>'
     run_filter(store, Pages(client({ROBOTS: Resp(""), "https://x.example/a": Resp(html)})), Judge(),
-               {"max_articles_per_run": 2, "culture_drop": 0.5})
+               {"max_articles_per_run": 2, "culture_drop": 0.5, "angle_drop": 0.4})
     assert store.article("https://x.example/a").lang == "en"
 
 
@@ -141,7 +144,7 @@ def test_a_section_page_is_skipped_for_good_at_filter(capsys):
     _found(store, "musica")
     judge = Judge()
     counts = run_filter(store, Pages(client({ROBOTS: Resp(""), "https://x.example/musica": Resp(SECTION)})), judge,
-                        {"max_articles_per_run": 2, "culture_drop": 0.5})
+                        {"max_articles_per_run": 2, "culture_drop": 0.5, "angle_drop": 0.4})
     assert counts == {"skip": 1}
     art = store.article("https://x.example/musica")
     assert (art.stage, art.outcome, art.data) == ("filtered", "skip", {"reason": "not an article"})
@@ -157,3 +160,63 @@ def test_a_section_page_already_kept_is_skipped_at_link():
     assert counts == {"articles": 0, "mentions": 0}
     art = store.article("https://x.example/musica")
     assert (art.stage, art.outcome, art.data) == ("linked", "skip", {"culture": 0.8, "reason": "not an article"})
+
+
+class Angles(Judge):
+    """angle scores by a word of the text (0.1 when none is there); records what was asked."""
+
+    def __init__(self, **scores):
+        self.scores, self.texts = scores, []
+
+    def angle(self, url, text):
+        self.texts.append(text)
+        return next((p for word, p in self.scores.items() if word in text), 0.1)
+
+
+ANGLE_CFG = {"max_articles_per_run": 5, "culture_drop": 0.5, "angle_drop": 0.4}
+
+
+def _long(marker):
+    filler = " ".join(f"parola{i}" for i in range(200))
+    return (f"<html><head><title>Titolo</title></head><body><p>Apertura {filler}</p><p><em>Ordet</em> {filler}</p>"
+            f"<p>{filler}</p><p><em>Ordet</em> {marker} {filler}</p></body></html>")
+
+
+def test_an_article_without_the_angle_is_dropped_and_reported_apart():
+    store = PressStore(sqlite3.connect(":memory:"))
+    _found(store, "a")
+    judge = Angles()
+    counts = run_filter(store, Pages(client({ROBOTS: Resp(""), "https://x.example/a": Resp(_long("x"))})), judge,
+                        ANGLE_CFG)
+    assert counts == {"drop (angle)": 1}
+    art = store.article("https://x.example/a")
+    assert (art.stage, art.outcome) == ("filtered", "drop")
+    assert art.data == {"culture": 0.9, "angle": 0.1, "angle_opening": 0.1, "reason": "angle"}
+    assert len(judge.texts) == 3  # the opening, then the two mentions' windows
+    assert all(len(t.split()) <= 150 and t.startswith("Titolo") for t in judge.texts)
+
+
+def test_an_angle_seen_only_further_on_keeps_the_article_with_its_best_score():
+    store = PressStore(sqlite3.connect(":memory:"))
+    _found(store, "a")
+    run_filter(store, Pages(client({ROBOTS: Resp(""), "https://x.example/a": Resp(_long("misericordia"))})),
+               Angles(misericordia=0.8), ANGLE_CFG)
+    art = store.article("https://x.example/a")
+    assert art.outcome == "keep" and art.data == {"culture": 0.9, "angle": 0.8, "angle_opening": 0.1}
+
+
+def test_an_angle_seen_in_the_opening_asks_no_further():
+    store = PressStore(sqlite3.connect(":memory:"))
+    _found(store, "a")
+    judge = Angles(Apertura=0.4)
+    run_filter(store, Pages(client({ROBOTS: Resp(""), "https://x.example/a": Resp(_long("x"))})), judge, ANGLE_CFG)
+    assert len(judge.texts) == 1 and store.article("https://x.example/a").outcome == "keep"
+
+
+def test_the_angle_is_not_asked_below_culture_drop():
+    store = PressStore(sqlite3.connect(":memory:"))
+    _found(store, "a")
+    judge = Angles()
+    assert run_filter(store, Pages(client({ROBOTS: Resp(""), "https://x.example/a": Resp(_long("x"))})), judge,
+                      {**ANGLE_CFG, "culture_drop": 0.95}) == {"drop": 1}
+    assert judge.texts == [] and store.article("https://x.example/a").data == {"culture": 0.9}

@@ -68,3 +68,19 @@ def test_readd_without_route_keeps_existing_route():
     assert s.unrouted() == []
     s.add_mention(replace(m, route="waiting"))
     assert s.mentions(qid="Q1")[0].route == "waiting"
+
+
+def test_an_old_store_gains_the_stance_columns_and_its_mentions_are_not_critical():
+    import sqlite3
+    db = sqlite3.connect(":memory:")
+    db.execute("CREATE TABLE press_mentions (url TEXT, qid TEXT, label TEXT, kind TEXT, domain TEXT, p REAL, "
+               "passages_json TEXT, route TEXT, PRIMARY KEY (url, qid))")
+    db.execute("INSERT INTO press_mentions VALUES ('u', 'Q1', 'x', 'work', 'film', 0.9, '[]', NULL)")
+    store = PressStore(db)
+    assert [(m.stance, m.critical) for m in store.mentions()] == [(None, False)]
+    PressStore(db)  # again: the migration is guarded
+    store.add_mention(Mention("u", "Q1", "x", "work", "film", 0.9, [], stance=0.1, critical=True))
+    store.add_mention(Mention("u", "Q1", "x", "work", "film", 0.9, []))  # re-found without a score: kept
+    assert [(m.stance, m.critical) for m in store.mentions()] == [(0.1, True)]
+    store.add_mention(Mention("u", "Q1", "x", "work", "film", 0.9, [], stance=0.8))
+    assert [(m.stance, m.critical) for m in store.mentions()] == [(0.8, False)]

@@ -1,6 +1,7 @@
 """Routing the kept mentions: to the enrichment list (SeminaVerbi already covers the item), into the queue as a
 candidate of the mention's domain (source `press:<outlet>`), or to `waiting` (its domain has no module yet; released
-later with the same coverage decision).
+later with the same coverage decision). A mention whose article is only critical of the item never reaches the queue
+(route `dropped`), but still goes to the enrichment list of a covered work.
 
 A mention keeps its route once set, so routing twice adds neither a second candidate nor a second enrichment entry.
 The queue is keyed by QID alone: a mention of a QID that is already a row of another domain is decided and recorded
@@ -93,7 +94,7 @@ def _route(store, queue, mention, outlet: str, domain: str, entity: dict, repo, 
 
 
 def decide(mention, domain: str, entity: dict, repo, wikis, sparql=None) -> tuple[str, dict]:
-    """("enrichment" or "candidate", stage-0 data) for the mention's item under `domain`, with the coverage check
+    """("enrichment", "candidate" or, for an only critical mention of a work not covered, "dropped"; stage-0 data) for the mention's item under `domain`, with the coverage check
     stage 1 runs: the domain's own `covered` when it has one (literature: a series covered through a volume),
     else stages.covered. A domain module may give `press_stage0(qid, entity, sparql) -> dict`, the stage-0 data
     that check needs for an item none of its queries added (literature: a series' volumes; music and art: a
@@ -106,7 +107,9 @@ def decide(mention, domain: str, entity: dict, repo, wikis, sparql=None) -> tupl
     row.data = {0: stage0}
     covered = getattr(module, "covered", None) or stages.covered
     outcome = covered(row, repo, wikis)[0]
-    return ("enrichment" if outcome in ("drop", "translation") else "candidate"), stage0
+    if outcome in ("drop", "translation"):
+        return "enrichment", stage0
+    return ("dropped" if mention.critical else "candidate"), stage0
 
 
 def _route_one(store, queue, mention, outlet: str, repo, wikis, wikidata, sparql) -> str | None:

@@ -289,3 +289,16 @@ def test_compact_and_full_types_are_resolved():
     assert _article(_head("website", '{"@type": "https://schema.org/Article"}'))
     assert not _article(_graph({"@type": "o:Article"}, context='{"o": "https://other.test/"}'))
     assert _article(_head("website", '{"@type": "schema:NewsArticle"}'))  # the usual prefix, undeclared
+
+
+def test_mention_texts_are_bounded_spread_and_leave_out_the_opening():
+    from pipeline.press.extract import Span, mention_texts
+    long = " ".join(["w"] * 160)
+    paragraphs = ["Ordet breve"] + [f"Ordet{i} {long}" for i in range(1, 9)]
+    page = Page("Titolo " * 40, None, "it", "u", paragraphs,
+                [Span("Ordet", 0, "italic")] + [Span(f"Ordet{i}", i, "italic") for i in range(1, 9)])
+    texts = mention_texts(page, 3)
+    assert len(texts) == 3 and all(len(t.split()) <= 150 for t in texts)
+    assert [next(w for w in t.split() if w.startswith("Ordet")) for t in texts] == ["Ordet1", "Ordet5", "Ordet8"]
+    assert mention_texts(Page("T", None, "it", "u", ["breve"], [Span("breve", 0, "italic")]), 3) == []
+    assert len(mention_texts(page, 1)) == 1

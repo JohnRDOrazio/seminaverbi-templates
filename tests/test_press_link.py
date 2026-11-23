@@ -27,7 +27,7 @@ CLOSURE = {
     "Q3305213": ["Q3305213"],                # painting
     "Q5": ["Q5"],                            # human
 }
-CFG = {"pick_p": 0.8, "pick_confidence": 0.6, "mention_keep": 0.6,
+CFG = {"pick_p": 0.8, "pick_confidence": 0.6, "mention_keep": 0.6, "stance_drop": 0.4,
        "waiting_classes": {"music": ["Q105543609", "Q7366", "Q482994", "Q484692"],
                            "art": ["Q3305213", "Q860861"], "artists": ["Q5"]}}
 
@@ -66,9 +66,13 @@ class FakeWikidata:
 
 
 class FakeJudge:
-    def __init__(self, pick=None, substantive=0.9):
-        self._pick, self._substantive = pick, substantive
-        self.picks, self.substantives = [], []
+    def __init__(self, pick=None, substantive=0.9, stance=0.8):
+        self._pick, self._substantive, self._stance = pick, substantive, stance
+        self.picks, self.substantives, self.stances = [], [], []
+
+    def stance(self, url, label, passage, item, title):
+        self.stances.append({"url": url, "label": label, "passage": passage, "item": item, "title": title})
+        return self._stance(passage) if callable(self._stance) else self._stance
 
     def pick(self, url, passage, label, options):
         """The configured answer; by default the first option, surely."""
@@ -364,3 +368,36 @@ def test_a_title_without_hits_is_searched_once(store, cache):
     wd = FakeWikidata({})
     assert run(pg, store, FakeJudge(), wd, cache) == []
     assert wd.searches == [("Nulla", "it"), ("Nulla", "en")]
+
+
+@pytest.mark.parametrize("score,critical", [(0.39, True), (0.4, False)])
+def test_the_stance_of_a_kept_mention_is_stored(store, cache, score, critical):
+    pg = page(["Silence racconta il dubbio."], [Span("Silence", 0, "italic")])
+    wd = FakeWikidata({"Q1": entity(["Q11424"], {"it": "Silence"}, {"it": "film"})},
+                      search={("Silence", "it"): ["Q1"]})
+    judge = FakeJudge(stance=score)
+    run(pg, store, judge, wd, cache)
+    assert [(m.stance, m.critical) for m in store.mentions()] == [(score, critical)]
+    assert judge.stances == [{"url": URL, "label": "Silence", "passage": "Silence racconta il dubbio.",
+                              "item": "Silence — film", "title": "T"}]
+
+
+def test_a_mixed_judgment_seen_in_a_later_window_is_not_critical(store, cache):
+    filler = " ".join(f"parola{i}" for i in range(200))
+    pg = page([f"Silence stroncato. {filler}", filler, f"Silence però commuove. {filler}", filler,
+               f"Silence ancora. {filler}", filler, f"Silence quarta. {filler}"], [Span("Silence", 0, "italic")])
+    wd = FakeWikidata({"Q1": entity(["Q11424"])}, search={("Silence", "it"): ["Q1"]})
+    judge = FakeJudge(stance=lambda passage: 0.7 if "commuove" in passage else 0.1)
+    assert [(m.stance, m.critical) for m in run(pg, store, judge, wd, cache)] == [(0.7, False)]
+    assert len(judge.stances) == 2
+    judge = FakeJudge(stance=0.1)
+    run(pg, PressStore(sqlite3.connect(":memory:")), judge, wd, cache)
+    assert len(judge.stances) == 3  # at most three windows
+    assert all(len((s["title"] + " " + s["passage"]).split()) <= 150 for s in judge.stances)
+
+
+def test_a_mention_dropped_as_passing_is_not_asked_its_stance(store, cache):
+    pg = page(["Silence di passaggio."], [Span("Silence", 0, "italic")])
+    judge = FakeJudge(substantive=0.1)
+    run(pg, store, judge, FakeWikidata({"Q1": entity(["Q11424"])}, search={("Silence", "it"): ["Q1"]}), cache)
+    assert judge.stances == []

@@ -454,6 +454,39 @@ def window(paragraphs: list[str], index: int, words: int = 150, needle: str | No
     return " ".join(head + cur + nxt[:take_next])
 
 
+MAX_TITLE = 30  # words of the title sent beside a window
+
+
+def short_title(page: Page) -> str:
+    return " ".join(page.title.split()[:MAX_TITLE])
+
+
+def titled_room(page: Page, words: int = 150) -> int:
+    """The words left for a window sent beside the title."""
+    return words - len(short_title(page).split())
+
+
+def mention_texts(page: Page, limit: int, words: int = 150) -> list[str]:
+    """At most `limit` texts of the title and the window around a mention, for mentions not wholly in the opening,
+    spread over the article (the first, the last, and evenly between)."""
+    room = titled_room(page, words)
+    ends, total = [], len(page.title.split())
+    for paragraph in page.paragraphs:
+        total += len(paragraph.split())
+        ends.append(total)
+    texts: list[str] = []
+    for span in sorted(page.spans, key=lambda s: s.paragraph):
+        if 0 <= span.paragraph < len(ends) and ends[span.paragraph] > words:
+            text = f"{short_title(page)} {window(page.paragraphs, span.paragraph, room, span.text)}".strip()
+            if text not in texts:
+                texts.append(text)
+    if len(texts) <= limit:
+        return texts
+    if limit == 1:
+        return texts[:1]
+    return [texts[round(i * (len(texts) - 1) / (limit - 1))] for i in range(limit)]
+
+
 def passage(paragraph: str, needle: str, words: int = 25) -> str:
     """At most `words` words around `needle`, with … at cut ends; the paragraph's first words when the needle is
     not in it."""
