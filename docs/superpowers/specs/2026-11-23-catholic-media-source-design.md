@@ -206,7 +206,31 @@ backfill spreads over days. Domain stages 1–6 still run as now, by hand (`run 
    and for how long, and how an outlet asks to be left out. No personal email. Its text is part of the plan; it is
    published only with the author's approval in session, like any wiki edit.
 4. **Outlets that refuse us** (a 401/403/429, a robots `Disallow`, La Civiltà Cattolica's 403 today): skipped and
-   reported, never written around.
+   reported, never written around. What follows from a refusal: "Outlets that refuse us" below.
+
+## Outlets that refuse us (author, 2026-11-23)
+
+The author's decision: "If a bot is refused access to a site, then the bot should stop reading that site for that day;
+any new articles should still be available the day later. If a bot is refused continuously for say a week, then the
+site should be removed and no longer consulted".
+
+- **A refusal** is a 401, 403 or 429 from the outlet (an article or feed, redirects followed) or from its own robots.txt.
+  It is not a redirect target's robots.txt, a disallowed path, a timeout, a 5xx or an unreachable host (an unreachable
+  robots.txt stops the outlet for that run only, as before).
+- **The day** is the UTC calendar day. The refusal is kept in `press_refusals` (outlet, day, reason); for the rest of that
+  day every run, of any action, asks the outlet nothing, robots.txt included. The day after it is tried again. Articles
+  not read stay `found`, unattempted; feeds not read to the end keep their old validators, so nothing is missed.
+- **A refused day** (toward removal) is one with a refusal and no successful response (2xx or 304) other than robots.txt.
+- **Removal:** at seven refused days with no successful day between them. Each is a different calendar day, so they span
+  seven days at least. A day with neither a refusal nor a success (no run, or only errors) neither counts nor breaks the
+  sequence. Any successful day starts it again.
+- **Removal is state** (`press_outlets`: last successful day, removed on, since, reason, reinstated on), never an edit of
+  `config/press.json`. A removed outlet is never asked again, until `press reinstate OUTLET`, which starts the count again
+  but leaves today's refusal, if any, standing for today.
+- **Seen:** every run that reads outlets ends with `press refused:` and `press removed:`, with since when; `press outlets`
+  lists both without asking anything.
+- **Dry runs:** `run --dry-run` keeps refusals in the store it is given (a copy). `discover --dry-run` honours the real
+  store's state and writes none, so a refusal it meets does not stop a real run later that day.
 
 ## Precision (2026-11-23 dry run)
 

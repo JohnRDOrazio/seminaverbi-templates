@@ -19,12 +19,12 @@ Every proposal for a new article is read and voted on by people before anything 
 * At most 200 articles per day, across all the outlets it reads.
 * One request at a time per site, at least 10 seconds apart, or more if the site's <code>robots.txt</code> asks for a longer <code>Crawl-delay</code>.
 * It reads the site's <code>robots.txt</code> on every run and obeys it. It reads feeds and sitemaps with conditional requests, so an unchanged feed costs almost nothing.
-* If a site answers that it refuses the request (HTTP 401, 403 or 429), the bot stops reading that site for the day and does not try again by other means.
+* If a site answers that it refuses the request (HTTP 401, 403 or 429), the bot stops reading that site for the day and does not try again by other means. A site that refuses it every day for a week is no longer read.
 
 == What is kept ==
-For each article: its link, title, date, outlet and language, and, for each work or person it discusses, at most three short quotations of no more than 25 words each, always shown with the outlet, the title, the date and the link.
+For each article: its link, title, date, outlet and language, and, for each work or person it discusses, at most three short quotations of no more than 25 words each, always shown with the outlet, the title, the date and the link. It also keeps the scores the assistant gives, and, for articles from ''L'Osservatore Romano'' and its journalists' blogs, a short numeric fingerprint (hashes only) used to recognise the same article on two sites.
 
-The full text of an article is never stored. It is read only while the bot works on it, and an automated assistant reads only the paragraphs around a mention (about 150 words at a time) to judge whether the article really discusses the work. Nothing read is used to train any model.
+The full text of an article is never stored. It is read only while the bot works on it, and an automated assistant reads the title and opening of an article and the paragraphs around a mention, never more than about 150 words at a time, to judge whether the article really discusses the work. Those passages are sent to [https://typesafe.ai TypeSafe], the service that runs the assistant. The service's terms ([https://typesafe.ai/legal/mca customer agreement], [https://typesafe.ai/legal/privacy-policy privacy policy]) state that it does not train models on what it is sent.
 
 == For how long ==
 As long as a SeminaVerbi article or an article proposal cites it. A link and its short quotations stay with the article that cites them, like any other source.

@@ -155,13 +155,27 @@ python -m pipeline press run --dry-run   # discover, filter, link; prints each m
 ```
 
 `--dry-run` also works with `discover` (into a throwaway store: lists the URLs found per outlet, keeps nothing),
-`route` (prints the would-be routes) and `enrich` (prints the page text). Each run ends with the outlets that refused
-us (`press refused: …`); a 401/403/429 or a robots.txt rule stops that outlet for the run, never worked around.
+`route` (prints the would-be routes) and `enrich` (prints the page text).
+
+**Outlets that refuse us.** A 401/403/429, from the outlet or from its own robots.txt, stops that outlet for the rest of
+the UTC day: no later run of that day asks it anything, robots.txt included, and it is never worked around. The articles
+not read stay `found`, and the next day it is tried again. After seven days in a row of refusals the outlet is removed:
+never asked again. A day counts as refused only if nothing but robots.txt answered successfully (2xx or 304) that day; a
+successful day starts the count again; a day with neither (no run, or only timeouts, 5xx, 404, disallowed paths) neither
+counts nor breaks it. An unreachable robots.txt stops the outlet for that run only; a disallowed path is only not read.
+All of it is state in the store, not in `config/press.json`. Each run that reads outlets ends with `press refused: …` and
+`press removed: …`, with since when. `discover --dry-run` honours that state and keeps nothing of its own; `run --dry-run`
+writes to the store it is given (use a copy).
+
+```
+python -m pipeline press outlets            # the outlets that refuse us, since when, and the removed ones; no request
+python -m pipeline press reinstate OUTLET   # puts a removed outlet back (if it refused us today, from tomorrow)
+```
 
 The bot reads politely: its own user agent (`SeminaVerbi-press/1.0`, pointing to the page `Semina Verbi:Press bot`,
 whose text is `docs/press-bot-page.wiki`), one request at a time per outlet at least `delay_seconds` (10) apart or the
 outlet's `Crawl-delay`. A mention whose article is neutral on the work or only critical of it never becomes a candidate or
-press evidence; for a work SeminaVerbi covers it goes to the enrichment page, the critical ones marked. The bot keeps the link, title, date, outlet, language and quotations of at most 25 words; never the
+press evidence; for a work SeminaVerbi covers it goes to the enrichment page, the critical ones marked. The bot keeps the link, title, date, outlet, language, scores and quotations of at most 25 words; never the
 full text. Jev reads at most about 150 words per question. Read the `--dry-run` report before the first real run.
 
 **Archives, caps and republished articles** (`vallini`, for now; all per outlet in `config/press.json`):

@@ -1,4 +1,4 @@
-"""Tables for the Catholic-media source: articles, mentions, feed caches.
+"""Tables for the Catholic-media source: articles, mentions, feed caches, the outlets that refuse us.
 
 Keeps link, title, date, outlet, language and short passages only, and for outlets that republish one another a short
 fingerprint of hashes (see duplicates); never article text.
@@ -9,8 +9,10 @@ import json
 import sqlite3
 import time
 from dataclasses import dataclass, field
+from datetime import date, datetime, timezone
 
 MAX_PASSAGE_WORDS = 25
+REMOVE_AFTER = 7  # refused days in a row, and the calendar days they span at least, before an outlet is removed
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS press_articles (
@@ -21,7 +23,15 @@ CREATE TABLE IF NOT EXISTS press_mentions (
   passages_json TEXT, route TEXT, stance REAL, stance_outcome TEXT, PRIMARY KEY (url, qid));
 CREATE TABLE IF NOT EXISTS press_feeds (url TEXT PRIMARY KEY, etag TEXT, last_modified TEXT);
 CREATE TABLE IF NOT EXISTS press_walks (url TEXT PRIMARY KEY, data_json TEXT);
+CREATE TABLE IF NOT EXISTS press_refusals (outlet TEXT, day TEXT, reason TEXT, PRIMARY KEY (outlet, day));
+CREATE TABLE IF NOT EXISTS press_outlets (
+  outlet TEXT PRIMARY KEY, ok_day TEXT, reinstated TEXT, removed TEXT, since TEXT, reason TEXT);
 """
+
+
+def utc_today() -> str:
+    """The day a refusal holds for: the UTC calendar day, whatever the machine's time zone."""
+    return datetime.now(timezone.utc).date().isoformat()
 
 
 @dataclass
@@ -210,4 +220,83 @@ class PressStore:
 
     def set_walk(self, url, data: dict) -> None:
         self.db.execute("INSERT OR REPLACE INTO press_walks VALUES (?,?)", (url, json.dumps(data)))
+        self.db.commit()
+
+    # The outlets that refuse us. A refusal stops the outlet for its UTC day. A day counts as refused toward removal
+    # when no successful response came from the outlet that day; a successful day, or putting the outlet back, starts
+    # the count again; a day with neither (no run, or timeouts and errors only) neither counts nor breaks it.
+
+    def _ensure_outlet(self, outlet: str) -> None:
+        self.db.execute("INSERT OR IGNORE INTO press_outlets (outlet) VALUES (?)", (outlet,))
+
+    def _counted(self, outlet: str) -> list[str]:
+        """The refused days since the last successful day and the last reinstatement, oldest first."""
+        return [r[0] for r in self.db.execute(
+            "SELECT day FROM press_refusals r LEFT JOIN press_outlets o USING (outlet) WHERE r.outlet=? "
+            "AND day > MAX(COALESCE(ok_day, ''), COALESCE(reinstated, '')) ORDER BY day", (outlet,)).fetchall()]
+
+    def refuse(self, outlet: str, reason: str) -> None:
+        """Record that the outlet refused us today; on the REMOVE_AFTERth refused day in a row it is removed."""
+        today = utc_today()
+        self._ensure_outlet(outlet)
+        self.db.execute("INSERT OR IGNORE INTO press_refusals VALUES (?,?,?)", (outlet, today, reason))
+        days = self._counted(outlet)
+        if (len(days) >= REMOVE_AFTER
+                and (date.fromisoformat(days[-1]) - date.fromisoformat(days[0])).days + 1 >= REMOVE_AFTER):
+            self.db.execute("UPDATE press_outlets SET removed=?, since=?, reason=? WHERE outlet=? AND removed IS NULL",
+                            (today, days[0], reason, outlet))
+        self.db.commit()
+
+    def succeeded(self, outlet: str) -> None:
+        """Record that the outlet answered successfully (not its robots.txt) today."""
+        today = utc_today()
+        r = self.db.execute("SELECT ok_day FROM press_outlets WHERE outlet=?", (outlet,)).fetchone()
+        if r and r[0] and r[0] >= today:
+            return
+        self._ensure_outlet(outlet)
+        self.db.execute("UPDATE press_outlets SET ok_day=? WHERE outlet=?", (today, outlet))
+        self.db.commit()
+
+    def refused_today(self) -> dict[str, str]:
+        """{outlet: reason} of the outlets that refused us today."""
+        return {r[0]: r[1] for r in self.db.execute(
+            "SELECT outlet, reason FROM press_refusals WHERE day=? ORDER BY outlet", (utc_today(),)).fetchall()}
+
+    def removed(self) -> dict[str, dict]:
+        """{outlet: on (the day it was removed), since (the first refused day), reason} of the removed outlets."""
+        return {r[0]: {"on": r[1], "since": r[2], "reason": r[3]} for r in self.db.execute(
+            "SELECT outlet, removed, since, reason FROM press_outlets WHERE removed IS NOT NULL ORDER BY outlet")
+            .fetchall()}
+
+    def stopped(self) -> dict[str, str]:
+        """{outlet: why} of the outlets to ask nothing of today: refused today, or removed."""
+        return self.refused_today() | dict.fromkeys(self.removed(), "removed")
+
+    def refusals(self) -> dict[str, dict]:
+        """The outlets whose last word was a refusal, the removed ones aside: {outlet: on (its last refusal), reason,
+        since and days (the refused days counted toward removal; None and 0 when that day also had a success)}."""
+        out, removed = {}, self.removed()
+        for outlet, day, reason, ok, back in self.db.execute(
+                "SELECT r.outlet, MAX(day), r.reason, COALESCE(ok_day, ''), COALESCE(reinstated, '') "
+                "FROM press_refusals r LEFT JOIN press_outlets o USING (outlet) GROUP BY r.outlet ORDER BY r.outlet"
+                ).fetchall():
+            if outlet in removed or day < max(ok, back):
+                continue
+            days = self._counted(outlet)
+            out[outlet] = {"on": day, "since": days[0] if days else None, "days": len(days), "reason": reason}
+        return out
+
+    def reinstate(self, outlet: str) -> bool:
+        """Put a removed outlet back (False: it is not removed). Its refusals so far count no more; one of today still
+        stops it for today."""
+        cur = self.db.execute("UPDATE press_outlets SET removed=NULL, since=NULL, reason=NULL, reinstated=? "
+                              "WHERE outlet=? AND removed IS NOT NULL", (utc_today(), outlet))
+        self.db.commit()
+        return cur.rowcount == 1
+
+    def copy_refusals(self, other: "PressStore") -> None:
+        """Take over what `other` knows of the outlets that refuse us (for a throwaway store)."""
+        for table, n in (("press_refusals", 3), ("press_outlets", 6)):
+            rows = [tuple(r) for r in other.db.execute(f"SELECT * FROM {table}").fetchall()]
+            self.db.executemany(f"INSERT OR REPLACE INTO {table} VALUES ({','.join('?' * n)})", rows)
         self.db.commit()

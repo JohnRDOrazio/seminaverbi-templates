@@ -2,8 +2,10 @@
 
 One request at a time per host and per outlet, at least `delay` seconds apart (more when a host's
 robots.txt asks for a larger Crawl-delay), robots.txt read each run, our own
-honest user agent. A 401/403/429 stops that outlet for the run: it is recorded
-in `refused` and never retried around. Redirects, robots.txt's own included, are followed by hand (at most five
+honest user agent. A 401/403/429, from an article or feed or from the outlet's own robots.txt, stops that outlet
+for the run and, kept in the store, for every later run of the same UTC day: nothing is asked of it, robots.txt
+included, and it is never retried around. An outlet removed after a week of refusals (see store.PressStore) is never
+asked. An unreachable robots.txt stops the outlet for the run only. Redirects, robots.txt's own included, are followed by hand (at most five
 hops, each paced), each new host with its own robots.txt and delay.
 """
 import json
@@ -40,16 +42,22 @@ class PoliteClient:
                  clock=time.monotonic, sleep=time.sleep):
         self.session, self.user_agent, self.delay = session, user_agent, delay
         self.store, self.clock, self.sleep = store, clock, sleep
-        self.refused: dict[str, str] = {}
+        # outlet -> why nothing is asked of it: refused or removed by the store, or refused in this run
+        self.refused: dict[str, str] = store.stopped() if store else {}
         self._last: dict[str, float] = {}
         self._last_outlet: dict[str, float] = {}
         self._robots: dict[str, RobotFileParser] = {}
         self._blocked: set[str] = set()  # recorded in `refused` but answered None, not raised
         self._foreign_down: dict[str, str] = {}  # redirect targets' hosts whose robots.txt failed this run
 
-    def _refuse(self, outlet: str, reason: str):
-        self.refused[outlet] = reason
+    def _refuse(self, outlet: str, reason: str, keep: bool = True):
+        self._record(outlet, reason, keep)
         raise Refused(outlet, reason)
+
+    def _record(self, outlet: str, reason: str, keep: bool = True) -> None:
+        self.refused[outlet] = reason
+        if keep and self.store:
+            self.store.refuse(outlet, reason)
 
     def _wait(self, outlet: str, host: str, delay: float) -> None:
         """Sleep until the later of the host's deadline (its own delay) and the outlet's (the configured one)."""
@@ -101,10 +109,10 @@ class PoliteClient:
             self._foreign_down[host] = trouble
             raise RobotsUnavailable(f"{host}: {trouble}")
         if code == 429 or trouble == "robots unreachable":
-            self._refuse(outlet, trouble)
+            self._refuse(outlet, trouble, keep=code == 429)
         if code in (401, 403):
             rp.disallow_all = True
-            self.refused[outlet] = trouble
+            self._record(outlet, trouble)
             self._blocked.add(outlet)
         elif code >= 400:
             rp.allow_all = True
@@ -118,6 +126,8 @@ class PoliteClient:
         hosts this run, or 304 on a conditional get)."""
         if outlet in self._blocked:
             return None
+        if self.store:  # another process may have been refused since
+            self.refused = self.store.stopped() | self.refused
         if outlet in self.refused:
             raise Refused(outlet, self.refused[outlet])
         headers = {}
@@ -143,6 +153,8 @@ class PoliteClient:
             raise requests.TooManyRedirects(f"{url}: more than {MAX_HOPS} redirects")
         if r.status_code in REFUSING:
             self._refuse(outlet, str(r.status_code))
+        if self.store and (200 <= r.status_code < 300 or r.status_code == 304):
+            self.store.succeeded(outlet)
         if r.status_code == 304:
             return None
         return r
