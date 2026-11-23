@@ -512,3 +512,93 @@ def test_release_releases_the_valid_qids_even_when_another_is_refused(bench, cap
     path, _ = bench
     assert cli.main(["release-benchmark", "Q2", "Q1", "--db", str(path)]) != 0
     assert Queue(path).row("Q2").calibration is False and Queue(path).row("Q1").calibration is True
+
+
+# --- the music and art domains, end to end on fakes ---
+
+class DomainWikipedia:
+    def __init__(self, lang, project="wikipedia"):
+        self.lang, self.project = lang, project
+
+    def lead(self, title):
+        return f"{title} is a work with a theological reading in its sources."
+
+    def sections(self, title):
+        return [("Reception", f"{title} was read as a parable of mercy.")]
+
+    def url(self, title):
+        return f"https://{self.lang}.{self.project}.org/wiki/{title.replace(' ', '_')}"
+
+
+class DomainWikidata:
+    def entity(self, qid):
+        return {}
+
+    def labels(self, qids, lang="en"):
+        return {}
+
+
+class DomainJudge:
+    def __init__(self, key):
+        self.key = key
+
+    def plausible(self, row, synopsis):
+        return 0.9
+
+    def connection(self, row, text):
+        return {"choice": "seeds", "probabilities": {"seeds": 0.8}, "confidence": 0.9}
+
+    def field(self, row, text):
+        return {"choice": "music", "probabilities": {"music": 0.7}}
+
+    def themes(self, row, text):
+        return {self.key: {"p": 0.7, "status": "applied"}}
+
+    def evidence(self, row, key, paragraphs):
+        return 0
+
+
+class PageEditor:
+    def __init__(self):
+        self.pages = {}
+
+    def revision(self, title):
+        return self.pages.get(title)
+
+    def edit(self, title, text, summary, tags=None, createonly=False, baserevid=None):
+        self.pages[title] = (len(self.pages) + 1, text)
+        return {"result": "Success"}
+
+
+@pytest.mark.parametrize("domain", ["music", "art"])
+def test_run_takes_a_candidate_to_a_proposal(domain, monkeypatch, tmp_path):
+    from pipeline import load_config
+    from pipeline.domains import DOMAINS
+    from sync import categories
+    from pipeline.judge import ROOT
+    tree = categories.load(ROOT)
+    key = categories.leaf_themes(tree)[0].key
+    module, path, editor = DOMAINS[domain], tmp_path / "data" / "pipeline.sqlite", PageEditor()
+
+    def candidates(queue, sparql, wikipedia, cfg, wikidata=None):
+        queue.add("Q42", domain, "form" if domain == "music" else "list", {"en": "Sample Work"},
+                  {"enwiki": "Sample Work"}, data={"instance_of": list(module.WORK_CLASSES[:1]), "count": 40})
+        return 1
+
+    monkeypatch.setattr(module, "candidates", candidates)
+    monkeypatch.setattr(stages, "covered", lambda row, repo, wikis: ("pass", {}))
+    monkeypatch.setattr(module, "covered", lambda row, repo, wikis: ("pass", {}), raising=False)
+    monkeypatch.setattr(cli, "load_config", load_config)
+    monkeypatch.setattr(cli, "_sparql", lambda: None)
+    monkeypatch.setattr(cli, "_wikidata", DomainWikidata)
+    monkeypatch.setattr(cli, "_wikipedia", DomainWikipedia)
+    monkeypatch.setattr(cli, "_wikis", lambda: {lang: object() for lang in cli.LANGS})
+    monkeypatch.setattr(cli, "_tree", lambda: tree)
+    monkeypatch.setattr(cli, "_judge", lambda queue: DomainJudge(key))
+    monkeypatch.setattr(cli, "_editor", lambda: editor)
+    assert cli.main(["run", "--publish", "--domain", domain, "--db", str(path)]) == 0
+    row = Queue(path).row("Q42")
+    assert row.outcomes == {0: "pass", 1: "pass", 2: "pass", 3: "pass", 4: "pass", 5: "pass"}
+    proposals = [t for t in editor.pages if t.startswith("Semina Verbi:Article proposals/")]
+    assert len(proposals) == 1 and "Sample Work" in proposals[0]
+    assert f"=== {domain.capitalize()} ===" in editor.pages["Semina Verbi:Article proposals"][1]

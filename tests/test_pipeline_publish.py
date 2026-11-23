@@ -195,6 +195,14 @@ def test_ranking_links_to_each_section_with_its_count(q):
     assert text.index(nav) < text.index("== Open ==")
 
 
+def test_ranking_links_the_new_domains(q):
+    add(q, "Q1", "Song", domain="music"); q.set_status("Q1", "open", page=PREFIX + "Song")
+    add(q, "Q2", "Painting", domain="art"); q.set_status("Q2", "open", page=PREFIX + "Painting")
+    text = ranking(q)
+    assert text.splitlines()[2].startswith("Go to: [[#Art|Art]] (1) · [[#Music|Music]] (1) · ")
+    assert "=== Art ===" in text and "=== Music ===" in text
+
+
 def test_colliding_titles_get_the_qid(q):
     q.add("Q1", "film", "s", {}, {"enwiki": "A|B"}); q.add("Q2", "film", "s", {}, {"enwiki": "AB"})
     a, b = q.pending(1)

@@ -60,6 +60,22 @@ their target; only links with no Wikidata item, or people and items with no lite
 adds Wikisource pages to the proposal's sources as links only (they are never read). Run `python -m pipeline calibrate
 --domain literature` first, to check the cut-offs against the articles SeminaVerbi already has.
 
+Music (`--domain music`) and art (`--domain art`) run the same stages. Music candidates come from the work classes
+(songs, hymns, masses, oratorios, operas and the like, found through the class closure), genres, facets and artists;
+bands and groups are reported and skipped, as are people. Rows from facets and genres need 10 sitelinks, rows whose
+only source is an artist need 20 (`music.sitelink_floor`, `music.artist_sitelink_floor`); a part (a movement, an
+act) is folded into its whole. Art candidates come from what a work depicts, Iconclass codes (Wikidata's P1257
+only), genres and a curated list; the floor is 15 sitelinks (`art.sitelink_floor`) and rows from the curated
+`list` pass without it. Jev's quick question for art asks about significance, not plausibility. Recordings and
+editions, and art copies, are dropped at triage. Run `python -m pipeline calibrate --domain music` (or `art`) and read the
+report before the first `publish` of that domain.
+
+**Art benchmark.** `calibrate --domain art` also adds a benchmark of 20 works (strong and weak) held back as
+calibration rows. Open item: the author approves the benchmark list in `art.benchmark` before the first live art
+run; this is not done yet. A benchmark work is released one QID at a time with
+`python -m pipeline release-benchmark QID [QID ...]`, which turns it into a live candidate that runs stages 1-5 again
+(a QID that is not a benchmark row changes nothing and makes the command exit with an error).
+
 Commands (options `--db PATH`, default `data/pipeline.sqlite`, and `--domain`, default `film`, go before or after the command):
 
 ```
@@ -68,6 +84,7 @@ python -m pipeline run [--publish]    # stages 0-5, at most max_new_per_run ente
 python -m pipeline calibrate          # add the articles SeminaVerbi already has, run stages 1-5 on them, print the report
 python -m pipeline redo STAGE [--qid Q]   # clear that stage and later ones (STAGE 0 is refused)
 python -m pipeline skip QID --reason TEXT # drop a row that breaks a stage, at its next stage without an outcome
+python -m pipeline release-benchmark QID [QID ...]   # art: turn held-back benchmark works into candidates
 python -m pipeline publish | votes | approved
 ```
 
