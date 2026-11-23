@@ -142,12 +142,13 @@ def _stage_functions(domain, queue, cfg) -> dict:
         if outcome == "drop" and data.get("reason") == "empty dossier":  # press-only work: the press is its dossier
             data = {k: v for k, v in data.items() if k != "reason"}
             outcome = "pass"
-            data["languages"] = {}
-            for n in notes:
-                data["languages"][n["lang"]] = data["languages"].get(n["lang"], 0) + 1
         elif outcome == "drop":
             return outcome, data
         data["notes"] = notes + data.get("notes", [])
+        languages = dict.fromkeys(data.get("languages") or {}, 0)  # counted again over the merged notes
+        for n in data["notes"]:
+            languages[n["lang"]] = languages.get(n["lang"], 0) + 1
+        data["languages"] = languages
         return outcome, data
 
     return {

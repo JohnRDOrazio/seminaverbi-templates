@@ -110,3 +110,15 @@ def test_missing_press_config_does_not_break_rows_without_mentions(queue, monkey
         raise OSError("no config")
     monkeypatch.setattr(cli, "load_press_config", boom)
     assert _run(queue, "pass", {"notes": [], "languages": {}}, monkeypatch)[0] == "pass"
+
+
+def test_press_notes_count_in_the_languages_of_a_passing_dossier(store, queue, monkeypatch):
+    mention(store, "http://a/1", "Q1", ["x y"])
+    mention(store, "http://a/2", "Q1", ["z w"])
+    wiki = {"notes": [{"lang": "en", "url": "https://en.wikipedia.org/wiki/F", "heading": "Plot", "text": "t"}],
+            "languages": {"en": 1, "de": 0}}
+    outcome, data = _run(queue, "pass", wiki, monkeypatch)
+    assert outcome == "pass" and len(data["notes"]) == 3
+    assert data["languages"] == {"en": 1, "de": 0, "it": 2}
+    from pipeline import stages
+    assert stages._first_wiki(data["languages"]) == "it"

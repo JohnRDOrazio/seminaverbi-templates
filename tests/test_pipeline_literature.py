@@ -702,3 +702,12 @@ def test_candidates_run_the_exclusion(q, monkeypatch):
     literature.candidates(q, FakeSparql(), FakeWikipedia([]), {**CFG_FULL, "_it_wikipedia": FakeItWikipedia([])},
                           FakeWikidata({}))
     assert seen == [q]
+
+
+def test_a_press_exempt_row_below_the_floor_is_checked(q):
+    q.add("Q_PRESS", "literature", "press:sir", {}, {}, data={"count": 2, "press": {"sir": 0.8}})
+    q.add("Q_WEAK", "literature", "press:sir", {}, {}, data={"count": 2, "press": {"sir": 0.4}})
+    sparql = _excluding(q, {"Q_PRESS": ["religious"]})
+    assert "wd:Q_PRESS" in sparql.queries[0] and "wd:Q_WEAK " not in sparql.queries[0]
+    assert q.row("Q_PRESS").data[0]["excluded"] == "a religious text"
+    assert literature.triage(q.row("Q_PRESS"), CFG)[0] == "drop"
