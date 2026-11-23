@@ -29,20 +29,7 @@ shown, with the famous sacred works first and seeds of the Word in secular works
 
 - `pipeline/domains/music.py` and `pipeline/domains/art.py`, thin modules on `common.py`, with the domain
   interface of phase 2 (`candidates`, `add_calibration`, `calibration_qids`, `triage`, `dossier`,
-  `dossier_stage`, `Only the author can settle these; each changes what gets built. Most important first.
-
-1. **Architecture now or later?** #23 includes churches, cathedrals and monasteries. They are works, but a
-   different class tree, a different dossier (history, liturgical arrangement, artworks inside) and many
-   thousands of candidates. Options: (a) later, as its own domain (my pick: art first, with the folding
-   rule stopping at buildings); (b) now, inside `art`.
-2. **A significance check for art?** Nearly every art candidate is religious by subject, so the usual
-   plausibility question would pass them all. Options: (a) replace it, for art only, with the significance
-   question above (my pick: it is #23's own criterion, and calibration tests it); (b) keep plausibility and
-   rely on the floor and the voters.
-3. **The art benchmark.** The art tree has one work to calibrate against. Options: (a) I draft a list of
-   about 20 works (strong, implicit, and two or three controls) and you approve or edit it before the first
-   art run (my pick); (b) you name the list; (c) no benchmark: calibrate on the Ghent Altarpiece and read the
-   first proposals as the test.`), registered in `pipeline/domains/__init__.py`.
+  `dossier_stage`, `covered`), registered in `pipeline/domains/__init__.py`.
 - `music` and `art` blocks in `config/pipeline.json`.
 - `python -m pipeline --domain music|art run|calibrate|…` working like film and literature; the ranking page
   gets a "Music" and an "Art" section by itself (it groups by domain).
@@ -109,8 +96,11 @@ the queries):
   retable (Q46686, Q3714446), stained-glass window (Q21061279), mural (Q219423, frescos included), mosaic,
   tapestry and the liturgical goldsmith's works the builder confirms (chalices, reliquaries, crosses).
 
-Each module exposes the owned classes as `WORK_CLASSES`, and a function `owns(instance_of: list[str]) -> bool`
-for a row's stage-0 P31 list. This is the **Catholic media hook**: that source resolves an article to QIDs
+Each module exposes the owned classes as `WORK_CLASSES`, and a function
+`owns(instance_of: Iterable[str], sparql, cache: Path | None = None) -> bool` for a row's stage-0 P31 list.
+It is built on `common.owns(instance_of, work_classes, sparql, cache=None)`: the `sparql` client resolves the
+subclass closure of `WORK_CLASSES`, and the optional `cache` is the JSON file where closures are kept
+(30 days), so a repeated check costs no query. This is the **Catholic media hook**: that source resolves an article to QIDs
 and asks each domain whether it owns the item, so it can add the row to the right domain with a source tag
 of its own. Nothing else in this design depends on that source.
 
