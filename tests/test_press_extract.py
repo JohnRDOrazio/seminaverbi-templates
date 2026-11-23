@@ -215,3 +215,16 @@ def test_a_section_or_index_page_is_not_an_article():
 def test_a_page_without_any_signal_counts_as_an_article():
     assert extract("<html><body><p>Testo.</p></body></html>", "https://e.test/a", "it").article
     assert extract(_head(None, "{not json"), "https://e.test/a", "it").article
+
+
+def test_a_jsonld_block_with_a_raw_control_character_still_counts():
+    """L'Osservatore Romano's NewsArticle block carried a raw tab inside a string (invalid strict JSON): the
+    article was skipped as a section in the 2026-11-23 measurement."""
+    html = _head("website", '{"@type": "WebSite"}', '{"@type": "NewsArticle", "headline": "Collodi\tal Tufello"}')
+    assert extract(html, "https://e.test/a", "it").article
+
+
+def test_an_unreadable_jsonld_block_leaves_the_page_an_article():
+    """A block that is not JSON at all may be the article's own: the page is not judged a section on the rest."""
+    assert extract(_head("website", '{"@type": "WebSite"}', '{"@type": "NewsArticle",'), "https://e.test/a",
+                   "it").article

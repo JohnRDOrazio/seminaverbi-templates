@@ -195,7 +195,7 @@ def _jsonld_date(blobs: list[str]) -> str | None:
 
     for blob in blobs:
         try:
-            found = walk(json.loads(blob))
+            found = walk(json.loads(blob, strict=False))
         except (ValueError, RecursionError):
             continue
         if found:
@@ -203,16 +203,19 @@ def _jsonld_date(blobs: list[str]) -> str | None:
     return None
 
 
-def _ld_types(blobs: list[str]) -> list[str]:
+def _ld_types(blobs: list[str]) -> list[str] | None:
     """The schema.org types of the page's own JSON-LD nodes: each block's top-level objects and the members of
     their @graph (not nested values: a collection page lists articles in its parts), without the schema.org
-    prefix."""
+    prefix. Control characters inside strings are accepted (an outlet's block had a raw tab); None when a block
+    is still unreadable, since it may be the article's own."""
     found: list[str] = []
     for blob in blobs:
-        try:
-            data = json.loads(blob)
-        except (ValueError, RecursionError):
+        if not blob.strip():
             continue
+        try:
+            data = json.loads(blob, strict=False)
+        except (ValueError, RecursionError):
+            return None
         nodes = data if isinstance(data, list) else [data]
         for node in [n for n in nodes if isinstance(n, dict)]:
             graph = node.get("@graph")
@@ -224,12 +227,14 @@ def _ld_types(blobs: list[str]) -> list[str]:
     return found
 
 
-def is_article(ld_types: list[str], og_type: str) -> bool:
+def is_article(ld_types: list[str] | None, og_type: str) -> bool:
     """Whether the page is one article rather than a section or index page. Its JSON-LD decides when it has any
     (an article type among its own nodes), else its og:type when it has one ("article", "video.*"); a page with
-    neither signal counts as an article. Measured on one article and one section page of each outlet
-    (2026-11-23): every article names an article type (L'Osservatore Romano's says og:type "website"), no
-    section does."""
+    neither signal, or with an unreadable JSON-LD block (`ld_types` None), counts as an article. Measured on one
+    article and one section page of each outlet (2026-11-23): every article names an article type (L'Osservatore
+    Romano's says og:type "website"), no section does."""
+    if ld_types is None:
+        return True
     if ld_types:
         return not ARTICLE_TYPES.isdisjoint(ld_types)
     og_type = og_type.strip().lower()
