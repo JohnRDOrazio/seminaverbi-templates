@@ -3,9 +3,9 @@ enrichment page's links.
 
 An article is fetched when a stage needs it and kept in memory (as a parsed Page, never stored) for that run only,
 so `press run` fetches each article once for filter and link. Article stages in press_articles: `found` (from
-discovery) -> `filtered` (outcome `keep`, `drop` below culture_drop, or `skip` when the article is gone or robots.txt
-forbids its path) -> `linked`. A timeout, a 5xx, a refused outlet or a robots.txt answering 401/403 leaves the article
-where it was, for the next run.
+discovery) -> `filtered` (outcome `keep`, `drop` below culture_drop, or `skip` when the article is gone, robots.txt
+forbids its path or the page is a section or index page, not an article) -> `linked`. A timeout, a 5xx, a refused
+outlet or a robots.txt answering 401/403 leaves the article where it was, for the next run.
 """
 from __future__ import annotations
 
@@ -22,9 +22,10 @@ from pipeline.press.extract import Page, extract, opening
 from pipeline.press.fetch import Refused
 from pipeline.press.link import link_article
 from pipeline.press.outlets import discover
-from pipeline.press.route import WAITING, _provisional, decide, owner
+from pipeline.press.route import LOOKUP_ERRORS, WAITING, _provisional, decide, lookup_failed, owner
 
 GONE = (404, 410)
+NOT_ARTICLE = "not an article"
 # one article's failure (SyncError: Wikidata or WDQS still failing after the retries); the run goes on
 ARTICLE_ERRORS = (requests.RequestException, OSError, TypeSafeError, SyncError)
 
@@ -64,6 +65,9 @@ class Pages:
             print(f"press: {art.outlet} {art.url}: HTTP {r.status_code}", file=sys.stderr)
             return None, (f"HTTP {r.status_code}" if r.status_code in GONE else None)
         page = extract(r.text, art.url, art.lang)
+        if not page.article:  # a section or index page the outlet's sitemap lists among its articles
+            print(f"press: {art.outlet} {art.url}: not an article, skipped", file=sys.stderr)
+            return None, NOT_ARTICLE
         self._pages[art.url] = page
         return page, None
 
@@ -131,7 +135,8 @@ def run_link(store, pages: Pages, judge, wikidata, sparql, pcfg: dict) -> dict[s
 
 def would_route(store, repo, wikis, wikidata, sparql=None, queue=None) -> list[tuple[object, str]]:
     """(mention, route it would take) for every unrouted mention, by route()'s own decision (under the domain of
-    the QID's row in `queue`, when it has one); reads the wikis, writes nothing."""
+    the QID's row in `queue`, when it has one); reads the wikis, writes nothing. A mention whose lookup still fails
+    after the clients' retries is reported and left out."""
     out = []
     for m in store.unrouted():
         if m.domain.startswith(WAITING):
@@ -140,8 +145,12 @@ def would_route(store, repo, wikis, wikidata, sparql=None, queue=None) -> list[t
             kind = "unknown"
         else:
             under = owner(queue, m.qid, m.domain)
-            kind = (decide(m, under, wikidata.entity(m.qid), repo, wikis, sparql)[0] if under in domains.DOMAINS
-                    else "unknown")
+            try:
+                kind = (decide(m, under, wikidata.entity(m.qid), repo, wikis, sparql)[0]
+                        if under in domains.DOMAINS else "unknown")
+            except LOOKUP_ERRORS as e:
+                lookup_failed(m, e)
+                continue
         out.append((m, kind))
     return out
 

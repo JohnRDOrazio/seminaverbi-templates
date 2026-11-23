@@ -55,12 +55,20 @@ def test_pick_none_returns_none(queue):
     assert PressJudge(fake, queue).pick(URL, "p", "X", {"Q1": "X — y"}) == (None, 0.9, 0.8)
 
 
-def test_substantive(queue):
+def test_substantive_names_the_item(queue):
     fake = Counting({"substantive": 0.6})
     judge = PressJudge(fake, queue)
-    assert judge.substantive(URL, "Ben-Hur", "passage") == 0.6
+    assert judge.substantive(URL, "Ben-Hur", "passage", "Ben-Hur — 1959 film") == 0.6
     assert fake.calls[0]["questions"]["substantive"].instructions == SUBSTANTIVE
-    assert fake.calls[0]["state"] == {"text": "passage", "mention": "Ben-Hur"}
+    assert fake.calls[0]["state"] == {"text": "passage", "mention": "Ben-Hur", "item": "Ben-Hur — 1959 film"}
+
+
+def test_substantive_asks_about_the_item_as_a_subject_not_the_name():
+    """The 2026-11-23 dry run kept six Bond titles listed in a casting article and Botticelli's Birth of Venus
+    used as a comparison: the question names the item and tells the subjects from the rest."""
+    assert "`item`" in SUBSTANTIVE
+    for wording in ("subjects", "listed", "in passing", "comparison", "another sense"):
+        assert wording in SUBSTANTIVE
 
 
 def test_text_over_150_words_is_refused(queue):
@@ -71,6 +79,6 @@ def test_text_over_150_words_is_refused(queue):
     with pytest.raises(ValueError):
         judge.pick("u", long, "X", {})
     with pytest.raises(ValueError):
-        judge.substantive("u", "X", long)
+        judge.substantive("u", "X", long, "X — y")
     assert fake.calls == []
     PressJudge(Counting({"culture": 0.5}), queue).culture("u", " ".join(["w"] * 150))

@@ -124,8 +124,8 @@ Article text is fetched when a stage needs it and kept in memory for that run on
 3. **Link.** Mentions are found in the article's markup and text: italicised or quoted titles, links to Wikipedia,
    and capitalised names next to a creator's name. Each mention is searched on Wikidata (`wbsearchentities` in the
    article's language, then en) and its hits are typed (P31/P279 against the domains' classes, Q5 for people).
-   One hit of a known type: linked. Several: one Jev `Choice` among them, given the article passage; kept only at
-   ≥ 0.80 with confidence ≥ 0.60, else dropped as ambiguous. Then one Jev `Noul` per linked mention: does the
+   One or several hits of a known type: one Jev `Choice` among them and "none", given the article passage; kept only
+   at ≥ 0.80 with confidence ≥ 0.60, else dropped as ambiguous or, for "none", as no matching item. Then one Jev `Noul` per linked mention: does the
    article discuss this work or person substantively, not in passing? Below `mention_keep` (start 0.60): dropped.
    The passages kept are the paragraphs that name the item, cut to ≤ 25 words around the mention.
 4. **Route.** Each kept mention goes:
@@ -206,3 +206,58 @@ backfill spreads over days. Domain stages 1–6 still run as now, by hand (`run 
    published only with the author's approval in session, like any wiki edit.
 4. **Outlets that refuse us** (a 401/403/429, a robots `Disallow`, La Civiltà Cattolica's 403 today): skipped and
    reported, never written around.
+
+## Precision (2026-11-23 dry run)
+
+The first `press run --dry-run` (200 articles from 9 outlets, 65 kept, 60 linked, 25 mentions routed) showed five
+problems. What changed:
+
+1. **Transient failures.** WDQS dropped a connection during routing and the whole run exited 1; Wikidata search
+   answered `cirrussearch-too-busy-error` on five articles, which stopped linking them part-way. The SPARQL client
+   retries a dropped connection like a read timeout, and the Wikidata client retries dropped connections, timeouts
+   and a busy search, both with sync.wiki's bounded backoff. In `press route` (and its dry-run preview) a lookup
+   still failing after the retries is reported and leaves that one mention unrouted for the next run.
+2. **Section pages.** Famiglia Cristiana's sitemap lists its sections (`/cultura-e-spettacoli/musica`, `/libri`,
+   `/arte`, `/cinema-serie-tv-streaming`, `/sanremo-2026`), read like articles. Measured on one article and one
+   section page of each of the nine outlets: every article's JSON-LD names an article type among its own nodes
+   (`NewsArticle`, `Article`, `BlogPosting`; KTO's programme pages `VideoObject`), no section page's does but KTO's
+   home page (never discovered: its feed lists only programme pages), while og:type misleads (L'Osservatore
+   Romano's articles say `website`). The node that describes the page (by `url`, `@id` or `mainEntityOfPage`)
+   decides, or its one `mainEntity`; articles another node lists do not count. Only evidence rejects (a collection
+   type describing the page, or articles only as listed members): inconclusive JSON-LD leaves it to og:type, except
+   breadcrumbs alone without og:type (Avvenire's sections), which are a section. A page with no signal, or
+   with a block that cannot be read, counts as an article. A page that is not one is skipped for good ("not an
+   article"). JSON-LD is read leniently: one Osservatore article has a raw carriage return inside a string. No
+   outlet needs a rule of its own.
+3. **A sole hit was taken unasked.** "free climbing" became a 1986 film, "it takes a village" Hillary Clinton's
+   book. A sole search hit now goes through the same `pick` (that item or none, at 0.80/0.60); a Wikipedia link
+   still names its item itself. A rejected pick may be asked again where the title recurs in another window.
+4. **The substantive question** now names the item (label and Wikidata description) and asks whether that work or
+   person is one of the subjects the article discusses, rather than listed, named in passing, used as a comparison,
+   or meant in another sense by the same name.
+5. **Scholarly articles reached literature**: Wikidata files scholarly literature under literature, a literary work.
+   `literature.owns` stops at scholarly literature (Q68200780).
+
+**Before and after**, on the same 65 articles (mentions cleared, `press link` and `press route --dry-run` again):
+
+| | before | after |
+|---|---|---|
+| articles linked | 60 (4 of them section pages; 5 more articles stopped part-way by a busy search) | 60 (the 5 sections skipped; one HTTP 503, linked on a second run) |
+| mentions routed | 25 | 31 |
+| earlier mentions kept / dropped | | 15 / 10 |
+
+- Kept, as hoped: *Vous n'aurez pas ma haine*, *A Silvia*, *Le notti bianche*, *Una pura formalità*, *Gaza Surf
+  Club*, *I bambini di Gaza* (p 0.71–0.97).
+- Dropped, as hoped: free climbing and *It Takes a Village* (Jev picks none), the scholarly article (stop class),
+  the two mentions of section pages, a wrong *GTA VI* item, *Dragons*, *Lumière intérieure*, *Vendetta privata*
+  (now "no matching item"). Lost although right: *Ballando con le stelle* (the sole hit, picked at 0.74 with
+  confidence 0.48, under the cut).
+- **Not fixed:** the Pattinson casting article still keeps its Bond titles and *The Batman* (p 0.76–0.97), and the
+  La Salette article Botticelli's *Birth of Venus* (0.80). Once the article was linked to the end (the busy search
+  had stopped it), it yielded 17 mentions, among them Pattinson's filmography (*Tenet*, *Mickey 17*, *Cosmopolis*,
+  …, p 0.63–0.78). Each window Jev reads is a paragraph of a Bond history or a filmography, so within it the film
+  *is* what the paragraph is about; the question sees 150 words, not the article. The kept good finds (0.71–0.97)
+  and the kept bad ones (0.62–0.97) overlap, so no `mention_keep` separates them: it stays 0.60. Paragraph count
+  does not separate them either (*A Silvia* and *Vous n'aurez pas ma haine* are named in one paragraph). Fixing this
+  needs an article-level signal (for example the article's title given to the substantive question, or a cap on
+  mentions per article), which is the author's call rather than wording tuned to this sample.

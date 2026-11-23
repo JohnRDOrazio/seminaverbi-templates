@@ -17,7 +17,9 @@ CANONICAL = "https://example.org/en/cultura/a?ref=rss"  # what the page's own ca
 CLOSURE = {
     "Q11424": ["Q11424", "Q24862"],          # film, short film
     "Q5398426": ["Q5398426"],                # television series
-    "Q7725634": ["Q7725634", "Q8261"],       # literary work, novel
+    # literary work, novel, and (through literature > scholarly literature > scientific literature) scholarly article
+    "Q7725634": ["Q7725634", "Q8261", "Q8242", "Q68200780", "Q12042160", "Q13442814"],
+    "Q68200780": ["Q68200780", "Q12042160", "Q13442814"],  # scholarly literature
     "Q47461344": ["Q47461344"],
     "Q1667921": ["Q1667921"],
     "Q277759": ["Q277759"],
@@ -69,11 +71,12 @@ class FakeJudge:
         self.picks, self.substantives = [], []
 
     def pick(self, url, passage, label, options):
+        """The configured answer; by default the first option, surely."""
         self.picks.append({"url": url, "passage": passage, "label": label, "options": options})
-        return self._pick
+        return self._pick if self._pick is not None else (next(iter(options)), 0.95, 0.9)
 
-    def substantive(self, url, label, passage):
-        self.substantives.append({"url": url, "label": label, "passage": passage})
+    def substantive(self, url, label, passage, item):
+        self.substantives.append({"url": url, "label": label, "passage": passage, "item": item})
         return self._substantive
 
 
@@ -109,17 +112,38 @@ def test_wikilink_resolves_without_search(store, cache):
     assert store.mentions() == out
 
 
-def test_one_typed_hit_is_taken_without_jev_pick(store, cache):
+def test_one_typed_hit_is_still_asked_whether_the_passage_means_it(store, cache):
     pg = page(["Il romanzo Il Signore degli Anelli parla di misericordia e di sacrificio."],
               [Span("Il Signore degli Anelli", 0, "italic")])
-    # three hits, only one of a class that routes: the others are discarded before any pick
-    wd = FakeWikidata({"Q15228": entity(["Q8261"]), "Q1": entity(["Q4167410"]), "Q2": entity([])},
+    # three hits, only one of a class that routes: the others are discarded before the pick
+    wd = FakeWikidata({"Q15228": entity(["Q8261"], {"it": "Il Signore degli Anelli"}, {"it": "romanzo di Tolkien"}),
+                       "Q1": entity(["Q4167410"]), "Q2": entity([])},
                       search={("Il Signore degli Anelli", "it"): ["Q1", "Q15228", "Q2"]})
-    judge = FakeJudge(substantive=0.75)
+    judge = FakeJudge(pick=("Q15228", 0.85, 0.7), substantive=0.75)
     out = run(pg, store, judge, wd, cache)
-    assert judge.picks == []
+    assert [p["options"] for p in judge.picks] == [{"Q15228": "Il Signore degli Anelli — romanzo di Tolkien"}]
     assert [(m.qid, m.domain, m.p) for m in out] == [("Q15228", "literature", 0.75)]
+    # the substantive question names the item, as the pick's option does
+    assert [s["item"] for s in judge.substantives] == ["Il Signore degli Anelli — romanzo di Tolkien"]
     assert wd.searches == [("Il Signore degli Anelli", "it")]  # a routed hit in the page's lang: no en search
+
+
+@pytest.mark.parametrize("answer", [(None, 0.9, 0.9), ("Q123303166", 0.7, 0.9), ("Q123303166", 0.9, 0.5)])
+def test_one_typed_hit_jev_does_not_take_is_dropped(store, cache, answer, capsys):
+    """"free climbing" (the activity) was taken unasked as Q123303166, a 1986 film: a sole hit now needs the same
+    pick as several, at the same cut."""
+    pg = page(["Il free climbing nasce sulle pareti delle Dolomiti."], [Span("free climbing", 0, "italic")])
+    wd = FakeWikidata({"Q123303166": entity(["Q11424"], {"en": "Free Climbing"}, {"en": "1986 film"})},
+                      search={("free climbing", "it"): ["Q123303166"]})
+    judge = FakeJudge(pick=answer)
+    assert run(pg, store, judge, wd, cache) == []
+    assert judge.substantives == [] and store.mentions() == []
+    err = capsys.readouterr().err
+    if answer[0] is None:
+        assert "'free climbing' no matching item (p=0.90, confidence=0.90), dropped" in err
+        assert "ambiguous" not in err
+    else:
+        assert "ambiguous (Q123303166" in err
 
 
 def test_search_falls_back_to_english(store, cache):
@@ -291,11 +315,52 @@ def test_a_passing_first_mention_does_not_hide_a_later_substantive_one(store, ca
     wd = FakeWikidata({"Q9": entity(["Q11424"]), "Q3": entity(["Q11424"])}, search={("Silence", "it"): ["Q9", "Q3"]})
 
     class ByWindow(FakeJudge):
-        def substantive(self, url, label, passage):
-            super().substantive(url, label, passage)
+        def substantive(self, url, label, passage, item):
+            super().substantive(url, label, passage, item)
             return 0.9 if "dubbio" in passage else 0.2
     judge = ByWindow(pick=("Q9", 0.9, 0.9))
     out = run(pg, store, judge, wd, cache)
     assert [(m.qid, m.p) for m in out] == [("Q9", 0.9)]
     assert len(judge.substantives) == 2
     assert len(judge.picks) == 1  # the same title is resolved once
+
+
+def test_a_scholarly_article_does_not_route_to_literature(cache):
+    """Wikidata files scholarly literature under literature, a literary work: its articles (Q13442814) reached
+    literature in the 2026-11-23 dry run ("Magnifica Humanitas", Q141292031). Scholarly literature is a stop
+    class of literature.owns; an item that is also a literary work in its own right stays literature's."""
+    assert "Q68200780" in literature.STOP_CLASSES
+    assert literature.owns(["Q13442814"], FakeSparql(), cache) is False
+    assert class_route(["Q13442814"], FakeSparql(), CFG, cache) is None
+    assert literature.owns(["Q13442814", "Q8261"], FakeSparql(), cache) is True
+    assert literature.owns(["Q8242"], FakeSparql(), cache) is True  # literature itself is not stopped
+
+
+class PickByWindow(FakeJudge):
+    """Takes the first option only where the passage speaks of a film; none of them elsewhere."""
+
+    def pick(self, url, passage, label, options):
+        super().pick(url, passage, label, options)
+        return (next(iter(options)), 0.95, 0.9) if "regista" in passage else (None, 0.95, 0.9)
+
+
+def test_a_rejected_pick_is_asked_again_in_another_window_and_never_twice_in_one(store, cache):
+    filler = " ".join(f"parola{i}" for i in range(200))
+    pg = page([f"Il Free Climbing nasce in parete: «Free Climbing». {filler}", filler, filler,
+               f"Free Climbing, del regista francese, racconta una cordata. {filler}", filler, filler,
+               f"Ancora Free Climbing del regista. {filler}"],
+              [Span("Free Climbing", 0, "italic"), Span("Free Climbing", 0, "quoted"),
+               Span("Free Climbing", 3, "italic"), Span("Free Climbing", 6, "italic")])
+    wd = FakeWikidata({"Q1": entity(["Q11424"])}, search={("Free Climbing", "it"): ["Q1"]})
+    judge = PickByWindow()
+    assert [m.qid for m in run(pg, store, judge, wd, cache)] == ["Q1"]
+    # window 0 once (two spans), window 3 taken, then memoised: window 6 is not asked
+    assert len(judge.picks) == 2
+    assert wd.searches == [("Free Climbing", "it")]
+
+
+def test_a_title_without_hits_is_searched_once(store, cache):
+    pg = page(["Nulla qui.", "x", "x", "Nulla anche qui."], [Span("Nulla", 0, "italic"), Span("Nulla", 3, "italic")])
+    wd = FakeWikidata({})
+    assert run(pg, store, FakeJudge(), wd, cache) == []
+    assert wd.searches == [("Nulla", "it"), ("Nulla", "en")]

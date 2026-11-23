@@ -16,8 +16,10 @@ CULTURE = ("`text` is the title and opening of an article in a Catholic newspape
            "Church affairs?")
 PICK = ("`text` is a passage of an article that names `mention`. Which of these Wikidata items does the passage "
         "mean?")
-SUBSTANTIVE = ("`text` is a passage of an article that names `mention`. Does the article discuss this work or "
-               "person substantively (what it says, means or shows), rather than naming it in passing?")
+SUBSTANTIVE = ("`text` is a passage of an article that names `mention`, here taken to be `item` (a Wikidata "
+               "item: its label and description). Is `item`, that very work or person, one of the subjects the "
+               "article discusses (what it says, means or shows), rather than listed among others, named in "
+               "passing, used as a comparison, or meant in another sense by the same name?")
 
 
 def article_key(url: str) -> str:
@@ -52,6 +54,8 @@ class PressJudge:
         a = self._ask(url, "pick", Choice(instructions=PICK, criteria=criteria), state).choices["pick"]
         return (None if a.choice == "none" else a.choice, a.probabilities[a.choice], a.confidence)
 
-    def substantive(self, url: str, label: str, passage: str) -> float:
-        state = {"text": _bounded(passage), "mention": label}
+    def substantive(self, url: str, label: str, passage: str, item: str) -> float:
+        """Whether the article discusses `item` ("<label> — <description>", as `pick`'s options) as one of its
+        subjects."""
+        state = {"text": _bounded(passage), "mention": label, "item": item}
         return float(self._ask(url, "substantive", Noul(instructions=SUBSTANTIVE), state).nouls["substantive"].noul)

@@ -116,3 +116,57 @@ def test_error_is_sync_error():
             return Response({"error": {"code": "x", "info": "y"}})
     with pytest.raises(SyncError, match="wikidata"):
         WikidataClient(session=Broken()).entity("Q1")
+
+
+class Flaky(Wikidata):
+    """A Wikidata that first fails with each of `failures` (an exception raised, or an API error code answered)."""
+
+    def __init__(self, failures, **kwargs):
+        super().__init__(**kwargs)
+        self.failures = list(failures)
+
+    def get(self, url, params=None, timeout=None, headers=None):
+        if self.failures:
+            failure = self.failures.pop(0)
+            self.calls.append((url, dict(params)))
+            if isinstance(failure, Exception):
+                raise failure
+            return Response({"error": {"code": failure, "info": "Search is currently too busy."}})
+        return super().get(url, params=params, timeout=timeout, headers=headers)
+
+
+@pytest.fixture
+def waits(monkeypatch):
+    slept = []
+    monkeypatch.setattr("time.sleep", slept.append)
+    return slept
+
+
+def test_search_retries_when_search_is_too_busy(waits):
+    wd = Flaky(["cirrussearch-too-busy-error", "cirrussearch-too-busy-error"], search={("Ordet", "it"): ["Q1"]})
+    assert WikidataClient(session=wd).search("Ordet", "it") == ["Q1"]
+    assert len(wd.calls) == 3
+    assert waits == [1.0, 2.0]  # sync.wiki's bounded backoff
+
+
+def test_entity_retries_a_dropped_connection(waits):
+    import requests
+    wd = Flaky([requests.exceptions.ConnectionError("Remote end closed connection without response")],
+               entities={"Q1": {"id": "Q1", "claims": {}}})
+    assert WikidataClient(session=wd).entity("Q1")["id"] == "Q1"
+    assert len(wd.calls) == 2
+
+
+def test_a_busy_search_gives_up_after_the_retries(waits):
+    from sync.wiki import RETRIES
+    wd = Flaky(["cirrussearch-too-busy-error"] * (RETRIES + 1))
+    with pytest.raises(SyncError, match="cirrussearch-too-busy-error"):
+        WikidataClient(session=wd).search("Ordet", "it")
+    assert len(wd.calls) == RETRIES + 1
+
+
+def test_other_api_errors_are_not_retried(waits):
+    wd = Flaky(["no-such-entity"])
+    with pytest.raises(SyncError, match="no-such-entity"):
+        WikidataClient(session=wd).entity("Q1")
+    assert len(wd.calls) == 1 and waits == []

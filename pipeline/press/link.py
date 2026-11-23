@@ -2,9 +2,10 @@
 
 A span (italic or quoted title, Wikipedia link) becomes a list of Wikidata hits: a link through its sitelink, any
 other span through Wikidata search in the page's language, then in English. Hits whose class routes to no domain
-are discarded; one routed hit is taken, several go to Jev's `pick`, taken only above the configured cut. Jev then
-judges, on the paragraphs around the mention (at most 150 words, centred on it), whether the article discusses the
-item substantively, asking again at each later mention in another window until one is kept; a kept mention is stored
+are discarded; a link's item is taken, a search's routed hits (one or several) go to Jev's `pick` (those items
+or none), taken only above the configured cut. Jev then judges, on the paragraphs around the mention (at most 150
+words, centred on it), whether the item (named by its label and description) is one of the subjects the article
+discusses, asking again at each later mention in another window until one is kept; a kept mention is stored
 with up to three passages of at most 25 words.
 
 Class membership comes only from the domains' `owns()` and `common.owns()`, backed by the cached subclass closure:
@@ -87,19 +88,19 @@ class _Linker:
                 return routed
         return []
 
-    def resolve(self, span: Span, context: str) -> str | None:
-        """The one item the span names, or None (no routed hit, or an ambiguity Jev does not settle)."""
-        hits = self.hits(span)
-        if len(hits) == 1:
+    def resolve(self, span: Span, context: str, hits: list[str]) -> str | None:
+        """The one of `hits` (at least one) the span names, or None: Jev picks none of them, or its pick is under
+        the cut. A sole search hit is asked too (that one option or none): a name can mean something else (an activity,
+        a saying) that happens to share a title with an item. A Wikipedia link names its item itself."""
+        if span.kind == "wikilink" and span.wiki:  # the article itself links the item: nothing to ask
             return hits[0]
-        if not hits:
-            return None
         options = {q: _option(q, self.wikidata.entity(q), self.page.lang) for q in sorted(hits)}
         qid, p, confidence = self.judge.pick(self.url, context, span.text, options)
         if qid in options and p >= self.cfg["pick_p"] and confidence >= self.cfg["pick_confidence"]:
             return qid
-        print(f"press: {self.outlet} {self.url}: {span.text!r} ambiguous ({qid}, p={p:.2f}, "
-              f"confidence={confidence:.2f}), dropped", file=sys.stderr)
+        why = "no matching item (" if qid is None else f"ambiguous ({qid}, "
+        print(f"press: {self.outlet} {self.url}: {span.text!r} {why}p={p:.2f}, confidence={confidence:.2f}), "
+              "dropped", file=sys.stderr)
         return None
 
     def passages(self, span: Span) -> list[str]:
@@ -123,7 +124,10 @@ def link_article(page: Page, outlet: str, store, judge, wikidata, sparql, cfg: d
     closure cache (default: common.CLOSURE_CACHE); `routes` is the run's memo of class_route by set of P31
     classes, shared across the run's articles (default: one for this article)."""
     linker = _Linker(page, outlet, url, judge, wikidata, sparql, cfg, cache, routes)
-    resolved: dict[tuple[str, tuple[str, str] | None], str | None] = {}  # span key -> item, resolved once
+    Key = tuple[str, tuple[str, str] | None]  # a span's title and link
+    hits: dict[Key, list[str]] = {}  # searched once per title
+    resolved: dict[Key, str] = {}  # the item Jev took (or the link's), kept for the title's later mentions
+    rejected: set[tuple[Key, str]] = set()  # (title, window) whose pick failed: another window may still settle it
     judged: set[tuple[str, str]] = set()  # (item, window) already asked
     done: set[str] = set()  # items kept
     kept: list[Mention] = []
@@ -134,14 +138,24 @@ def link_article(page: Page, outlet: str, store, judge, wikidata, sparql, cfg: d
         if not context:  # a span outside the paragraphs: nothing for Jev to read
             continue
         key = (span.text.casefold(), span.wiki)
+        if key not in hits:
+            hits[key] = linker.hits(span)
+        if not hits[key]:
+            continue
         if key not in resolved:
-            resolved[key] = linker.resolve(span, context)
+            if (key, context) in rejected:
+                continue
+            qid = linker.resolve(span, context, hits[key])
+            if qid is None:
+                rejected.add((key, context))
+                continue
+            resolved[key] = qid
         qid = resolved[key]
         # an item is done only once kept: a passing first mention does not hide a later substantive one
-        if qid is None or qid in done or (qid, context) in judged:
+        if qid in done or (qid, context) in judged:
             continue
         judged.add((qid, context))
-        p = judge.substantive(url, span.text, context)
+        p = judge.substantive(url, span.text, context, _option(qid, wikidata.entity(qid), page.lang))
         if p < cfg["mention_keep"]:
             continue
         done.add(qid)

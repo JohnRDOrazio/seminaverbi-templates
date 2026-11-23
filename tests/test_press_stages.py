@@ -129,3 +129,31 @@ def test_an_old_press_store_gains_the_attempt_column():
     store = PressStore(db)
     assert [a.url for a in store.articles("found")] == ["https://x.example/a"]
     assert "attempted_at" in {r[1] for r in db.execute("PRAGMA table_info(press_articles)")}
+
+
+SECTION = ('<html><head><meta property="og:type" content="section">'
+           '<script type="application/ld+json">{"@type": "BreadcrumbList"}</script></head>'
+           '<body><p>Elenco</p></body></html>')
+
+
+def test_a_section_page_is_skipped_for_good_at_filter(capsys):
+    store = PressStore(sqlite3.connect(":memory:"))
+    _found(store, "musica")
+    judge = Judge()
+    counts = run_filter(store, Pages(client({ROBOTS: Resp(""), "https://x.example/musica": Resp(SECTION)})), judge,
+                        {"max_articles_per_run": 2, "culture_drop": 0.5})
+    assert counts == {"skip": 1}
+    art = store.article("https://x.example/musica")
+    assert (art.stage, art.outcome, art.data) == ("filtered", "skip", {"reason": "not an article"})
+
+
+def test_a_section_page_already_kept_is_skipped_at_link():
+    from pipeline.press.stages import run_link
+    store = PressStore(sqlite3.connect(":memory:"))
+    _found(store, "musica")
+    store.set_article("https://x.example/musica", "filtered", "keep", {"culture": 0.8})
+    counts = run_link(store, Pages(client({ROBOTS: Resp(""), "https://x.example/musica": Resp(SECTION)})), None,
+                      None, None, {})
+    assert counts == {"articles": 0, "mentions": 0}
+    art = store.article("https://x.example/musica")
+    assert (art.stage, art.outcome, art.data) == ("linked", "skip", {"culture": 0.8, "reason": "not an article"})

@@ -25,7 +25,9 @@ USER_AGENT = "seminaverbi-templates-sync/1.0 (https://github.com/JohnRDOrazio/se
 
 
 class SyncError(Exception):
-    pass
+    def __init__(self, message: str = "", code: str | None = None):
+        super().__init__(message)
+        self.code = code  # the API's error code, when the error is the API's answer
 
 
 class PageInfo(NamedTuple):
@@ -59,7 +61,8 @@ class WikiClient:
             # MediaWiki's own per-user limit ($wgRateLimits, e.g. page moves): it gives no wait time
             time.sleep(RATELIMITED_WAIT)
         if "error" in data:
-            raise SyncError(f"{self.lang}: {data['error'].get('code')}: {data['error'].get('info')}")
+            raise SyncError(f"{self.lang}: {data['error'].get('code')}: {data['error'].get('info')}",
+                            code=data["error"].get("code"))
         return data
 
     def _request(self, method: str, params: dict, budget: list | None = None) -> dict:

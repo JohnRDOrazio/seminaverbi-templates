@@ -163,3 +163,192 @@ def test_a_skipped_block_still_ends_the_paragraph():
 def test_locate_counts_casefold_expansion():
     from pipeline.press.extract import locate
     assert locate(["Straße", "dell'Infinito"], "Infinito") == (1, 1)
+
+
+def _head(og_type=None, *ld):
+    """A page with the measured head signals: og:type and the JSON-LD blocks (synthetic text)."""
+    meta = f'<meta property="og:type" content="{og_type}">' if og_type else ""
+    scripts = "".join(f'<script type="application/ld+json">{block}</script>' for block in ld)
+    return f"<html><head>{meta}{scripts}</head><body><article><p>Testo.</p></article></body></html>"
+
+
+# the head signals of one article and one section page per outlet, as measured on 2026-11-23
+ARTICLES = {
+    "aleteia": _head("article", '{"@context": "https://schema.org", "@graph": [{"@type": "WebPage"}, '
+                                '{"@type": "NewsArticle"}, {"@type": "Organization"}]}'),
+    "avvenire": _head("article", '{"@type": "NewsArticle", "author": {"@type": "Person"}}',
+                      '{"@type": "BreadcrumbList"}'),
+    "famigliacristiana": _head("article", '{"@type": "NewsArticle"}', '{"@type": "BreadcrumbList"}'),
+    "kto": _head("video.other", '{"@type": "Organization"}', '{"@type": "VideoObject"}'),
+    "ncregister": _head("article", '[{"@type": "NewsMediaOrganization"}, {"@type": "WebSite"}]',
+                        '{"@type": "NewsArticle"}'),
+    "osservatore": _head("website", '{"@type": "WebSite"}', '{"@type": "NewsArticle"}'),
+    "romasette": _head("article", '{"@graph": [{"@type": ["Article", "BlogPosting"]}, {"@type": "WebPage"}]}'),
+    "sir": _head("article", '{"@graph": [{"@type": "BlogPosting"}, {"@type": "WebSite"}]}'),
+    "vaticannews": _head("article", '{"@type": "http://schema.org/NewsArticle"}'),
+}
+SECTIONS = {
+    "aleteia": _head("website", '{"@type": "WebSite"}', '{"@type": "Organization"}'),
+    "avvenire": _head(None, '{"@type": "BreadcrumbList"}'),
+    "famigliacristiana": _head("section", '{"@type": "BreadcrumbList"}'),
+    "ncregister": _head("website", '[{"@type": "NewsMediaOrganization"}, {"@type": "WebSite"}]'),
+    "osservatore": _head("website", '{"@type": "WebSite"}'),
+    "romasette": _head("website", '{"@graph": [{"@type": "WebPage"}, {"@type": "WebSite"}]}'),
+    "sir": _head(None, '{"@graph": [{"@type": "CollectionPage", "hasPart": [{"@type": "NewsArticle"}]}]}'),
+    "vaticannews": _head("website"),
+}
+
+
+def test_an_article_page_is_an_article():
+    for outlet, html in ARTICLES.items():
+        assert extract(html, "https://e.test/a", "it").article, outlet
+
+
+def test_a_section_or_index_page_is_not_an_article():
+    """Famiglia Cristiana's sitemap listed its sections (/cultura-e-spettacoli/musica, ...), which were filtered
+    and linked like articles. A page whose JSON-LD names no article type at its top level (an article listed
+    inside a collection does not count), or, without JSON-LD, whose og:type is not an article's, is not one."""
+    for outlet, html in SECTIONS.items():
+        assert not extract(html, "https://e.test/s", "it").article, outlet
+
+
+def test_a_page_without_any_signal_counts_as_an_article():
+    assert extract("<html><body><p>Testo.</p></body></html>", "https://e.test/a", "it").article
+    assert extract(_head(None, "{not json"), "https://e.test/a", "it").article
+
+
+def test_a_jsonld_block_with_a_raw_control_character_still_counts():
+    """L'Osservatore Romano's NewsArticle block carried a raw carriage return inside a string (invalid strict JSON): the
+    article was skipped as a section in the 2026-11-23 measurement."""
+    html = _head("website", '{"@type": "WebSite"}', '{"@type": "NewsArticle", "headline": "Collodi\ral Tufello"}')
+    assert extract(html, "https://e.test/a", "it").article
+
+
+def test_an_unreadable_jsonld_block_leaves_the_page_an_article():
+    """A block that is not JSON at all may be the article's own: the page is not judged a section on the rest."""
+    assert extract(_head("website", '{"@type": "WebSite"}', '{"@type": "NewsArticle",'), "https://e.test/a",
+                   "it").article
+
+
+PAGE = "https://e.test/cinema"
+
+
+def _graph(*nodes, context='"https://schema.org"'):
+    import json
+    return _head("website", '{"@context": %s, "@graph": %s}' % (context, json.dumps(list(nodes))))
+
+
+def _article(html, url=PAGE):
+    return extract(html, url, "it").article
+
+
+ART1 = {"@type": "NewsArticle", "@id": "https://e.test/a1#article", "url": "https://e.test/a1"}
+
+
+def test_articles_listed_by_a_collection_in_the_same_graph_do_not_make_it_an_article():
+    collection = {"@type": "CollectionPage", "@id": PAGE + "/#page", "url": PAGE + "/"}
+    assert not _article(_graph({**collection, "hasPart": [{"@id": ART1["@id"]}]}, ART1))
+    items = [{"@type": "ListItem", "position": 1, "item": {"@id": ART1["@id"]}}]
+    assert not _article(_graph({**collection, "mainEntity": {"@type": "ItemList", "itemListElement": items}}, ART1))
+    # the list by URL, on a page with no node of its own for this URL
+    assert not _article(_graph({"@type": "ItemList", "itemListElement": [{"@type": "ListItem",
+                                                                           "url": "https://e.test/a1"}]}, ART1))
+    # the page's own node is a collection: an article that only says it is part of it does not count
+    assert not _article(_graph(collection, {**ART1, "isPartOf": {"@id": collection["@id"]}}))
+
+
+def test_a_listing_through_graph_level_list_items_is_read():
+    entry = {"@type": "ListItem", "@id": "#entry", "item": {"@id": ART1["@id"]}}
+    listing = {"@type": "ItemList", "itemListElement": [{"@id": "#entry"}]}
+    assert not _article(_graph(listing, entry, ART1))
+    # an entry that leads back to its own list ends
+    loop = {**entry, "item": {"@type": "ItemList", "itemListElement": [{"@id": "#entry"}, {"@id": ART1["@id"]}]}}
+    assert not _article(_graph(listing, loop, ART1))
+    # a breadcrumb's entries name the page itself
+    own = {"@type": "Article", "@id": PAGE + "#article"}
+    crumb = {"@type": "ListItem", "@id": "#entry", "item": {"@id": own["@id"]}}
+    assert _article(_graph({"@type": "BreadcrumbList", "itemListElement": [{"@id": "#entry"}]}, crumb, own))
+
+
+def test_a_collection_listed_in_the_same_graph_as_the_pages_own_article_still_counts():
+    own = {"@type": "NewsArticle", "@id": PAGE + "#article", "mainEntityOfPage": {"@id": PAGE + "/#webpage"}}
+    section = {"@type": "CollectionPage", "url": "https://e.test/all", "hasPart": [{"@id": own["@id"]}]}
+    assert _article(_graph(section, own))
+
+
+def test_a_webpage_and_its_article_count():
+    webpage = {"@type": "WebPage", "@id": PAGE + "/", "url": PAGE + "/"}
+    crumbs = {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "item": PAGE + "#article"}]}
+    for link in ({"isPartOf": {"@id": PAGE + "/"}}, {"mainEntityOfPage": {"@id": PAGE + "/"}}, {}):
+        assert _article(_graph(webpage, crumbs, {"@type": "Article", "@id": PAGE + "#article", **link})), link
+    assert _article(_graph({**webpage, "mainEntity": {"@id": PAGE + "#article"}},
+                           {"@type": "Article", "@id": PAGE + "#article"}))
+
+
+def test_a_single_object_graph_and_non_object_entries():
+    assert _article(_head("website", '{"@graph": {"@type": "NewsArticle"}}'))
+    assert not _article(_head("article", '{"@graph": {"@type": "CollectionPage"}}'))
+    assert _article(_head("website", '[3, null, "x", {"@graph": [1, null, "NewsArticle", {"@type": "Article"}]}]'))
+    assert not _article(_head("website", '{"@graph": [null, "NewsArticle", {"@type": "WebPage", "@id": 4, '
+                                         '"url": ["x"], "mainEntityOfPage": 7, "hasPart": 1}]}'))
+
+
+def test_compact_and_full_types_are_resolved():
+    for context in ('{"schema": "https://schema.org/"}', '["https://x.test/c", {"schema": {"@id": "http://schema.org/"}}]'):
+        assert _article(_graph({"@type": "schema:NewsArticle"}, context=context))
+        assert not _article(_graph({"@type": "schema:CollectionPage"}, context=context))
+    assert _article(_head("website", '{"@context": {"s": "https://schema.org/"}, "@type": ["s:BlogPosting"]}'))
+    assert _article(_graph({"@context": {"n": "https://schema.org/"}, "@type": "n:Article"}))
+    assert _article(_head("website", '{"@type": "https://schema.org/Article"}'))
+    assert not _article(_graph({"@type": "o:Article"}, context='{"o": "https://other.test/"}'))
+    assert _article(_head("website", '{"@type": "schema:NewsArticle"}'))  # the usual prefix, undeclared
+
+
+def _og(og, *nodes):
+    import json
+    return _head(og, *[json.dumps(n) for n in nodes])
+
+
+def test_the_pages_main_entity_is_followed():
+    page = {"@type": "WebPage", "url": PAGE}
+    inline = {"@type": "NewsArticle", "mainEntityOfPage": PAGE}
+    for entity in (inline, [inline], {"@type": "NewsArticle"}, {"@type": "s:NewsArticle"}):
+        node = {"@context": {"s": "https://schema.org/"}, **page, "mainEntity": entity}
+        assert _article(_og("website", node)), entity
+    own = {"@type": "Article", "@id": PAGE + "#article"}
+    for entity in ({"@id": own["@id"]}, [{"@id": own["@id"]}], own["@id"], [own["@id"]]):
+        assert _article(_graph({**page, "mainEntity": entity}, own)), entity
+
+
+def test_several_main_entities_or_an_item_list_are_a_listing():
+    page = {"@type": "WebPage", "url": PAGE}
+    ref = {"@id": ART1["@id"]}
+    items = {"@type": "ItemList", "itemListElement": [{"@type": "ListItem", "item": ref}]}
+    for entity in ([ref, {"@id": "https://e.test/a2"}], items, [items]):
+        assert not _article(_graph({**page, "mainEntity": entity}, ART1)), entity
+        assert not _article(_og("article", {**page, "mainEntity": entity}, ART1)), entity
+    # articles embedded in a listing are members too, not the page
+    for listing in ({"hasPart": [{"@type": "NewsArticle"}]}, {"mainEntity": [{"@type": "Article"}, {"@type": "Article"}]}):
+        assert not _article(_og("article", {**page, **listing})), listing
+
+
+def test_another_pages_main_entity_is_not_followed():
+    other = {"@type": "WebPage", "url": "https://e.test/other", "mainEntity": {"@type": "NewsArticle"}}
+    assert not _article(_og("website", other))
+
+
+def test_inconclusive_jsonld_falls_back_to_og_type_then_to_an_article():
+    page = {"@type": "WebPage", "url": PAGE}
+    assert _article(_og("article", page)) and _article(_og(None, page))
+    assert not _article(_og("website", page))
+    elsewhere = {"@type": "CollectionPage", "url": "https://e.test/all"}  # the section it belongs to
+    assert _article(_og("article", page, elsewhere)) and _article(_og(None, page, elsewhere))
+    assert not _article(_og("article", {**elsewhere, "url": PAGE}))
+    assert not _article(_og("article", {"@type": "CollectionPage"}))
+
+
+def test_breadcrumbs_alone_without_og_type_stay_a_section():
+    """Avvenire's section pages (/agora/cultura): breadcrumbs, no other JSON-LD and no og:type."""
+    crumbs = {"@type": "BreadcrumbList", "itemListElement": []}
+    assert not _article(_og(None, crumbs))
+    assert _article(_og("article", crumbs))
