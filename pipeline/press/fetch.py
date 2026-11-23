@@ -73,6 +73,13 @@ class PoliteClient:
         if keep and self.store:
             self.store.refuse(outlet, reason)
 
+    def _check(self, outlet: str) -> None:
+        """Refused when nothing may be asked of the outlet, another process's refusals included."""
+        if self.store:
+            self.refused = self.store.stopped() | self.refused
+        if outlet in self.refused:
+            raise Refused(outlet, self.refused[outlet])
+
     def _wait(self, outlet: str, host: str, delay: float) -> None:
         """Sleep until the later of the host's deadline (its own delay) and the outlet's (the configured one)."""
         deadlines = [self._last[host] + delay] if host in self._last else []
@@ -86,6 +93,7 @@ class PoliteClient:
 
     def _request(self, outlet: str, host: str, url: str, delay: float, headers: dict | None = None):
         self._wait(outlet, host, delay)
+        self._check(outlet)  # it may have been refused during the wait
         h = {"User-Agent": self.user_agent, **(headers or {})}
         try:
             return self.session.get(url, headers=h, timeout=TIMEOUT, allow_redirects=False)
@@ -113,6 +121,8 @@ class PoliteClient:
             return self._robots[host]
         try:
             r = self._robots_txt(outlet, scheme, host)
+        except Refused:
+            raise
         except Exception:
             r = None
         code = r.status_code if r is not None else None
@@ -139,10 +149,7 @@ class PoliteClient:
         hosts this run, or 304 on a conditional get)."""
         if outlet in self._blocked:
             return None
-        if self.store:  # another process may have been refused since
-            self.refused = self.store.stopped() | self.refused
-        if outlet in self.refused:
-            raise Refused(outlet, self.refused[outlet])
+        self._check(outlet)
         headers = {}
         if conditional and self.store:
             etag, modified = self.store.feed_cache(url)

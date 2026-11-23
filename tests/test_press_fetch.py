@@ -254,3 +254,21 @@ def test_a_robots_refusal_on_one_of_the_outlets_hosts_stops_its_other_hosts():
     assert pc.get("o", f"{it}/a") is None
     assert [u for u, _ in s.calls] == [ROBOTS]
     assert pc.refused == {"o": "robots 403"}
+
+
+@pytest.mark.parametrize("during", ["robots", "article"])
+def test_a_refusal_another_run_records_during_the_wait_stops_the_request(during):
+    store = PressStore(sqlite3.connect(":memory:"))
+    clock = Clock()
+    robots = "https://x.example/robots.txt"
+    session = FakeSession({robots: Resp(""), "https://x.example/a": Resp("a")})
+
+    def sleep(gap):
+        store.refuse("o", "429")  # the other run, while this one waits
+        clock.now += gap
+    pc = PoliteClient(session, UA, 10, store, clock=lambda: clock.now, sleep=sleep)
+    if during == "robots":  # another host of the outlet was asked just before
+        pc._last_outlet["o"] = clock.now
+    with pytest.raises(Refused, match="429"):
+        pc.get("o", "https://x.example/a")
+    assert [u for u, _ in session.calls] == ([] if during == "robots" else [robots])
