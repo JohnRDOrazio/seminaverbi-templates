@@ -8,7 +8,7 @@ Identical on all six wikis. Always write the English name; the localized aliases
 
 Quotes a Bible passage through BibleGet, in the wiki's default version. Use it for every verse an article names or alludes to.
 
-Aliases: it: `SV citazione bibbia`, es: `SV cita bíblica`, fr: `SV citation biblique`, de: `SV Bibelzitat`, pt: `SV citação bíblica`
+Aliases: en: `Bible quote`, it: `Citazione bibbia`, it: `SV citazione bibbia`, es: `SV cita bíblica`, fr: `SV citation biblique`, de: `SV Bibelzitat`, pt: `SV citação bíblica`
 
 | parameter | meaning |
 |---|---|
