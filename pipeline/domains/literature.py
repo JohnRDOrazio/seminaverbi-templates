@@ -472,7 +472,7 @@ def triage(row, cfg: dict) -> tuple[str, str]:
         return "drop", f"{data['excluded']}, not a literary work"
     if EDITION in data.get("instance_of", []):
         return "drop", "an edition or translation, not a work of its own"
-    if not set(row.sources) & DIRECT:
+    if not set(row.sources) & DIRECT and not common.press_exempt(row):
         count, floor = data.get("count", 0), cfg["sitelink_floor"]
         if count < floor:
             return "drop", f"{count} sitelinks, under the floor of {floor}"

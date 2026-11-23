@@ -82,6 +82,13 @@ def qids(entity: dict, prop: str) -> list[str]:
     return out
 
 
+def press_exempt(row, threshold: float = 0.60) -> bool:
+    """True when a Catholic-media mention of the work was kept at `threshold` or more: a press-only work skips the
+    sitelink floor."""
+    press = row.data.get(0, {}).get("press") or {}
+    return bool(press) and max(press.values()) >= threshold
+
+
 def entity_sitelinks(entity: dict) -> dict[str, str]:
     return {site: v["title"] for site, v in entity.get("sitelinks", {}).items() if "title" in v}
 

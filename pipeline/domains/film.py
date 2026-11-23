@@ -143,7 +143,8 @@ def triage(row, cfg: dict) -> tuple[str, str]:
     for qid in data.get("instance_of", []):
         if qid in NON_WORKS:
             return "drop", f"a {NON_WORKS[qid]}, not a work of its own"
-    if set(row.sources) == {"facet"}:
+    only_floored = bool(row.sources) and all(s == "facet" or s.startswith("press:") for s in row.sources)
+    if only_floored and not common.press_exempt(row):
         count = data.get("count", 0)
         if count < cfg["sitelink_floor"]:
             return "drop", f"{count} sitelinks, under the floor of {cfg['sitelink_floor']}"

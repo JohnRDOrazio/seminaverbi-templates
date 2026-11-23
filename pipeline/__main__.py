@@ -15,6 +15,8 @@ from pipeline import calibration, load_config, stages
 from pipeline.domains import DOMAINS
 from pipeline.domains.common import domain_config
 from pipeline.publish import approved_report, publish, sync_votes
+from pipeline.press.route import release_waiting
+from pipeline.press.store import PressStore
 from pipeline.queue import Queue
 from sync import categories
 from sync.wiki import SyncError, WikiClient
@@ -120,6 +122,12 @@ def cmd_candidates(args, queue, cfg):
     domain = DOMAINS[args.domain]
     added = domain.candidates(queue, _sparql(), _wikipedia("en"), cfg, _wikidata())
     print(f"candidates: {added} added")
+    press = PressStore.of(queue)
+    waiting = f"waiting:{args.domain}"
+    released = (release_waiting(press, queue, args.domain, _wikidata())
+                if any(m.domain == waiting for m in press.mentions(route="waiting")) else 0)
+    if released:
+        print(f"candidates: {released} press mentions released from waiting")
 
 
 def _limit(stage: int, cfg) -> int | None:
