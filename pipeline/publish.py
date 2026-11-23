@@ -61,15 +61,21 @@ def _params(row, result) -> list[tuple[str, str]]:
         p += [(f"theme{n}", theme["key"]), (f"theme{n}_p", f"{theme['p']:.2f}"),
               (f"theme{n}_status", theme["status"]), (f"theme{n}_evidence", ev.get("excerpt") or ""),
               (f"theme{n}_source", ev.get("url") or "")]
-    urls = []
+        if ev.get("label"):  # a press quotation: "<outlet> (<date>): <title>"
+            p.append((f"theme{n}_source_label", ev["label"]))
+    urls, labels = [], {}
     dossier = row.data.get(4) or {}
-    for url in [n["url"] for n in dossier.get("notes", [])] + dossier.get("links", []):
+    for url, label in ([(n["url"], n.get("label")) for n in dossier.get("notes", [])]
+                       + [(link, None) for link in dossier.get("links", [])]):
         url = url.replace(" ", "%20")
         if url not in urls:
             urls.append(url)
+        if label and url not in labels:
+            labels[url] = label
     status = row.status if row.status in KEPT_STATUSES else "open"
-    p += [("outline", " ; ".join(result["outline"])), ("sources", " ".join(urls)),
-          ("first_wiki", result["first_wiki"]), ("status", status)]
+    p += [("outline", " ; ".join(result["outline"])), ("sources", " ".join(urls))]
+    p += [(f"source{i}_label", labels[url]) for i, url in enumerate(urls, 1) if url in labels]
+    p += [("first_wiki", result["first_wiki"]), ("status", status)]
     return p
 
 

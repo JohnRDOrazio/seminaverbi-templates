@@ -5,8 +5,8 @@ The box of one article proposal, on the English wiki: the work, its connection t
 * domain: the pipeline domain (e.g. <code>film</code>).
 * connection: <code>direct</code>, <code>seeds</code>, <code>entertainment</code> or <code>none</code>; connection_p its probability (<code>0.83</code> shows 83%).
 * field: a field key of the category tree; field_p its probability.
-* theme1, theme2, …: theme keys of the category tree; each with theme1_p (probability), theme1_status, theme1_evidence (excerpt) and theme1_source (URL of the excerpt).
-* outline: sections separated by <code> ; </code>. sources: URLs separated by spaces.
+* theme1, theme2, …: theme keys of the category tree; each with theme1_p (probability), theme1_status, theme1_evidence (excerpt), theme1_source (URL of the excerpt) and theme1_source_label (the link's text, e.g. a press article's outlet, date and title; without it the link shows no text).
+* outline: sections separated by <code> ; </code>. sources: URLs separated by spaces; source1_label, source2_label, …: the text shown for the 1st, 2nd, … URL (without it, the URL itself).
 * first_wiki: the language code of the wiki the article is written on first.
 * status: <code>open</code> (default), <code>approved</code>, <code>created</code> or <code>declined</code>. reason: why it was declined. article: the title of the created article on first_wiki.
 

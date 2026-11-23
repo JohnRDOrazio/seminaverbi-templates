@@ -180,8 +180,10 @@ The box of one article proposal on the en wiki (written by the pipeline bot at t
 | `themeN_status` | applied or author |
 | `themeN_evidence` | the excerpt that supports theme N; empty shows nothing |
 | `themeN_source` | URL of the excerpt; empty shows the excerpt without a link |
+| `themeN_source_label` | text of the excerpt's link, e.g. a press article's outlet, date and title |
 | `outline` | proposed sections, separated by ' ; ' |
 | `sources` | URLs, separated by spaces |
+| `sourceN_label` | N = 1, 2, …: the text shown for the Nth URL of sources; without it, the URL |
 | `first_wiki` | language code of the wiki the article is written on first |
 | `status` | open (default), approved, created or declined; anything else counts as open |
 | `reason` | why a declined proposal was declined |

@@ -186,3 +186,14 @@ def test_created_link_decodes_an_escaped_title():
     out = render(status="created", article=_escape("War & Peace"), first_wiki="it")
     assert "https://it.seminaverbi.bibleget.io/wiki/War_%26_Peace" in out
     assert "amp" not in out.split("seminaverbi.bibleget.io/wiki/")[1].split(" ")[0]
+
+
+def test_press_labels_name_the_evidence_and_sources():
+    from pipeline.publish import _escape
+    label = _escape("Avvenire (2026-03-01): Il film [[x]] & noi")
+    out = render(theme1_source_label=label, source2_label=label)
+    shown = "Avvenire (2026-03-01): Il film &#91;&#91;x&#93;&#93; &#38; noi"
+    assert f"[https://en.wikipedia.org/wiki/X {shown}]" in out
+    assert f"[https://b.example/y {shown}]" in out
+    assert "[https://a.example/x " in out and "[https://a.example/x Avvenire" not in out  # unlabelled: as before
+    assert "[[x]]" not in out

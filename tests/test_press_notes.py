@@ -30,7 +30,7 @@ def test_press_notes_come_first_in_the_dossier(store, queue):
     notes = press_notes(store, "Q1", OUTLETS)
     assert [n["url"] for n in notes] == ["http://a/new", "http://a/old"]
     assert notes[0] == {"lang": "en", "url": "http://a/new", "heading": "Vatican News (2026-04-02): New",
-                        "text": "new words"}
+                        "label": "Vatican News (2026-04-02): New", "text": "new words"}
 
     class Dom:
         __name__ = "pipeline.domains.film"
