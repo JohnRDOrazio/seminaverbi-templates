@@ -73,8 +73,10 @@ report before the first `publish` of that domain.
 **Art benchmark.** `calibrate --domain art` also adds a benchmark of 20 works (strong and weak) held back as
 calibration rows. Open item: the author approves the benchmark list in `art.benchmark` before the first live art
 run; this is not done yet. A benchmark work is released one QID at a time with
-`python -m pipeline release-benchmark QID [QID ...]`, which turns it into a live candidate that runs stages 1-5 again
-(a QID that is not a benchmark row changes nothing and makes the command exit with an error).
+`python -m pipeline release-benchmark QID [QID ...]`, which turns it into a live candidate that runs stages 1-5 again:
+the sitelink floor, the quick drop and `max_new_per_run` apply to it as to any candidate, so it becomes a proposal
+only if it passes them, not because it passed them as calibration (a QID that is not a benchmark row changes nothing
+and makes the command exit with an error).
 
 Commands (options `--db PATH`, default `data/pipeline.sqlite`, and `--domain`, default `film`, go before or after the command):
 

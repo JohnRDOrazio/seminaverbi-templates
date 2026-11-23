@@ -239,8 +239,11 @@ answer of `sacred-art` for a painting is a disagreement to report.
   Benchmark rows run stages 3–5 as calibration rows and appear in the report; unlike calibration rows they
   are not articles, so stage 1 lists no translation suggestion for them, and once the author has read the
   report `python -m pipeline --domain art release-benchmark Q… Q…` clears the calibration flag of the works
-  the author names, so they become proposals at the next `publish` (they have already passed stage 5); the
-  controls and the unnamed rows stay benchmark rows and are never published (decided 2026-11-23).
+  the author names, and each released work runs stages 1–5 again as a live candidate: the sitelink floor,
+  the quick drop and `max_new_per_run` apply to it as to any candidate, and it becomes a proposal only if it
+  passes them (amended at the final review, 2026-11-23: the calibration outcomes are cleared on release, so a
+  released row is never proposed on the strength of its calibration run); the controls and the unnamed rows
+  stay benchmark rows and are never published (decided 2026-11-23).
 - The author reads each domain's report before its first proposal is posted, as for film and literature;
   wording and cut-offs change only through a pull request afterwards, and a change re-asks that domain's
   rows only.
