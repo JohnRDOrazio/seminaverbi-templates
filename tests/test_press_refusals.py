@@ -383,3 +383,7 @@ def test_the_page_says_it():
             "read.\n") in text
     assert "numeric fingerprint (hashes only)" in text and "https://typesafe.ai/legal/mca" in text
     assert "used to train any model" not in text
+    for said in ("with its title and date when the article gives them", "reads the quotations kept again",
+                 "a sitemap index, and the archive of a blog", "Nothing listed above is deleted yet", "for the day (UTC)"):
+        assert said in text
+    assert "As long as" not in text

@@ -5,8 +5,8 @@ MAX_PASSAGES = 3
 
 
 def _head(art, outlets: dict[str, str]) -> str:
-    name = outlet_name(art, outlets)
-    return f"{name} ({art.published}): {art.title}" if art.published else f"{name}: {art.title}"
+    name, title = outlet_name(art, outlets), art.title or art.url
+    return f"{name} ({art.published}): {title}" if art.published else f"{name}: {title}"
 
 
 def press_notes(store, qid: str, outlets: dict[str, str]) -> list[dict]:

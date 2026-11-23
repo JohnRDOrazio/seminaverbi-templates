@@ -167,6 +167,7 @@ def test_the_size_cap_drops_what_is_beyond_it_and_the_line_it_cuts():
     (star("Crawl-delay: inf"), 0), (star("Crawl-delay: 5") + star("Crawl-delay: 9"), 9),
     (star("Crawl-delay: 30") + "User-agent: SeminaVerbi-press\nCrawl-delay: 12\n", 12),
     (star("Crawl-delay: 30") + "User-agent: other\nCrawl-delay: 99\n", 30),
+    (star("Disallow: /x") + "User-agent: other\nCrawl-delay: 99\n", 0),
 ])
 def test_crawl_delay(text, delay):
     assert Robots(text, BOT).crawl_delay == delay

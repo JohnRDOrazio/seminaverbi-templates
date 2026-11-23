@@ -244,6 +244,16 @@ site should be removed and no longer consulted".
   normalised, 500 KiB, unreadable lines ignored, Crawl-delay kept. urllib.robotparser knew no wildcards and took the first
   matching rule.
 
+## Open: retention (author, 2026-11-23: "We'll cross that bridge when we get to it")
+
+Nothing is deleted today, and the bot's page says so. A rule matching "as long as a SeminaVerbi article or an article
+proposal cites it" would delete, for every article that no mention with route `candidate` (of a queue row not dropped or
+declined), `enrichment` or `waiting` points to, its mentions, fingerprint, cached Jev answers (`press:<sha1>`) and the
+title, date and scores of its row, keeping the bare URL (or a hash of it) so that it is not discovered, fetched and judged
+again. It would do so some weeks after the article was filtered or linked (to allow a redo, and a copy to be recognised),
+and, for an article cited until then, when its last citing row is dropped or declined, its enrichment entry is marked
+done, or the SeminaVerbi article no longer links it, which is the one thing the pipeline cannot see today.
+
 ## Precision (2026-11-23 dry run)
 
 The first `press run --dry-run` (200 articles from 9 outlets, 65 kept, 60 linked, 25 mentions routed) showed five
