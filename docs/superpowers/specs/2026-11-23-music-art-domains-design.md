@@ -52,8 +52,8 @@ shown, with the famous sacred works first and seeds of the Word in secular works
 
 - People (see above). A composer, painter, band or singer reached by any source is reported, not queued.
 - **Architecture** (churches, cathedrals, monasteries: #23's last source) and **comics** (`comics` sits under
-  visual arts; *New Gods* is filed there): later, each with its own candidate classes and dossier. See
-  "Questions for the author", 1.
+  visual arts; *New Gods* is filed there): later, each with its own candidate classes and dossier (architecture
+  decided 2026-11-23).
 - Sources beyond Wikidata and Wikipedia/Wikiquote in this phase: MusicBrainz, CPDL, IMSLP, museum
   open-access APIs (Met, AIC, Smithsonian, Rijksmuseum), Europeana and Iconclass outside Wikidata. #22 and #23
   list them; they are enrichment for a later phase, once the Wikidata backlog has run. Iconclass notations
@@ -197,7 +197,7 @@ verse or movement is enough).
 Art: most candidates are religious by subject, so plausibility filters nothing. The art question asks for
 **significance** instead (#23): whether the work, beyond depicting a religious subject, shapes how the scene
 or the faith is imagined or understood, or carries a theological reading in its sources. `quick_drop`
-(0.25) applies to that probability. The wording is a starting point for calibration (see Questions, 2).
+(0.25) applies to that probability (decided 2026-11-23). The wording is a starting point for calibration.
 
 ### Dossier (stage 4)
 
@@ -250,7 +250,7 @@ answer of `sacred-art` for a painting is a disagreement to report.
   are not articles, so stage 1 lists no translation suggestion for them, and once the author has read the
   report `python -m pipeline --domain art release-benchmark Q… Q…` clears the calibration flag of the works
   the author names, so they become proposals at the next `publish` (they have already passed stage 5); the
-  controls and the unnamed rows stay benchmark rows and are never published (see Questions, 3).
+  controls and the unnamed rows stay benchmark rows and are never published (decided 2026-11-23).
 - The author reads each domain's report before its first proposal is posted, as for film and literature;
   wording and cut-offs change only through a pull request afterwards, and a change re-asks that domain's
   rows only.
@@ -330,19 +330,12 @@ What the numbers decide (builder's calls, from these counts):
 - The Jev wording for both domains (calibration tests it), within the shape above.
 - Test doubles, following the existing domain tests.
 
-## Questions for the author
+## Answered by the author (2026-11-23)
 
-Only the author can settle these; each changes what gets built. Most important first.
-
-1. **Architecture now or later?** #23 includes churches, cathedrals and monasteries. They are works, but a
-   different class tree, a different dossier (history, liturgical arrangement, artworks inside) and many
-   thousands of candidates. Options: (a) later, as its own domain (my pick: art first, with the folding
-   rule stopping at buildings); (b) now, inside `art`.
-2. **A significance check for art?** Nearly every art candidate is religious by subject, so the usual
-   plausibility question would pass them all. Options: (a) replace it, for art only, with the significance
-   question above (my pick: it is #23's own criterion, and calibration tests it); (b) keep plausibility and
-   rely on the floor and the voters.
-3. **The art benchmark.** The art tree has one work to calibrate against. Options: (a) I draft a list of
-   about 20 works (strong, implicit, and two or three controls) and you approve or edit it before the first
-   art run (my pick); (b) you name the list; (c) no benchmark: calibrate on the Ghent Altarpiece and read the
-   first proposals as the test.
+1. **Architecture: later**, as its own domain. `art` stops folding at a building.
+2. **Art's quick check is significance**, for art only: does the work shape how the scene or the faith is
+   imagined or understood, beyond depicting a religious subject. Music keeps plausibility.
+3. **Art benchmark:** the builder drafts about 20 works (QIDs: strong, implicit, and two or three controls)
+   in `art.benchmark`; the author approves the list before the first live art run. Benchmark rows are released
+   one QID at a time, so the controls never become proposals. Approval is an open item before the live run,
+   not a blocker for building.
