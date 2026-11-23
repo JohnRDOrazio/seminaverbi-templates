@@ -103,7 +103,26 @@ class PressStore:
         for name, kind in (("stance", "REAL"), ("stance_outcome", "TEXT")):
             if name not in columns:
                 db.execute(f"ALTER TABLE press_mentions ADD COLUMN {name} {kind}")
+        if "first_read" not in {r[1] for r in db.execute("PRAGMA table_info(press_outlets)")}:
+            self._add_reads()
         db.commit()
+
+    def _add_reads(self) -> None:
+        """The first read and the days read of each outlet. A store made before them takes them from its articles (found
+        in a feed that was read) and its last successful day: the days seen there are the least it was read."""
+        days: dict[str, set[str]] = {}
+        for outlet, at in self.db.execute("SELECT outlet, found_at FROM press_articles WHERE found_at IS NOT NULL"):
+            days.setdefault(outlet, set()).add(datetime.fromtimestamp(at, timezone.utc).date().isoformat())
+        for outlet, ok in self.db.execute("SELECT outlet, ok_day FROM press_outlets WHERE ok_day IS NOT NULL"):
+            days.setdefault(outlet, set()).add(ok)
+        # days_read first: an interrupted migration is done again as long as first_read is missing
+        if "days_read" not in {r[1] for r in self.db.execute("PRAGMA table_info(press_outlets)")}:
+            self.db.execute("ALTER TABLE press_outlets ADD COLUMN days_read INTEGER")
+        self.db.execute("ALTER TABLE press_outlets ADD COLUMN first_read TEXT")
+        for outlet, seen in days.items():
+            self._ensure_outlet(outlet)
+            self.db.execute("UPDATE press_outlets SET first_read=?, days_read=? WHERE outlet=?",
+                            (min(seen), len(seen), outlet))
 
     @classmethod
     def of(cls, queue) -> "PressStore":
@@ -293,8 +312,15 @@ class PressStore:
         if r and r[0] and r[0] >= today:
             return
         self._ensure_outlet(outlet)
-        self.db.execute("UPDATE press_outlets SET ok_day=? WHERE outlet=?", (today, outlet))
+        self.db.execute("UPDATE press_outlets SET ok_day=?, first_read=COALESCE(first_read, ?), "
+                        "days_read=COALESCE(days_read, 0)+1 WHERE outlet=?", (today, today, outlet))
         self.db.commit()
+
+    def reads(self) -> dict[str, tuple[str, int]]:
+        """{outlet: (the first day it was read, on how many days)} of the outlets ever read (robots.txt aside)."""
+        return {r[0]: (r[1], r[2]) for r in self.db.execute(
+            "SELECT outlet, first_read, days_read FROM press_outlets WHERE first_read IS NOT NULL ORDER BY outlet")
+            .fetchall()}
 
     def refused_today(self) -> dict[str, str]:
         """{outlet: reason} of the outlets that refused us today."""
@@ -335,7 +361,9 @@ class PressStore:
 
     def copy_refusals(self, other: "PressStore") -> None:
         """Take over what `other` knows of the outlets that refuse us (for a throwaway store)."""
-        for table, n in (("press_refusals", 3), ("press_outlets", 6)):
-            rows = [tuple(r) for r in other.db.execute(f"SELECT * FROM {table}").fetchall()]
-            self.db.executemany(f"INSERT OR REPLACE INTO {table} VALUES ({','.join('?' * n)})", rows)
+        for table, columns in (("press_refusals", "outlet, day, reason"),
+                               ("press_outlets", "outlet, ok_day, reinstated, removed, since, reason")):
+            rows = [tuple(r) for r in other.db.execute(f"SELECT {columns} FROM {table}").fetchall()]
+            marks = ",".join("?" * (columns.count(",") + 1))
+            self.db.executemany(f"INSERT OR REPLACE INTO {table} ({columns}) VALUES ({marks})", rows)
         self.db.commit()

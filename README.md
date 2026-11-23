@@ -154,6 +154,15 @@ python -m pipeline press run        # all five, each article fetched once
 python -m pipeline press run --dry-run   # discover, filter, link; prints each mention's would-be route, writes no queue, no wiki
 ```
 
+**What each outlet gives.** `press outlets` shows per outlet: the day it was first read and on how many days, articles
+read and kept, candidates, proposals published and not declined (and how many approved or created), and enrichment
+entries apart. A useful proposal is a queue row with press evidence from it whose page is published (open, approved or
+created). Without one, 30 calendar days after its first successful read it is marked `no useful proposals for N days:
+review`, at 60 `consider dropping`, with its enrichment entries; a real `press run` ends with `press review: …`, naming
+the marked outlets. It is a report: nothing is dropped. An article is credited to the outlet where it was read, also when
+its evidence counts as another's (a Vallini post counted as L'Osservatore Romano is `vallini`'s), and to both outlets when
+it was found in both. An outlet with no entries is shown as never read and a removed one as removed, neither marked.
+
 **The day's limits** (UTC, shared by every run of the day, manual and catch-up ones included): `max_articles_per_day`
 (250) and an outlet's `max_per_day`. At most that many articles are discovered (added to the store), and at most that
 many are read. An article counts as read once a day, the first time `filter` or `link` sets out to fetch it, whatever
@@ -175,7 +184,7 @@ All of it is state in the store, not in `config/press.json`. Each run that reads
 writes to the store it is given (use a copy).
 
 ```
-python -m pipeline press outlets            # the outlets that refuse us, since when, and the removed ones; no request
+python -m pipeline press outlets            # what each outlet has given, those that refuse us, since when, and the removed ones; no request
 python -m pipeline press reinstate OUTLET   # puts a removed outlet back (if it refused us today, from tomorrow)
 ```
 

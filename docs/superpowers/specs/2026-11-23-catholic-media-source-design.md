@@ -244,6 +244,23 @@ site should be removed and no longer consulted".
   normalised, 500 KiB, unreadable lines ignored, Crawl-delay kept. urllib.robotparser knew no wildcards and took the first
   matching rule.
 
+## What each outlet gives (author, 2026-11-23)
+
+The author's decision: "if no useful proposals come from a source within a month or two, we should consider dropping the
+source". A report (`report.py`, `press outlets`), never an automatic drop.
+
+- **Useful:** a queue row (no benchmark or calibration row) with press evidence from the outlet, its page made and its
+  status open, approved or created. Not declined, not unpublished, not a part retired into its whole. Enrichment entries do
+  not make an outlet useful; they are shown beside the mark.
+- **Marks:** none useful 30 calendar days after the first successful read: review; 60: consider dropping. Days without a run
+  are not treated apart. One useful proposal and the outlet is never marked again.
+- **First read and days read** are stored (`press_outlets.first_read`, `days_read`: 2xx or 304 other than robots.txt). A store
+  made before takes them from its articles' `found_at` and its last successful day.
+- **Credit:** where the article was read, not the outlet its evidence counts for in the queue: the question is what reading
+  the source gives, and most of Vallini's posts count as L'Osservatore Romano. Such candidates are told apart on his line.
+  The same article found in both outlets is credited to both. Enrichment entries are counted by work.
+- Never read (no entries, or never answered), removed, or no longer configured: shown as such, not marked.
+
 ## Open: retention (author, 2026-11-23: "We'll cross that bridge when we get to it")
 
 Nothing is deleted today, and the bot's page says so. A rule matching "as long as a SeminaVerbi article or an article

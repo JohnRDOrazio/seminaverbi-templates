@@ -8,7 +8,7 @@ for quick, adjudicate and calibrate. `skip QID --reason TEXT` drops a row that b
 
 `press discover|filter|link|route|enrich|run [--dry-run]` runs the Catholic-press source (pipeline/press/): filter
 and link ask Jev (TYPESAFE_API_KEY), enrich and run write the enrichment page as the editor bot; `--dry-run` writes
-neither the candidates queue nor the wiki. `press outlets` lists the outlets that refuse us or were removed;
+neither the candidates queue nor the wiki. `press outlets` lists what each outlet has given and those that refuse us or were removed;
 `press reinstate OUTLET` puts a removed one back.
 """
 import argparse
@@ -28,6 +28,7 @@ from pipeline.press import stages as press_stages
 from pipeline.press.enrich import ENRICH_TITLE, enrichment, publish_enrichment
 from pipeline.press.notes import press_notes
 from pipeline.press.route import release_waiting, route
+from pipeline.press import report
 from pipeline.press import store as press_store
 from pipeline.press.store import PressStore
 from pipeline.queue import Queue
@@ -281,8 +282,10 @@ def _refused(client, store) -> None:
     _removed(store)
 
 
-def _press_outlets(store) -> None:
-    """`press outlets`: the outlets that refuse us, since when, and the removed ones; nothing is asked of them."""
+def _press_outlets(store, queue, outlets) -> None:
+    """`press outlets`: what each outlet has given, then those that refuse us, since when, and the removed ones; nothing
+    is asked of them."""
+    print("press outlets:\n" + "\n".join(report.lines(store, queue, outlets)))
     today, known = store.refused_today(), store.refusals()
     now = [f"{o} ({why}{_since(known[o]) if o in known else ''})" for o, why in today.items() if o not in store.removed()]
     print(f"press refused today ({press_store.utc_today()} UTC): " + (", ".join(now) or "none"))
@@ -303,7 +306,7 @@ def cmd_press(args, queue, cfg):
     store and list the URLs; route (and run) only print each mention's would-be route; enrich prints the page."""
     action, dry = args.action, args.dry_run
     if action == "outlets":
-        return _press_outlets(PressStore.of(queue))
+        return _press_outlets(PressStore.of(queue), queue, load_press_config()["outlets"])
     if action == "reinstate":
         return _press_reinstate(PressStore.of(queue), args.outlet)
     pcfg = load_press_config()
@@ -353,6 +356,8 @@ def cmd_press(args, queue, cfg):
                          press_stages.titles(store, wikis()["en"], wikidata())))
     if client is not None:
         _refused(client, kept)
+    if action == "run" and not dry:
+        print(report.marked(store, queue, pcfg["outlets"]))
 
 
 def cmd_release_benchmark(args, queue, cfg):
