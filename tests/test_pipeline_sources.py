@@ -229,3 +229,11 @@ def test_section_links_without_the_section_is_empty():
     session = FakeSession(Resp({"parse": {"sections": [{"index": "1", "line": "Storia"}]}}))
     assert Wikipedia("it", session=session).section_links("Illustrissimi", "Nope") == []
     assert len(session.calls) == 1
+
+
+def test_a_short_query_that_encodes_long_goes_by_post():
+    # 3,000 characters of braces and colons: each is three once percent-encoded in a GET URL (HTTP 414 past ~8 KB)
+    heavy = "{:}" * 1000
+    s = FakeSession(bindings())
+    Sparql(s).select(heavy)
+    assert s.calls[0][1]["method"] == "POST"

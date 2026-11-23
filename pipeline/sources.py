@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 import time
-from urllib.parse import quote
+from urllib.parse import quote, quote_plus
 
 import mwparserfromhell
 import requests
@@ -13,7 +13,7 @@ from sync.wikidata import _OwnHeaders
 
 SPARQL_ENDPOINT = "https://query.wikidata.org/sparql"
 SPARQL_RETRIES = 3
-POST_ABOVE = 6000  # characters: a longer query goes by POST
+POST_ABOVE = 6000  # characters of the percent-encoded query: a longer one goes by POST
 RETRY_STATUSES = (429, 502, 503, 504)  # rate limit, and the gateway errors of a busy endpoint
 _ENTITY = "http://www.wikidata.org/entity/"
 _TAG = re.compile(r"<[^>]+>")
@@ -30,7 +30,8 @@ class Sparql:
         retries = 0
         while True:
             try:
-                if len(query) > POST_ABOVE:  # a long query overruns the front end's URL limit (HTTP 414)
+                # a long URL overruns the front end's limit (HTTP 414): count the query as the GET would send it
+                if len(quote_plus(query)) > POST_ABOVE:
                     r = self.session.post(SPARQL_ENDPOINT, data={"query": query, "format": "json"},
                                           headers=headers, timeout=60)
                 else:
