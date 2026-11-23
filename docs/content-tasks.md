@@ -87,4 +87,4 @@ the page had by hand.
 | Item | Finding | Proposed | Status |
 |------|---------|----------|--------|
 | TypeSafe | TypeSafe's written confirmation that it does not train on API inputs: needed before enabling `sv-pipeline-press.timer`. | ask TypeSafe; record the answer and its date here | open |
-| `Semina Verbi:Press bot` | The page the bot's user agent points to; its text is `docs/press-bot-page.wiki` | publish on en with the author's approval, before the first live run | open |
+| `Semina Verbi:Press bot` | The page the bot's user agent points to; its text is `docs/press-bot-page.wiki` | publish on en with the author's approval, before the first live run | done (2026-11-23) |

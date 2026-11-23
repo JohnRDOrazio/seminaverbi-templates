@@ -70,7 +70,7 @@ only), genres and a curated list; the floor is 15 sitelinks (`art.sitelink_floor
 editions, and art copies, are dropped at triage. Run `python -m pipeline calibrate --domain music` (or `art`) and read the
 report before the first `publish` of that domain.
 
-**Art benchmark.** `calibrate --domain art` also adds a benchmark of 20 works (strong and weak) held back as
+**Art benchmark.** `calibrate --domain art` also adds a benchmark of 21 works (strong, implicit and controls) held back as
 calibration rows. Open item: the author approves the benchmark list in `art.benchmark` before the first live art
 run; this is not done yet. A benchmark work is released one QID at a time with
 `python -m pipeline release-benchmark QID [QID ...]`, which turns it into a live candidate that runs stages 1-5 again:
