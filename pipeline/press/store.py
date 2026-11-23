@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import json
 import sqlite3
-import time
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 
@@ -24,14 +23,19 @@ CREATE TABLE IF NOT EXISTS press_mentions (
 CREATE TABLE IF NOT EXISTS press_feeds (url TEXT PRIMARY KEY, etag TEXT, last_modified TEXT);
 CREATE TABLE IF NOT EXISTS press_walks (url TEXT PRIMARY KEY, data_json TEXT);
 CREATE TABLE IF NOT EXISTS press_refusals (outlet TEXT, day TEXT, reason TEXT, PRIMARY KEY (outlet, day));
+CREATE TABLE IF NOT EXISTS press_reads (url TEXT PRIMARY KEY, outlet TEXT, day TEXT);
 CREATE TABLE IF NOT EXISTS press_outlets (
   outlet TEXT PRIMARY KEY, ok_day TEXT, reinstated TEXT, removed TEXT, since TEXT, reason TEXT);
 """
 
 
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
 def utc_today() -> str:
-    """The day a refusal holds for: the UTC calendar day, whatever the machine's time zone."""
-    return datetime.now(timezone.utc).date().isoformat()
+    """The day a refusal or a daily limit holds for: the UTC calendar day, whatever the machine's time zone."""
+    return utc_now().date().isoformat()
 
 
 @dataclass
@@ -108,7 +112,7 @@ class PressStore:
     def add_article(self, url, outlet, lang, title=None, published=None) -> bool:
         cur = self.db.execute(
             "INSERT OR IGNORE INTO press_articles (url, outlet, lang, title, published, found_at) "
-            "VALUES (?,?,?,?,?,?)", (url, outlet, lang, title, published, time.time()))
+            "VALUES (?,?,?,?,?,?)", (url, outlet, lang, title, published, utc_now().timestamp()))
         self.db.commit()
         return cur.rowcount == 1
 
@@ -157,7 +161,7 @@ class PressStore:
         return [_article(r) for r in rows]
 
     def attempted(self, url: str) -> None:
-        self.db.execute("UPDATE press_articles SET attempted_at=? WHERE url=?", (time.time(), url))
+        self.db.execute("UPDATE press_articles SET attempted_at=? WHERE url=?", (utc_now().timestamp(), url))
         self.db.commit()
 
     def set_article(self, url, stage, outcome, data: dict) -> None:
@@ -221,6 +225,41 @@ class PressStore:
     def set_walk(self, url, data: dict) -> None:
         self.db.execute("INSERT OR REPLACE INTO press_walks VALUES (?,?)", (url, json.dumps(data)))
         self.db.commit()
+
+    # The day's budget (UTC), shared by every run. An article counts once a day, the first time a stage sets out to
+    # read it, whatever comes of it; discovery counts the articles it added.
+
+    def found_today(self, outlet: str | None = None) -> int:
+        """The articles (of the outlet) added today."""
+        start = datetime.combine(utc_now().date(), datetime.min.time(), timezone.utc).timestamp()
+        sql, args = "SELECT COUNT(*) FROM press_articles WHERE found_at >= ?", [start]
+        if outlet is not None:
+            sql += " AND outlet=?"; args.append(outlet)
+        return self.db.execute(sql, args).fetchone()[0]
+
+    def read_today(self, outlet: str | None = None) -> int:
+        """The articles (of the outlet) counted today."""
+        sql, args = "SELECT COUNT(*) FROM press_reads WHERE day=?", [utc_today()]
+        if outlet is not None:
+            sql += " AND outlet=?"; args.append(outlet)
+        return self.db.execute(sql, args).fetchone()[0]
+
+    def was_read_today(self, url: str) -> bool:
+        return self.db.execute("SELECT 1 FROM press_reads WHERE url=? AND day=?", (url, utc_today())).fetchone() is not None
+
+    def take(self, url: str, outlet: str, limit: int, cap: int | None) -> bool:
+        """Whether the article may be read: it was counted today already, or it is counted now, leaving the day's count
+        within `limit` and its outlet's within `cap` (None: no cap). One statement, so processes cannot overrun it."""
+        if self.was_read_today(url):
+            return True
+        today = utc_today()
+        self.db.execute("DELETE FROM press_reads WHERE day < ?", (today,))
+        cur = self.db.execute(
+            "INSERT OR IGNORE INTO press_reads SELECT ?, ?, ? WHERE (SELECT COUNT(*) FROM press_reads WHERE day=?) < ? "
+            "AND (? IS NULL OR (SELECT COUNT(*) FROM press_reads WHERE day=? AND outlet=?) < ?)",
+            (url, outlet, today, today, limit, cap, today, outlet, cap))
+        self.db.commit()
+        return cur.rowcount == 1 or self.was_read_today(url)
 
     # The outlets that refuse us. A refusal stops the outlet for its UTC day. A day counts as refused toward removal
     # when no successful response came from the outlet that day; a successful day, or putting the outlet back, starts

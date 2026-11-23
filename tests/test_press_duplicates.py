@@ -25,7 +25,7 @@ OUTLETS = [{"id": "osservatore", "name": "L'Osservatore Romano"},
            {"id": "vallini", "name": "Gaetano Vallini, Camera con vista", "author": "Gaetano Vallini",
             "republishes": "osservatore", "article_feed": FEED}]
 NAMES = {o["id"]: o["name"] for o in OUTLETS}
-CFG = {"max_articles_per_run": 10, "culture_drop": 0.5, "angle_drop": 0.4, "outlets": OUTLETS}
+CFG = {"max_articles_per_day": 10, "culture_drop": 0.5, "angle_drop": 0.4, "outlets": OUTLETS}
 WORDS = [f"parola{i}" for i in range(900)]
 
 

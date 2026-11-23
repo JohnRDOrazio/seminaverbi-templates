@@ -36,7 +36,7 @@ PAGES = {
     A3: html("La partita", "Una partita di calcio senza nulla di culturale."),
 }
 
-PRESS = {"user_agent": "SeminaVerbi-press/1.0 (+test)", "delay_seconds": 0, "max_articles_per_run": 200,
+PRESS = {"user_agent": "SeminaVerbi-press/1.0 (+test)", "delay_seconds": 0, "max_articles_per_day": 200,
          "culture_drop": 0.4, "pick_p": 0.8, "pick_confidence": 0.6, "mention_keep": 0.6,
          "angle_drop": 0.4, "stance_keep": 0.5, "press_exempt": 0.6,
          "waiting_classes": {"music": ["Q7366"]},
@@ -300,7 +300,7 @@ def test_outlets_config():
     for o in cfg["outlets"]:
         assert o["entries"] or o.get("note"), o["id"]
     assert cfg["user_agent"].startswith("SeminaVerbi-press/1.0 ")
-    assert cfg["max_articles_per_run"] == 250
+    assert cfg["max_articles_per_day"] == 250
 
 
 def test_press_bot_page_text():
@@ -360,6 +360,6 @@ def test_the_vallini_blog_config():
     labels = ("Cinema", "Film", "Musica", "Letteratura", "Libri", "Romanzo")
     assert [e["url"] for e in o["entries"]] == [f"{o['base']}/feeds/posts/summary/-/{x}" for x in labels]
     assert all(e["walk"] and e["lang"] == "it" for e in o["entries"])
-    assert o["max_per_run"] == 40 < cfg["max_articles_per_run"]
+    assert o["max_per_day"] == 40 < cfg["max_articles_per_day"]
     assert o["republishes"] in by_id and o["name"] == f"{o['author']}, Camera con vista"
     assert "{path}" in o["article_feed"] and o["article_feed"].startswith(o["base"])

@@ -145,7 +145,7 @@ Avvenire, Roma Sette, EWTN, La Civiltà Cattolica, Famiglia Cristiana, Aleteia, 
 and Gaetano Vallini's blog *Camera con vista*) and feeds every domain. Design: `docs/superpowers/specs/2026-11-23-catholic-media-source-design.md`.
 
 ```
-python -m pipeline press discover   # new article URLs from each outlet's feeds and sitemaps (round-robin, max_articles_per_run: 250)
+python -m pipeline press discover   # new article URLs from each outlet's feeds and sitemaps (round-robin)
 python -m pipeline press filter     # Jev: is the article about a work of culture or an artist (culture_drop)? with a faith or values angle (angle_drop)? below either: dropped
 python -m pipeline press link       # mentions linked to Wikidata items; kept when Jev finds them discussed substantively; with the article's stance on them (stance_keep)
 python -m pipeline press route      # each mention to its domain's queue (source press:<outlet>), the enrichment page, or waiting
@@ -153,6 +153,13 @@ python -m pipeline press enrich     # writes Semina Verbi:Press for existing art
 python -m pipeline press run        # all five, each article fetched once
 python -m pipeline press run --dry-run   # discover, filter, link; prints each mention's would-be route, writes no queue, no wiki
 ```
+
+**The day's limits** (UTC, shared by every run of the day, manual and catch-up ones included): `max_articles_per_day`
+(250) and an outlet's `max_per_day`. At most that many articles are discovered (added to the store), and at most that
+many are read. An article counts as read once a day, the first time `filter` or `link` sets out to fetch it, whatever
+comes of it: filtered and linked, or tried twice, on the same day it counts once; kept earlier and fetched again by
+`link` another day, it counts that day. `filter` leaves room for those, at most half of the day. Feeds, sitemaps and
+robots.txt are not articles. Articles over the limit wait for another day (`left for another day` in link's counts).
 
 `--dry-run` also works with `discover` (into a throwaway store: lists the URLs found per outlet, keeps nothing),
 `route` (prints the would-be routes) and `enrich` (prints the page text).
@@ -174,7 +181,7 @@ python -m pipeline press reinstate OUTLET   # puts a removed outlet back (if it 
 
 The bot reads politely: its own user agent (`SeminaVerbi-press/1.0`, pointing to the page `Semina Verbi:Press bot`,
 whose text is `docs/press-bot-page.wiki`), one request at a time per outlet at least `delay_seconds` (10) apart or the
-outlet's `Crawl-delay`. A mention whose article is neutral on the work or only critical of it never becomes a candidate or
+outlet's `Crawl-delay`, robots.txt obeyed as RFC 9309 says (`pipeline/press/robots.py`). A mention whose article is neutral on the work or only critical of it never becomes a candidate or
 press evidence; for a work SeminaVerbi covers it goes to the enrichment page, the critical ones marked. The bot keeps the link, title, date, outlet, language, scores and quotations of at most 25 words; never the
 full text. Jev reads at most about 150 words per question. Read the `--dry-run` report before the first real run.
 
@@ -182,8 +189,8 @@ full text. Jev reads at most about 150 words per question. Read the `--dry-run` 
 
 - An entry with `"walk": true` is an Atom feed (Blogger) whose whole archive is read over successive runs, newest
   change first and cut by date, never by offset; then only its top is read. A post under several labels is one article.
-- `max_per_run` bounds the articles an outlet adds, and attempts, per run, inside `max_articles_per_run`; its share (up
-  to half of the run) is taken first, so neither it nor the others are starved.
+- `max_per_day` bounds the articles an outlet adds, and those read, per day, inside `max_articles_per_day`; its share (up
+  to half of what the day has left) is taken first, so neither it nor the others are starved.
 - `article_feed` (a URL with `{path}`) reads an article from its feed entry, for a site whose pages hold no text.
 - `republishes` and `author`: a post that states its issue ("L'Osservatore Romano dell'8 novembre 2025", "(©L'Osservatore
   Romano, 23 luglio 2020)") is cited as "Gaetano Vallini, L'Osservatore Romano" with that date, any other as the

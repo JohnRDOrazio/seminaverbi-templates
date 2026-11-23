@@ -1,5 +1,6 @@
 """An outlet that refuses us: not read again that day (UTC), removed after a week of refusals, put back by hand."""
 import sqlite3
+from datetime import datetime
 
 import pytest
 
@@ -21,7 +22,7 @@ class Day:
 
     def __init__(self, monkeypatch, day="2026-12-01"):
         self.day = day
-        monkeypatch.setattr(press_store, "utc_today", lambda: self.day)
+        monkeypatch.setattr(press_store, "utc_now", lambda: datetime.fromisoformat(f"{self.day}T04:30:00+00:00"))
 
     def set(self, n):
         self.day = f"2026-12-{n:02d}"
@@ -131,7 +132,7 @@ def test_articles_of_a_stopped_outlet_stay_found_unattempted(day):
     store.add_article(A, "o", "it")
     store.refuse("o", "403")
     pc, s = client(store, OK)
-    pcfg = {"outlets": [{"id": "o"}], "max_articles_per_run": 5}
+    pcfg = {"outlets": [{"id": "o"}], "max_articles_per_day": 5}
     assert press_stages.run_filter(store, press_stages.Pages(pc), None, pcfg) == {}
     assert s.calls == [] and store.article(A).stage == "found"
     assert store.db.execute("SELECT attempted_at FROM press_articles").fetchone()[0] is None

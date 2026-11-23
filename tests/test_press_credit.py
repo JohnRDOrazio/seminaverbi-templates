@@ -60,7 +60,7 @@ OUTLETS = [{"id": "osservatore", "name": OR},
            {"id": "o", "name": "Gaetano Vallini, Camera con vista", "author": "Gaetano Vallini",
             "republishes": "osservatore", "article_feed": "https://x.example/feeds/posts/default?path={path}"}]
 NAMES = {o["id"]: o["name"] for o in OUTLETS}
-CFG = {"max_articles_per_run": 10, "culture_drop": 0.5, "angle_drop": 0.4, "outlets": OUTLETS}
+CFG = {"max_articles_per_day": 10, "culture_drop": 0.5, "angle_drop": 0.4, "outlets": OUTLETS}
 
 
 def filtered(content):

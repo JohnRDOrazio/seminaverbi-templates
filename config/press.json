@@ -1,7 +1,7 @@
 {
   "user_agent": "SeminaVerbi-press/1.0 (+https://en.seminaverbi.bibleget.io/wiki/Semina_Verbi:Press_bot)",
   "delay_seconds": 10,
-  "max_articles_per_run": 250,
+  "max_articles_per_day": 250,
   "culture_drop": 0.4,
   "angle_drop": 0.4,
   "pick_p": 0.8,
@@ -317,10 +317,10 @@
         }
       ],
       "article_feed": "https://gaetanovallini.blogspot.com/feeds/posts/default?path={path}",
-      "max_per_run": 40,
+      "max_per_day": 40,
       "culture_paths": [],
       "since": null,
-      "note": "Blogger blog of a journalist of L'Osservatore Romano who republishes his articles there (`republishes`; a post counts as the newspaper's only when it says so with the issue's date). robots.txt allows all but /search and /share-widget. Only these labels (Fotografia is left out); `walk`: the label's whole archive, newest change first, over successive runs (about 385 posts with the overlaps). The pages are drawn by script and hold no text (nor do ?m=1 and ?v=0), so `article_feed` gives each post's own feed entry. `max_per_run`: articles added and attempted per run, so the archive cannot crowd out the news outlets."
+      "note": "Blogger blog of a journalist of L'Osservatore Romano who republishes his articles there (`republishes`; a post counts as the newspaper's only when it says so with the issue's date). robots.txt allows all but /search and /share-widget. Only these labels (Fotografia is left out); `walk`: the label's whole archive, newest change first, over successive runs (about 385 posts with the overlaps). The pages are drawn by script and hold no text (nor do ?m=1 and ?v=0), so `article_feed` gives each post's own feed entry. `max_per_day`: articles added and attempted per run, so the archive cannot crowd out the news outlets."
     }
   ]
 }

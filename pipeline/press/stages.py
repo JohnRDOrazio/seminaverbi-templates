@@ -42,8 +42,8 @@ SV_LANGS = pipeline_stages.LANGS
 
 
 def run_discover(store, client, pcfg: dict) -> dict[str, int]:
-    """New articles per outlet (round-robin, at most max_articles_per_run in all)."""
-    return discover(store, client, pcfg["outlets"], pcfg["max_articles_per_run"])
+    """New articles per outlet (round-robin, at most max_articles_per_day in all, the day's earlier runs included)."""
+    return discover(store, client, pcfg["outlets"], pcfg["max_articles_per_day"])
 
 
 def _text(r) -> str:
@@ -65,6 +65,9 @@ class Pages:
     def __init__(self, client, outlets=()):
         self.client, self._pages = client, {}
         self._feeds = {o["id"]: o["article_feed"] for o in outlets if o.get("article_feed")}
+
+    def holds(self, art) -> bool:
+        return art.url in self._pages
 
     def get(self, art) -> tuple[Page | None, str | None]:
         if art.url in self._pages:
@@ -125,8 +128,8 @@ def _angle(page: Page, url: str, judge, cut: float) -> dict[str, float]:
 
 
 def _turns(articles: list, limit: int, caps: dict[str, int]) -> list:
-    """The articles in the order they are attempted: each capped outlet's share first (its cap, or its part of half
-    the run), so a backlog of the others cannot starve it, then all the rest as they come. The caps themselves are
+    """The articles in the order they are attempted: each capped outlet's share first (what its cap has left, or its part
+    of half of what the day has left), so a backlog of the others cannot starve it, then all the rest as they come. The budget is
     applied by the caller."""
     room = {oid: min(cap, limit // 2 // len(caps)) for oid, cap in caps.items()}
     first, rest = [], []
@@ -138,26 +141,48 @@ def _turns(articles: list, limit: int, caps: dict[str, int]) -> list:
     return first + rest
 
 
+class _Budget:
+    """The articles the stages may still read today (UTC): max_articles_per_day in all, and an outlet's max_per_day of
+    its own, shared by filter and link and by every run of the day. An article counts once a day (PressStore.take).
+    `hold`: how many filter leaves for the articles kept on earlier days that link has to fetch again: as many as there
+    are, at most half of the day (or of the outlet's cap)."""
+
+    def __init__(self, store, pages: Pages, pcfg: dict, hold: bool = False):
+        self.store, limit = store, pcfg["max_articles_per_day"]
+        self.caps = {o["id"]: o["max_per_day"] for o in pcfg.get("outlets", ()) if "max_per_day" in o}
+        waiting: dict[str, int] = {}
+        for art in store.articles("filtered") if hold else ():
+            if art.outcome == "keep" and art.outlet not in pages.client.refused and not store.was_read_today(art.url):
+                waiting[art.outlet] = waiting.get(art.outlet, 0) + 1
+        self.caps_open = {oid: cap - min(waiting.get(oid, 0), cap // 2) for oid, cap in self.caps.items()}
+        held = sum(min(n, self.caps[oid] // 2) if oid in self.caps else n for oid, n in waiting.items())
+        self.open = limit - min(held, limit // 2)
+
+    def left(self) -> int:
+        return max(0, self.open - self.store.read_today())
+
+    def left_of(self, outlet: str) -> int:
+        return max(0, self.caps_open[outlet] - self.store.read_today(outlet))
+
+    def take(self, art) -> bool:
+        return self.store.take(art.url, art.outlet, self.open, self.caps_open.get(art.outlet))
+
+
 def run_filter(store, pages: Pages, judge, pcfg: dict) -> dict[str, int]:
     """Jev's culture question on each found article's title and opening, then, for those it keeps, the faith or
-    values angle (below angle_drop: dropped, reason "angle", counted apart). At most max_articles_per_run articles are
-    attempted (fetched or judged, failures included; a refused outlet's articles are not asked, so not counted):
-    the never-attempted first, then the oldest attempt, so failures cannot starve the new articles. An outlet's
-    `max_per_run` bounds its own attempts, within the same total."""
+    values angle (below angle_drop: dropped, reason "angle", counted apart). Only the articles the day's
+    budget admits (_Budget) are attempted (fetched or judged, failures included; a refused outlet's articles are not
+    asked, so not counted): the never-attempted first, then the oldest attempt, so failures cannot starve the new
+    articles."""
     counts: dict[str, int] = {}
-    attempted = 0
     outlets = {o["id"]: o for o in pcfg.get("outlets", ())}
-    caps = {oid: o["max_per_run"] for oid, o in outlets.items() if "max_per_run" in o}
-    tried: dict[str, int] = {}
-    for art in _turns(store.articles("found", tried_last=True), pcfg["max_articles_per_run"], caps):
-        if attempted >= pcfg["max_articles_per_run"]:
-            break
+    budget = _Budget(store, pages, pcfg, hold=True)
+    caps = {oid: budget.left_of(oid) for oid in budget.caps}
+    for art in _turns(store.articles("found", tried_last=True), budget.left(), caps):
         if art.outlet in pages.client.refused:
             continue  # refused for the run (or its robots.txt refused us): nothing asked, tried again next run
-        if art.outlet in caps and tried.get(art.outlet, 0) >= caps[art.outlet]:
+        if not budget.take(art):
             continue
-        tried[art.outlet] = tried.get(art.outlet, 0) + 1
-        attempted += 1
         store.attempted(art.url)
         page, skip = pages.get(art)
         if page is None:
@@ -189,12 +214,21 @@ def run_filter(store, pages: Pages, judge, pcfg: dict) -> dict[str, int]:
 
 
 def run_link(store, pages: Pages, judge, wikidata, sparql, pcfg: dict) -> dict[str, int]:
-    """Link the mentions of every kept article; keyed by the stored article URL."""
+    """Link the mentions of every kept article; keyed by the stored article URL. An article kept by an earlier run is
+    fetched again within the day's budget (_Budget), the oldest attempt first."""
     counts: dict[str, int] = {"articles": 0, "mentions": 0}
     routes: dict = {}  # class_route by set of P31 classes, for the whole run
-    for art in store.articles("filtered"):
+    budget = _Budget(store, pages, pcfg)
+    for art in store.articles("filtered", tried_last=True):
         if art.outcome != "keep":
             continue
+        if not pages.holds(art):
+            if art.outlet in pages.client.refused:
+                continue
+            if not budget.take(art):
+                counts["left for another day"] = counts.get("left for another day", 0) + 1
+                continue
+            store.attempted(art.url)
         page, skip = pages.get(art)
         if page is None:
             if skip:

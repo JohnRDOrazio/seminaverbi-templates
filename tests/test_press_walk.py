@@ -6,11 +6,13 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 
 from pipeline.press import outlets as mod
+from pipeline.press import store as press_store
 from pipeline.press.fetch import Refused
 from pipeline.press.outlets import discover
 from pipeline.press.store import PressStore
 
 T0 = datetime(2026, 1, 1, tzinfo=timezone.utc)
+days = []  # one per run: each run is on a day of its own
 
 
 class Resp:
@@ -58,6 +60,8 @@ class Blog:
 @pytest.fixture(autouse=True)
 def small_pages(monkeypatch):
     monkeypatch.setattr(mod, "WALK_PAGE", 4)
+    days.clear()
+    monkeypatch.setattr(press_store, "utc_now", lambda: T0 + timedelta(days=len(days)))
 
 
 def store():
@@ -74,6 +78,7 @@ def found(s):
 
 
 def run(s, blog, limit=100, **kw):
+    days.append(1)
     blog.calls.clear()
     return discover(s, blog, [outlet(**kw)], limit)["b"]
 
@@ -212,5 +217,5 @@ def test_a_page_that_is_no_feed_or_has_an_undated_entry_is_reported(capsys):
 
 def test_the_outlets_cap_bounds_what_a_run_discovers():
     s, blog = store(), Blog({n: n for n in range(30)})
-    assert run(s, blog, max_per_run=7) == 7
-    assert run(s, blog, max_per_run=7) == 7
+    assert run(s, blog, max_per_day=7) == 7
+    assert run(s, blog, max_per_day=7) == 7

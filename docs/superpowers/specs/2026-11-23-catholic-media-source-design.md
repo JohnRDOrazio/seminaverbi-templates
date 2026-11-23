@@ -89,7 +89,7 @@ editors' list of press articles on the works SeminaVerbi already has.
   (the polite HTTP client), `extract.py` (article text, title, date, language; mention spans), `link.py`
   (Wikidata matching and domain routing), `stages.py` (the press stages below).
 - `config/press.json`: the outlets (id, name, base URL, languages, discovery entries, culture filter, `since`),
-  `user_agent`, `delay_seconds`, `max_articles_per_run`, the Jev cut-offs below.
+  `user_agent`, `delay_seconds`, `max_articles_per_day`, the Jev cut-offs below.
 - `deploy/systemd/sv-pipeline-press.{service,timer}`.
 - `python -m pipeline press discover|filter|link|route|enrich|run` (one sub-stage each, plus `run`).
 
@@ -158,7 +158,7 @@ Article text is fetched when a stage needs it and kept in memory for that run on
 
 `sv-pipeline-press.timer`, daily at 04:30 (off the votes timer's three-hour marks), runs `press run` through
 `runeditor.py` (the enrichment page is a wiki write) with `TYPESAFE_API_KEY` from the service's environment file.
-Each run reads at most `max_articles_per_run` new articles (250) across outlets, round-robin, so the first
+At most `max_articles_per_day` (250) new articles a UTC day across outlets, round-robin, whatever the runs, so the first
 backfill spreads over days. Domain stages 1–6 still run as now, by hand (`run --publish`).
 
 ## Calls made for the builder (the author may overturn any)
@@ -169,7 +169,7 @@ backfill spreads over days. Domain stages 1–6 still run as now, by hand (`run 
 - Cut-offs to start: `culture_drop` 0.40, disambiguation 0.80/0.60, `mention_keep` 0.60. A calibration run on the
   existing articles' press coverage tests them before anything is posted.
 - 25-word quotations, at most three per mention.
-- Timer daily at 04:30, 250 articles per run (200 until the author raised it, 2026-11-23), 10 s between requests per outlet.
+- Timer daily at 04:30, 250 articles per day (200 per run until the author raised it, 2026-11-23), 10 s between requests per outlet.
 - The enrichment page on en only, like the ranking page (the pipeline writes only en's project namespace).
 - A press source counts as a seed for triage.
 - An outlet that refuses us (403, robots) is skipped and reported, never worked around.
@@ -231,6 +231,18 @@ site should be removed and no longer consulted".
   lists both without asking anything.
 - **Dry runs:** `run --dry-run` keeps refusals in the store it is given (a copy). `discover --dry-run` honours the real
   store's state and writes none, so a refusal it meets does not stop a real run later that day.
+
+## The day's limits and robots.txt (author, 2026-11-23)
+
+- **Limits are the UTC day's**, shared by every run: `max_articles_per_day` and each outlet's `max_per_day`, for the
+  articles added (`found_at`) and, apart, for the articles read. An article is counted the first time that day that filter
+  or link sets out to fetch it (`press_reads`, emptied of earlier days), failures included; never twice a day. Link's
+  fetches of articles kept on earlier days count too, and filter leaves them room, at most half. Counted in one SQL
+  statement, so runs at the same time share the budget.
+- **robots.txt** is read as RFC 9309 says (`robots.py`): `*` and `$`, the longest match, Allow on a tie, our group (the
+  groups of one name combined; `SeminaVerbi` counts as ours when `SeminaVerbi-press` is not named) else `*`, escapes
+  normalised, 500 KiB, unreadable lines ignored, Crawl-delay kept. urllib.robotparser knew no wildcards and took the first
+  matching rule.
 
 ## Precision (2026-11-23 dry run)
 
@@ -347,7 +359,7 @@ and Romanzo. Checked with our user agent on 2026-11-23, on 53 posts (2008–2025
   read from its own feed entry (`?path=`). Its content is paragraphs in any block element or none; blocks and double
   line breaks end a paragraph. HTML of any outlet served without a charset (L'Osservatore Romano's) is now read as
   UTF-8 when it is UTF-8: it was read as Latin-1, with garbled accents.
-- **Cap.** `max_per_run` 40, on articles added and attempted. The outlet's share of a run (at most half) is attempted
+- **Cap.** `max_per_day` 40, on articles added and read in a UTC day. The outlet's share of a run (at most half of what the day has left) is attempted
   first; its failures count toward the cap and go behind its untried articles.
 - **Attribution.** 47 of the 53 posts state the newspaper's issue, in a paragraph of its own (2022 on) or after © or
   "Copyright" (before), with the date as "8 novembre 2025", "21-22 ottobre 2019" (the first day is taken),

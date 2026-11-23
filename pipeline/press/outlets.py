@@ -313,15 +313,15 @@ def _candidates(client, outlet: dict, store=None):
 
 
 def discover(store, client, outlets: list[dict], limit: int) -> dict[str, int]:
-    """New articles per outlet, taken round-robin across outlets until `limit` in all, and at most `max_per_run` of
-    an outlet that has one."""
+    """New articles per outlet, taken round-robin across outlets until `limit` in all today (UTC, earlier runs
+    included), and at most `max_per_day` of an outlet that has one."""
     counts = {o["id"]: 0 for o in outlets}
     streams = {o["id"]: (o, _candidates(client, o, store)) for o in outlets}
-    total = 0
+    total, before = store.found_today(), {oid: store.found_today(oid) for oid in counts}
     while streams and total < limit:
         for oid in list(streams):
             outlet, stream = streams[oid]
-            if counts[oid] >= outlet.get("max_per_run", limit):
+            if before[oid] + counts[oid] >= outlet.get("max_per_day", limit):
                 del streams[oid]
                 continue
             for url, date, lang in stream:
