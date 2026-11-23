@@ -29,6 +29,13 @@ class FakeSession:
             raise response
         return response
 
+    def post(self, url, **kwargs):
+        self.calls.append((url, {"method": "POST", **kwargs}))
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
+
 
 @pytest.fixture(autouse=True)
 def no_sleep(monkeypatch):
@@ -47,6 +54,29 @@ def test_select_flattens_bindings():
     assert kw["params"]["format"] == "json" and kw["params"]["query"] == "SELECT * WHERE {}"
     assert kw["headers"]["Accept"] == "application/sparql-results+json"
     assert kw["timeout"] == 60
+
+
+def test_a_long_query_goes_by_post_with_the_query_in_the_body():
+    long_query = "SELECT * WHERE { " + "wd:Q1 " * 1500 + "}"
+    s = FakeSession(bindings({"n": {"value": "1"}}))
+    assert Sparql(s).select(long_query) == [{"n": "1"}]
+    url, kw = s.calls[0]
+    assert kw["method"] == "POST" and kw["data"] == {"query": long_query, "format": "json"}
+    assert "params" not in kw and kw["timeout"] == 60
+    assert kw["headers"]["Accept"] == "application/sparql-results+json" and "User-Agent" in kw["headers"]
+
+
+def test_a_short_query_still_gets():
+    s = FakeSession(bindings())
+    Sparql(s).select("x" * 6000)
+    assert "method" not in s.calls[0][1] and "params" in s.calls[0][1]
+
+
+def test_a_long_post_is_retried():
+    long_query = "x" * 6001
+    s = FakeSession(Resp(status=503), bindings({"n": {"value": "1"}}))
+    assert Sparql(s).select(long_query) == [{"n": "1"}]
+    assert [c[1].get("method") for c in s.calls] == ["POST", "POST"]
 
 
 def test_select_retries_on_429_then_succeeds():

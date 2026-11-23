@@ -13,6 +13,7 @@ from sync.wikidata import _OwnHeaders
 
 SPARQL_ENDPOINT = "https://query.wikidata.org/sparql"
 SPARQL_RETRIES = 3
+POST_ABOVE = 6000  # characters: a longer query goes by POST
 RETRY_STATUSES = (429, 502, 503, 504)  # rate limit, and the gateway errors of a busy endpoint
 _ENTITY = "http://www.wikidata.org/entity/"
 _TAG = re.compile(r"<[^>]+>")
@@ -29,8 +30,12 @@ class Sparql:
         retries = 0
         while True:
             try:
-                r = self.session.get(SPARQL_ENDPOINT, params={"query": query, "format": "json"},
-                                     headers=headers, timeout=60)
+                if len(query) > POST_ABOVE:  # a long query overruns the front end's URL limit (HTTP 414)
+                    r = self.session.post(SPARQL_ENDPOINT, data={"query": query, "format": "json"},
+                                          headers=headers, timeout=60)
+                else:
+                    r = self.session.get(SPARQL_ENDPOINT, params={"query": query, "format": "json"},
+                                         headers=headers, timeout=60)
             except requests.exceptions.ReadTimeout:
                 # the endpoint stalls now and then on a query it answers in a second on the next try
                 if retries >= SPARQL_RETRIES:
