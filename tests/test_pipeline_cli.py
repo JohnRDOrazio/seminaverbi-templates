@@ -496,6 +496,7 @@ def test_release_turns_one_benchmark_row_into_a_candidate(bench, capsys):
     assert row.calibration is False and not row.data[0].get("benchmark")
     assert row.data[0]["count"] == 30 and "Q2" in [r.qid for r in Queue(path).open_rows("art")]
     assert Queue(path).row("Q1").calibration is True
+    assert "Q2" in [r.qid for r in Queue(path).pending(1, "art")]  # it runs stages 1-5 as a live candidate
 
 
 def test_release_refuses_a_non_benchmark_qid(bench, capsys):

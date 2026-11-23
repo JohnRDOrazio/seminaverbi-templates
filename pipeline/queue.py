@@ -183,7 +183,8 @@ class Queue:
             return False
         data = {k: v for k, v in row.data[0].items() if k not in ("benchmark", "benchmark_kind")}
         self.db.execute("UPDATE candidates SET calibration=0 WHERE qid=?", (qid,))
-        self.set_outcome(qid, 0, "pass", data)
+        self.redo(1, qid)  # the calibration run's forced passes go: the row runs stages 1-5 as a live candidate
+        self.set_outcome(qid, 0, "pass", {**data, "released": True})  # kept by later adds: calibrate skips it
         return True
 
     def calibration_rows(self) -> list[Row]:

@@ -130,7 +130,9 @@ def candidates(queue, sparql, wikipedia, cfg: dict, wikidata=None) -> int:
         rows = _gather(sparql, pattern, label)
         added += common.fold_parts(queue, sparql, rows, source, "art", WORK_CLASSES, STOP_CLASSES)
     listed = _listed(sparql, [w["qid"] for w in art["works"]])
-    return added + common.fold_parts(queue, sparql, listed, "list", "art", WORK_CLASSES, STOP_CLASSES)
+    added += common.fold_parts(queue, sparql, listed, "list", "art", WORK_CLASSES, STOP_CLASSES)
+    _hold_benchmark(queue, art.get("benchmark", []))
+    return added
 
 
 # ---- stage 4: the dossier ----
@@ -258,6 +260,23 @@ def dossier_stage(row, cfg: dict, wiki_for, wikidata) -> tuple[str, dict]:
 
 # ---- calibration and the benchmark ----
 
+def _released(queue, qid: str) -> bool:
+    row = queue.row(qid)
+    return bool(row and row.data.get(0, {}).get("released"))
+
+
+def _hold_benchmark(queue, benchmark: list[dict]) -> None:
+    """A benchmark work some other source found is held back too (a benchmark calibration row, as add_calibration
+    makes it), so it is never proposed before `release-benchmark`, whatever the order of the commands."""
+    for work in benchmark:
+        row = queue.row(work["qid"])
+        if row and row.status is None and not row.data.get(0, {}).get("released") and not (
+                row.calibration and row.data.get(0, {}).get("benchmark")):
+            queue.add(row.qid, row.domain, row.sources[0], row.labels, row.sitelinks, True,
+                      {"benchmark": True, "benchmark_kind": work["kind"]})
+            queue.redo(1, row.qid)
+
+
 def add_calibration(queue, sparql, qids: list[str], benchmark: list[dict] | None = None) -> int:
     """Add the art works SeminaVerbi already covers, flagged as calibration, and every benchmark work with
     stage-0 data {"benchmark": True, "benchmark_kind": kind} (held back until `release-benchmark`); returns the
@@ -265,9 +284,10 @@ def add_calibration(queue, sparql, qids: list[str], benchmark: list[dict] | None
     need not be of a work class (a chapel's frescos, a cycle)."""
     benchmark = load_config()["art"]["benchmark"] if benchmark is None else benchmark
     kinds = {b["qid"]: b["kind"] for b in benchmark}
+    kinds = {qid: kind for qid, kind in kinds.items() if not _released(queue, qid)}
     found: set[str] = set()
     added = 0
-    ordinary = [q for q in qids if q not in kinds]
+    ordinary = [q for q in qids if q not in kinds and not _released(queue, q)]
     for i in range(0, len(ordinary), common.CHUNK):
         values = f"  VALUES ?item {{ {common.values(ordinary[i:i + common.CHUNK])} }}\n"
         for cls in WORK_CLASSES:

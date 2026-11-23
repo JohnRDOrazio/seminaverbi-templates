@@ -257,3 +257,48 @@ def test_the_configured_benchmark_is_a_hand_picked_list():
     assert len({b["qid"] for b in bench}) == len(bench)
     assert {b["kind"] for b in bench} == {"strong", "implicit", "control"}
     assert all(b["qid"].startswith("Q") and b["name"] for b in bench)
+
+
+# --- a release survives later runs ---
+
+BENCH = [{"qid": "Q2", "name": "Rublev Trinity", "kind": "strong"}]
+
+
+def released_queue(q):
+    art.add_calibration(q, FakeSparql({"VALUES ?item { wd:Q2 }": [item("Q2", "B", 50)]}), [], benchmark=BENCH)
+    for stage in (1, 2):
+        q.set_outcome("Q2", stage, "pass", {})
+    assert q.release_calibration("Q2")
+
+
+def test_calibrate_after_a_release_keeps_the_row_released_and_live(q):
+    released_queue(q)
+    assert art.add_calibration(q, FakeSparql({"VALUES ?item { wd:Q2 }": [item("Q2", "B", 50)]}), [], benchmark=BENCH) == 0
+    row = q.row("Q2")
+    assert row.calibration is False and not row.data[0].get("benchmark") and row.data[0]["released"]
+    assert "Q2" in [r.qid for r in q.pending(1)]
+
+
+def test_a_release_clears_the_calibration_outcomes_so_the_row_runs_as_a_candidate(q, monkeypatch):
+    from pipeline import stages
+    released_queue(q)
+    row = q.row("Q2")
+    assert set(row.outcomes) == {0}
+    monkeypatch.setattr(stages, "_local_item", lambda r, repo: "item")
+    monkeypatch.setattr(stages, "_title_matches", lambda r, lang, wiki, item: (lang == "en", []))
+    outcome, _ = stages.covered(row, type("R", (), {"item_sitelinks": lambda s, i: (None, {"it": 1})})(), {l: None for l in common.LANGS})
+    assert outcome == "translation"  # a calibration row would pass
+
+
+def test_candidates_hold_back_an_unreleased_benchmark_work(q):
+    cfg = load_config()
+    cfg["art"]["benchmark"] = [{"qid": "Q1", "name": "x", "kind": "strong"}, {"qid": "Q2", "name": "y", "kind": "control"}]
+    sparql = FakeSparql({"wdt:P180": [item("Q1", "A", 30, "Q3305213"), item("Q2", "B", 30, "Q3305213"),
+                                      item("Q3", "C", 30, "Q3305213")]})
+    q.add("Q2", "art", "calibration", {}, {}, data={"released": True})  # already released: left alone
+    art.candidates(q, sparql, None, cfg)
+    one = q.row("Q1")
+    assert one.calibration and one.data[0]["benchmark"] and one.data[0]["benchmark_kind"] == "strong"
+    assert q.row("Q3").calibration is False
+    assert "Q1" not in [r.qid for r in q.open_rows("art")]
+    assert q.row("Q2").calibration is False and "benchmark" not in q.row("Q2").data[0]
