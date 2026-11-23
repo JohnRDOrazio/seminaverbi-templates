@@ -292,3 +292,47 @@ def test_press_bot_page_text():
     text = (ROOT / "docs/press-bot-page.wiki").read_text()
     assert "Catholic Digital Commons Foundation" in text and "SeminaVerbi-press" in text
     assert "25 words" in text and "200" in text and "@" not in text
+
+
+def test_a_jev_error_on_one_article_still_filters_the_others(press, capsys):
+    from typesafe_sdk import TypeSafeError
+    db, fakes = press
+    judge = fakes["judge"]
+    real = judge.culture
+
+    def culture(url, text):
+        if url == A1:
+            raise TypeSafeError("service down")
+        return real(url, text)
+
+    judge.culture = culture
+    assert cli.main(["press", "discover", "--db", str(db)]) == 0
+    assert cli.main(["press", "filter", "--db", str(db)]) == 0
+    captured = capsys.readouterr()
+    store = PressStore.of(Queue(db))
+    assert store.article(A1).stage == "found"          # retried next run
+    assert store.article(A2).outcome == "keep" and store.article(A3).outcome == "drop"
+    assert f"press: sir {A1}: service down" in captured.err
+    assert "errors 1" in captured.out
+
+
+def test_a_wikidata_error_on_one_article_still_links_the_other_and_routes(press, monkeypatch, capsys):
+    import requests
+    db, fakes = press
+    search = FakeWikidata.search
+
+    def flaky(self, text, lang):
+        if text == "Ordet":
+            raise requests.Timeout("wikidata timed out")
+        return search(self, text, lang)
+
+    monkeypatch.setattr(FakeWikidata, "search", flaky)
+    assert cli.main(["press", "run", "--db", str(db)]) == 0
+    captured = capsys.readouterr()
+    store = PressStore.of(Queue(db))
+    assert store.article(A1).stage == "filtered"       # left for the next run
+    assert store.article(A2).stage == "linked"
+    assert [(m.qid, m.route) for m in store.mentions()] == [("Q2", "candidate")]
+    assert f"press: sir {A1}: wikidata timed out" in captured.err
+    assert "errors 1" in captured.out
+    assert "press route: candidate 1" in captured.out and "press enrich:" in captured.out

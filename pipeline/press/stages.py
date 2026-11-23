@@ -11,6 +11,7 @@ from __future__ import annotations
 import sys
 
 import requests
+from typesafe_sdk import TypeSafeError
 
 from pipeline import domains
 from pipeline import stages as pipeline_stages
@@ -21,6 +22,13 @@ from pipeline.press.outlets import discover
 from pipeline.press.route import WAITING, _provisional
 
 GONE = (404, 410)
+ARTICLE_ERRORS = (requests.RequestException, OSError, TypeSafeError)  # one article's failure; the run goes on
+
+
+def _error(art, e, counts: dict) -> None:
+    """Report an article whose Jev or Wikidata call failed; it stays at its stage for the next run."""
+    print(f"press: {art.outlet} {art.url}: {e}", file=sys.stderr)
+    counts["errors"] = counts.get("errors", 0) + 1
 SV_LANGS = pipeline_stages.LANGS
 
 
@@ -77,7 +85,11 @@ def run_filter(store, pages: Pages, judge, pcfg: dict) -> dict[str, int]:
                 counts["skip"] = counts.get("skip", 0) + 1
             continue
         _set_meta(store, art.url, page)
-        p = judge.culture(art.url, opening(page))
+        try:
+            p = judge.culture(art.url, opening(page))
+        except ARTICLE_ERRORS as e:
+            _error(art, e, counts)
+            continue
         judged += 1
         outcome = "drop" if p < pcfg["culture_drop"] else "keep"
         store.set_article(art.url, "filtered", outcome, {"culture": p})
@@ -87,7 +99,7 @@ def run_filter(store, pages: Pages, judge, pcfg: dict) -> dict[str, int]:
 
 def run_link(store, pages: Pages, judge, wikidata, sparql, pcfg: dict) -> dict[str, int]:
     """Link the mentions of every kept article; keyed by the stored article URL."""
-    counts = {"articles": 0, "mentions": 0}
+    counts: dict[str, int] = {"articles": 0, "mentions": 0}
     for art in store.articles("filtered"):
         if art.outcome != "keep":
             continue
@@ -96,7 +108,11 @@ def run_link(store, pages: Pages, judge, wikidata, sparql, pcfg: dict) -> dict[s
             if skip:
                 store.set_article(art.url, "linked", "skip", art.data | {"reason": skip})
             continue
-        kept = link_article(page, art.outlet, store, judge, wikidata, sparql, pcfg, url=art.url)
+        try:
+            kept = link_article(page, art.outlet, store, judge, wikidata, sparql, pcfg, url=art.url)
+        except ARTICLE_ERRORS as e:
+            _error(art, e, counts)
+            continue
         store.set_article(art.url, "linked", "keep", art.data | {"mentions": len(kept)})
         counts["articles"] += 1
         counts["mentions"] += len(kept)
