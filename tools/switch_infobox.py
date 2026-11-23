@@ -64,7 +64,7 @@ import requests
 
 from sync.categories import load, nodes
 from sync.pages import LANGS
-from sync.wiki import SyncError, WikiClient
+from sync.wiki import SyncError, WikiClient, repo_client
 from sync.wikidata import WikidataClient
 from tools.connect_items import SUBKINDS, _template_name, claim_ids, passes
 from tools.file_items import guarded_save, layout_for
@@ -1448,7 +1448,7 @@ def main(argv=None, repo=None, clients=None, wikidata=None, out=print) -> int:
     try:
         if clients is None:
             clients = {lang: WikiClient(lang) for lang in langs}
-            repo = clients.get("en") or WikiClient("en")
+            repo = repo_client(clients, WikiClient)
             if args.apply:
                 for client in {id(c): c for c in [*clients.values(), repo]}.values():
                     client.login(user, password)

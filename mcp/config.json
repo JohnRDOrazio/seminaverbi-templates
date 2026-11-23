@@ -175,6 +175,35 @@
         }
       },
       "bot": true
+    },
+    "data": {
+      "sitename": "Semina Verbi Data",
+      "server": "https://data.seminaverbi.bibleget.io",
+      "articlepath": "/wiki",
+      "scriptpath": "/w",
+      "private": false,
+      "tags": "seminaverbi-mcp",
+      "username": {
+        "exec": {
+          "command": "/usr/bin/python3",
+          "args": [
+            "-I",
+            "-c",
+            "import os\nfor line in open(os.path.expanduser('~/.config/seminaverbi/editor.env'), encoding='utf-8'):\n    k, _, v = line.strip().partition('=')\n    if k == 'SV_EDITOR_USER':\n        print(v.strip().strip('\"').strip(\"'\"), end='')\n"
+          ]
+        }
+      },
+      "password": {
+        "exec": {
+          "command": "/usr/bin/python3",
+          "args": [
+            "-I",
+            "-c",
+            "import os\nfor line in open(os.path.expanduser('~/.config/seminaverbi/editor.env'), encoding='utf-8'):\n    k, _, v = line.strip().partition('=')\n    if k == 'SV_EDITOR_PASSWORD':\n        print(v.strip().strip('\"').strip(\"'\"), end='')\n"
+          ]
+        }
+      },
+      "bot": true
     }
   }
 }

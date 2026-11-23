@@ -9,10 +9,11 @@
  * needed (labels and descriptions in the SeminaVerbi languages, sitelinks to those Wikipedias),
  * and copies main values only, without qualifiers or references.
  *
- *   maintenance/run --wiki en <tools-dir>/EnrichItems.php \
+ *   maintenance/run --wiki <repo-wiki> <tools-dir>/EnrichItems.php \
  *       [--item Q4178]... [--from-articles en,it] [--properties FILE] [--dry-run]
  *       [--import Q123|P21]... [--follow P106,P27]
  *
+ * <repo-wiki> is the wiki that holds the Wikibase repository (config/wikis.json).
  * --import creates a lean local copy of each given Wikidata item or property that is not mapped
  * yet (properties: datatype, labels, descriptions) and then enriches the imported items like
  * --item. --follow also enriches the items the selected items point to through the given Wikidata

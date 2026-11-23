@@ -7,7 +7,9 @@ Claude Code reads and edits the six SeminaVerbi wikis through
 hidden from RecentChanges unless `hidebots=0`).
 How the bot is expected to edit is in `skills/seminaverbi-editor/`.
 
-- `config.json`: the six wikis (keys `en it es fr de pt`). No secrets: the username and password are
+- `config.json`: the six wikis (keys `en it es fr de pt`; default `en`) and `data`, the wiki the Wikibase
+  repository moves to (until then it shows as unreachable, which the server tolerates; the repository is
+  the wiki `config/wikis.json` names). No secrets: the username and password are
   read at startup from `~/.config/seminaverbi/editor.env` (`SV_EDITOR_USER`, `SV_EDITOR_PASSWORD`, mode
   600) by the inline `exec` commands.
 - The server is installed at a pinned version in `~/.local/share/seminaverbi-mcp` and run with an

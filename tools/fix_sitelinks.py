@@ -18,7 +18,7 @@ from typing import NamedTuple
 
 from sync.categories import load, nodes
 from sync.pages import LANGS
-from sync.wiki import SyncError, WikiClient
+from sync.wiki import SyncError, WikiClient, repo_client
 
 ROOT = Path(__file__).resolve().parent.parent
 BOT = "SV editor bot"
@@ -147,7 +147,7 @@ def main(argv=None, repo: WikiClient | None = None, data: dict | None = None) ->
     args = parser.parse_args(argv)
     data = data or load(ROOT)
     titles = tree_titles(data)
-    repo = repo or WikiClient("en")
+    repo = repo or repo_client(factory=WikiClient)
     if args.apply:
         repo.login(os.environ["SV_EDITOR_USER"], os.environ["SV_EDITOR_PASSWORD"])
     failed, clients = 0, {}

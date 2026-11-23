@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 
+from sync import wiki
 from sync.pages import LANGS
 
 WIKIPEDIA = [f"{lang}wiki" for lang in LANGS]
@@ -18,13 +19,13 @@ def parse_import_log(text: str) -> tuple[dict, dict]:
 
 
 def import_command(wds: list, tools_dir: str) -> str:
-    return (f"php maintenance/run.php {tools_dir}/EnrichItems.php --wiki=en "
+    return (f"php maintenance/run.php {tools_dir}/EnrichItems.php --wiki={wiki.REPO_WIKI} "
             + " ".join(f"--import {q}" for q in wds))
 
 
 def enrich_command(items: list, tools_dir: str) -> str:
     """EnrichItems --item: the items get the Wikidata statements they lack (Wikidata is the first source)."""
-    return (f"php maintenance/run.php {tools_dir}/EnrichItems.php --wiki=en "
+    return (f"php maintenance/run.php {tools_dir}/EnrichItems.php --wiki={wiki.REPO_WIKI} "
             + " ".join(f"--item {q}" for q in items))
 
 

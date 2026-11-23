@@ -16,7 +16,7 @@ from typing import NamedTuple
 
 from sync.categories import load, nodes
 from sync.pages import LANGS
-from sync.wiki import SyncError, WikiClient
+from sync.wiki import SyncError, WikiClient, repo_client
 
 ROOT = Path(__file__).resolve().parent.parent
 TAG = "seminaverbi-mcp"
@@ -217,7 +217,7 @@ def main(argv=None, client_factory=WikiClient, data=None, path=None) -> int:
         # read-only on the wiki: no login
         data = data or load(ROOT)
         try:
-            result, missing = record_items(client_factory("en"), data)
+            result, missing = record_items(repo_client(factory=client_factory), data)
         except (SyncError, OSError) as exc:
             print(f"ERROR: {exc}", file=sys.stderr)
             return 1
@@ -241,7 +241,7 @@ def main(argv=None, client_factory=WikiClient, data=None, path=None) -> int:
             report = check(args.wiki, data, client)
             _print_report(args.wiki, data, report)
             return 1 if report.missing or report.redirect or report.wrong_parent else 0
-        repo = client if args.wiki == "en" else client_factory("en")
+        repo = repo_client({args.wiki: client}, client_factory)
         if repo is not client:
             repo.login(user, password)
         result = create(args.wiki, data, client, repo, args.dry_run, args.replace_missing)

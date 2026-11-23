@@ -20,7 +20,7 @@ from typing import NamedTuple
 
 from sync.categories import leaf_themes, load, nodes
 from sync.pages import LANGS
-from sync.wiki import SyncError, WikiClient
+from sync.wiki import SyncError, WikiClient, repo_client
 from tools import jev
 from tools.migrate_categories import _line_regex
 
@@ -391,7 +391,7 @@ def main(argv=None, repo=None, clients=None, classify=None, data=None) -> int:
     try:
         if clients is None:
             clients = {lang: WikiClient(lang) for lang in langs}
-            repo = clients.get("en") or WikiClient("en")
+            repo = repo_client(clients, WikiClient)
             if args.apply:
                 user, password = os.environ["SV_EDITOR_USER"], os.environ["SV_EDITOR_PASSWORD"]
                 for client in {id(c): c for c in [*clients.values(), repo]}.values():
