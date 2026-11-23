@@ -270,24 +270,34 @@ def _hold_benchmark(queue, benchmark: list[dict]) -> None:
     makes it), so it is never proposed before `release-benchmark`, whatever the order of the commands."""
     for work in benchmark:
         row = queue.row(work["qid"])
-        if row and row.status is None and not row.data.get(0, {}).get("released") and not (
+        if row and row.domain == "art" and row.status is None and not row.data.get(0, {}).get("released") and not (
                 row.calibration and row.data.get(0, {}).get("benchmark")):
             queue.add(row.qid, row.domain, row.sources[0], row.labels, row.sitelinks, True,
                       {"benchmark": True, "benchmark_kind": work["kind"]})
             queue.redo(1, row.qid)
 
 
+def _settled(queue, qid: str) -> bool:
+    """True, reported, for a row that already has a status (open, approved, created, declined): calibration
+    leaves its flag and its outcomes alone."""
+    row = queue.row(qid)
+    if row and row.status is not None:
+        print(f"art calibration: {qid} is already {row.status}, left alone")
+        return True
+    return False
+
+
 def add_calibration(queue, sparql, qids: list[str], benchmark: list[dict] | None = None) -> int:
     """Add the art works SeminaVerbi already covers, flagged as calibration, and every benchmark work with
     stage-0 data {"benchmark": True, "benchmark_kind": kind} (held back until `release-benchmark`); returns the
     rows added. A QID that answers to no work class, or is a person, is reported and skipped; a benchmark work
-    need not be of a work class (a chapel's frescos, a cycle)."""
+    need not be of a work class (a chapel's frescos, a cycle). A row that already has a status is left alone."""
     benchmark = load_config()["art"]["benchmark"] if benchmark is None else benchmark
     kinds = {b["qid"]: b["kind"] for b in benchmark}
-    kinds = {qid: kind for qid, kind in kinds.items() if not _released(queue, qid)}
+    kinds = {qid: kind for qid, kind in kinds.items() if not _released(queue, qid) and not _settled(queue, qid)}
     found: set[str] = set()
     added = 0
-    ordinary = [q for q in qids if q not in kinds and not _released(queue, q)]
+    ordinary = [q for q in qids if q not in kinds and not _released(queue, q) and not _settled(queue, q)]
     for i in range(0, len(ordinary), common.CHUNK):
         values = f"  VALUES ?item {{ {common.values(ordinary[i:i + common.CHUNK])} }}\n"
         for cls in WORK_CLASSES:

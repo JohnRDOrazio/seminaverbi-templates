@@ -302,3 +302,26 @@ def test_candidates_hold_back_an_unreleased_benchmark_work(q):
     assert q.row("Q3").calibration is False
     assert "Q1" not in [r.qid for r in q.open_rows("art")]
     assert q.row("Q2").calibration is False and "benchmark" not in q.row("Q2").data[0]
+
+
+# --- calibration and the benchmark leave other rows alone ---
+
+@pytest.mark.parametrize("status", ["open", "approved", "created", "declined"])
+def test_calibration_leaves_a_row_with_a_status_alone(q, status, capsys):
+    for qid in ("Q1", "Q2"):
+        q.add(qid, "art", "depicts", {"en": qid}, {"enwiki": qid}, data={"count": 30})
+        q.set_outcome(qid, 2, "drop", {"reason": "x"})
+        q.set_status(qid, status)
+    sparql = FakeSparql({"VALUES ?item": [item("Q1", "A", 50, "Q3305213"), item("Q2", "B", 50, "Q3305213")]})
+    art.add_calibration(q, sparql, ["Q1"], benchmark=[{"qid": "Q2", "name": "x", "kind": "strong"}])
+    for qid in ("Q1", "Q2"):
+        row = q.row(qid)
+        assert row.calibration is False and row.outcomes[2] == "drop" and not row.data[0].get("benchmark")
+    assert "already " + status in capsys.readouterr().out
+
+
+def test_a_benchmark_qid_held_by_another_domain_is_not_held_back(q):
+    q.add("Q1", "music", "form", {"en": "A"}, {"enwiki": "A"}, data={"count": 30})
+    art._hold_benchmark(q, [{"qid": "Q1", "name": "x", "kind": "strong"}])
+    row = q.row("Q1")
+    assert row.domain == "music" and row.calibration is False and "benchmark" not in row.data[0]
