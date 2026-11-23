@@ -1,3 +1,6 @@
+import json
+from datetime import date, timedelta
+
 import pytest
 
 from pipeline.domains import common, film
@@ -143,3 +146,23 @@ def test_whole_is_a_translation_suggestion_when_a_part_is_covered():
     outcome, data = common.covered_with_parts(
         row_with_parts({"Q10": {"sitelinks": {"itwiki": "Kyrie"}, "count": 5}}), repo, wikis)
     assert outcome == "translation" and data["have"] == ["it"] and data["note"].startswith("covered through")
+
+
+def _write_closure_cache(cache, cls, date_text, subclasses):
+    cache.write_text(json.dumps({cls: {"date": date_text, "subclasses": subclasses}}), encoding="utf-8")
+
+
+def test_cache_entry_with_non_string_subclass_is_refetched(tmp_path):
+    cache = tmp_path / "closure.json"
+    _write_closure_cache(cache, "Q7366", date.today().isoformat(), [[]])
+    sparql = FakeSparql({"wd:Q7366": [{"sub": "Q7366"}]})
+    assert common.class_closure(sparql, ["Q7366"], cache) == {"Q7366"}
+    assert len(sparql.queries) == 1
+
+
+def test_future_dated_cache_entry_is_stale(tmp_path):
+    cache = tmp_path / "closure.json"
+    _write_closure_cache(cache, "Q7366", (date.today() + timedelta(days=5)).isoformat(), ["Q999"])
+    sparql = FakeSparql({"wd:Q7366": [{"sub": "Q7366"}]})
+    assert common.class_closure(sparql, ["Q7366"], cache) == {"Q7366"}
+    assert len(sparql.queries) == 1
