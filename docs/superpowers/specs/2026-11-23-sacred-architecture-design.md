@@ -41,8 +41,9 @@ as its own domain". This is that domain.
   dedication, above `sitelink_floor` (15, like art), ordered by sitelinks, in bounded queries as art's; plus
   `works`, a hand list (the Sagrada Família, Q48435, first). A UNESCO World Heritage designation (P1435) is a
   second source below the floor.
-- **Triage (2).** As art: the floor, the press exemption (≥ 0.60), and the queue's other-domain guard (a
-  building already queued under art stays there).
+- **Triage (2).** As art: the floor, with the press exemption (≥ 0.60), and the queue's other-domain guard (a
+  building already queued under art stays there). The floor is also waived for a candidate from the UNESCO source or
+  from `works`, as literature waives it for sources that name a work directly; it still meets the significance check.
 - **Quick check (3): significance.** Jev's `plausible` wording for architecture:
   > Does the building described in `text` shape how the Christian faith is lived or understood (through its
   > liturgy, as a place of pilgrimage, or through a theology expressed in its forms), or express the beauty of
