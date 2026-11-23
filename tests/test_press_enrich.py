@@ -133,3 +133,22 @@ def test_end_before_begin_and_editor_marker_line(store):
     assert text.endswith("<!-- press:end -->\nkeep this\n")
     assert text.count("<!-- press:begin -->") == 1 and text.count("<!-- press:end -->") == 1
     assert "old" not in text
+
+
+def test_an_encoded_slash_is_not_a_slash(store):
+    add(store, "https://x/review/a%2Fb")
+    add(store, "https://x/review/a/b")
+    old = f"{INTRO_MARK}\n<!-- press:begin -->\n<!-- press:end -->\n{{{{SV press done|https://x/review/a%2fb}}}}\n"
+    block = enrichment(store, OUTLETS, old).split("<!-- press:end -->")[0]
+    assert "https://x/review/a%2Fb" not in block and "https://x/review/a/b " in block
+
+
+@pytest.mark.parametrize("literal", ["<nowiki>{{SV press done|https://x/a}}</nowiki>",
+                                     "<!-- {{SV press done|https://x/a}} -->",
+                                     "<NOWIKI>e.g. {{SV press done|https://x/a}}</NOWIKI>"])
+def test_literal_and_commented_done_calls_do_not_close(store, literal):
+    add(store, "https://x/a")
+    old = f"{INTRO_MARK}\n<!-- press:begin -->\n<!-- press:end -->\n{literal}\n"
+    assert done_urls(old) == set()
+    assert "https://x/a" in enrichment(store, OUTLETS, old).split("<!-- press:end -->")[0]
+    assert done_urls(old + "{{SV press done|https://x/a}}\n") == {"https://x/a"}

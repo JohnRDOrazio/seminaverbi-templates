@@ -146,3 +146,20 @@ def test_passage_anchors_on_the_whole_title_not_a_stray_word():
     assert "dell'Infinito" in passage(" ".join(["w"] * 60 + ["dell'Infinito"] + ["w"] * 60), "Infinito")
     # truly absent: the paragraph's first words
     assert passage(" ".join(["the"] + ["w"] * 60), "The Mission").startswith("the w")
+
+
+def test_an_inline_script_keeps_the_paragraph():
+    page = extract("<html><body><p>Review <script>var x = 1;</script>of <i>Silence</i>.</p></body></html>",
+                   "https://example.test/s", "en")
+    assert page.paragraphs == ["Review of Silence."]
+    assert [(s.text, s.kind) for s in page.spans] == [("Silence", "italic")]
+
+
+def test_a_skipped_block_still_ends_the_paragraph():
+    page = extract("<html><body><p>One<nav>menu</nav>two</p></body></html>", "https://example.test/n", "en")
+    assert page.paragraphs == ["One"]
+
+
+def test_locate_counts_casefold_expansion():
+    from pipeline.press.extract import locate
+    assert locate(["Straße", "dell'Infinito"], "Infinito") == (1, 1)

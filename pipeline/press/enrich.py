@@ -6,7 +6,7 @@ notes) is kept as written, and an entry whose URL is closed there is left out of
 from __future__ import annotations
 
 import re
-from urllib.parse import quote, unquote
+from urllib.parse import quote
 
 from pipeline.press.notes import MAX_PASSAGES
 from pipeline.publish import _write
@@ -19,9 +19,20 @@ END = "<!-- press:end -->"
 _DONE = re.compile(r"\{\{\s*(?:(?i:template)\s*:\s*)?[Ss]V[ _]+press[ _]+done\s*\|\s*(?:1\s*=\s*)?([^|}\s]+)\s*(?:\|[^}]*)?\}\}")
 
 
+_ESCAPE = re.compile(r"%([0-9A-Fa-f]{2})")
+_UNRESERVED = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+_LITERAL = re.compile(r"<!--.*?(?:-->|\Z)|<(nowiki|pre)\b[^>]*?(?<!/)>.*?(?:</\1\s*>|\Z)", re.DOTALL | re.IGNORECASE)
+
+
+def _unescape(m: re.Match) -> str:
+    c = chr(int(m.group(1), 16))
+    return c if c in _UNRESERVED else "%" + m.group(1).upper()
+
+
 def _norm(url: str) -> str:
-    """A URL as compared: percent-escapes decoded, http as https, no trailing slash."""
-    url = unquote(url.strip()).rstrip("/")
+    """A URL as compared: escapes of unreserved characters decoded (others kept, as upper-case hex), http as
+    https, no trailing slash."""
+    url = _ESCAPE.sub(_unescape, url.strip()).rstrip("/")
     return "https://" + url[len("http://"):] if url.startswith("http://") else url
 
 
@@ -38,8 +49,9 @@ def _tail(old_text: str | None) -> str | None:
 
 
 def done_urls(text: str | None) -> set[str]:
-    """The (normalised) URLs closed with `{{SV press done|url}}` in the editors' part of the page text."""
-    return {_norm(u) for u in _DONE.findall(_tail(text) or "")}
+    """The (normalised) URLs closed with `{{SV press done|url}}` in the editors' part of the page text; calls
+    inside comments, `<nowiki>` or `<pre>` are examples, not calls."""
+    return {_norm(u) for u in _DONE.findall(_LITERAL.sub("", _tail(text) or ""))}
 
 
 _ENT = {"[": "&#91;", "]": "&#93;", "{": "&#123;", "}": "&#125;", "|": "&#124;", "<": "&#60;", ">": "&#62;"}

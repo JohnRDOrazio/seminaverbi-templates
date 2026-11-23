@@ -14,6 +14,7 @@ from typing import Literal
 from urllib.parse import unquote, urljoin, urlparse
 
 SKIPPED = {"nav", "footer", "aside", "script", "style", "noscript", "template"}
+SKIPPED_BLOCKS = {"nav", "footer", "aside"}  # end the paragraph; the others are left out of it
 ITALIC = {"em", "i"}
 WIKI_HOST = re.compile(r"^(?:([a-z]{2,3}(?:-[a-z]+)?)\.)(?:m\.)?wikipedia\.org$")
 QUOTED = re.compile(r"«([^»]+)»|“([^”]+)”|\"([^\"]+)\"")
@@ -101,7 +102,8 @@ class _Parser(HTMLParser):
             self.in_jsonld = True
             self.jsonld.append("")
         if tag in SKIPPED:
-            self._flush()
+            if tag in SKIPPED_BLOCKS:
+                self._flush()
             self.skip += 1
             return
         if self.skip:
@@ -273,7 +275,7 @@ def locate(tokens: list[str], needle: str) -> tuple[int, int] | None:
         return None
     ends, pos = [], 0
     for t in tokens:
-        pos += len(t)
+        pos += len(t.casefold())
         ends.append(pos)
         pos += 1
     first = next(i for i, end in enumerate(ends) if end > at)
