@@ -220,14 +220,16 @@ problems. What changed:
 2. **Section pages.** Famiglia Cristiana's sitemap lists its sections (`/cultura-e-spettacoli/musica`, `/libri`,
    `/arte`, `/cinema-serie-tv-streaming`, `/sanremo-2026`), read like articles. Measured on one article and one
    section page of each of the nine outlets: every article's JSON-LD names an article type among its own nodes
-   (`NewsArticle`, `Article`, `BlogPosting`; KTO's programme pages `VideoObject`), no section page's does, while
-   og:type misleads (L'Osservatore Romano's articles say `website`). A page is an article by its JSON-LD, else by
-   og:type, else (no signal, or a block that cannot be read) it counts as one; a page that is not is skipped for
-   good ("not an article"). JSON-LD is read leniently: one Osservatore article has a raw tab inside a string. No
-   outlet needs a rule of its own (KTO's home page claims `Article`, but its feed lists only programme pages).
+   (`NewsArticle`, `Article`, `BlogPosting`; KTO's programme pages `VideoObject`), no section page's does but KTO's
+   home page (never discovered: its feed lists only programme pages), while og:type misleads (L'Osservatore
+   Romano's articles say `website`). The node that describes the page (by `url`, `@id` or `mainEntityOfPage`)
+   decides; articles another node lists do not count. Without JSON-LD og:type decides; a page with no signal, or
+   with a block that cannot be read, counts as an article. A page that is not one is skipped for good ("not an
+   article"). JSON-LD is read leniently: one Osservatore article has a raw carriage return inside a string. No
+   outlet needs a rule of its own.
 3. **A sole hit was taken unasked.** "free climbing" became a 1986 film, "it takes a village" Hillary Clinton's
    book. A sole search hit now goes through the same `pick` (that item or none, at 0.80/0.60); a Wikipedia link
-   still names its item itself.
+   still names its item itself. A rejected pick may be asked again where the title recurs in another window.
 4. **The substantive question** now names the item (label and Wikidata description) and asks whether that work or
    person is one of the subjects the article discusses, rather than listed, named in passing, used as a comparison,
    or meant in another sense by the same name.
@@ -238,7 +240,7 @@ problems. What changed:
 
 | | before | after |
 |---|---|---|
-| articles linked | 60 (5 of them section pages; 5 stopped part-way by a busy search) | 60 (the 5 sections skipped, no errors) |
+| articles linked | 60 (4 of them section pages; 5 more articles stopped part-way by a busy search) | 60 (the 5 sections skipped; one HTTP 503, linked on a second run) |
 | mentions routed | 25 | 31 |
 | earlier mentions kept / dropped | | 15 / 10 |
 
