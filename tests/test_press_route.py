@@ -351,3 +351,46 @@ def test_the_dry_run_decides_under_the_rows_domain(q, store, uncovered):
     assert [k for _, k in would_route(store, None, {}, FakeWikidata({"Q9": ent()}), queue=q)] == ["candidate"]
     assert [row.domain for row in uncovered] == ["literature"]
     assert store.mentions()[0].domain == "film" and q.row("Q9").sources == ["category"]  # writes nothing
+
+
+def _passed(q, status=None):
+    q.add("Q9", "film", "facet", {"en": "Ordet"}, {"enwiki": "Ordet"}, data={"count": 20, "press": {"sir": 0.7}})
+    for stage in (1, 2, 3, 4):
+        q.set_outcome("Q9", stage, "pass")
+    if status:
+        q.set_status("Q9", status)
+
+
+@pytest.mark.parametrize("p,url", [(0.9, URL), (0.8, URL + "2")])  # a higher p, a new outlet
+def test_new_press_evidence_rebuilds_a_passed_dossier(q, store, uncovered, p, url):
+    _passed(q)
+    store.add_mention(mention(p=p, url=url))
+    route(store, q, None, {}, FakeWikidata({"Q9": ent()}))
+    r = q.row("Q9")
+    assert 4 not in r.outcomes and r.outcomes[3] == "pass"
+
+
+@pytest.mark.parametrize("p,status", [(0.5, None), (0.9, "open")])
+def test_a_dossier_stays_without_new_evidence_or_with_a_status(q, store, uncovered, p, status):
+    _passed(q, status)
+    store.add_mention(mention(p=p))
+    route(store, q, None, {}, FakeWikidata({"Q9": ent()}))
+    assert q.row("Q9").outcomes[4] == "pass"
+
+
+def test_an_interrupted_release_leaves_the_mention_waiting(q, store, uncovered, monkeypatch):
+    from pipeline.press import route as route_mod
+    q.add("Q7", "art", "category", {"en": "Canto"}, {"enwiki": "Canto"}, data={"count": 20})
+    store.add_mention(mention("Q7", "waiting:music"))
+    store.set_route(URL, "Q7", "waiting")
+
+    real = route_mod._add_candidate
+    monkeypatch.setattr(route_mod, "_add_candidate", lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("cut")))
+    with pytest.raises(RuntimeError):
+        release_waiting(store, q, "music", None, {}, FakeWikidata({"Q7": ent()}))
+    m = store.mentions()[0]
+    assert (m.domain, m.route) == ("waiting:music", "waiting")
+    monkeypatch.setattr(route_mod, "_add_candidate", real)
+    assert release_waiting(store, q, "music", None, {}, FakeWikidata({"Q7": ent()})) == {"candidate": 1}
+    m = store.mentions()[0]
+    assert (m.domain, m.route) == ("art", "candidate")

@@ -39,7 +39,8 @@ def _add_candidate(queue, mention, outlet: str, entity: dict, domain: str, stage
     """Add the mention's item to the queue under `domain`, or its source and press probability to the row it has.
     `stage0`: the domain's own stage-0 data for a new row (e.g. a literature series' volumes)."""
     existing = queue.row(mention.qid)
-    press = dict(existing.data.get(0, {}).get("press", {})) if existing else {}
+    old = existing.data.get(0, {}).get("press", {}) if existing else {}
+    press = dict(old)
     press[outlet] = max(mention.p, press.get(outlet, 0.0))
     data = {"press": press}
     sitelinks = _sitelinks(entity)
@@ -47,8 +48,12 @@ def _add_candidate(queue, mention, outlet: str, entity: dict, domain: str, stage
         data |= {"count": len(sitelinks), "instance_of": common.qids(entity, "P31")} | (stage0 or {})
     queue.add(mention.qid, domain, f"press:{outlet}", _labels(entity), sitelinks, data=data)
     row = queue.row(mention.qid)
-    if existing and row.status is None and row.outcomes.get(2) == "drop" and common.press_exempt(row):
+    if not existing or row.status is not None:
+        return
+    if row.outcomes.get(2) == "drop" and common.press_exempt(row):
         queue.redo(2, mention.qid)  # dropped (under the sitelink floor) before this evidence: triaged again
+    elif press != old and 4 in row.outcomes:
+        queue.redo(4, mention.qid)  # a dossier built without this evidence: built again with its press notes
 
 
 def owner(queue, qid: str, domain: str) -> str:
@@ -70,10 +75,10 @@ def _route(store, queue, mention, outlet: str, domain: str, entity: dict, repo, 
     if under != domain:
         print(f"press: {mention.qid} in {mention.url}: already a {under} candidate, routed as {under}",
               file=sys.stderr)
-        store.set_mention_domain(mention.url, mention.qid, under)
     if kind == "candidate":
         _add_candidate(queue, mention, outlet, entity, under, stage0)
-    store.set_route(mention.url, mention.qid, kind)
+    # the domain and the route together, once the candidate is in: an interruption leaves the mention as it was
+    store.set_route(mention.url, mention.qid, kind, under if under != domain else None)
     return kind
 
 

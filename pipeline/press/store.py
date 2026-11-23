@@ -121,12 +121,10 @@ class PressStore:
     def unrouted(self) -> list[Mention]:
         return self._mentions(" WHERE route IS NULL", [])
 
-    def set_mention_domain(self, url, qid, domain) -> None:
-        self.db.execute("UPDATE press_mentions SET domain=? WHERE url=? AND qid=?", (domain, url, qid))
-        self.db.commit()
-
-    def set_route(self, url, qid, route) -> None:
-        self.db.execute("UPDATE press_mentions SET route=? WHERE url=? AND qid=?", (route, url, qid))
+    def set_route(self, url, qid, route, domain: str | None = None) -> None:
+        """The mention's route, and its domain when given, in one committed update."""
+        self.db.execute("UPDATE press_mentions SET route=?, domain=COALESCE(?, domain) WHERE url=? AND qid=?",
+                        (route, domain, url, qid))
         self.db.commit()
 
     def feed_cache(self, url) -> tuple[str | None, str | None]:
