@@ -165,5 +165,15 @@
       {"qid": "Q189534", "name": "Arvo Pärt"},
       {"qid": "Q730556", "name": "Marco Frisina"}
     ]
+  },
+  "art": {
+    "sitelink_floor": 15,
+    "depicts": ["Q302", "Q345"],
+    "biblical_classes": ["Q12405827"],
+    "scene_classes": ["Q51628", "Q51636", "Q154326", "Q51633"],
+    "iconclass_prefixes": ["7", "11"],
+    "genres": ["Q2864737", "Q645717"],
+    "works": [],
+    "benchmark": []
   }
 }
