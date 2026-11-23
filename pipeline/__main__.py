@@ -7,6 +7,7 @@ for quick, adjudicate and calibrate. `skip QID --reason TEXT` drops a row that b
 `release-benchmark QID [QID ...]` turns held-back benchmark rows into candidates.
 """
 import argparse
+import inspect
 import os
 import sys
 
@@ -119,7 +120,15 @@ NAMES = {1: "covered", 2: "triage", 3: "quick", 4: "dossier", 5: "adjudicate"}
 
 def cmd_candidates(args, queue, cfg):
     domain = DOMAINS[args.domain]
-    added = domain.candidates(queue, _sparql(), _wikipedia("en"), cfg, _wikidata())
+    extra = {}
+    if getattr(domain, "covered", None) and "covered" in inspect.signature(domain.candidates).parameters:
+        lazy: dict = {}
+
+        def covered(row):  # stage 1 for an open whole that gains parts; the wikis are made when first needed
+            wikis = lazy.setdefault("wikis", _wikis())
+            return domain.covered(row, wikis["en"], wikis)
+        extra["covered"] = covered
+    added = domain.candidates(queue, _sparql(), _wikipedia("en"), cfg, _wikidata(), **extra)
     print(f"candidates: {added} added")
 
 

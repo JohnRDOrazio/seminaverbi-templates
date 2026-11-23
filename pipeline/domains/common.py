@@ -307,10 +307,12 @@ def _insert_row(queue, row: dict, source: str, domain: str) -> int:
     return queue.add(row["item"], domain, source, labels, sitelinks, False, data)
 
 
-def _fold_into_whole(queue, whole_qid: str, whole_row: dict, parts: list[dict], source: str, domain: str) -> int:
+def _fold_into_whole(queue, whole_qid: str, whole_row: dict, parts: list[dict], source: str, domain: str,
+                     recheck=None) -> int:
     """Add or extend the whole's row with `parts` (`query` rows); the part rows already in the queue are marked
     `folded_into` (triage then drops them; an open one is also marked `retired`). A whole already closed gets
-    nothing."""
+    nothing. An open whole that gains parts is re-checked with `recheck(row)` (the domain's stage 1) and, when
+    that finds it covered, marked `retired`; its outcomes are kept either way."""
     if other_domain(queue, whole_qid, domain):
         return 0
     parts = [p for p in parts if not other_domain(queue, p["item"], domain)]  # another domain's part stays there
@@ -345,15 +347,29 @@ def _fold_into_whole(queue, whole_qid: str, whole_row: dict, parts: list[dict], 
     added = queue.add(whole_qid, domain, source, labels, sitelinks, False, data)
     if new_part and old and old.status is None:
         queue.redo(1, whole_qid)  # coverage, triage and the later stages saw the previous parts
+    elif new_part and old and old.status == "open" and recheck is not None and not old.data.get(0, {}).get("retired"):
+        _recheck_open_whole(queue, whole_qid, domain, recheck, old.page)
     return added
 
 
+def _recheck_open_whole(queue, whole_qid: str, domain: str, recheck, page) -> None:
+    """A published whole is covered through a part it just gained: it leaves publication and the ranking (its
+    page is live, with votes: nothing is deleted, and the page is the author's to decline or redirect)."""
+    row = queue.row(whole_qid)
+    outcome, _ = recheck(row)
+    if outcome in ("translation", "drop"):
+        queue.add(whole_qid, domain, row.sources[0], {}, {}, False, {"retired": True})
+        print(f"{domain} candidates: {whole_qid} gained parts and is now covered ({outcome}) but already open: "
+              f"retired; decline or redirect {page} by hand")
+
+
 def fold_parts(queue, sparql, rows: list[dict], source: str, domain: str, whole_classes: Iterable[str],
-               stop_classes: Iterable[str] = ()) -> int:
+               stop_classes: Iterable[str] = (), recheck=None) -> int:
     """Add the `query` rows under `domain`/`source`, each part replaced by its whole (P361) when it has exactly
     one in the closure of `whole_classes` and outside that of `stop_classes`: the whole carries the source and
     a stage-0 `parts` entry for the part. A part with no such whole, or with several (reported), is added as
-    itself. Returns the rows added to the queue."""
+    itself. `recheck` re-checks an open whole that gains parts (see _fold_into_whole). Returns the rows added to
+    the queue."""
     whole_classes, stop_classes = tuple(whole_classes), tuple(stop_classes)
     classes = class_closure(sparql, whole_classes)
     stop = class_closure(sparql, stop_classes) if stop_classes else set()
@@ -370,7 +386,7 @@ def fold_parts(queue, sparql, rows: list[dict], source: str, domain: str, whole_
         else:
             added += _insert_row(queue, row, source, domain)
     for whole_qid, parts in grouped.items():
-        added += _fold_into_whole(queue, whole_qid, details[whole_qid], parts, source, domain)
+        added += _fold_into_whole(queue, whole_qid, details[whole_qid], parts, source, domain, recheck)
     return added
 
 

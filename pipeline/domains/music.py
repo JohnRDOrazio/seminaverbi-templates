@@ -98,7 +98,7 @@ def _gather(sparql, pattern: str, label: str, floor: int) -> list[dict]:
     return list(found.values())
 
 
-def candidates(queue, sparql, wikipedia, cfg: dict, wikidata=None) -> int:
+def candidates(queue, sparql, wikipedia, cfg: dict, wikidata=None, covered=None) -> int:
     """Stage 0: add the form, genre, facet and seed-artist candidates to the queue; returns the rows added.
     Parts fold into their composition (never a song into its album); `wikipedia` and `wikidata` are unused. The
     queries keep only works at the floor of their source (the artist floor for the artists), as triage does."""
@@ -118,7 +118,8 @@ def candidates(queue, sparql, wikipedia, cfg: dict, wikidata=None) -> int:
     added = 0
     for source, label, pattern in patterns:
         rows = _gather(sparql, pattern, label, floors.get(source, music["sitelink_floor"]))
-        added += common.fold_parts(queue, sparql, rows, source, "music", FOLD_WHOLES, FOLD_STOP)
+        added += common.fold_parts(queue, sparql, rows, source, "music", FOLD_WHOLES, FOLD_STOP,
+                                    recheck=covered)
     return added
 
 

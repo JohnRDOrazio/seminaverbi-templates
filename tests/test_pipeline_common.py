@@ -257,3 +257,61 @@ def test_a_closed_part_that_folds_is_left_alone(q, no_closure_cache, status):
     sparql = FakeSparql({"wdt:P361": [{"item": "Q10", "whole": "Q1"}], "VALUES ?item { wd:Q1 }": [whole_row("Q1", 40)]})
     common.fold_parts(q, sparql, [part_row("Q10", 25)], "form", "music", ["Q105543609"])
     assert "retired" not in q.row("Q10").data[0]
+
+
+def open_whole(q):
+    q.add("Q1", "music", "form", {"en": "Mass"}, {"enwiki": "Mass"},
+          data={"count": 40, "parts": {"Q10": {"sitelinks": {"enwiki": "Q10"}, "count": 25}}})
+    for stage in range(1, 6):
+        q.set_outcome("Q1", stage, "pass", {})
+    q.set_status("Q1", "open", page="P/Mass")
+
+
+NEW_PART = {"wdt:P361": [{"item": "Q11", "whole": "Q1"}], "VALUES ?item { wd:Q1 }": [whole_row("Q1", 40)]}
+
+
+def test_an_open_whole_that_gains_a_covered_part_is_retired_and_reported(q, no_closure_cache, capsys):
+    open_whole(q)
+    seen = []
+    recheck = lambda row: (seen.append(set(row.data[0]["parts"])), ("translation", {"have": ["en"]}))[1]
+    common.fold_parts(q, FakeSparql(NEW_PART), [part_row("Q11", 25)], "form", "music", ["Q105543609"],
+                      recheck=recheck)
+    row = q.row("Q1")
+    assert seen == [{"Q10", "Q11"}]  # re-checked after the new part is recorded
+    assert row.data[0]["retired"] is True and row.status == "open"
+    assert row.outcomes == {s: "pass" for s in range(6)}  # nothing deleted: its page is live
+    out = capsys.readouterr().out
+    assert "Q1 gained parts and is now covered" in out and "P/Mass" in out and "by hand" in out
+
+
+def test_an_open_whole_that_gains_an_uncovered_part_stays_open_and_unchanged(q, no_closure_cache, capsys):
+    open_whole(q)
+    seen = []
+    common.fold_parts(q, FakeSparql(NEW_PART), [part_row("Q11", 25)], "form", "music", ["Q105543609"],
+                      recheck=lambda row: (seen.append(row.qid), ("pass", {}))[1])
+    row = q.row("Q1")
+    assert seen == ["Q1"] and "retired" not in row.data[0] and row.status == "open"
+    assert row.outcomes == {s: "pass" for s in range(6)}
+    assert "covered" not in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("status", [None, "approved", "created", "declined"])
+def test_only_an_open_whole_is_rechecked(q, no_closure_cache, status):
+    open_whole(q)
+    if status is None:
+        q.db.execute("UPDATE candidates SET status=NULL WHERE qid='Q1'"); q.db.commit()
+    else:
+        q.set_status("Q1", status)
+    seen = []
+    common.fold_parts(q, FakeSparql(NEW_PART), [part_row("Q11", 25)], "form", "music", ["Q105543609"],
+                      recheck=lambda row: (seen.append(row.qid), ("drop", {}))[1])
+    assert seen == [] and "retired" not in q.row("Q1").data[0]
+
+
+def test_an_open_whole_with_no_new_part_is_not_rechecked(q, no_closure_cache):
+    open_whole(q)
+    sparql = FakeSparql({"wdt:P361": [{"item": "Q10", "whole": "Q1"}], "VALUES ?item { wd:Q1 }": [whole_row("Q1", 40)]})
+    seen = []
+    common.fold_parts(q, sparql, [part_row("Q10", 25)], "form", "music", ["Q105543609"],
+                      recheck=lambda row: (seen.append(row.qid), ("drop", {}))[1])
+    assert seen == []

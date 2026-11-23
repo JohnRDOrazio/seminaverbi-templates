@@ -108,7 +108,7 @@ def _listed(sparql, qids: list[str]) -> list[dict]:
     return found
 
 
-def candidates(queue, sparql, wikipedia, cfg: dict, wikidata=None) -> int:
+def candidates(queue, sparql, wikipedia, cfg: dict, wikidata=None, covered=None) -> int:
     """Stage 0: add the depicts, Iconclass, genre and curated-list candidates to the queue; returns the rows
     added. Panels and scenes fold into their altarpiece or cycle (never into a building); `wikipedia` and
     `wikidata` are unused. The queries keep only works at the sitelink floor, which triage applies anyway: on
@@ -131,9 +131,11 @@ def candidates(queue, sparql, wikipedia, cfg: dict, wikidata=None) -> int:
     try:
         for source, label, pattern in patterns:
             rows = _gather(sparql, pattern, label, floor)
-            added += common.fold_parts(queue, sparql, rows, source, "art", WORK_CLASSES, STOP_CLASSES)
+            added += common.fold_parts(queue, sparql, rows, source, "art", WORK_CLASSES, STOP_CLASSES,
+                                        recheck=covered)
         listed = _listed(sparql, [w["qid"] for w in art["works"]])
-        added += common.fold_parts(queue, sparql, listed, "list", "art", WORK_CLASSES, STOP_CLASSES)
+        added += common.fold_parts(queue, sparql, listed, "list", "art", WORK_CLASSES, STOP_CLASSES,
+                                    recheck=covered)
     finally:  # a failed source keeps the rows already written: the benchmark works among them are held all the same
         _hold_benchmark(queue, art.get("benchmark", []))
     return added

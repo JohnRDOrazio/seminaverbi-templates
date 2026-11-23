@@ -626,3 +626,36 @@ def test_triage_reads_the_real_config_for_the_domain(domain, source, passing, dr
     assert Queue(path).row("Q1").outcomes[2] == "pass"
     assert Queue(path).row("Q2").outcomes[2] == "drop"
     assert f"under the floor of {floor}" in str(Queue(path).row("Q2").data.get(2))
+
+
+@pytest.mark.parametrize("domain", ["music", "art"])
+def test_candidates_give_music_and_art_the_coverage_recheck(domain, monkeypatch, tmp_path):
+    from pipeline.domains import DOMAINS
+    module, seen = DOMAINS[domain], {}
+    wikis = {lang: object() for lang in cli.LANGS}
+
+    def candidates(queue, sparql, wikipedia, cfg, wikidata=None, covered=None):
+        seen["outcome"] = covered("row")
+        return 0
+
+    monkeypatch.setattr(module, "candidates", candidates)
+    monkeypatch.setattr(module, "covered", lambda row, repo, ws: (seen.update(repo=repo, wikis=ws), ("drop", {}))[1])
+    monkeypatch.setattr(cli, "_sparql", lambda: None)
+    monkeypatch.setattr(cli, "_wikidata", lambda: None)
+    monkeypatch.setattr(cli, "_wikipedia", lambda lang, project="wikipedia": None)
+    monkeypatch.setattr(cli, "_wikis", lambda: wikis)
+    assert cli.main(["candidates", "--domain", domain, "--db", str(tmp_path / "q.sqlite")]) == 0
+    assert seen == {"outcome": ("drop", {}), "repo": wikis["en"], "wikis": wikis}
+
+
+@pytest.mark.parametrize("domain", ["music", "art"])
+def test_music_and_art_candidates_pass_the_recheck_to_the_fold(domain, monkeypatch, tmp_path):
+    from pipeline import load_config
+    from pipeline.domains import DOMAINS, common
+    module, seen = DOMAINS[domain], []
+    monkeypatch.setattr(common, "CLOSURE_CACHE", tmp_path / "closure.json")
+    monkeypatch.setattr(common, "fold_parts", lambda *a, recheck=None, **k: seen.append(recheck) or 0)
+    from test_pipeline_film import FakeSparql
+    marker = object()
+    module.candidates(Queue(tmp_path / "q.db"), FakeSparql(), None, load_config(), covered=marker)
+    assert seen and all(r is marker for r in seen)
