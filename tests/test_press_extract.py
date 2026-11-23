@@ -163,3 +163,55 @@ def test_a_skipped_block_still_ends_the_paragraph():
 def test_locate_counts_casefold_expansion():
     from pipeline.press.extract import locate
     assert locate(["Straße", "dell'Infinito"], "Infinito") == (1, 1)
+
+
+def _head(og_type=None, *ld):
+    """A page with the measured head signals: og:type and the JSON-LD blocks (synthetic text)."""
+    meta = f'<meta property="og:type" content="{og_type}">' if og_type else ""
+    scripts = "".join(f'<script type="application/ld+json">{block}</script>' for block in ld)
+    return f"<html><head>{meta}{scripts}</head><body><article><p>Testo.</p></article></body></html>"
+
+
+# the head signals of one article and one section page per outlet, as measured on 2026-11-23
+ARTICLES = {
+    "aleteia": _head("article", '{"@context": "https://schema.org", "@graph": [{"@type": "WebPage"}, '
+                                '{"@type": "NewsArticle"}, {"@type": "Organization"}]}'),
+    "avvenire": _head("article", '{"@type": "NewsArticle", "author": {"@type": "Person"}}',
+                      '{"@type": "BreadcrumbList"}'),
+    "famigliacristiana": _head("article", '{"@type": "NewsArticle"}', '{"@type": "BreadcrumbList"}'),
+    "kto": _head("video.other", '{"@type": "Organization"}', '{"@type": "VideoObject"}'),
+    "ncregister": _head("article", '[{"@type": "NewsMediaOrganization"}, {"@type": "WebSite"}]',
+                        '{"@type": "NewsArticle"}'),
+    "osservatore": _head("website", '{"@type": "WebSite"}', '{"@type": "NewsArticle"}'),
+    "romasette": _head("article", '{"@graph": [{"@type": ["Article", "BlogPosting"]}, {"@type": "WebPage"}]}'),
+    "sir": _head("article", '{"@graph": [{"@type": "BlogPosting"}, {"@type": "WebSite"}]}'),
+    "vaticannews": _head("article", '{"@type": "http://schema.org/NewsArticle"}'),
+}
+SECTIONS = {
+    "aleteia": _head("website", '{"@type": "WebSite"}', '{"@type": "Organization"}'),
+    "avvenire": _head(None, '{"@type": "BreadcrumbList"}'),
+    "famigliacristiana": _head("section", '{"@type": "BreadcrumbList"}'),
+    "ncregister": _head("website", '[{"@type": "NewsMediaOrganization"}, {"@type": "WebSite"}]'),
+    "osservatore": _head("website", '{"@type": "WebSite"}'),
+    "romasette": _head("website", '{"@graph": [{"@type": "WebPage"}, {"@type": "WebSite"}]}'),
+    "sir": _head(None, '{"@graph": [{"@type": "CollectionPage", "hasPart": [{"@type": "NewsArticle"}]}]}'),
+    "vaticannews": _head("website"),
+}
+
+
+def test_an_article_page_is_an_article():
+    for outlet, html in ARTICLES.items():
+        assert extract(html, "https://e.test/a", "it").article, outlet
+
+
+def test_a_section_or_index_page_is_not_an_article():
+    """Famiglia Cristiana's sitemap listed its sections (/cultura-e-spettacoli/musica, ...), which were filtered
+    and linked like articles. A page whose JSON-LD names no article type at its top level (an article listed
+    inside a collection does not count), or, without JSON-LD, whose og:type is not an article's, is not one."""
+    for outlet, html in SECTIONS.items():
+        assert not extract(html, "https://e.test/s", "it").article, outlet
+
+
+def test_a_page_without_any_signal_counts_as_an_article():
+    assert extract("<html><body><p>Testo.</p></body></html>", "https://e.test/a", "it").article
+    assert extract(_head(None, "{not json"), "https://e.test/a", "it").article

@@ -18,6 +18,10 @@ SKIPPED_BLOCKS = {"nav", "footer", "aside"}  # end the paragraph; the others are
 ITALIC = {"em", "i"}
 WIKI_HOST = re.compile(r"^(?:([a-z]{2,3}(?:-[a-z]+)?)\.)(?:m\.)?wikipedia\.org$")
 QUOTED = re.compile(r"«([^»]+)»|“([^”]+)”|\"([^\"]+)\"")
+# schema.org types of a page that is one article (Article and its subtypes) or one programme (KTO's video pages)
+ARTICLE_TYPES = {"Article", "NewsArticle", "AnalysisNewsArticle", "BackgroundNewsArticle", "OpinionNewsArticle",
+                 "ReportageNewsArticle", "ReviewNewsArticle", "BlogPosting", "LiveBlogPosting", "Report",
+                 "ScholarlyArticle", "TechArticle", "SatiricalArticle", "VideoObject"}
 
 
 @dataclass
@@ -36,6 +40,7 @@ class Page:
     canonical: str
     paragraphs: list[str] = field(default_factory=list)
     spans: list[Span] = field(default_factory=list)
+    article: bool = True  # False for a section or index page (see is_article)
 
 
 def _clean(text: str) -> str:
@@ -198,6 +203,41 @@ def _jsonld_date(blobs: list[str]) -> str | None:
     return None
 
 
+def _ld_types(blobs: list[str]) -> list[str]:
+    """The schema.org types of the page's own JSON-LD nodes: each block's top-level objects and the members of
+    their @graph (not nested values: a collection page lists articles in its parts), without the schema.org
+    prefix."""
+    found: list[str] = []
+    for blob in blobs:
+        try:
+            data = json.loads(blob)
+        except (ValueError, RecursionError):
+            continue
+        nodes = data if isinstance(data, list) else [data]
+        for node in [n for n in nodes if isinstance(n, dict)]:
+            graph = node.get("@graph")
+            for n in [node] + [g for g in (graph if isinstance(graph, list) else []) if isinstance(g, dict)]:
+                kinds = n.get("@type")
+                for kind in kinds if isinstance(kinds, list) else [kinds]:
+                    if isinstance(kind, str) and kind.strip():
+                        found.append(kind.strip().rsplit("/", 1)[-1])
+    return found
+
+
+def is_article(ld_types: list[str], og_type: str) -> bool:
+    """Whether the page is one article rather than a section or index page. Its JSON-LD decides when it has any
+    (an article type among its own nodes), else its og:type when it has one ("article", "video.*"); a page with
+    neither signal counts as an article. Measured on one article and one section page of each outlet
+    (2026-11-23): every article names an article type (L'Osservatore Romano's says og:type "website"), no
+    section does."""
+    if ld_types:
+        return not ARTICLE_TYPES.isdisjoint(ld_types)
+    og_type = og_type.strip().lower()
+    if og_type:
+        return og_type == "article" or og_type.startswith("video.")
+    return True
+
+
 def _canonical(href: str, url: str) -> str:
     href = href.strip()
     if href:
@@ -249,7 +289,8 @@ def extract(html: str, url: str, default_lang: str) -> Page:
                  or _jsonld_date(parser.jsonld))
     lang = parser.html_lang.strip()[:2].lower() if parser.html_lang.strip() else ""
     return Page(title, published or None, lang if lang.isalpha() and len(lang) == 2 else default_lang,
-                _canonical(parser.canonical_href, url), paragraphs, spans)
+                _canonical(parser.canonical_href, url), paragraphs, spans,
+                is_article(_ld_types(parser.jsonld), parser.meta.get("og:type", "")))
 
 
 def _norm(token: str) -> str:
