@@ -70,3 +70,45 @@ def triage(row, cfg: dict) -> tuple[str, str]:
     if count < floor:
         return "drop", f"{count} sitelinks, under the floor of {floor}"
     return "pass", ""
+
+
+def _skippable(row: dict) -> bool:
+    """A person, or a group that is no work (a row of a work class is kept whatever else it is)."""
+    classes = set(row.get("types", "").split())
+    return PERSON in classes or (not classes & set(WORK_CLASSES) and bool(classes & GROUPS))
+
+
+def _gather(sparql, pattern: str, label: str) -> list[dict]:
+    """The rows of `pattern` bounded to each work class (its subclasses a VALUES list from the closure), one
+    row per item; people and groups are reported and left out."""
+    found: dict[str, dict] = {}
+    for cls in WORK_CLASSES:
+        query = common.bounded(pattern, cls, common.class_closure(sparql, [cls]))
+        for row in common.run_query(sparql, "music", f"{label} ({cls})", query):
+            if _skippable(row):
+                print(f"music candidates: {row['item']} is a person or group, skipped")
+            else:
+                found.setdefault(row["item"], row)
+    return list(found.values())
+
+
+def candidates(queue, sparql, wikipedia, cfg: dict, wikidata=None) -> int:
+    """Stage 0: add the form, genre, facet and seed-artist candidates to the queue; returns the rows added.
+    Parts fold into their composition (never a song into its album); `wikipedia` and `wikidata` are unused."""
+    music = cfg["music"]
+    patterns: list[tuple[str, str, str]] = []
+    forms = common.values(sorted(common.class_closure(sparql, music["forms"])))
+    patterns.append(("form", "forms", f"  VALUES ?f {{ {forms} }}\n  ?item wdt:P7937|wdt:P136|wdt:P31 ?f ."))
+    patterns.append(("genre", "genres",
+                     f"  VALUES ?genre {{ {common.values(music['genres'])} }}\n  ?item wdt:P136 ?genre ."))
+    patterns += [("facet", f"facet {d}", p) for d, p in common.facet_patterns(music) if d != "genres"]
+    artists = [a["qid"] for a in music["artists"]]
+    for i in range(0, len(artists), common.CHUNK):
+        chunk = common.values(artists[i:i + common.CHUNK])
+        patterns.append(("artist", f"artists {i // common.CHUNK + 1}",
+                         f"  VALUES ?a {{ {chunk} }}\n  ?item wdt:P175|wdt:P86|wdt:P676 ?a ."))
+    added = 0
+    for source, label, pattern in patterns:
+        rows = _gather(sparql, pattern, label)
+        added += common.fold_parts(queue, sparql, rows, source, "music", FOLD_WHOLES, FOLD_STOP)
+    return added

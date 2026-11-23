@@ -43,11 +43,14 @@ def query(pattern: str, key: str = "") -> str:
             f"GROUP BY {key}?item\nLIMIT {LIMIT}")
 
 
-def bounded(pattern: str, cls: str) -> str:
+def bounded(pattern: str, cls: str, subclasses: Iterable[str] | None = None) -> str:
     """The query of `pattern` on items of class `cls`, at most LIMIT items: the most linked ones (sitelink
-    count), so a truncated result drops the least notable."""
+    count), so a truncated result drops the least notable. `subclasses` (a class closure) replaces the
+    `P31/P279*` path by a VALUES list of classes, which the endpoint answers faster."""
+    kind = (f"  VALUES ?cls {{ {values(sorted(set(subclasses) | {cls}))} }}\n  ?item wdt:P31 ?cls .\n"
+            if subclasses is not None else f"  ?item wdt:P31/wdt:P279* wd:{cls} .\n")
     return query(f"  {{ SELECT DISTINCT ?item ?sitelinks WHERE {{\n{_ORDERED}{pattern}\n"
-                  f"  ?item wdt:P31/wdt:P279* wd:{cls} .\n  ?item wikibase:sitelinks ?sitelinks .\n"
+                  f"{kind}  ?item wikibase:sitelinks ?sitelinks .\n"
                   f"  }} ORDER BY DESC(?sitelinks) LIMIT {LIMIT} }}")
 
 

@@ -166,3 +166,10 @@ def test_future_dated_cache_entry_is_stale(tmp_path):
     sparql = FakeSparql({"wd:Q7366": [{"sub": "Q7366"}]})
     assert common.class_closure(sparql, ["Q7366"], cache) == {"Q7366"}
     assert len(sparql.queries) == 1
+
+
+def test_bounded_with_a_closure_lists_the_classes_instead_of_a_path():
+    plain = common.bounded("  ?item wdt:P1 ?x .", "Q1")
+    listed = common.bounded("  ?item wdt:P1 ?x .", "Q1", ["Q2", "Q3"])
+    assert "wdt:P31/wdt:P279* wd:Q1" in plain
+    assert "P279*" not in listed and "VALUES ?cls { wd:Q1 wd:Q2 wd:Q3 }" in listed and "LIMIT 500" in listed
