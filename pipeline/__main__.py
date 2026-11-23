@@ -107,8 +107,26 @@ def _stage_functions(domain, queue, cfg) -> dict:
 
     def dossier(row):
         outcome, data = domain.dossier_stage(row, cfg, wiki_for, lazy.setdefault("wikidata", _wikidata()))
-        outlets = {o["id"]: o["name"] for o in load_press_config()["outlets"]}
-        data["notes"] = press_notes(PressStore.of(queue), row.qid, outlets) + data.get("notes", [])
+        store = PressStore.of(queue)
+        if not store.mentions(qid=row.qid):
+            return outcome, data
+        if "outlets" not in lazy:
+            try:
+                lazy["outlets"] = {o["id"]: o["name"] for o in load_press_config()["outlets"]}
+            except (OSError, ValueError, KeyError):
+                lazy["outlets"] = {}
+        notes = press_notes(store, row.qid, lazy["outlets"])
+        if not notes:
+            return outcome, data
+        if outcome == "drop" and data.get("reason") == "empty dossier":  # press-only work: the press is its dossier
+            data = {k: v for k, v in data.items() if k != "reason"}
+            outcome = "pass"
+            data["languages"] = {}
+            for n in notes:
+                data["languages"][n["lang"]] = data["languages"].get(n["lang"], 0) + 1
+        elif outcome == "drop":
+            return outcome, data
+        data["notes"] = notes + data.get("notes", [])
         return outcome, data
 
     return {

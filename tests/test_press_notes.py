@@ -62,3 +62,51 @@ def test_unknown_outlet_falls_back_to_its_id_and_missing_date(store):
 
 def test_no_mentions_no_notes(store):
     assert press_notes(store, "Q9", OUTLETS) == []
+
+
+def test_a_mention_with_five_passages_yields_three(store):
+    mention(store, "http://a/1", "Q1", ["a", "b", "c", "d", "e"])
+    (n,) = press_notes(store, "Q1", OUTLETS)
+    assert n["text"] == "a … b … c"
+
+
+def _run(queue, outcome, data, monkeypatch, qid="Q1"):
+    class Dom:
+        __name__ = "pipeline.domains.film"
+
+        @staticmethod
+        def dossier_stage(row, cfg, wiki_for, wikidata):
+            return outcome, dict(data)
+
+    monkeypatch.setattr(cli, "_wikidata", lambda: None)
+    queue.add(qid, "film", "s", {"en": "F"}, {})
+    row = queue._rows("qid=?", (qid,))[0]
+    return cli._stage_functions(Dom, queue, {})[4](row)
+
+
+@pytest.mark.parametrize("outcome,data", [
+    ("pass", {"notes": [], "languages": {}}),
+    ("pass", {"languages": {}}),
+    ("drop", {"reason": "empty dossier"}),
+])
+def test_no_mentions_leaves_the_domain_output_untouched(queue, monkeypatch, outcome, data):
+    assert _run(queue, outcome, data, monkeypatch) == (outcome, data)
+
+
+def test_press_only_row_with_empty_wiki_dossier_passes(store, queue, monkeypatch):
+    mention(store, "http://a/1", "Q1", ["x y"])
+    outcome, data = _run(queue, "drop", {"reason": "empty dossier"}, monkeypatch)
+    assert outcome == "pass" and "reason" not in data
+    assert [n["url"] for n in data["notes"]] == ["http://a/1"] and data["languages"] == {"it": 1}
+
+
+def test_other_drop_reason_stays_dropped(store, queue, monkeypatch):
+    mention(store, "http://a/1", "Q1", ["x y"])
+    assert _run(queue, "drop", {"reason": "other"}, monkeypatch) == ("drop", {"reason": "other"})
+
+
+def test_missing_press_config_does_not_break_rows_without_mentions(queue, monkeypatch):
+    def boom():
+        raise OSError("no config")
+    monkeypatch.setattr(cli, "load_press_config", boom)
+    assert _run(queue, "pass", {"notes": [], "languages": {}}, monkeypatch)[0] == "pass"
