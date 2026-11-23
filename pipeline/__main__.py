@@ -27,7 +27,7 @@ from pipeline.press.fetch import load_press_config
 from pipeline.press import stages as press_stages
 from pipeline.press.enrich import ENRICH_TITLE, enrichment, publish_enrichment
 from pipeline.press.notes import press_notes
-from pipeline.press.route import release_waiting, route
+from pipeline.press.route import reconcile, release_waiting, route
 from pipeline.press import report
 from pipeline.press import store as press_store
 from pipeline.press.store import PressStore
@@ -341,6 +341,8 @@ def cmd_press(args, queue, cfg):
         print("press filter: " + _counts(press_stages.run_filter(store, pages, judge, pcfg)))
     if action in ("link", "run"):
         print("press link: " + _counts(press_stages.run_link(store, pages, judge, wikidata(), _sparql(), pcfg)))
+    if action in ("filter", "link") and not dry:  # route does it too
+        reconcile(store, queue)
     if action in ("route", "run"):
         if dry:
             print("\n".join(press_stages.preview(store, wikis()["en"], wikis(), wikidata(), _sparql(), queue)))

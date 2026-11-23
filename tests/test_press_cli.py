@@ -363,3 +363,13 @@ def test_the_vallini_blog_config():
     assert o["max_per_day"] == 40 < cfg["max_articles_per_day"]
     assert o["republishes"] in by_id and o["name"] == f"{o['author']}, Camera con vista"
     assert "{path}" in o["article_feed"] and o["article_feed"].startswith(o["base"])
+
+
+@pytest.mark.parametrize("action", ["filter", "link", "route"])
+@pytest.mark.parametrize("dry", [False, True])
+def test_the_queues_press_evidence_is_corrected_after_each_stage_but_not_in_a_dry_run(press, action, dry):
+    db, _ = press
+    q = Queue(db)
+    q.add("Q7", "film", "press:sir", {}, {}, data={"count": 3, "press": {"sir": 0.9}})  # no mention supports it
+    assert cli.main(["press", action, "--db", str(db)] + ["--dry-run"] * dry) == 0
+    assert Queue(db).row("Q7").data[0]["press"] == ({"sir": 0.9} if dry else {})

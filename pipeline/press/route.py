@@ -10,6 +10,7 @@ under that row's domain, and its evidence goes to that row.
 from __future__ import annotations
 
 import sys
+from dataclasses import replace
 
 import requests
 
@@ -48,42 +49,66 @@ def _provisional(mention, entity: dict) -> Row:
     return Row(mention.qid, mention.domain, [], _labels(entity), _sitelinks(entity), False)
 
 
-def _moved(store, qid: str) -> dict[str, str]:
-    """{outlet: the outlet its evidence for the item now counts for}: the outlets whose every candidate mention of it
-    proved, after it was routed, to be an article of another."""
-    under: dict[str, set[str]] = {}
-    for m in store.mentions(qid=qid, route="candidate"):
+def _evidence(store, qid: str, routing=None) -> dict[str, float]:
+    """{outlet: the highest probability of the item's supporting mentions that count for it now}; supporting: routed as
+    candidates (or `routing`, the one being routed) and not judged neutral or critical."""
+    press: dict[str, float] = {}
+    for m in store.mentions(qid=qid):
         art = store.article(m.url)
-        if art is not None:
-            under.setdefault(art.outlet, set()).add(art.evidence_outlet)
-    own = {o for found in under.values() for o in found}
-    return {o: min(found) for o, found in under.items() if o not in own}
+        if art is None or not m.supports or (m.route != "candidate" and (routing is None or m.url != routing.url)):
+            continue
+        press[art.evidence_outlet] = max(m.p, press.get(art.evidence_outlet, 0.0))
+    return press
+
+
+def _sources(old: list[str], press: dict[str, float]) -> list[str]:
+    """The row's sources, the press ones as `press` has them; the old ones stay on a row that would have none left (what
+    found it; a row with no source is not held to the sitelink floor)."""
+    now = [f"press:{o}" for o in press]
+    kept = [s for s in old if not s.startswith("press:") or s in now]
+    return kept + [s for s in now if s not in kept] or old
+
+
+def _reconcile(store, queue, qid: str, routing=None) -> None:
+    """Make the row's press evidence what its supporting mentions say (see _evidence). Its evidence is corrected whatever
+    its status; its outcomes only when it has none: it is triaged again when it gained or lost the exemption from the
+    sitelink floor (never a benchmark row), and else its dossier is built again."""
+    row = queue.row(qid)
+    if row is None:
+        return
+    stage0 = row.data.get(0, {})
+    old, press = stage0.get("press") or {}, _evidence(store, qid, routing)
+    sources = _sources(row.sources, press)
+    if press == old and sources == row.sources and routing is None:
+        return
+    redo = None
+    if row.status is None and (press != old or routing is not None):
+        was, triage = common.press_exempt(row), row.outcomes.get(2)
+        now = common.press_exempt(replace(row, data={**row.data, 0: {**stage0, "press": press}}))
+        if triage == "drop" and now and (routing is not None or not was):
+            redo = 2  # dropped (under the sitelink floor) before this evidence
+        elif triage == "pass" and was and not now and not row.calibration:
+            redo = 2  # it may have passed by the exemption alone
+        elif 4 in row.outcomes:  # the notes are not those the dossier was built with
+            redo = 4
+    queue.set_press(qid, press, sources, redo)
+
+
+def reconcile(store, queue) -> None:
+    """Every row's press evidence, after articles were read: a copy found changes the outlet an earlier article counts for,
+    and no mention need be routed for it."""
+    for qid in dict.fromkeys([*queue.press_qids(), *(m.qid for m in store.mentions(route="candidate"))]):
+        _reconcile(store, queue, qid)
 
 
 def _add_candidate(store, queue, mention, outlet: str, entity: dict, domain: str, stage0: dict | None = None) -> None:
     """Add the mention's item to the queue under `domain`, or its source and press probability to the row it has.
     `stage0`: the domain's own stage-0 data for a new row (e.g. a literature series' volumes)."""
-    existing = queue.row(mention.qid)
-    press = dict(existing.data.get(0, {}).get("press", {})) if existing else {}
-    press[outlet] = max(mention.p, press.get(outlet, 0.0))
-    moved = {old: new for old, new in _moved(store, mention.qid).items() if old in press and old != outlet}
-    for old, new in moved.items():
-        press[new] = max(press.pop(old), press.get(new, 0.0))
-    data = {"press": press}
-    sitelinks = _sitelinks(entity)
-    if existing is None:  # what triage reads of a row the domain's own queries did not make
-        data |= {"count": len(sitelinks), "instance_of": common.qids(entity, "P31")} | (stage0 or {})
-    for source in dict.fromkeys((outlet, *moved.values())):
-        queue.add(mention.qid, domain, f"press:{source}", _labels(entity), sitelinks, data=data)
-    for old in moved:
-        queue.drop_source(mention.qid, f"press:{old}")
-    row = queue.row(mention.qid)
-    if not existing or row.status is not None:
-        return
-    if row.outcomes.get(2) == "drop" and common.press_exempt(row):
-        queue.redo(2, mention.qid)  # dropped (under the sitelink floor) before this evidence: triaged again
-    elif 4 in row.outcomes:  # a mention is routed once: its passages are new to the stored dossier
-        queue.redo(4, mention.qid)
+    sitelinks, data = _sitelinks(entity), None
+    if queue.row(mention.qid) is None:  # what triage reads of a row the domain's own queries did not make
+        data = {"count": len(sitelinks), "instance_of": common.qids(entity, "P31")} | (stage0 or {})
+    queue.add(mention.qid, domain, f"press:{outlet}", _labels(entity), sitelinks, data=data)
+    _reconcile(store, queue, mention.qid, routing=mention)
 
 
 def owner(queue, qid: str, domain: str) -> str:
@@ -160,6 +185,7 @@ def route(store, queue, repo, wikis, wikidata, sparql=None) -> dict[str, int]:
             kind = "errors"
         if kind is not None:
             counts[kind] = counts.get(kind, 0) + 1
+    reconcile(store, queue)
     return counts
 
 
@@ -176,3 +202,4 @@ def release_waiting(store, queue, domain: str, repo, wikis, wikidata, sparql=Non
         if kind is not None:
             counts[kind] = counts.get(kind, 0) + 1
     return counts
+

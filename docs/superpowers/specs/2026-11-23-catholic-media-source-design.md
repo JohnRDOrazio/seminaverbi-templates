@@ -402,9 +402,17 @@ and Romanzo. Checked with our user agent on 2026-11-23, on 53 posts (2008–2025
 - **What follows from a duplicate.** The second copy, either way round, is not judged: skipped, "duplicate". The
   evidence counts for the newspaper in the queue (also for a post that states its issue but whose original was not
   found), the dossier has one note and the enrichment page one entry, with both links; closing either URL closes it.
+  A row's per-outlet press evidence (and its `press:` sources) is always recomputed from its supporting mentions (routed as
+  candidates, not neutral or critical) under the outlet each counts for now, when a mention is routed and after filter,
+  link and route (never in a dry run). On a pending row a change rebuilds the dossier, and triage again when it gained or
+  lost the exemption from the sitelink floor; with no support left the exemption is gone, and the last `press:` source
+  stays only on a row with no other, as what found it. On a row with a status only the evidence is corrected: its outcomes,
+  dossier, proposal and status stay. Benchmark rows are not triaged again. `press outlets` does not read this map: it
+  credits the outlet where the article was read.
 - **Known limits.** Missed: originals for subscribers only (no text, so no fingerprint), partly shown or heavily edited
   ones, posts that gather several of the paper's articles (one is cited under Vallini whole), articles filtered before
-  fingerprints existed. A false merge needs half the text in common: an article reprinted with an update. A copy found
-  after a proposal's dossier was built adds its link when the dossier is next rebuilt. The author is not checked: a post
+  fingerprints existed. A false merge needs half the text in common: an article reprinted with an update. A copy that
+  changes no evidence (its post already counted for the newspaper) adds its link when the dossier is next rebuilt, and one
+  found once a row has a status never changes that row's proposal. The author is not checked: a post
   with another's article is attributed to Vallini.
 - **Kept, beyond the list above:** the fingerprint (hashes only; no text can be read from them).

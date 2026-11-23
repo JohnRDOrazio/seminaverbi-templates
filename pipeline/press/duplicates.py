@@ -88,8 +88,9 @@ def record(store, art, page, outlets: dict[str, dict]) -> str | None:
             prints = (mine, theirs) if first else (theirs, mine)
             if same_article(post, prints[0], paper, prints[1]):
                 store.set_same(post.url, paper.url, paper.outlet)
-                if found.outcome in ("keep", "drop"):
-                    judged = judged or url
+                for copy in (found, *store.copies(url)):  # the one judged may be another copy of the same article
+                    if copy.url != art.url and copy.outcome in ("keep", "drop"):
+                        judged = judged or copy.url
                 if first:  # a post is one article of the newspaper
                     return judged
     return judged

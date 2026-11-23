@@ -9,7 +9,8 @@ from pipeline import stages as pipeline_stages
 from pipeline.press.duplicates import fingerprint, overlap, same_article
 from pipeline.press.enrich import enrichment
 from pipeline.press.notes import press_notes
-from pipeline.press.route import route
+from pipeline.domains import common, film
+from pipeline.press.route import reconcile, route
 from pipeline.press.stages import Pages, run_filter
 from pipeline.press.store import Article, Mention, PressStore
 from pipeline.publish import _params
@@ -262,3 +263,162 @@ def test_a_copy_that_does_not_support_gives_no_note(store, outcome):
     store.add_mention(Mention(BLOG, "Q9", "Ordet", "work", "film", 0.8, ["x"], "dropped",
                               stance_outcome=outcome))
     assert press_notes(store, "Q9", NAMES) == []
+
+
+BLOG2 = "https://x.example/2025/01/di-nuovo.html"
+
+
+def second_post(store, judge):
+    store.add_article(BLOG2, "vallini", "it", published="2025-01-02")
+    routes = {ROBOTS: Resp(""), FEED.replace("{path}", "/2025/01/di-nuovo.html"): Resp(feed(
+        entry(f"<div>{' '.join(REVIEW)}</div>", url=BLOG2)))}
+    return run_filter(store, Pages(client(routes), OUTLETS), judge, CFG)
+
+
+@pytest.mark.parametrize("order", [(BLOG, PAPER), (PAPER, BLOG)])
+def test_a_third_copy_is_not_judged_whichever_copy_was(store, order):
+    judge = Counting()
+    pair(store, order, judge)
+    assert second_post(store, judge) == {"skip (duplicate)": 1}
+    assert judge.asked == [order[0]] and store.article(BLOG2).data["of"] == order[0]
+    assert store.article(BLOG2).same_as == PAPER
+
+
+def test_a_copy_of_unjudged_copies_is_judged(store):
+    pair(store, (PAPER,), Counting())
+    store.set_article(PAPER, "filtered", "skip", {"reason": "HTTP 404"})
+    judge = Counting()
+    assert second_post(store, judge) == {"keep": 1} and judge.asked == [BLOG2]
+
+
+# ---- the queue's press map is what its supporting mentions say, under their present evidence outlet ----
+
+OWN, OTHER = "https://x.example/own", "https://x.example/other"
+
+
+def routed(store, q, url, p, outlet=None):
+    if outlet:
+        store.add_article(url, outlet, "it")
+        store.set_article(url, "linked", "keep", {})
+    mention(store, url, p, kind=None)
+    route(store, q, None, {}, FakeWikidata({"Q9": ent()}))
+
+
+def press(q):
+    row = q.row("Q9")
+    assert {s for s in row.sources if s.startswith("press:")} == {f"press:{o}" for o in row.data[0]["press"]}
+    return row.data[0]["press"]
+
+
+def test_a_copy_found_moves_the_evidence_with_no_further_candidate(store, q, uncovered):
+    pair(store, (BLOG,), Counting())
+    routed(store, q, BLOG, 0.9)
+    routed(store, q, OTHER, 0.7, "osservatore")
+    assert press(q) == {"vallini": 0.9, "osservatore": 0.7}
+    pair(store, (PAPER,), Counting())
+    assert route(store, q, None, {}, FakeWikidata({})) == {}
+    assert press(q) == {"osservatore": 0.9}
+
+
+def test_reattributed_and_own_evidence_keep_their_own_probabilities(store, q, uncovered):
+    pair(store, (BLOG,), Counting())
+    routed(store, q, BLOG, 0.9)
+    pair(store, (PAPER,), Counting())
+    routed(store, q, OWN, 0.6, "vallini")
+    assert press(q) == {"vallini": 0.6, "osservatore": 0.9}
+    routed(store, q, OTHER, 0.7, "osservatore")
+    assert press(q) == {"vallini": 0.6, "osservatore": 0.9}
+
+
+def test_a_changed_map_rebuilds_a_pending_dossier_and_an_unchanged_one_does_not(store, q, uncovered):
+    pair(store, (BLOG,), Counting())
+    routed(store, q, BLOG, 0.9)
+    for stage in (1, 2, 3, 4, 5):
+        q.set_outcome("Q9", stage, "pass")
+    reconcile(store, q)
+    assert sorted(q.row("Q9").outcomes) == [0, 1, 2, 3, 4, 5]
+    pair(store, (PAPER,), Counting())
+    reconcile(store, q)
+    assert sorted(q.row("Q9").outcomes) == [0, 1, 2, 3]  # still exempt: not triaged again
+
+
+@pytest.mark.parametrize("status", ["open", "approved", "created", "declined"])
+def test_a_row_with_a_status_has_its_evidence_corrected_and_its_outcomes_left(store, q, uncovered, status):
+    pair(store, (BLOG,), Counting())
+    routed(store, q, BLOG, 0.9)
+    for stage in (1, 2, 3, 4, 5):
+        q.set_outcome("Q9", stage, "pass", {"n": stage})
+    q.set_status("Q9", status, page="P")
+    pair(store, (PAPER,), Counting())
+    reconcile(store, q)
+    row = q.row("Q9")
+    assert press(q) == {"osservatore": 0.9} and (row.status, row.page) == (status, "P")
+    assert {s: row.data[s] for s in (1, 2, 3, 4, 5)} == {s: {"n": s} for s in (1, 2, 3, 4, 5)}
+    unsupport(store, BLOG)
+    reconcile(store, q)
+    row = q.row("Q9")
+    assert row.data[0]["press"] == {} and sorted(row.outcomes) == [0, 1, 2, 3, 4, 5]
+
+
+def unsupport(store, url, outcome="neutral"):
+    """The article's mention is judged again: it gives no support."""
+    store.add_mention(Mention(url, "Q9", "Ordet", "work", "film", 0.8, ["x"], stance=0.1, stance_outcome=outcome))
+
+
+@pytest.mark.parametrize("outcome", ["neutral", "critical"])
+def test_a_pending_row_without_support_loses_the_exemption(store, q, uncovered, outcome):
+    pair(store, (BLOG,), Counting())
+    routed(store, q, BLOG, 0.9)
+    for stage in (1, 2, 3, 4):
+        q.set_outcome("Q9", stage, "pass")
+    unsupport(store, BLOG, outcome)
+    reconcile(store, q)
+    row = q.row("Q9")
+    assert row.data[0]["press"] == {} and not common.press_exempt(row)
+    assert sorted(row.outcomes) == [0, 1]  # triaged again, now held to the floor
+    assert row.sources == ["press:vallini"]  # what found it: a row with no source would pass the floor
+    assert film.triage(row, {"sitelink_floor": 15})[0] == "drop"
+
+
+@pytest.mark.parametrize("outcome", ["bearing", "mixed", None])
+def test_support_is_every_stance_but_neutral_and_critical(store, q, uncovered, outcome):
+    pair(store, (BLOG,), Counting())
+    routed(store, q, BLOG, 0.9)
+    unsupport(store, BLOG, outcome)
+    reconcile(store, q)
+    assert press(q) == {"vallini": 0.8}  # the probability as judged again
+
+
+def test_a_row_of_other_sources_keeps_them_when_the_press_falls_away(store, q, uncovered):
+    q.add("Q9", "film", "facet", {}, {}, data={"count": 20})
+    pair(store, (BLOG,), Counting())
+    routed(store, q, BLOG, 0.9)
+    unsupport(store, BLOG)
+    reconcile(store, q)
+    assert q.row("Q9").sources == ["facet"] and q.row("Q9").data[0] == {"count": 20, "press": {}}
+
+
+def test_evidence_that_raises_the_row_to_the_exemption_triages_it_again(store, q, uncovered):
+    routed(store, q, OTHER, 0.5, "osservatore")
+    for stage, outcome in ((1, "pass"), (2, "drop")):
+        q.set_outcome("Q9", stage, outcome)
+    mention(store, OTHER, 0.7, kind=None)
+    reconcile(store, q)
+    assert sorted(q.row("Q9").outcomes) == [0, 1]
+
+
+def test_a_benchmark_row_is_not_triaged_again(store, q, uncovered):
+    q.add("Q9", "film", "category", {}, {}, calibration=True, data={"count": 1})
+    routed(store, q, OTHER, 0.9, "osservatore")
+    for stage in (1, 2):
+        q.set_outcome("Q9", stage, "pass")
+    unsupport(store, OTHER)
+    reconcile(store, q)
+    assert q.row("Q9").outcomes[2] == "pass"
+
+
+def test_rows_the_press_never_touched_are_left_alone(store, q):
+    q.add("Q1", "film", "facet", {}, {}, data={"count": 3})
+    before = list(q.db.iterdump())
+    reconcile(store, q)
+    assert list(q.db.iterdump()) == before
