@@ -14,6 +14,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Iterable
 from urllib.parse import quote as urlquote
 
 from sync import categories
@@ -28,6 +29,16 @@ from .common import CHUNK, LANGS, LIMIT  # noqa: F401
 CLOSED = ("approved", "created", "declined")  # a series with one of these statuses absorbs nothing
 
 WORK, EDITION = "Q7725634", "Q3331189"  # literary work; version, edition or translation
+# literary work and the config's series_classes (literary and book series): what literature itself queries. Not
+# written work (Q47461344): its closure takes in encyclicals, letters and scholarly articles.
+WORK_CLASSES: tuple[str, ...] = (WORK, "Q1667921", "Q277759")
+
+
+def owns(instance_of: Iterable[str], sparql, cache: Path | None = None) -> bool:
+    """True when an item of these P31 classes is a literary work or series (or of a subclass)."""
+    return common.owns(instance_of, WORK_CLASSES, sparql, cache)
+
+
 DIRECT = {"illustrissimi", "francis"}  # sources that name a work directly: no sitelink floor
 
 # Jev's wording for the quick judgment, the connection choice and its options (pipeline.judge asks with these).
@@ -118,6 +129,45 @@ def _fold_into(queue, series_qid: str, series_row: dict, volumes: list[dict], so
     return _extend_series(queue, series_qid, labels, sitelinks, data, volumes, source)
 
 
+def _volume_entry(volume: dict) -> dict:
+    """What a series records of one volume (a common.query row): its Wikipedia sitelinks and sitelink count."""
+    _, sitelinks, data = common.row_data(volume)
+    return {"sitelinks": sitelinks, "count": data["count"]}
+
+
+def _series_data(data: dict, sitelinks: dict, known: dict) -> dict:
+    """Mark `data` (a series' stage-0 data) with its `known` volumes, the best count, and the lead sitelinks of
+    a series without a Wikipedia page of its own."""
+    data.update(series=True, volumes=known, count=max([data["count"], *(v["count"] for v in known.values())]))
+    if known and not _has_wikipedia(sitelinks):
+        with_page = [v for v in known.values() if _has_wikipedia(v["sitelinks"])]
+        data["lead_sitelinks"] = max(with_page or known.values(), key=lambda v: v["count"])["sitelinks"]
+    return data
+
+
+def _volume_rows(sparql, qids: list[str]) -> list[dict]:
+    """common.query rows (with ?series and ?shared) of the volumes of the series `qids`: their parts (P527) and
+    the items that are part of them (P179); ?shared is bound for a volume sharing an author with its series."""
+    pattern = (f"  VALUES ?series {{ {common.values(qids)} }}\n"
+               "  { ?series wdt:P527 ?item } UNION { ?item wdt:P179 ?series }")
+    # ?shared is bound only for a volume sharing an author with the series (a BIND(EXISTS) is left unbound)
+    pattern += "\n  OPTIONAL { ?item wdt:P50 ?a . ?series wdt:P50 ?a . BIND(\"true\" AS ?shared) }"
+    return _run(sparql, "volumes of series", common.query(pattern, "?series ?shared "))
+
+
+def press_stage0(qid: str, entity: dict, sparql) -> dict:
+    """The stage-0 data coverage needs for an item the press found that no literature query added: for a series
+    (an instance of a series_classes class), its volumes, so `covered` can see a volume SeminaVerbi already has.
+    {} for any other item."""
+    if not common.owns(common.qids(entity, "P31"), _series_classes(), sparql):
+        return {}
+    known = {r["item"]: _volume_entry(r) for r in _volume_rows(sparql, [qid])
+             if r["series"] == qid and r["item"] != qid}
+    sitelinks = {site: title for site, title in common.entity_sitelinks(entity).items()
+                 if site in {f"{lang}wiki" for lang in LANGS}}
+    return _series_data({"count": len(sitelinks)}, sitelinks, known)
+
+
 def _extend_series(queue, series_qid: str, labels: dict, sitelinks: dict, data: dict, volumes: list[dict],
                    source: str, foldable: set[str] | None = None) -> int:
     """`foldable`: the volumes whose standalone row may be marked folded (None: all of them; those of `fold` share
@@ -130,8 +180,7 @@ def _extend_series(queue, series_qid: str, labels: dict, sitelinks: dict, data: 
     known = dict(old.data.get(0, {}).get("volumes", {})) if old else {}
     new_volume = False
     for volume in volumes:
-        _, volume_sitelinks, volume_data = common.row_data(volume)
-        entry = {"sitelinks": volume_sitelinks, "count": volume_data["count"]}
+        entry = _volume_entry(volume)
         new_volume = new_volume or known.get(volume["item"]) != entry  # new, or its count or pages changed
         known[volume["item"]] = entry
         own = queue.row(volume["item"]) if foldable is None or volume["item"] in foldable else None
@@ -142,10 +191,7 @@ def _extend_series(queue, series_qid: str, labels: dict, sitelinks: dict, data: 
             else:
                 print(f"literature candidates: {volume['item']} folded into {series_qid} but already "
                       f"{own.status}, left alone")
-    data.update(series=True, volumes=known, count=max([data["count"], *(v["count"] for v in known.values())]))
-    if not _has_wikipedia(sitelinks):
-        with_page = [v for v in known.values() if _has_wikipedia(v["sitelinks"])]
-        data["lead_sitelinks"] = max(with_page or known.values(), key=lambda v: v["count"])["sitelinks"]
+    _series_data(data, sitelinks, known)
     added = queue.add(series_qid, "literature", source, labels, sitelinks, False, data)
     if new_volume and old and old.status is None:
         queue.redo(1, series_qid)  # coverage, triage and the later stages saw the previous volume list
@@ -165,11 +211,7 @@ def attach_volumes(queue, sparql, qids: list[str], series_classes: list[str]) ->
             todo.append(row)
     for i in range(0, len(todo), CHUNK):
         chunk = todo[i:i + CHUNK]
-        pattern = (f"  VALUES ?series {{ {common.values([r.qid for r in chunk])} }}\n"
-                   "  { ?series wdt:P527 ?item } UNION { ?item wdt:P179 ?series }")
-        # ?shared is bound only for a volume sharing an author with the series (a BIND(EXISTS) is left unbound)
-        pattern += "\n  OPTIONAL { ?item wdt:P50 ?a . ?series wdt:P50 ?a . BIND(\"true\" AS ?shared) }"
-        rows = _run(sparql, "volumes of series", common.query(pattern, "?series ?shared "))
+        rows = _volume_rows(sparql, [r.qid for r in chunk])
         shared = sorted({r["item"] for r in rows if r.get("shared") == "true"})
         other = series_of(sparql, shared, series_classes) if shared else {}
         for row in chunk:
@@ -289,11 +331,12 @@ def exclude(queue, sparql, cfg: dict) -> None:
     """Mark the religious texts (an instance of a `religious_classes` class, or part of the Bible) so that triage
     drops them, and move the musical works (`music_class`: musicals, operas, songs with a libretto or lyrics) to
     the music domain, where they wait for its stages. A religious text that is also a musical work (a psalm) is
-    excluded. Only the rows that can pass triage are checked (above the floor, or named directly by a source);
-    a row already triaged is triaged again, one with a status is left alone."""
+    excluded. Only the rows that can pass triage are checked (above the floor, named directly by a source, or
+    press-exempt); a row already triaged is triaged again, one with a status is left alone."""
     lit = cfg["literature"]
     todo = [r for r in queue.open_rows("literature")
-            if set(r.sources) & DIRECT or r.data.get(0, {}).get("count", 0) >= cfg["sitelink_floor"]]
+            if set(r.sources) & DIRECT or common.press_exempt(r)
+            or r.data.get(0, {}).get("count", 0) >= cfg["sitelink_floor"]]
     for i in range(0, len(todo), CHUNK):
         chunk = todo[i:i + CHUNK]
         rows = _run(sparql, "religious texts and musical works", (
@@ -462,7 +505,7 @@ def triage(row, cfg: dict) -> tuple[str, str]:
         return "drop", f"{data['excluded']}, not a literary work"
     if EDITION in data.get("instance_of", []):
         return "drop", "an edition or translation, not a work of its own"
-    if not set(row.sources) & DIRECT:
+    if not set(row.sources) & DIRECT and not common.press_exempt(row):
         count, floor = data.get("count", 0), cfg["sitelink_floor"]
         if count < floor:
             return "drop", f"{count} sitelinks, under the floor of {floor}"

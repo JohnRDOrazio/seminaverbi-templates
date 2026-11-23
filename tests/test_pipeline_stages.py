@@ -305,3 +305,13 @@ def test_a_confident_direct_connection_passes_without_a_theme(q, choice, p, outc
     judge = FakeJudge(choice, {T1: {"p": 0.3, "status": "no"}})
     judge.connection = lambda row, text: {"choice": choice, "probabilities": {choice: p}, "confidence": 0.9}
     assert adjudicate(r, judge, DATA)[0] == outcome
+
+
+def test_press_evidence_carries_the_note_label_and_other_evidence_does_not(q):
+    press = {**note(text="Press words.", url="http://p/1"), "label": "Avvenire (2026-03-01): Titolo"}
+    r = make_row(q, notes=[press, note(url="http://w/1")], languages={"en": 2})
+    _, result = adjudicate(r, FakeJudge(themes={T1: {"p": 0.8, "status": "applied"}}, pick=0), DATA)
+    assert result["themes"][0]["evidence"] == {"url": "http://p/1", "excerpt": "Press words.",
+                                               "label": "Avvenire (2026-03-01): Titolo"}
+    _, result = adjudicate(r, FakeJudge(themes={T1: {"p": 0.8, "status": "applied"}}, pick=1), DATA)
+    assert result["themes"][0]["evidence"] == {"url": "http://w/1", "excerpt": "Some text."}

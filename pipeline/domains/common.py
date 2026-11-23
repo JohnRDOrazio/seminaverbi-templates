@@ -105,6 +105,13 @@ def qids(entity: dict, prop: str) -> list[str]:
     return out
 
 
+def press_exempt(row, threshold: float = 0.60) -> bool:
+    """True when a Catholic-media mention of the work was kept at `threshold` or more: a press-only work skips the
+    sitelink floor."""
+    press = row.data.get(0, {}).get("press") or {}
+    return bool(press) and max(press.values()) >= threshold
+
+
 def entity_sitelinks(entity: dict) -> dict[str, str]:
     return {site: v["title"] for site, v in entity.get("sitelinks", {}).items() if "title" in v}
 
@@ -200,12 +207,30 @@ def domain_config(cfg: dict, name: str) -> dict:
     return {**cfg, **{key: value for key, value in block.items() if key in cfg}}
 
 
+_CLOSURE_MEMO: dict[Path, tuple[tuple[int, int] | None, dict]] = {}  # cache path -> (file stamp, parsed content)
+
+
+def _stamp(cache: Path) -> tuple[int, int] | None:
+    try:
+        st = cache.stat()
+    except OSError:
+        return None
+    return st.st_mtime_ns, st.st_size
+
+
 def _read_closure_cache(cache: Path) -> dict:
+    """The parsed cache file, read once per process (again only when the file changed under us)."""
+    stamp = _stamp(cache)
+    memo = _CLOSURE_MEMO.get(cache)
+    if memo is not None and memo[0] == stamp:
+        return memo[1]
     try:
         data = json.loads(cache.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return {}
-    return data if isinstance(data, dict) else {}
+        data = {}
+    data = data if isinstance(data, dict) else {}
+    _CLOSURE_MEMO[cache] = (stamp, data)
+    return data
 
 
 def _fresh_entry(entry) -> list[str] | None:
@@ -241,6 +266,7 @@ def class_closure(sparql, classes: Iterable[str], cache: Path | None = None) -> 
     if fetched:
         cache.parent.mkdir(parents=True, exist_ok=True)
         cache.write_text(json.dumps(stored, indent=1, sort_keys=True), encoding="utf-8")
+        _CLOSURE_MEMO[cache] = (_stamp(cache), stored)
     return closure
 
 
@@ -402,6 +428,27 @@ def fold_parts(queue, sparql, rows: list[dict], source: str, domain: str, whole_
     for whole_qid, parts in grouped.items():
         added += _fold_into_whole(queue, whole_qid, details[whole_qid], parts, source, domain, recheck)
     return added
+
+
+def press_parts(qid: str, entity: dict, sparql, domain: str, whole_classes: Iterable[str],
+                stop_classes: Iterable[str] = ()) -> dict:
+    """The stage-0 data coverage needs for a whole the press found that no query of `domain` added: its parts
+    (items part of it, P361, or listed as its parts, P527) as `fold_parts` stores them, so `covered_with_parts`
+    sees a part SeminaVerbi already has. {} for an item outside the closure of `whole_classes`, inside that of
+    `stop_classes`, or with no parts."""
+    instance_of = qids(entity, "P31")
+    if not owns(instance_of, whole_classes, sparql) or (stop_classes and owns(instance_of, stop_classes, sparql)):
+        return {}
+    pattern = f"  {{ ?item wdt:P361 wd:{qid} }} UNION {{ wd:{qid} wdt:P527 ?item }}"
+    parts = {}
+    for row in run_query(sparql, domain, "parts of a press whole", query(pattern)):
+        if row["item"] != qid:
+            _, sitelinks, data = row_data(row)
+            parts[row["item"]] = {"sitelinks": sitelinks, "count": data["count"]}
+    if not parts:
+        return {}
+    own = len([s for s in entity_sitelinks(entity) if s.endswith("wiki") and s not in NON_WIKIPEDIA])
+    return {"parts": parts, "count": max([own, *(p["count"] for p in parts.values())])}
 
 
 def _part_title(qid: str, sitelinks: dict) -> str:

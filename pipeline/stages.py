@@ -159,8 +159,8 @@ def _parts(notes: list[dict]) -> list[list[dict]]:
     return parts
 
 
-def _paragraphs(notes: list[dict]) -> list[tuple[str, str]]:
-    """(paragraph, url) for the non-empty blank-line-separated paragraphs of the notes, in order, while their
+def _paragraphs(notes: list[dict]) -> list[tuple[str, dict]]:
+    """(paragraph, note) for the non-empty blank-line-separated paragraphs of the notes, in order, while their
     total length stays within MAX_DOSSIER_CHARS (the one that crosses it is cut)."""
     out, left = [], MAX_DOSSIER_CHARS
     for n in notes:
@@ -170,7 +170,7 @@ def _paragraphs(notes: list[dict]) -> list[tuple[str, str]]:
                 continue
             if left <= 0:
                 return out
-            out.append((p[:left], n["url"]))
+            out.append((p[:left], n))
             left -= len(out[-1][0])
     return out
 
@@ -219,8 +219,10 @@ def adjudicate(row, judge, data) -> tuple[str, dict]:
         evidence = {"url": None, "excerpt": ""}
         paragraphs = _paragraphs(parts[i])
         if paragraphs:
-            paragraph, url = paragraphs[judge.evidence(row, key, [p for p, _ in paragraphs])]
-            evidence = {"url": url, "excerpt": _excerpt(paragraph)}
+            paragraph, n = paragraphs[judge.evidence(row, key, [p for p, _ in paragraphs])]
+            evidence = {"url": n["url"], "excerpt": _excerpt(paragraph)}
+            if n.get("label"):  # a press note: its outlet, date and title, shown beside the URL
+                evidence["label"] = n["label"]
         themes.append({"key": key, "p": v["p"], "status": v["status"], "evidence": evidence})
     outline = (["Lead", "Story and the Gospel"] + [f"Theme: {names[t['key']]}" for t in themes]
                + ["Discernment", "See also", "References"])

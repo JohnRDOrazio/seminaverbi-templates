@@ -87,9 +87,10 @@ local function themes(args, categories, lang, out)
 			.. withPercent('<strong>' .. themeLabel(categories, args['theme' .. i], lang) .. '</strong>',
 				args['theme' .. i .. '_p'])
 		local evidence, source = args['theme' .. i .. '_evidence'], args['theme' .. i .. '_source']
+		local sourceLabel = args['theme' .. i .. '_source_label']
 		if evidence then
 			line = line .. '<div class="sv-proposal-excerpt">' .. plain(evidence)
-				.. (source and (' ' .. externalLink(source)) or '') .. '</div>'
+				.. (source and (' ' .. externalLink(source, sourceLabel and plain(sourceLabel))) or '') .. '</div>'
 		end
 		items[#items + 1] = line .. '</li>'
 	end
@@ -152,8 +153,10 @@ function p.main(frame)
 	end
 	if args.sources then
 		local items = {}
+		-- sourceN_label (a press article's outlet, date and title) names the Nth URL; without it, the URL itself
 		for url in args.sources:gmatch('%S+') do
-			items[#items + 1] = '<li>' .. externalLink(url, plain(url)) .. '</li>'
+			local label = args['source' .. (#items + 1) .. '_label']
+			items[#items + 1] = '<li>' .. externalLink(url, plain(label or url)) .. '</li>'
 		end
 		out[#out + 1] = '<div class="sv-proposal-row"><span class="sv-proposal-label">' .. Util.msg('proposal_sources', lang)
 			.. '</span><ul>' .. table.concat(items) .. '</ul></div>'

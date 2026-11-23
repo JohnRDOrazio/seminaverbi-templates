@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<rss version="2.0"><channel><title>Synthetic</title>
+<item><title>One</title><link>https://x.example/cultura/one/?utm_source=f</link><pubDate>Tue, 03 Feb 2026 10:00:00 +0000</pubDate></item>
+<item><title>Two</title><link>https://x.example/politica/two</link><pubDate>Mon, 01 Dec 2025 08:30:00 GMT</pubDate></item>
+<item><title>Three</title><link>https://x.example/cultura/three</link></item>
+</channel></rss>

@@ -680,6 +680,39 @@ def test_dossier_links_are_proposal_sources(q):
     assert "|sources=http://x/a%20b https://en.wikisource.org/wiki/A%20b\n" in proposal_call(r, r.data[5])
 
 
+def test_proposal_sources_list_the_press_url_first(q):
+    from pipeline.publish import _params
+    r = add(q)
+    r.data[4]["notes"].insert(0, {"lang": "it", "url": "http://press/art", "heading": "h", "text": "t"})
+    sources = dict(_params(r, r.data[5]))["sources"]
+    assert sources.split()[0] == "http://press/art"
+
+
+def test_press_evidence_and_sources_carry_outlet_date_and_title(q):
+    """A press quotation is shown with its outlet, date and title, not as a bare URL."""
+    label = "Avvenire (2026-03-01): Il film | e {{noi}}"
+    q.add("Q2", "film", "press:avvenire", {"en": "Two"}, {"enwiki": "Two"})
+    q.set_outcome("Q2", 4, "pass", {"notes": [
+        {"lang": "it", "url": "http://p/a", "heading": label, "label": label, "text": "t"},
+        {"lang": "en", "url": "http://w/a", "heading": "Lead", "text": "t"}], "languages": {"it": 1, "en": 1},
+        "links": ["http://w/link"]})
+    res = result()
+    res["themes"][0]["evidence"] = {"url": "http://p/a", "excerpt": "parole", "label": label}
+    q.set_outcome("Q2", 5, "pass", res)
+    r = q.row("Q2")
+    lines = proposal_call(r, r.data[5]).splitlines()
+    escaped = "Avvenire (2026-03-01): Il film {{!}} e &#123;&#123;noi&#125;&#125;"
+    assert f"|theme1_source_label={escaped}" in lines
+    assert "|sources=http://p/a http://w/a http://w/link" in lines
+    assert f"|source1_label={escaped}" in lines
+    assert not any(line.startswith(("|source2_label", "|source3_label")) for line in lines)
+
+
+def test_rows_without_press_notes_get_no_label_parameters(q):
+    r = add(q)
+    assert "_label=" not in proposal_call(r, r.data[5])
+
+
 def test_benchmark_rows_are_not_translation_suggestions(q):
     q.add("Q2", "art", "calibration", {"en": "Trinity"}, {}, calibration=True, data={"benchmark": True})
     q.set_outcome("Q2", 1, "translation", {"have": ["it"], "missing": ["en", "es", "fr", "de", "pt"]})  # covered in a language

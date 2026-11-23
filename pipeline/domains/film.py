@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import Iterable
 
 from sync import categories
 from sync.wikidata import WikidataClient
@@ -57,6 +58,14 @@ def _run(sparql, label: str, query: str) -> list[dict]:
     return common.run_query(sparql, "film", label, query, limit=LIMIT)  # LIMIT read here, so tests can patch it
 
 FILM, SERIES = "Q11424", "Q5398426"
+WORK_CLASSES: tuple[str, ...] = (FILM, SERIES)
+
+
+def owns(instance_of: Iterable[str], sparql, cache: Path | None = None) -> bool:
+    """True when an item of these P31 classes is a film or a series (or of a subclass of one)."""
+    return common.owns(instance_of, WORK_CLASSES, sparql, cache)
+
+
 # television series episode, trailer, film clip: judged through their series or not at all
 NON_WORKS = {"Q21191270": "episode", "Q622550": "trailer", "Q128696755": "clip"}
 
@@ -134,7 +143,8 @@ def triage(row, cfg: dict) -> tuple[str, str]:
     for qid in data.get("instance_of", []):
         if qid in NON_WORKS:
             return "drop", f"a {NON_WORKS[qid]}, not a work of its own"
-    if set(row.sources) == {"facet"}:
+    only_floored = bool(row.sources) and all(s == "facet" or s.startswith("press:") for s in row.sources)
+    if only_floored and not common.press_exempt(row):
         count = data.get("count", 0)
         if count < cfg["sitelink_floor"]:
             return "drop", f"{count} sitelinks, under the floor of {cfg['sitelink_floor']}"

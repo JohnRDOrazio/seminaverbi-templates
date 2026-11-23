@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<feed xmlns="http://www.w3.org/2005/Atom"><title>Synthetic</title>
+<entry><title>A</title><link rel="self" href="https://x.example/feed"/><link rel="alternate" href="https://x.example/cultura/a"/><updated>2026-03-05T12:00:00Z</updated></entry>
+<entry><title>B</title><link href="https://x.example/b"/><published>2025-06-01T00:00:00+02:00</published><updated>2026-01-01T00:00:00Z</updated></entry>
+</feed>

@@ -1,0 +1,277 @@
+{
+  "user_agent": "SeminaVerbi-press/1.0 (+https://en.seminaverbi.bibleget.io/wiki/Semina_Verbi:Press_bot)",
+  "delay_seconds": 10,
+  "max_articles_per_run": 200,
+  "culture_drop": 0.4,
+  "pick_p": 0.8,
+  "pick_confidence": 0.6,
+  "mention_keep": 0.6,
+  "press_exempt": 0.6,
+  "waiting_classes": {
+    "music": [
+      "Q105543609",
+      "Q7366",
+      "Q482994",
+      "Q484692"
+    ],
+    "art": [
+      "Q3305213",
+      "Q860861",
+      "Q132137",
+      "Q15711026",
+      "Q46686",
+      "Q3714446",
+      "Q21061279",
+      "Q219423"
+    ],
+    "artists": [
+      "Q5"
+    ]
+  },
+  "outlets": [
+    {
+      "id": "osservatore",
+      "name": "L'Osservatore Romano",
+      "base": "https://www.osservatoreromano.va",
+      "langs": [
+        "it",
+        "en",
+        "es",
+        "fr",
+        "de",
+        "pt"
+      ],
+      "entries": [
+        {
+          "url": "https://www.osservatoreromano.va/sitemap.it.xml",
+          "lang": "it"
+        },
+        {
+          "url": "https://www.osservatoreromano.va/sitemap.en.xml",
+          "lang": "en"
+        },
+        {
+          "url": "https://www.osservatoreromano.va/sitemap.fr.xml",
+          "lang": "fr"
+        },
+        {
+          "url": "https://www.osservatoreromano.va/sitemap.de.xml",
+          "lang": "de"
+        },
+        {
+          "url": "https://www.osservatoreromano.va/sitemap.es.xml",
+          "lang": "es"
+        },
+        {
+          "url": "https://www.osservatoreromano.va/sitemap.pt.xml",
+          "lang": "pt"
+        }
+      ],
+      "culture_paths": [
+        "/news/"
+      ],
+      "since": null,
+      "note": "robots.txt lists sitemap.xml, an index of one sitemap per language (sitemap.<lang>.xml, urlsets of the articles under /<lang>/news/). No /feed or /rss (404)."
+    },
+    {
+      "id": "vaticannews",
+      "name": "Vatican News",
+      "base": "https://www.vaticannews.va",
+      "langs": [
+        "it",
+        "en",
+        "es",
+        "fr",
+        "de",
+        "pt"
+      ],
+      "entries": [
+        {
+          "url": "https://www.vaticannews.va/sitemap.it.xml",
+          "lang": "it"
+        },
+        {
+          "url": "https://www.vaticannews.va/sitemap.en.xml",
+          "lang": "en"
+        },
+        {
+          "url": "https://www.vaticannews.va/sitemap.fr.xml",
+          "lang": "fr"
+        },
+        {
+          "url": "https://www.vaticannews.va/sitemap.de.xml",
+          "lang": "de"
+        },
+        {
+          "url": "https://www.vaticannews.va/sitemap.es.xml",
+          "lang": "es"
+        },
+        {
+          "url": "https://www.vaticannews.va/sitemap.pt.xml",
+          "lang": "pt"
+        }
+      ],
+      "culture_paths": [
+        "/news/"
+      ],
+      "since": null,
+      "note": "robots.txt lists sitemap.xml, an index of one sitemap per language (sitemap.<lang>.xml). Articles are under /<lang>/<section>/news/; /news/ leaves out the podcasts, the Gospel of the day, the saints and the prayers. No /feed or /rss (404)."
+    },
+    {
+      "id": "avvenire",
+      "name": "Avvenire",
+      "base": "https://www.avvenire.it",
+      "langs": [
+        "it"
+      ],
+      "entries": [
+        "https://www.avvenire.it/google-news-sitemap.xml",
+        "https://www.avvenire.it/sitemap.xml"
+      ],
+      "culture_paths": [
+        "/agora/"
+      ],
+      "since": null,
+      "note": "Both sitemaps (from robots.txt) redirect to naxosprodstorage.blob.core.windows.net; the news sitemap holds the last days, sitemap.xml an index of monthly story sitemaps. Culture is the Agorà section (/agora/cultura seen). No /feed or /rss (404)."
+    },
+    {
+      "id": "romasette",
+      "name": "Roma Sette",
+      "base": "https://www.romasette.it",
+      "langs": [
+        "it"
+      ],
+      "entries": [
+        "https://www.romasette.it/feed/"
+      ],
+      "culture_paths": [],
+      "since": null,
+      "note": "RSS at /feed/ (the last 10 posts; answered 200 twice on 2026-11-23). /rss answered 403 to our agent, so it is never requested. Article URLs carry no section. sitemap.xml redirects to sitemap_index.xml (Yoast post sitemaps, oldest first): not used."
+    },
+    {
+      "id": "ewtn",
+      "name": "EWTN",
+      "base": "https://www.ewtn.com",
+      "langs": [
+        "en"
+      ],
+      "entries": [],
+      "culture_paths": [],
+      "since": null,
+      "note": "No feed (/feed, /rss 404). sitemap.xml is a single urlset of TV programmes and the Catholicism library (reprints from other publications), not EWTN's journalism; its news is on sister sites (the National Catholic Register is configured; CNA could be added)."
+    },
+    {
+      "id": "civilta",
+      "name": "La Civiltà Cattolica",
+      "base": "https://www.laciviltacattolica.it",
+      "langs": [
+        "it",
+        "en"
+      ],
+      "entries": [],
+      "culture_paths": [],
+      "since": null,
+      "note": "sitemap.xml (from robots.txt) answered 403 to our agent on 2026-11-23, as /feed/ did in the recon: refused, not worked around."
+    },
+    {
+      "id": "famigliacristiana",
+      "name": "Famiglia Cristiana",
+      "base": "https://www.famigliacristiana.it",
+      "langs": [
+        "it"
+      ],
+      "entries": [
+        "https://www.famigliacristiana.it/sitemaps/fc/sitemap_news1.xml",
+        "https://www.famigliacristiana.it/sitemaps/fc/sitemap_index.xml"
+      ],
+      "culture_paths": [
+        "/cultura-e-spettacoli/"
+      ],
+      "since": null,
+      "note": "No /feed or /rss (404). robots.txt lists sitemaps/fc/sitemap_index.xml (news, article, image and video sitemaps); the news sitemap first, for the latest articles. Culture section: /cultura-e-spettacoli/."
+    },
+    {
+      "id": "aleteia",
+      "name": "Aleteia",
+      "base": "https://aleteia.org",
+      "langs": [
+        "en",
+        "it",
+        "es",
+        "fr",
+        "pt"
+      ],
+      "entries": [
+        {
+          "url": "https://aleteia.org/news-sitemap.xml",
+          "lang": "en"
+        },
+        {
+          "url": "https://aleteia.org/sitemap.xml",
+          "lang": "en"
+        },
+        {
+          "url": "https://it.aleteia.org/sitemap.xml",
+          "lang": "it"
+        },
+        {
+          "url": "https://es.aleteia.org/sitemap.xml",
+          "lang": "es"
+        },
+        {
+          "url": "https://fr.aleteia.org/sitemap.xml",
+          "lang": "fr"
+        },
+        {
+          "url": "https://pt.aleteia.org/sitemap.xml",
+          "lang": "pt"
+        }
+      ],
+      "culture_paths": [],
+      "since": null,
+      "note": "One sitemap index per language site (aleteia.org for en, it./es./fr./pt.aleteia.org); robots.txt also lists aleteia.org/news-sitemap.xml, read first for the latest en articles. de.aleteia.org does not resolve (no German edition), so de is not among the languages. Article URLs are /YYYY/MM/DD/slug: no culture section."
+    },
+    {
+      "id": "ncregister",
+      "name": "National Catholic Register",
+      "base": "https://www.ncregister.com",
+      "langs": [
+        "en"
+      ],
+      "entries": [
+        "https://www.ncregister.com/sitemaps/sitemap-today.xml"
+      ],
+      "culture_paths": [],
+      "since": null,
+      "note": "sitemap.xml redirects to sitemaps/sitemap.xml (the one robots.txt lists), an index whose archive sitemaps are gzipped (.xml.gz, which discovery does not read); sitemap-today.xml from that index is plain XML. No /feed or /rss (404). Sections seen: /features, /cna; no culture section."
+    },
+    {
+      "id": "kto",
+      "name": "KTO",
+      "base": "https://www.ktotv.com",
+      "langs": [
+        "fr"
+      ],
+      "entries": [
+        "https://www.ktotv.com/rss"
+      ],
+      "culture_paths": [],
+      "since": null,
+      "note": "RSS at /rss (programme videos under /video/). robots.txt lists sitemap.txt, plain text that discovery does not read; no sitemap.xml or /feed (404)."
+    },
+    {
+      "id": "sir",
+      "name": "SIR",
+      "base": "https://www.agensir.it",
+      "langs": [
+        "it"
+      ],
+      "entries": [
+        "https://www.agensir.it/feed/"
+      ],
+      "culture_paths": [],
+      "since": null,
+      "note": "RSS at /feed/ (/rss redirects there; the last 10 items). No sitemap.xml (404). Sections seen: /italia, /chiesa, /diocesi, /mondo, /europa; no culture section."
+    }
+  ]
+}

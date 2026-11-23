@@ -81,3 +81,10 @@ the page had by hand.
 | es, fr, de, pt: main page | Created from the en/it text: Church documents in the Holy See's official texts, the prose and the Fathers in our own translation (marked as such) | a native speaker reads the de and pt pages | open |
 | fr, de, pt: main page | Wikipedia link titles not checked against the language Wikipedias (Wikimedia rate-limited this server): Paul de Tarse, Paulus von Tarsus, Paulo de Tarso, and the other `w:fr:`/`w:de:`/`w:pt:` links | check each title exists; fall back to `w:en:` where it does not | open |
 | all: main page | Section heading aligned with the it "Panoramica delle aree tematiche" (en "Overview of subject areas") | — | done (en 30821, es 516, fr 550, pt 510; de already matched) |
+
+## Catholic press (2026-11-23)
+
+| Item | Finding | Proposed | Status |
+|------|---------|----------|--------|
+| TypeSafe | TypeSafe's written confirmation that it does not train on API inputs: needed before enabling `sv-pipeline-press.timer`. | ask TypeSafe; record the answer and its date here | open |
+| `Semina Verbi:Press bot` | The page the bot's user agent points to; its text is `docs/press-bot-page.wiki` | publish on en with the author's approval, before the first live run | open |

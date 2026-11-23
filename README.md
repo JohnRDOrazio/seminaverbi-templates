@@ -100,7 +100,7 @@ their outcomes per stage and Jev's cached answers.
 Commands that write to the wiki (`publish`, `run --publish`, `votes`) log in as the editor bot from
 `SV_EDITOR_USER` / `SV_EDITOR_PASSWORD`, so run them through `~/.config/seminaverbi/runeditor.py pipeline …`;
 `run --publish` checks those credentials before it runs any stage.
-Only `quick`, `adjudicate`, `run` and `calibrate` need `TYPESAFE_API_KEY` (Jev).
+Only `quick`, `adjudicate`, `run`, `calibrate` and `press filter|link|run` need `TYPESAFE_API_KEY` (Jev).
 
 **Vote timer.** `votes` counts the votes on open proposals and approves those at the threshold
 (`vote_threshold` in `config/pipeline.json`, now 3; `max_new_per_run` and the other cut-offs live there too).
@@ -137,6 +137,46 @@ logged out, `loginctl enable-linger $USER`.
 **Sources and licences.** Wikidata (CC0) supplies the candidates. Wikipedia and Wikiquote are read as notes for the
 writer and Jev, never copied into articles. IMDb and TMDb are not used. The Arts & Faith Top 100 was dropped: it has
 no machine-readable list.
+
+### Catholic press
+
+`python -m pipeline press …` reads eleven Catholic outlets (`config/press.json`: L'Osservatore Romano, Vatican News,
+Avvenire, Roma Sette, EWTN, La Civiltà Cattolica, Famiglia Cristiana, Aleteia, National Catholic Register, KTO, SIR)
+and feeds every domain. Design: `docs/superpowers/specs/2026-11-23-catholic-media-source-design.md`.
+
+```
+python -m pipeline press discover   # new article URLs from each outlet's feeds and sitemaps (round-robin, max_articles_per_run)
+python -m pipeline press filter     # Jev: is the article about a work of culture or an artist? below culture_drop: dropped
+python -m pipeline press link       # mentions linked to Wikidata items; kept when Jev finds them discussed substantively
+python -m pipeline press route      # each mention to its domain's queue (source press:<outlet>), the enrichment page, or waiting
+python -m pipeline press enrich     # writes Semina Verbi:Press for existing articles on en (editor bot)
+python -m pipeline press run        # all five, each article fetched once
+python -m pipeline press run --dry-run   # discover, filter, link; prints each mention's would-be route, writes no queue, no wiki
+```
+
+`--dry-run` also works with `discover` (into a throwaway store: lists the URLs found per outlet, keeps nothing),
+`route` (prints the would-be routes) and `enrich` (prints the page text). Each run ends with the outlets that refused
+us (`press refused: …`); a 401/403/429 or a robots.txt rule stops that outlet for the run, never worked around.
+
+The bot reads politely: its own user agent (`SeminaVerbi-press/1.0`, pointing to the page `Semina Verbi:Press bot`,
+whose text is `docs/press-bot-page.wiki`), one request at a time per outlet at least `delay_seconds` (10) apart or the
+outlet's `Crawl-delay`. It keeps the link, title, date, outlet, language and quotations of at most 25 words; never the
+full text. Jev reads at most about 150 words per question. Read the `--dry-run` report before the first real run.
+
+`filter`, `link` and `run` need `TYPESAFE_API_KEY`; `enrich` and `run` (without `--dry-run`) log in as the editor
+bot first, so run them through `~/.config/seminaverbi/runeditor.py pipeline press …`. `discover` and `route` need
+neither.
+
+**Press timer.** `deploy/systemd/sv-pipeline-press.{service,timer}` run `press run` daily at 04:30 through
+`runeditor.py`, with `TYPESAFE_API_KEY` from `~/.config/seminaverbi/pipeline.env` (a `KEY=value` file, mode 600).
+Link them like the vote timer (same checkout assumptions):
+
+```
+systemctl --user link "$PWD"/deploy/systemd/sv-pipeline-press.{service,timer}
+```
+
+**Prerequisite:** do not enable `sv-pipeline-press.timer`, and do not run `press filter|link|run` live, before
+TypeSafe's written confirmation that it does not train on API inputs is recorded in `docs/content-tasks.md`.
 
 ## The category tree on the main pages
 

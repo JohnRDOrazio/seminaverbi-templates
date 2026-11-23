@@ -476,6 +476,40 @@ def test_literature_domain_is_accepted_and_stage_2_reads_its_floor(wired, monkey
     assert seen == [8] and config["sitelink_floor"] == 15
 
 
+def test_candidates_releases_waiting_press_mentions(wired, monkeypatch):
+    from pipeline.press.store import Mention, PressStore
+    path, _ = wired
+    queue = Queue(path)
+    press = PressStore.of(queue)
+    press.add_article("https://x/a", "sir", "it")
+    press.add_mention(Mention("https://x/a", "Q77", "Film", "work", "waiting:film", 0.8, [], "waiting"))
+    entity = {"labels": {"en": {"value": "Film"}}, "claims": {}, "sitelinks": {"enwiki": {"title": "Film"}}}
+    monkeypatch.setattr(cli, "_wikidata", lambda: type("W", (), {"entity": lambda self, qid: entity})())
+    queue.db.close()
+    assert cli.main(["candidates", "--db", str(path)]) == 0
+    queue = Queue(path)
+    assert queue.row("Q77").sources == ["press:sir"]
+    assert PressStore.of(queue).mentions()[0].route == "candidate"
+
+
+def test_candidates_sends_a_covered_waiting_mention_to_enrichment(wired, monkeypatch, capsys):
+    from pipeline.press.store import Mention, PressStore
+    path, _ = wired
+    queue = Queue(path)
+    press = PressStore.of(queue)
+    press.add_article("https://x/a", "sir", "it")
+    press.add_mention(Mention("https://x/a", "Q77", "Film", "work", "waiting:film", 0.8, [], "waiting"))
+    entity = {"labels": {"en": {"value": "Film"}}, "claims": {}, "sitelinks": {"enwiki": {"title": "Film"}}}
+    monkeypatch.setattr(cli, "_wikidata", lambda: type("W", (), {"entity": lambda self, qid: entity})())
+    monkeypatch.setattr(stages, "covered", lambda row, repo, wikis: ("drop", {"have": ["en"]}))
+    queue.db.close()
+    assert cli.main(["candidates", "--db", str(path)]) == 0
+    queue = Queue(path)
+    assert queue.row("Q77") is None
+    assert PressStore.of(queue).mentions()[0].route == "enrichment"
+    assert "1 to the enrichment list" in capsys.readouterr().out
+
+
 # --- release-benchmark ---
 
 @pytest.fixture
