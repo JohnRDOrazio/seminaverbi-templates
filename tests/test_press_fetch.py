@@ -175,9 +175,10 @@ def test_a_redirect_to_a_host_whose_robots_forbids_it_is_not_followed():
     assert f"{BLOB}/p" not in [u for u, _ in s.calls]
     pc, s, _ = client({ROBOTS: Resp(""), "https://x.example/a": Resp(status=302, headers={"Location": f"{BLOB}/p"}),
                        f"{BLOB}/robots.txt": Resp(status=429)})
-    with pytest.raises(Refused) as e:
+    import requests
+    with pytest.raises(requests.RequestException):  # the target host's trouble fails this fetch only
         pc.get("o", "https://x.example/a")
-    assert e.value.reason == "robots 429" and pc.refused == {"o": "robots 429"}
+    assert pc.refused == {}
 
 
 def test_redirects_stop_after_five_hops():
@@ -189,3 +190,29 @@ def test_redirects_stop_after_five_hops():
     with pytest.raises(requests.TooManyRedirects):
         pc.get("o", "https://x.example/0")
     assert len(s.calls) == 1 + 6  # robots, the first request and five hops
+
+
+@pytest.mark.parametrize("robots", [Resp(status=403), Resp(status=401), Resp(status=429), Resp(status=503),
+                                    TimeoutError("t")])
+def test_robots_trouble_on_a_redirect_target_fails_that_fetch_only(robots):
+    """The redirect target's host is not the outlet's: its robots trouble neither refuses nor blocks the outlet."""
+    import requests
+    pc, s, _ = client({ROBOTS: Resp(""), "https://x.example/a": Resp(status=302, headers={"Location": f"{BLOB}/p"}),
+                       f"{BLOB}/robots.txt": robots, "https://x.example/b": Resp("B")})
+    with pytest.raises(requests.RequestException):
+        pc.get("o", "https://x.example/a")
+    assert pc.refused == {} and pc._blocked == set()
+    assert pc.get("o", "https://x.example/b").text == "B"
+    with pytest.raises(requests.RequestException):  # the host is not asked again this run
+        pc.get("o", "https://x.example/a")
+    assert [u for u, _ in s.calls].count(f"{BLOB}/robots.txt") == 1
+
+
+def test_a_redirect_targets_trouble_does_not_spoil_that_host_for_its_own_outlet():
+    pc, s, _ = client({ROBOTS: Resp(""), "https://x.example/a": Resp(status=302, headers={"Location": f"{BLOB}/p"}),
+                       f"{BLOB}/robots.txt": Resp(status=403)})
+    import requests
+    with pytest.raises(requests.RequestException):
+        pc.get("o", "https://x.example/a")
+    assert pc.get("blob", f"{BLOB}/q") is None  # its own robots 403: blocked for the run, as before
+    assert pc.refused == {"blob": "robots 403"} and pc._blocked == {"blob"}

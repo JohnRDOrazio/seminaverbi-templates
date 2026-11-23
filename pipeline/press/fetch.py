@@ -31,6 +31,10 @@ class Refused(Exception):
         self.outlet, self.reason = outlet, reason
 
 
+class RobotsUnavailable(requests.RequestException):
+    """A redirect target's host (not the outlet's own) has a robots.txt we cannot use: that one fetch fails."""
+
+
 class PoliteClient:
     def __init__(self, session, user_agent: str, delay: float, store=None,
                  clock=time.monotonic, sleep=time.sleep):
@@ -40,6 +44,7 @@ class PoliteClient:
         self._last: dict[str, float] = {}
         self._robots: dict[str, RobotFileParser] = {}
         self._blocked: set[str] = set()  # recorded in `refused` but answered None, not raised
+        self._foreign_down: dict[str, str] = {}  # redirect targets' hosts whose robots.txt failed this run
 
     def _refuse(self, outlet: str, reason: str):
         self.refused[outlet] = reason
@@ -62,23 +67,31 @@ class PoliteClient:
         finally:
             self._last[host] = self.clock()
 
-    def _rules(self, outlet: str, scheme: str, host: str) -> RobotFileParser:
+    def _rules(self, outlet: str, scheme: str, host: str, foreign: bool = False) -> RobotFileParser:
+        """The host's robots.txt rules. On the outlet's own host, trouble refuses or blocks the outlet; on a
+        redirect target's host (`foreign`), it only fails this fetch (RobotsUnavailable, and the host is not asked
+        again this run), leaving the outlet alone."""
+        if foreign and host in self._foreign_down:
+            raise RobotsUnavailable(f"{host}: {self._foreign_down[host]}")
         if host in self._robots:
             return self._robots[host]
         rp = RobotFileParser()
         try:
             r = self._request(host, f"{scheme}://{host}/robots.txt", self.delay)
         except Exception:
-            self._refuse(outlet, "robots unreachable")
-        code = r.status_code
-        if code == 429:
-            self._refuse(outlet, "robots 429")
+            r = None
+        code = r.status_code if r is not None else None
+        trouble = ("robots unreachable" if code is None or code >= 500
+                   else f"robots {code}" if code in REFUSING else None)
+        if trouble and foreign:
+            self._foreign_down[host] = trouble
+            raise RobotsUnavailable(f"{host}: {trouble}")
+        if code == 429 or trouble == "robots unreachable":
+            self._refuse(outlet, trouble)
         if code in (401, 403):
             rp.disallow_all = True
-            self.refused[outlet] = f"robots {code}"
+            self.refused[outlet] = trouble
             self._blocked.add(outlet)
-        elif code >= 500:
-            self._refuse(outlet, "robots unreachable")
         elif code >= 400:
             rp.allow_all = True
         else:
@@ -97,10 +110,10 @@ class PoliteClient:
                 headers["If-None-Match"] = etag
             if modified:
                 headers["If-Modified-Since"] = modified
-        target = url
+        target, home = url, urlsplit(url).netloc
         for _ in range(MAX_HOPS + 1):
             parts = urlsplit(target)
-            rp = self._rules(outlet, parts.scheme, parts.netloc)
+            rp = self._rules(outlet, parts.scheme, parts.netloc, foreign=parts.netloc != home)
             if not rp.can_fetch(self.user_agent, target):
                 return None
             delay = max(self.delay, float(rp.crawl_delay(self.user_agent) or 0))
