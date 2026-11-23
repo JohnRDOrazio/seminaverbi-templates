@@ -166,10 +166,13 @@ def cmd_candidates(args, queue, cfg):
     print(f"candidates: {added} added")
     press = PressStore.of(queue)
     waiting = f"waiting:{args.domain}"
-    released = (release_waiting(press, queue, args.domain, _wikidata())
-                if any(m.domain == waiting for m in press.mentions(route="waiting")) else 0)
+    if not any(m.domain == waiting for m in press.mentions(route="waiting")):
+        return
+    wikis = _wikis()
+    released = release_waiting(press, queue, args.domain, wikis["en"], wikis, _wikidata())
     if released:
-        print(f"candidates: {released} press mentions released from waiting")
+        print(f"candidates: press mentions released from waiting: {released.get('candidate', 0)} as candidates, "
+              f"{released.get('enrichment', 0)} to the enrichment list")
 
 
 def _limit(stage: int, cfg) -> int | None:

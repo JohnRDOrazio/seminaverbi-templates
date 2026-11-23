@@ -100,12 +100,24 @@ def test_music_waits_until_release(q, store, uncovered):
     store.add_mention(mention("Q7", "waiting:music"))
     assert route(store, q, None, {}, FakeWikidata({"Q7": ent("Canto")})) == {"waiting": 1}
     assert q.row("Q7") is None
-    assert release_waiting(store, q, "art", FakeWikidata({"Q7": ent()})) == 0
-    assert release_waiting(store, q, "music", FakeWikidata({"Q7": ent("Canto")})) == 1
+    assert release_waiting(store, q, "art", None, {}, FakeWikidata({"Q7": ent()})) == {}
+    assert release_waiting(store, q, "music", None, {}, FakeWikidata({"Q7": ent("Canto")})) == {"candidate": 1}
     r = q.row("Q7")
     assert r.domain == "music" and r.sources == ["press:sir"] and r.data[0]["press"] == {"sir": 0.8}
     assert store.mentions()[0].route == "candidate"
-    assert release_waiting(store, q, "music", FakeWikidata({})) == 0
+    assert release_waiting(store, q, "music", None, {}, FakeWikidata({})) == {}
+    assert [row.domain for row in uncovered] == ["music"]  # asked about coverage as the released domain's work
+
+
+def test_a_released_mention_of_a_covered_work_goes_to_enrichment(q, store, monkeypatch):
+    """A work SeminaVerbi already covers is never proposed again: once its domain exists, its waiting press
+    mentions feed the enrichment list, as route() decides for the others."""
+    monkeypatch.setattr(stages, "covered", lambda row, repo, wikis: ("drop", {"have": ["en"]}))
+    store.add_mention(mention("Q7", "waiting:music"))
+    route(store, q, None, {}, FakeWikidata({"Q7": ent("Canto")}))
+    assert release_waiting(store, q, "music", None, {}, FakeWikidata({"Q7": ent("Canto")})) == {"enrichment": 1}
+    assert q.row("Q7") is None
+    assert [m.qid for m in store.mentions(route="enrichment")] == ["Q7"]
 
 
 def test_a_waiting_mention_is_not_asked_about_coverage(q, store, uncovered):

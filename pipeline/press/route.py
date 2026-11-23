@@ -1,5 +1,6 @@
 """Routing the kept mentions: to the enrichment list (SeminaVerbi already covers the item), into the queue as a
-candidate of the mention's domain (source `press:<outlet>`), or to `waiting` (its domain has no module yet).
+candidate of the mention's domain (source `press:<outlet>`), or to `waiting` (its domain has no module yet; released
+later with the same coverage decision).
 
 A mention keeps its route once set, so routing twice adds neither a second candidate nor a second enrichment entry.
 """
@@ -69,14 +70,23 @@ def route(store, queue, repo, wikis, wikidata) -> dict[str, int]:
     return counts
 
 
-def release_waiting(store, queue, domain: str, wikidata) -> int:
-    """Turn the `waiting:<domain>` mentions into candidates of `domain` (called once its module exists)."""
-    released = 0
+def release_waiting(store, queue, domain: str, repo, wikis, wikidata) -> dict[str, int]:
+    """Route the `waiting:<domain>` mentions once `domain` has a module (called by `candidates`), with route()'s
+    coverage decision: a work SeminaVerbi already covers goes to the enrichment list (never proposed again), any
+    other becomes a candidate of `domain`. The count of each route taken."""
+    counts: dict[str, int] = {}
     for mention in store.mentions(route="waiting"):
         outlet = _outlet(store, mention.url)
         if mention.domain != WAITING + domain or outlet is None:
             continue
-        _add_candidate(queue, mention, outlet, wikidata.entity(mention.qid), domain)
-        store.set_route(mention.url, mention.qid, "candidate")
-        released += 1
-    return released
+        entity = wikidata.entity(mention.qid)
+        row = _provisional(mention, entity)
+        row.domain = domain
+        if stages.covered(row, repo, wikis)[0] in ("drop", "translation"):
+            kind = "enrichment"
+        else:
+            _add_candidate(queue, mention, outlet, entity, domain)
+            kind = "candidate"
+        store.set_route(mention.url, mention.qid, kind)
+        counts[kind] = counts.get(kind, 0) + 1
+    return counts

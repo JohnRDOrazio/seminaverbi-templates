@@ -134,7 +134,8 @@ Article text is fetched when a stage needs it and kept in memory for that run on
    - to its domain's queue otherwise, with `queue.add(qid, domain, "press:<outlet>", …)` (an existing candidate just
      gains the source);
    - to **waiting** when its domain has no module yet (`waiting:music`, `waiting:art`, `waiting:artists`); when
-     the domain lands, its first run takes them (the hook for music, art and artists).
+     the domain lands, its first run takes them (the hook for music, art and artists), with the same coverage
+     decision: a work SeminaVerbi already covers goes to the enrichment list, never to the queue.
 5. **Enrich.** Regenerate `Semina Verbi:Press for existing articles` on en, owned by the bot like the ranking
    page: per article (by item), the wikis that have it, then each press article (outlet, date, title as link,
    language, the passages). Newest first; an entry an editor marks done (`{{SV press done|url}}` on the page, kept
