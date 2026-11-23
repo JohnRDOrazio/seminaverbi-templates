@@ -34,6 +34,7 @@ class PoliteClient:
         self.refused: dict[str, str] = {}
         self._last: dict[str, float] = {}
         self._robots: dict[str, RobotFileParser] = {}
+        self._blocked: set[str] = set()  # recorded in `refused` but answered None, not raised
 
     def _refuse(self, outlet: str, reason: str):
         self.refused[outlet] = reason
@@ -64,8 +65,12 @@ class PoliteClient:
         except Exception:
             self._refuse(outlet, "robots unreachable")
         code = r.status_code
+        if code == 429:
+            self._refuse(outlet, "robots 429")
         if code in (401, 403):
             rp.disallow_all = True
+            self.refused[outlet] = f"robots {code}"
+            self._blocked.add(outlet)
         elif code >= 500:
             self._refuse(outlet, "robots unreachable")
         elif code >= 400:
@@ -77,7 +82,7 @@ class PoliteClient:
 
     def get(self, outlet: str, url: str, conditional: bool = False):
         """Response, or None (disallowed by robots.txt, or 304 on a conditional get)."""
-        if outlet in self.refused:
+        if outlet in self.refused and outlet not in self._blocked:
             raise Refused(outlet, self.refused[outlet])
         parts = urlsplit(url)
         rp = self._rules(outlet, parts.scheme, parts.netloc)

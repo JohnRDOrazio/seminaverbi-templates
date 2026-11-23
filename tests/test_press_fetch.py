@@ -130,3 +130,19 @@ def test_config_agent_has_no_email():
     cfg = load_press_config()
     assert "@" not in cfg["user_agent"] and cfg["user_agent"].startswith("SeminaVerbi-press/1.0")
     assert cfg["delay_seconds"] == 10 and len(cfg["outlets"]) == 11
+
+
+def test_robots_429_refuses_instead_of_allowing_all():
+    pc, s, _ = client({ROBOTS: Resp(status=429), "https://x.example/a": Resp("A")})
+    with pytest.raises(Refused) as e:
+        pc.get("o", "https://x.example/a")
+    assert e.value.reason == "robots 429" and pc.refused == {"o": "robots 429"}
+    assert [u for u, _ in s.calls] == [ROBOTS]
+
+
+def test_robots_403_is_recorded_without_raising():
+    pc, s, _ = client({ROBOTS: Resp(status=403)})
+    assert pc.get("o", "https://x.example/a") is None
+    assert pc.get("o", "https://x.example/b") is None
+    assert pc.refused == {"o": "robots 403"}
+    assert [u for u, _ in s.calls] == [ROBOTS]
