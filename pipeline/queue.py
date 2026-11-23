@@ -174,6 +174,19 @@ class Queue:
         return self._rows("EXISTS (SELECT 1 FROM outcomes o WHERE o.qid=candidates.qid"
                           " AND o.stage=? AND o.outcome=?)", (stage, outcome))
 
+    def release_calibration(self, qid: str) -> bool:
+        """Turn a benchmark row (a calibration row whose stage-0 data carries `benchmark`) into an ordinary
+        candidate: `calibration` and the benchmark flags are cleared. False, with nothing changed, for any other
+        QID."""
+        row = self.row(qid)
+        if row is None or not row.calibration or not row.data.get(0, {}).get("benchmark"):
+            return False
+        data = {k: v for k, v in row.data[0].items() if k not in ("benchmark", "benchmark_kind")}
+        self.db.execute("UPDATE candidates SET calibration=0 WHERE qid=?", (qid,))
+        self.redo(1, qid)  # the calibration run's forced passes go: the row runs stages 1-5 as a live candidate
+        self.set_outcome(qid, 0, "pass", {**data, "released": True})  # kept by later adds: calibrate skips it
+        return True
+
     def calibration_rows(self) -> list[Row]:
         return self._rows("calibration=1", ())
 

@@ -172,9 +172,15 @@ def test_person_kind_and_waiting_route(store, cache):
     assert [(m.kind, m.domain) for m in out] == [("person", "waiting:artists")]
 
 
-def test_routes_music_art_and_people_to_waiting(cache):
+def test_routes_to_waiting_when_the_domain_has_no_module(monkeypatch, cache):
+    monkeypatch.setattr(domains, "DOMAINS", {"film": film, "literature": literature})
     assert [class_route(p31, FakeSparql(), CFG, cache) for p31 in (["Q7366"], ["Q3305213"], ["Q5"])] == \
         ["waiting:music", "waiting:art", "waiting:artists"]
+
+
+def test_music_and_art_modules_take_their_items_and_people_still_wait(cache):
+    assert [class_route(p31, FakeSparql(), CFG, cache) for p31 in (["Q7366"], ["Q3305213"], ["Q5"])] == \
+        ["music", "art", "waiting:artists"]
     assert class_route(["Q4167410"], FakeSparql(), CFG, cache) is None
     assert class_route([], FakeSparql(), CFG, cache) is None
 

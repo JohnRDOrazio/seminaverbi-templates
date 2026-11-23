@@ -3,13 +3,15 @@
 Stages: 0 candidates, 1 covered, 2 triage, 3 quick, 4 dossier, 5 adjudicate, 6 publish (see the README).
 Commands that write to the wiki (publish, run --publish, votes) log in as the editor bot with
 SV_EDITOR_USER / SV_EDITOR_PASSWORD (run --publish logs in before any stage); the Jev client is only made
-for quick, adjudicate and calibrate. `skip QID --reason TEXT` drops a row that breaks a stage.
+for quick, adjudicate and calibrate. `skip QID --reason TEXT` drops a row that breaks a stage;
+`release-benchmark QID [QID ...]` turns held-back benchmark rows into candidates.
 
 `press discover|filter|link|route|enrich|run [--dry-run]` runs the Catholic-press source (pipeline/press/): filter
 and link ask Jev (TYPESAFE_API_KEY), enrich and run write the enrichment page as the editor bot; `--dry-run` writes
 neither the candidates queue nor the wiki.
 """
 import argparse
+import inspect
 import os
 import sqlite3
 import sys
@@ -162,7 +164,15 @@ NAMES = {1: "covered", 2: "triage", 3: "quick", 4: "dossier", 5: "adjudicate"}
 
 def cmd_candidates(args, queue, cfg):
     domain = DOMAINS[args.domain]
-    added = domain.candidates(queue, _sparql(), _wikipedia("en"), cfg, _wikidata())
+    extra = {}
+    if getattr(domain, "covered", None) and "covered" in inspect.signature(domain.candidates).parameters:
+        lazy: dict = {}
+
+        def covered(row):  # stage 1 for an open whole that gains parts; the wikis are made when first needed
+            wikis = lazy.setdefault("wikis", _wikis())
+            return domain.covered(row, wikis["en"], wikis)
+        extra["covered"] = covered
+    added = domain.candidates(queue, _sparql(), _wikipedia("en"), cfg, _wikidata(), **extra)
     print(f"candidates: {added} added")
     press = PressStore.of(queue)
     waiting = f"waiting:{args.domain}"
@@ -302,6 +312,18 @@ def cmd_press(args, queue, cfg):
         _refused(client)
 
 
+def cmd_release_benchmark(args, queue, cfg):
+    """Release benchmark rows one QID at a time; any QID that is not a benchmark row changes nothing."""
+    refused = False
+    for qid in args.qids:
+        if queue.release_calibration(qid):
+            print(f"released {qid}")
+        else:
+            print(f"{qid} is not a benchmark row, nothing changed")
+            refused = True
+    return 1 if refused else 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     # the common options are accepted before or after the command
     common = argparse.ArgumentParser(add_help=False, argument_default=argparse.SUPPRESS)
@@ -325,6 +347,8 @@ def build_parser() -> argparse.ArgumentParser:
     press = sub.add_parser("press", parents=[common])
     press.add_argument("action", choices=PRESS_ACTIONS)
     press.add_argument("--dry-run", action="store_true")
+    release = sub.add_parser("release-benchmark", parents=[common])
+    release.add_argument("qids", nargs="+", metavar="QID")
     return parser
 
 
@@ -342,6 +366,7 @@ def parse_args(argv=None, parser=None) -> argparse.Namespace:
 
 COMMANDS = {"candidates": cmd_candidates, "publish": cmd_publish, "run": cmd_run, "calibrate": cmd_calibrate,
             "votes": cmd_votes, "approved": cmd_approved, "redo": cmd_redo, "skip": cmd_skip, "press": cmd_press,
+            "release-benchmark": cmd_release_benchmark,
             **{n: cmd_stage for n in NAMES.values()}}
 
 

@@ -317,3 +317,19 @@ def test_quick_prefers_the_rows_own_wikipedia_over_a_borrowed_lead(queue):
     j = FakeJudge(0.9)
     quick(r, j, FakeWikipedia)
     assert j.seen == ["it:Own"]
+
+
+def test_an_art_row_is_asked_the_art_wording_and_a_film_row_the_film_wording(queue):
+    from pipeline.domains import art, film
+    queue.add("A1", "art", "depicts", {"en": "Trinity"}, {})
+    linked = {"connection": choice({"direct": 1.0, "seeds": 0.0, "entertainment": 0.0, "none": 0.0}, 0.9)}
+    fake = FakeJev({"plausible": 0.5}, linked, {"plausible": 0.5}, linked)
+    judge = Judge(fake, queue, DATA)
+    for r in (queue.row("A1"), queue.row("Q1")):
+        judge.plausible(r, "t")
+        judge.connection(r, "t")
+    asked = [(c["questions"].get("plausible") or c["questions"]["connection"]).instructions for c in fake.calls]
+    assert asked == [art.QUESTIONS["plausible"], art.QUESTIONS["connection"],
+                     film.QUESTIONS["plausible"], film.QUESTIONS["connection"]]
+    assert set(fake.calls[1]["questions"]["connection"].criteria) == set(art.QUESTIONS["connections"])
+    assert art.QUESTIONS["plausible"] != film.QUESTIONS["plausible"]
