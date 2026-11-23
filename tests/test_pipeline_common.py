@@ -173,3 +173,13 @@ def test_bounded_with_a_closure_lists_the_classes_instead_of_a_path():
     listed = common.bounded("  ?item wdt:P1 ?x .", "Q1", ["Q2", "Q3"])
     assert "wdt:P31/wdt:P279* wd:Q1" in plain
     assert "P279*" not in listed and "VALUES ?cls { wd:Q1 wd:Q2 wd:Q3 }" in listed and "LIMIT 500" in listed
+
+
+def test_a_part_held_by_another_domain_is_reported_and_not_folded(q, no_closure_cache, capsys):
+    q.add("Q8", "literature", "author", {}, {})
+    sparql = FakeSparql({"wdt:P361": [{"item": "Q8", "whole": "Q1"}, {"item": "Q10", "whole": "Q1"}],
+                         "VALUES ?item { wd:Q1 }": [whole_row("Q1", 40)]})
+    common.fold_parts(q, sparql, [part_row("Q8", 90), part_row("Q10", 25)], "form", "music", ["Q105543609"])
+    row = q.row("Q1")
+    assert set(row.data[0]["parts"]) == {"Q10"} and row.data[0]["count"] == 40
+    assert q.row("Q8").domain == "literature" and "Q8 is already a literature candidate" in capsys.readouterr().out

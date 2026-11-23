@@ -285,6 +285,9 @@ def _fold_into_whole(queue, whole_qid: str, whole_row: dict, parts: list[dict], 
     `folded_into` (triage then drops them). A whole already closed gets nothing."""
     if other_domain(queue, whole_qid, domain):
         return 0
+    parts = [p for p in parts if not other_domain(queue, p["item"], domain)]  # another domain's part stays there
+    if not parts:
+        return 0
     old = queue.row(whole_qid)
     if old and old.status in CLOSED:
         return 0
