@@ -18,6 +18,11 @@ LIMIT = 500  # per query: keeps each one well under the endpoint's 60 s timeout
 CHUNK = 50
 CLOSURE_CACHE = Path("data/class_closure.json")  # git-ignored with the rest of data/
 CLOSURE_DAYS = 30
+# a closure up to this many classes goes into a query as a VALUES list; a larger one as the P31/P279* path (sculpture's
+# 145,420 classes made a 2 MB query, which the endpoint refused with HTTP 413)
+VALUES_MAX = 500
+# walk such a path up from the item, not down from the class through every subclass (timeouts otherwise)
+_FORWARD = " hint:Prior hint:gearing \"forward\" ."
 NON_WIKIPEDIA = {"commonswiki", "wikidatawiki", "metawiki", "specieswiki", "mediawikiwiki"}
 
 # keep the patterns in the order written: left to the optimizer, the wide joins time out on WDQS
@@ -43,12 +48,30 @@ def query(pattern: str, key: str = "") -> str:
             f"GROUP BY {key}?item\nLIMIT {LIMIT}")
 
 
-def bounded(pattern: str, cls: str) -> str:
+def bounded(pattern: str, cls: str, subclasses: Iterable[str] | None = None, floor: int | None = None) -> str:
     """The query of `pattern` on items of class `cls`, at most LIMIT items: the most linked ones (sitelink
-    count), so a truncated result drops the least notable."""
-    return query(f"  {{ SELECT DISTINCT ?item ?sitelinks WHERE {{\n{_ORDERED}{pattern}\n"
-                  f"  ?item wdt:P31/wdt:P279* wd:{cls} .\n  ?item wikibase:sitelinks ?sitelinks .\n"
-                  f"  }} ORDER BY DESC(?sitelinks) LIMIT {LIMIT} }}")
+    count), so a truncated result drops the least notable. `subclasses` (a class closure) of up to VALUES_MAX
+    classes replaces the `P31/P279*` path by a list of classes (`FILTER IN`: a VALUES list, joined before the
+    pattern, timed out on WDQS); a larger closure keeps the path, walked up from the item. `floor` keeps only
+    items with at least that many sitelinks, tested right after the pattern, before the class."""
+    listed = None if subclasses is None else set(subclasses) | {cls}
+    if listed is None:
+        kind = f"  ?item wdt:P31/wdt:P279* wd:{cls} .\n"
+    elif len(listed) <= VALUES_MAX:
+        kind = f"  ?item wdt:P31 ?cls . FILTER(?cls IN ({one_of(listed)}))\n"
+    else:
+        kind = f"  ?item wdt:P31/wdt:P279* wd:{cls} .{_FORWARD}\n"
+    if floor is None:
+        body = f"{pattern}\n{kind}  ?item wikibase:sitelinks ?sitelinks .\n"
+    else:
+        body = f"{pattern}\n  ?item wikibase:sitelinks ?sitelinks . FILTER(?sitelinks >= {int(floor)})\n{kind}"
+    return query(f"  {{ SELECT DISTINCT ?item ?sitelinks WHERE {{\n{_ORDERED}{body}"
+                 f"  }} ORDER BY DESC(?sitelinks) LIMIT {LIMIT} }}")
+
+
+def one_of(qids: Iterable[str]) -> str:
+    """The QIDs as the list of a SPARQL `IN (...)`, sorted."""
+    return ", ".join(f"wd:{q}" for q in sorted(set(qids)))
 
 
 def values(qids) -> str:
@@ -234,3 +257,173 @@ def other_domain(queue, qid: str, domain: str) -> str | None:
         print(f"{domain} candidates: {qid} is already a {old.domain} candidate, skipped")
         return old.domain
     return None
+
+
+CLOSED = ("approved", "created", "declined")  # a whole with one of these statuses absorbs nothing
+
+
+def _instance_of(var: str, roots: Iterable[str], closure: set[str]) -> str:
+    """`?whole` is an instance of a class bound to `?var`: one of `closure` (`FILTER IN`) when it has at most
+    VALUES_MAX classes, else one of the `roots` through the P31/P279* path, walked up from the whole."""
+    if len(closure) <= VALUES_MAX:
+        return f"?whole wdt:P31 ?{var} . FILTER(?{var} IN ({one_of(closure)}))"
+    return f"VALUES ?{var} {{ {values(sorted(set(roots)))} }} ?whole wdt:P31/wdt:P279* ?{var} .{_FORWARD}"
+
+
+def _wholes_of(sparql, qids: list[str], classes: tuple[Iterable[str], set[str]],
+               stop: tuple[Iterable[str], set[str]]) -> dict[str, list[str]]:
+    """Part QID -> the wholes (P361) of it that are instances of one of `classes` and of none of `stop` (each
+    a pair of root classes and their closure); one query per CHUNK of parts."""
+    found: dict[str, list[str]] = {}
+    exclude = f"  FILTER NOT EXISTS {{ {_instance_of('stop', *stop)} }}\n" if stop[1] else ""
+    for i in range(0, len(qids), CHUNK):
+        rows = run_query(sparql, "parts", "wholes of parts", (
+            "SELECT DISTINCT ?item ?whole WHERE {\n"
+            f"  VALUES ?item {{ {values(qids[i:i + CHUNK])} }}\n"
+            f"  ?item wdt:P361 ?whole .\n  {_instance_of('cls', *classes)}\n{exclude}}}\nLIMIT {LIMIT}"))
+        for row in rows:
+            if row["whole"] not in found.setdefault(row["item"], []):
+                found[row["item"]].append(row["whole"])
+    return found
+
+
+def _whole_rows(sparql, qids: list[str]) -> dict[str, dict]:
+    """Labels, sitelinks and count of the wholes `qids`, as `query` rows keyed by QID."""
+    rows: dict[str, dict] = {}
+    for i in range(0, len(qids), CHUNK):
+        pattern = f"  VALUES ?item {{ {values(qids[i:i + CHUNK])} }}"
+        rows.update({r["item"]: r for r in run_query(sparql, "parts", "whole details", query(pattern))})
+    return rows
+
+
+def _insert_row(queue, row: dict, source: str, domain: str) -> int:
+    if other_domain(queue, row["item"], domain):
+        return 0
+    labels, sitelinks, data = row_data(row)
+    old = queue.row(row["item"])
+    stored = old.data.get(0, {}) if old else {}
+    if stored.get("parts") and "count" in stored:
+        data["count"] = max(data["count"], stored["count"])  # a whole folded earlier counts its best part
+    return queue.add(row["item"], domain, source, labels, sitelinks, False, data)
+
+
+def _fold_into_whole(queue, whole_qid: str, whole_row: dict, parts: list[dict], source: str, domain: str,
+                     recheck=None) -> int:
+    """Add or extend the whole's row with `parts` (`query` rows); the part rows already in the queue are marked
+    `folded_into` (triage then drops them; an open one is also marked `retired`). A whole already closed gets
+    nothing. An open whole that gains parts is re-checked with `recheck(row)` (the domain's stage 1) and, when
+    that finds it covered, marked `retired`; its outcomes are kept either way."""
+    if other_domain(queue, whole_qid, domain):
+        return 0
+    parts = [p for p in parts if not other_domain(queue, p["item"], domain)]  # another domain's part stays there
+    if not parts:
+        return 0
+    old = queue.row(whole_qid)
+    if old and old.status in CLOSED:
+        return 0
+    labels, sitelinks, data = row_data(whole_row)
+    known = dict(old.data.get(0, {}).get("parts", {})) if old else {}
+    new_part = False
+    for part in parts:
+        _, part_sitelinks, part_data = row_data(part)
+        entry = {"sitelinks": part_sitelinks, "count": part_data["count"]}
+        new_part = new_part or known.get(part["item"]) != entry
+        known[part["item"]] = entry
+        own = queue.row(part["item"])
+        if own is not None and own.domain == domain and own.data.get(0, {}).get("folded_into") != whole_qid:
+            queue.add(part["item"], domain, own.sources[0], {}, {}, False, {"folded_into": whole_qid})
+            if own.status is None:
+                queue.redo(2, part["item"])
+            elif own.status == "open":
+                # its proposal page is live, with votes: nothing is deleted, the row leaves publication and the
+                # ranking, and the page is the author's to decline or redirect
+                queue.add(part["item"], domain, own.sources[0], {}, {}, False, {"retired": True})
+                print(f"{domain} candidates: {part['item']} folded into {whole_qid} but already open: retired; "
+                      f"decline or redirect {own.page} by hand")
+            else:
+                print(f"{domain} candidates: {part['item']} folded into {whole_qid} but already "
+                      f"{own.status}, left alone")
+    data.update(parts=known, count=max([data["count"], *(p["count"] for p in known.values())]))
+    pending = bool(new_part and old and old.status == "open" and not old.data.get(0, {}).get("retired"))
+    if pending:
+        data["recheck_pending"] = True  # stored with the new parts: cleared only once a check succeeds
+    added = queue.add(whole_qid, domain, source, labels, sitelinks, False, data)
+    if new_part and old and old.status is None:
+        queue.redo(1, whole_qid)  # coverage, triage and the later stages saw the previous parts
+    elif pending and recheck is not None:
+        _recheck_open_whole(queue, whole_qid, domain, recheck)
+    return added
+
+
+def _recheck_open_whole(queue, whole_qid: str, domain: str, recheck) -> None:
+    """A published whole is covered through a part it gained: it leaves publication and the ranking (its page
+    is live, with votes: nothing is deleted, and the page is the author's to decline or redirect). The
+    `recheck_pending` mark is cleared only after `recheck` returns; a failure leaves it for the next run."""
+    row = queue.row(whole_qid)
+    outcome, _ = recheck(row)
+    covered = outcome in ("translation", "drop")
+    queue.add(whole_qid, domain, row.sources[0], {}, {}, False,
+              {"recheck_pending": False, **({"retired": True} if covered else {})})
+    if covered:
+        print(f"{domain} candidates: {whole_qid} gained parts and is now covered ({outcome}) but already open: "
+              f"retired; decline or redirect {row.page} by hand")
+
+
+def recheck_pending(queue, domain: str, recheck) -> None:
+    """Re-check every open, unretired whole of `domain` whose earlier check did not complete."""
+    for row in queue.by_status("open"):
+        stage0 = row.data.get(0, {})
+        if row.domain == domain and stage0.get("recheck_pending") and not stage0.get("retired"):
+            _recheck_open_whole(queue, row.qid, domain, recheck)
+
+
+def fold_parts(queue, sparql, rows: list[dict], source: str, domain: str, whole_classes: Iterable[str],
+               stop_classes: Iterable[str] = (), recheck=None) -> int:
+    """Add the `query` rows under `domain`/`source`, each part replaced by its whole (P361) when it has exactly
+    one in the closure of `whole_classes` and outside that of `stop_classes`: the whole carries the source and
+    a stage-0 `parts` entry for the part. A part with no such whole, or with several (reported), is added as
+    itself. `recheck` re-checks an open whole that gains parts (see _fold_into_whole). Returns the rows added to
+    the queue."""
+    whole_classes, stop_classes = tuple(whole_classes), tuple(stop_classes)
+    classes = class_closure(sparql, whole_classes)
+    stop = class_closure(sparql, stop_classes) if stop_classes else set()
+    in_whole = _wholes_of(sparql, [r["item"] for r in rows], (whole_classes, classes), (stop_classes, stop))
+    details = _whole_rows(sparql, sorted({w[0] for w in in_whole.values() if len(w) == 1}))
+    grouped: dict[str, list[dict]] = {}
+    added = 0
+    for row in rows:
+        found = in_whole.get(row["item"], [])
+        if len(found) > 1:
+            print(f"{domain} candidates: {row['item']} has {len(found)} wholes, kept on its own")
+        if len(found) == 1 and found[0] in details:
+            grouped.setdefault(found[0], []).append(row)
+        else:
+            added += _insert_row(queue, row, source, domain)
+    for whole_qid, parts in grouped.items():
+        added += _fold_into_whole(queue, whole_qid, details[whole_qid], parts, source, domain, recheck)
+    return added
+
+
+def _part_title(qid: str, sitelinks: dict) -> str:
+    return sitelinks.get("enwiki") or next(iter(sitelinks.values()), None) or qid
+
+
+def covered_with_parts(row, repo, wikis) -> tuple[str, dict]:
+    """Stage 1: `stages.covered` on the whole; a whole it passes is still a translation suggestion when one of
+    its parts is covered on some wiki (the first such part sets `have` and the `note`)."""
+    from types import SimpleNamespace
+
+    from pipeline import stages
+
+    outcome, data = stages.covered(row, repo, wikis)
+    if outcome != "pass" or row.calibration or data.get("have"):
+        return outcome, data
+    for qid, part in row.data.get(0, {}).get("parts", {}).items():
+        sitelinks = part.get("sitelinks", {})
+        stand_in = SimpleNamespace(qid=qid, sitelinks=sitelinks, labels={}, calibration=False, data={})
+        part_outcome, part_data = stages.covered(stand_in, repo, wikis)
+        if part_outcome != "pass":
+            have = part_data["have"]
+            return "translation", {"have": have, "missing": [lang for lang in LANGS if lang not in have],
+                                   "note": f"covered through {_part_title(qid, sitelinks)}"}
+    return outcome, data

@@ -239,8 +239,11 @@ answer of `sacred-art` for a painting is a disagreement to report.
   Benchmark rows run stages 3–5 as calibration rows and appear in the report; unlike calibration rows they
   are not articles, so stage 1 lists no translation suggestion for them, and once the author has read the
   report `python -m pipeline --domain art release-benchmark Q… Q…` clears the calibration flag of the works
-  the author names, so they become proposals at the next `publish` (they have already passed stage 5); the
-  controls and the unnamed rows stay benchmark rows and are never published (decided 2026-11-23).
+  the author names, and each released work runs stages 1–5 again as a live candidate: the sitelink floor,
+  the quick drop and `max_new_per_run` apply to it as to any candidate, and it becomes a proposal only if it
+  passes them (amended at the final review, 2026-11-23: the calibration outcomes are cleared on release, so a
+  released row is never proposed on the strength of its calibration run); the controls and the unnamed rows
+  stay benchmark rows and are never published (decided 2026-11-23).
 - The author reads each domain's report before its first proposal is posted, as for film and literature;
   wording and cut-offs change only through a pull request afterwards, and a change re-asks that domain's
   rows only.
@@ -301,9 +304,12 @@ What the numbers decide (builder's calls, from these counts):
   source later and by `_other_domain` now. A row stores only its direct P31 classes, so `owns()` reads the
   subclass closure of `WORK_CLASSES`, fetched once per run with one SPARQL query per class and cached in
   `data/` with the date.
-- **Query weight:** no `wdt:P31/wdt:P279*` over the forms or the art classes in a candidate query (the
-  closure query above supplies the subclasses as a `VALUES` list); every candidate query goes through
-  `common.bounded`. If WDQS keeps the pipeline's User-Agent at one request a minute, a run makes about 15
+- **Query weight:** a class closure of up to 500 classes goes into a candidate or fold query as a list
+  (`?item wdt:P31 ?cls . FILTER(?cls IN (...))`; a `VALUES` list of classes timed out on WDQS), a larger one
+  as the `wdt:P31/wdt:P279*` path walked up from the item (`hint:gearing "forward"`): sculpture's closure has
+  145,420 classes, and as a list its query was 2 MB, refused with HTTP 413 (amended at the final review,
+  2026-11-23). The candidate queries test the domain's sitelink floor right after the pattern, before the
+  class; every candidate query goes through `common.bounded`. If WDQS keeps the pipeline's User-Agent at one request a minute, a run makes about 15
   queries per domain, which is acceptable; QLever is not used by the pipeline.
 - **Folding:** P361 only, into a whole of the same domain's classes, never into a building; songs never fold
   into albums.

@@ -474,3 +474,188 @@ def test_literature_domain_is_accepted_and_stage_2_reads_its_floor(wired, monkey
     assert cli.main(["covered", "--domain", "literature", "--db", str(path)]) == 0
     assert cli.main(["triage", "--domain", "literature", "--db", str(path)]) == 0
     assert seen == [8] and config["sitelink_floor"] == 15
+
+
+# --- release-benchmark ---
+
+@pytest.fixture
+def bench(tmp_path):
+    path = tmp_path / "q.db"
+    queue = Queue(path)
+    queue.add("Q1", "art", "calibration", {"en": "Plain"}, {}, calibration=True, data={"count": 30})
+    queue.add("Q2", "art", "calibration", {"en": "Trinity"}, {"enwiki": "Trinity"}, calibration=True,
+              data={"count": 30, "benchmark": True, "benchmark_kind": "strong"})
+    return path, queue
+
+
+def test_release_turns_one_benchmark_row_into_a_candidate(bench, capsys):
+    path, queue = bench
+    assert cli.main(["--domain", "art", "release-benchmark", "Q2", "--db", str(path)]) == 0
+    assert "released Q2" in capsys.readouterr().out
+    row = Queue(path).row("Q2")
+    assert row.calibration is False and not row.data[0].get("benchmark")
+    assert row.data[0]["count"] == 30 and "Q2" in [r.qid for r in Queue(path).open_rows("art")]
+    assert Queue(path).row("Q1").calibration is True
+    assert "Q2" in [r.qid for r in Queue(path).pending(1, "art")]  # it runs stages 1-5 as a live candidate
+
+
+def test_release_refuses_a_non_benchmark_qid(bench, capsys):
+    path, queue = bench
+    assert cli.main(["--domain", "art", "release-benchmark", "Q1", "Q404", "--db", str(path)]) != 0
+    out = capsys.readouterr().out
+    assert "Q1 is not a benchmark row, nothing changed" in out and "Q404 is not a benchmark row" in out
+    row = Queue(path).row("Q1")
+    assert row.calibration is True and Queue(path).row("Q2").data[0]["benchmark"]
+
+
+def test_release_releases_the_valid_qids_even_when_another_is_refused(bench, capsys):
+    path, _ = bench
+    assert cli.main(["release-benchmark", "Q2", "Q1", "--db", str(path)]) != 0
+    assert Queue(path).row("Q2").calibration is False and Queue(path).row("Q1").calibration is True
+
+
+# --- the music and art domains, end to end on fakes ---
+
+class DomainWikipedia:
+    def __init__(self, lang, project="wikipedia"):
+        self.lang, self.project = lang, project
+
+    def lead(self, title):
+        return f"{title} is a work with a theological reading in its sources."
+
+    def sections(self, title):
+        return [("Reception", f"{title} was read as a parable of mercy.")]
+
+    def url(self, title):
+        return f"https://{self.lang}.{self.project}.org/wiki/{title.replace(' ', '_')}"
+
+
+class DomainWikidata:
+    def entity(self, qid):
+        return {}
+
+    def labels(self, qids, lang="en"):
+        return {}
+
+
+class DomainJudge:
+    def __init__(self, key):
+        self.key = key
+
+    def plausible(self, row, synopsis):
+        return 0.9
+
+    def connection(self, row, text):
+        return {"choice": "seeds", "probabilities": {"seeds": 0.8}, "confidence": 0.9}
+
+    def field(self, row, text):
+        return {"choice": "music", "probabilities": {"music": 0.7}}
+
+    def themes(self, row, text):
+        return {self.key: {"p": 0.7, "status": "applied"}}
+
+    def evidence(self, row, key, paragraphs):
+        return 0
+
+
+class PageEditor:
+    def __init__(self):
+        self.pages = {}
+
+    def revision(self, title):
+        return self.pages.get(title)
+
+    def edit(self, title, text, summary, tags=None, createonly=False, baserevid=None):
+        self.pages[title] = (len(self.pages) + 1, text)
+        return {"result": "Success"}
+
+
+@pytest.mark.parametrize("domain", ["music", "art"])
+def test_run_takes_a_candidate_to_a_proposal(domain, monkeypatch, tmp_path):
+    from pipeline import load_config
+    from pipeline.domains import DOMAINS
+    from sync import categories
+    from pipeline.judge import ROOT
+    tree = categories.load(ROOT)
+    key = categories.leaf_themes(tree)[0].key
+    module, path, editor = DOMAINS[domain], tmp_path / "data" / "pipeline.sqlite", PageEditor()
+
+    def candidates(queue, sparql, wikipedia, cfg, wikidata=None):
+        queue.add("Q42", domain, "form" if domain == "music" else "list", {"en": "Sample Work"},
+                  {"enwiki": "Sample Work"}, data={"instance_of": list(module.WORK_CLASSES[:1]), "count": 40})
+        return 1
+
+    monkeypatch.setattr(module, "candidates", candidates)
+    monkeypatch.setattr(stages, "covered", lambda row, repo, wikis: ("pass", {}))
+    monkeypatch.setattr(module, "covered", lambda row, repo, wikis: ("pass", {}), raising=False)
+    monkeypatch.setattr(cli, "load_config", load_config)
+    monkeypatch.setattr(cli, "_sparql", lambda: None)
+    monkeypatch.setattr(cli, "_wikidata", DomainWikidata)
+    monkeypatch.setattr(cli, "_wikipedia", DomainWikipedia)
+    monkeypatch.setattr(cli, "_wikis", lambda: {lang: object() for lang in cli.LANGS})
+    monkeypatch.setattr(cli, "_tree", lambda: tree)
+    monkeypatch.setattr(cli, "_judge", lambda queue: DomainJudge(key))
+    monkeypatch.setattr(cli, "_editor", lambda: editor)
+    assert cli.main(["run", "--publish", "--domain", domain, "--db", str(path)]) == 0
+    row = Queue(path).row("Q42")
+    assert row.outcomes == {0: "pass", 1: "pass", 2: "pass", 3: "pass", 4: "pass", 5: "pass"}
+    proposals = [t for t in editor.pages if t.startswith("Semina Verbi:Article proposals/")]
+    assert len(proposals) == 1 and "Sample Work" in proposals[0]
+    assert f"=== {domain.capitalize()} ===" in editor.pages["Semina Verbi:Article proposals"][1]
+
+
+@pytest.mark.parametrize("domain, source, passing, dropped, floor", [
+    ("music", "artist", 25, 15, 20),  # an artist-only row: the artist floor (20), not the music floor (10)
+    ("art", "depicts", 20, 10, 15),
+])
+def test_triage_reads_the_real_config_for_the_domain(domain, source, passing, dropped, floor, monkeypatch, tmp_path,
+                                                     capsys):
+    from pipeline import load_config
+    from pipeline.domains import DOMAINS
+    module, path = DOMAINS[domain], tmp_path / "data" / "pipeline.sqlite"
+    monkeypatch.setattr(cli, "load_config", load_config)
+    monkeypatch.setattr(module, "covered", lambda row, repo, wikis: ("pass", {}), raising=False)
+    monkeypatch.setattr(stages, "covered", lambda row, repo, wikis: ("pass", {}))
+    monkeypatch.setattr(cli, "_wikis", lambda: {lang: object() for lang in cli.LANGS})
+    queue = Queue(path)
+    for qid, n in (("Q1", passing), ("Q2", dropped)):
+        queue.add(qid, domain, source, {"en": qid}, {"enwiki": qid},
+                  data={"instance_of": list(module.WORK_CLASSES[:1]), "count": n})
+    assert cli.main(["covered", "--domain", domain, "--db", str(path)]) == 0
+    assert cli.main(["triage", "--domain", domain, "--db", str(path)]) == 0
+    assert Queue(path).row("Q1").outcomes[2] == "pass"
+    assert Queue(path).row("Q2").outcomes[2] == "drop"
+    assert f"under the floor of {floor}" in str(Queue(path).row("Q2").data.get(2))
+
+
+@pytest.mark.parametrize("domain", ["music", "art"])
+def test_candidates_give_music_and_art_the_coverage_recheck(domain, monkeypatch, tmp_path):
+    from pipeline.domains import DOMAINS
+    module, seen = DOMAINS[domain], {}
+    wikis = {lang: object() for lang in cli.LANGS}
+
+    def candidates(queue, sparql, wikipedia, cfg, wikidata=None, covered=None):
+        seen["outcome"] = covered("row")
+        return 0
+
+    monkeypatch.setattr(module, "candidates", candidates)
+    monkeypatch.setattr(module, "covered", lambda row, repo, ws: (seen.update(repo=repo, wikis=ws), ("drop", {}))[1])
+    monkeypatch.setattr(cli, "_sparql", lambda: None)
+    monkeypatch.setattr(cli, "_wikidata", lambda: None)
+    monkeypatch.setattr(cli, "_wikipedia", lambda lang, project="wikipedia": None)
+    monkeypatch.setattr(cli, "_wikis", lambda: wikis)
+    assert cli.main(["candidates", "--domain", domain, "--db", str(tmp_path / "q.sqlite")]) == 0
+    assert seen == {"outcome": ("drop", {}), "repo": wikis["en"], "wikis": wikis}
+
+
+@pytest.mark.parametrize("domain", ["music", "art"])
+def test_music_and_art_candidates_pass_the_recheck_to_the_fold(domain, monkeypatch, tmp_path):
+    from pipeline import load_config
+    from pipeline.domains import DOMAINS, common
+    module, seen = DOMAINS[domain], []
+    monkeypatch.setattr(common, "CLOSURE_CACHE", tmp_path / "closure.json")
+    monkeypatch.setattr(common, "fold_parts", lambda *a, recheck=None, **k: seen.append(recheck) or 0)
+    from test_pipeline_film import FakeSparql
+    marker = object()
+    module.candidates(Queue(tmp_path / "q.db"), FakeSparql(), None, load_config(), covered=marker)
+    assert seen and all(r is marker for r in seen)
