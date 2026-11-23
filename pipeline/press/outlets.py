@@ -9,6 +9,7 @@ import requests
 
 DROPPED_PARAMS = ("utm_", "fbclid", "gclid")
 DATE_TAGS = ("publication_date", "pubDate", "date", "published", "updated", "lastmod")
+MAX_BODY = 10 * 1024 * 1024
 ITEM_TAGS = ("item", "entry", "url", "sitemap")
 
 
@@ -55,6 +56,10 @@ def _item_date(item) -> str | None:
 
 def _parse(xml_text: str) -> tuple[str, list[tuple[str, str | None]]]:
     """(kind, entries); kind is 'index' for a sitemap index, else 'entries'. ValueError if not XML."""
+    if len(xml_text) > MAX_BODY:
+        raise ValueError("body too large")
+    if re.search(r"<!(DOCTYPE|ENTITY)", xml_text, re.IGNORECASE):
+        raise ValueError("DTD or entity declarations are refused")
     try:
         root = ET.fromstring(xml_text.lstrip("﻿").strip())
     except ET.ParseError as e:
@@ -130,6 +135,9 @@ def _candidates(client, outlet: dict):
                 continue
             if kind == "index":
                 for child, _ in items:
+                    if lang or len(langs) == 1:
+                        pending.append((child, lang or langs[0]))
+                        continue
                     child_lang = next((x for x in langs if _has_lang(child, x)), None)
                     if child_lang:
                         pending.append((child, child_lang))

@@ -87,7 +87,7 @@ def test_sitemap_index_followed_for_outlet_langs():
     s = store()
     c = FakeClient({"https://o.example/feed": Resp(fx("sitemap-index.xml")),
                     "https://x.example/sitemap-it.xml": Resp(fx("urlset.xml"))})
-    n = discover(s, c, [outlet()], 10)
+    n = discover(s, c, [outlet(langs=["it", "de"])], 10)
     assert n == {"o": 2}
     assert all(call[2] for call in c.calls)  # conditional
     assert not any("sitemap-en" in call[1] for call in c.calls)
@@ -120,3 +120,45 @@ def test_refused_outlet_is_reported_not_retried():
     n = discover(s, c, [outlet("a", entries=["https://a.example/f1", "https://a.example/f2"]), outlet("b")], 10)
     assert n == {"a": 0, "b": 2}
     assert [x[1] for x in c.calls if x[0] == "a"] == ["https://a.example/f1"]
+
+
+def test_doctype_and_entity_bodies_are_skipped_unparsed(monkeypatch, capsys):
+    import xml.etree.ElementTree as ET
+
+    def boom(*a, **k):
+        raise AssertionError("parsed")
+    monkeypatch.setattr(ET, "fromstring", boom)
+    laughs = '<?xml version="1.0"?><!DOCTYPE l [<!ENTITY a "aaaa"><!ENTITY b "&a;&a;&a;">]><rss>&b;</rss>'
+    for body in (laughs, laughs.replace("DOCTYPE", "doctype"), "<!eNTITY x 'y'><rss/>"):
+        s = store()
+        c = FakeClient({"https://o.example/feed": Resp(body)})
+        assert discover(s, c, [outlet()], 10) == {"o": 0}
+    assert "press: o https://o.example/feed: not a feed or sitemap" in capsys.readouterr().err
+
+
+def test_oversize_body_is_skipped(capsys):
+    body = urlset("o.example", 1) + " " * (10 * 1024 * 1024)
+    s, c = store(), FakeClient({"https://o.example/feed": Resp(body)})
+    assert discover(s, c, [outlet()], 10) == {"o": 0}
+    assert "not a feed or sitemap" in capsys.readouterr().err
+
+
+INDEX = ('<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+         '<sitemap><loc>https://o.example/sitemap-1.xml</loc></sitemap>'
+         '<sitemap><loc>https://o.example/sitemap-2.xml</loc></sitemap></sitemapindex>')
+
+
+def test_single_language_outlet_follows_unmarked_children():
+    s = store()
+    c = FakeClient({"https://o.example/feed": Resp(INDEX),
+                    "https://o.example/sitemap-1.xml": Resp(urlset("o.example", 1)),
+                    "https://o.example/sitemap-2.xml": Resp(urlset("o.example", 2).replace("/a0", "/b0"))})
+    assert discover(s, c, [outlet()], 10) == {"o": 3}
+    assert {a.lang for a in s.articles("found")} == {"it"}
+
+
+def test_multi_language_outlet_still_filters_children_by_token():
+    s = store()
+    c = FakeClient({"https://o.example/feed": Resp(INDEX)})
+    assert discover(s, c, [outlet(langs=["it", "en"])], 10) == {"o": 0}
+    assert [x[1] for x in c.calls] == ["https://o.example/feed"]
