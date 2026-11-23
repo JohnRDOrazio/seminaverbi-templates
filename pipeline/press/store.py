@@ -1,6 +1,7 @@
 """Tables for the Catholic-media source: articles, mentions, feed caches.
 
-Keeps link, title, date, outlet, language and short passages only; never article text.
+Keeps link, title, date, outlet, language and short passages only, and for outlets that republish one another a short
+fingerprint of hashes (see duplicates); never article text.
 """
 from __future__ import annotations
 
@@ -35,6 +36,7 @@ class Article:
     data: dict = field(default_factory=dict)
     attribution: str | None = None  # who it is cited as, when not its outlet (a republished article)
     counts_as: str | None = None  # the outlet that published it first, when not its own
+    same_as: str | None = None  # the article this one is a copy of (its first publication)
 
     @property
     def evidence_outlet(self) -> str:
@@ -56,8 +58,8 @@ class Mention:
     critical: bool = False  # stance below stance_drop when asked
 
 
-ARTICLE = ("SELECT url, outlet, lang, title, published, stage, outcome, data_json, attribution, counts_as "
-           "FROM press_articles")
+ARTICLE = ("SELECT url, outlet, lang, title, published, stage, outcome, data_json, attribution, counts_as, "
+           "same_as FROM press_articles")
 
 
 def _article(r) -> Article:
@@ -71,7 +73,7 @@ class PressStore:
         if "attempted_at" not in {r[1] for r in db.execute("PRAGMA table_info(press_articles)")}:
             db.execute("ALTER TABLE press_articles ADD COLUMN attempted_at REAL")  # a store made before it
         columns = {r[1] for r in db.execute("PRAGMA table_info(press_articles)")}
-        for name in ("attribution", "counts_as"):
+        for name in ("attribution", "counts_as", "same_as", "fingerprint"):
             if name not in columns:
                 db.execute(f"ALTER TABLE press_articles ADD COLUMN {name} TEXT")
         columns = {r[1] for r in db.execute("PRAGMA table_info(press_mentions)")}
@@ -111,6 +113,29 @@ class PressStore:
         self.db.execute("UPDATE press_articles SET attribution=?, published=?, counts_as=? WHERE url=?",
                         (attribution, published, counts_as, url))
         self.db.commit()
+
+    def set_fingerprint(self, url, fingerprint: str) -> None:
+        self.db.execute("UPDATE press_articles SET fingerprint=? WHERE url=?", (fingerprint, url))
+        self.db.commit()
+
+    def fingerprints(self, outlet) -> list[tuple[str, str]]:
+        """(url, fingerprint) of the outlet's articles that have one."""
+        return [tuple(r) for r in self.db.execute(
+            "SELECT url, fingerprint FROM press_articles WHERE outlet=? AND fingerprint IS NOT NULL "
+            "ORDER BY found_at, rowid", (outlet,)).fetchall()]
+
+    def set_same(self, url, first: str, outlet: str) -> None:
+        """The article is a copy of `first`, an article of `outlet`: its evidence counts for that outlet."""
+        self.db.execute("UPDATE press_articles SET same_as=?, counts_as=? WHERE url=?", (first, outlet, url))
+        self.db.commit()
+
+    def copies(self, url) -> list[Article]:
+        """The other copies of the article, its first publication first."""
+        art = self.article(url)
+        first = (art.same_as if art else None) or url
+        rows = self.db.execute(ARTICLE + " WHERE (url=? OR same_as=?) AND url!=? ORDER BY url!=?, url",
+                               (first, first, url, first)).fetchall()
+        return [_article(r) for r in rows]
 
     def attempted(self, url: str) -> None:
         self.db.execute("UPDATE press_articles SET attempted_at=? WHERE url=?", (time.time(), url))

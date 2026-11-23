@@ -82,6 +82,13 @@ class Queue:
         self.db.commit()
         return True
 
+    def drop_source(self, qid, source: str) -> None:
+        r = self.db.execute("SELECT sources FROM candidates WHERE qid=?", (qid,)).fetchone()
+        if r:
+            self.db.execute("UPDATE candidates SET sources=? WHERE qid=?",
+                            (json.dumps([s for s in json.loads(r["sources"]) if s != source]), qid))
+            self.db.commit()
+
     def _rows(self, where: str, args: tuple, limit: int | None = None) -> list[Row]:
         sql = f"SELECT * FROM candidates WHERE {where} ORDER BY added_at, qid"
         if limit is not None:

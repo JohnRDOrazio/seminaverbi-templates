@@ -48,17 +48,35 @@ def _provisional(mention, entity: dict) -> Row:
     return Row(mention.qid, mention.domain, [], _labels(entity), _sitelinks(entity), False)
 
 
-def _add_candidate(queue, mention, outlet: str, entity: dict, domain: str, stage0: dict | None = None) -> None:
+def _moved(store, qid: str) -> dict[str, str]:
+    """{outlet: the outlet its evidence for the item now counts for}: the outlets whose every candidate mention of it
+    proved, after it was routed, to be an article of another."""
+    under: dict[str, set[str]] = {}
+    for m in store.mentions(qid=qid, route="candidate"):
+        art = store.article(m.url)
+        if art is not None:
+            under.setdefault(art.outlet, set()).add(art.evidence_outlet)
+    own = {o for found in under.values() for o in found}
+    return {o: min(found) for o, found in under.items() if o not in own}
+
+
+def _add_candidate(store, queue, mention, outlet: str, entity: dict, domain: str, stage0: dict | None = None) -> None:
     """Add the mention's item to the queue under `domain`, or its source and press probability to the row it has.
     `stage0`: the domain's own stage-0 data for a new row (e.g. a literature series' volumes)."""
     existing = queue.row(mention.qid)
     press = dict(existing.data.get(0, {}).get("press", {})) if existing else {}
     press[outlet] = max(mention.p, press.get(outlet, 0.0))
+    moved = {old: new for old, new in _moved(store, mention.qid).items() if old in press and old != outlet}
+    for old, new in moved.items():
+        press[new] = max(press.pop(old), press.get(new, 0.0))
     data = {"press": press}
     sitelinks = _sitelinks(entity)
     if existing is None:  # what triage reads of a row the domain's own queries did not make
         data |= {"count": len(sitelinks), "instance_of": common.qids(entity, "P31")} | (stage0 or {})
-    queue.add(mention.qid, domain, f"press:{outlet}", _labels(entity), sitelinks, data=data)
+    for source in dict.fromkeys((outlet, *moved.values())):
+        queue.add(mention.qid, domain, f"press:{source}", _labels(entity), sitelinks, data=data)
+    for old in moved:
+        queue.drop_source(mention.qid, f"press:{old}")
     row = queue.row(mention.qid)
     if not existing or row.status is not None:
         return
@@ -88,7 +106,7 @@ def _route(store, queue, mention, outlet: str, domain: str, entity: dict, repo, 
         print(f"press: {mention.qid} in {mention.url}: already a {under} candidate, routed as {under}",
               file=sys.stderr)
     if kind == "candidate":
-        _add_candidate(queue, mention, outlet, entity, under, stage0)
+        _add_candidate(store, queue, mention, outlet, entity, under, stage0)
     # the domain and the route together, once the candidate is in: an interruption leaves the mention as it was
     store.set_route(mention.url, mention.qid, kind, under if under != domain else None)
     return kind

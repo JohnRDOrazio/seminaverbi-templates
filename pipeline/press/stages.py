@@ -20,6 +20,7 @@ from sync.wiki import SyncError
 from pipeline import domains
 from pipeline import stages as pipeline_stages
 from pipeline.press.credit import credit_date
+from pipeline.press.duplicates import record
 from pipeline.press.extract import Page, extract, extract_entry, mention_texts, opening
 from pipeline.press.fetch import Refused
 from pipeline.press.link import link_article
@@ -166,6 +167,11 @@ def run_filter(store, pages: Pages, judge, pcfg: dict) -> dict[str, int]:
             continue
         _set_meta(store, art.url, page)
         _set_credit(store, art, page, outlets)
+        judged = record(store, store.article(art.url), page, outlets)
+        if judged:  # the same article in another outlet: one piece of evidence, not asked again
+            store.set_article(art.url, "filtered", "skip", {"reason": "duplicate", "of": judged})
+            counts["skip (duplicate)"] = counts.get("skip (duplicate)", 0) + 1
+            continue
         try:
             data: dict = {"culture": judge.culture(art.url, opening(page))}
             outcome = "drop" if data["culture"] < pcfg["culture_drop"] else "keep"
