@@ -14,6 +14,8 @@ import sys
 import requests
 from typesafe_sdk import TypeSafeError
 
+from sync.wiki import SyncError
+
 from pipeline import domains
 from pipeline import stages as pipeline_stages
 from pipeline.press.extract import Page, extract, opening
@@ -23,7 +25,8 @@ from pipeline.press.outlets import discover
 from pipeline.press.route import WAITING, _provisional
 
 GONE = (404, 410)
-ARTICLE_ERRORS = (requests.RequestException, OSError, TypeSafeError)  # one article's failure; the run goes on
+# one article's failure (SyncError: Wikidata or WDQS still failing after the retries); the run goes on
+ARTICLE_ERRORS = (requests.RequestException, OSError, TypeSafeError, SyncError)
 
 
 def _error(art, e, counts: dict) -> None:
@@ -101,6 +104,7 @@ def run_filter(store, pages: Pages, judge, pcfg: dict) -> dict[str, int]:
 def run_link(store, pages: Pages, judge, wikidata, sparql, pcfg: dict) -> dict[str, int]:
     """Link the mentions of every kept article; keyed by the stored article URL."""
     counts: dict[str, int] = {"articles": 0, "mentions": 0}
+    routes: dict = {}  # class_route by set of P31 classes, for the whole run
     for art in store.articles("filtered"):
         if art.outcome != "keep":
             continue
@@ -110,7 +114,7 @@ def run_link(store, pages: Pages, judge, wikidata, sparql, pcfg: dict) -> dict[s
                 store.set_article(art.url, "linked", "skip", art.data | {"reason": skip})
             continue
         try:
-            kept = link_article(page, art.outlet, store, judge, wikidata, sparql, pcfg, url=art.url)
+            kept = link_article(page, art.outlet, store, judge, wikidata, sparql, pcfg, url=art.url, routes=routes)
         except ARTICLE_ERRORS as e:
             _error(art, e, counts)
             continue

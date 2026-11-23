@@ -52,17 +52,23 @@ def _option(qid: str, entity: dict, lang: str) -> str:
 
 
 class _Linker:
-    def __init__(self, page: Page, outlet: str, url: str, judge, wikidata, sparql, cfg: dict, cache: Path | None):
+    def __init__(self, page: Page, outlet: str, url: str, judge, wikidata, sparql, cfg: dict, cache: Path | None,
+                 routes: dict | None = None):
         self.page, self.outlet, self.url = page, outlet, url
         self.judge, self.wikidata, self.sparql, self.cfg, self.cache = judge, wikidata, sparql, cfg, cache
-        self._routes: dict[str, tuple[str | None, list[str]]] = {}
+        self._items: dict[str, tuple[str | None, list[str]]] = {}
+        self._classes: dict[frozenset, str | None] = {} if routes is None else routes
 
     def route_of(self, qid: str) -> tuple[str | None, list[str]]:
-        """(domain or None, P31) of the item, asked once per article."""
-        if qid not in self._routes:
+        """(domain or None, P31) of the item, asked once per article; class_route asked once per set of classes
+        in the run (the `routes` memo)."""
+        if qid not in self._items:
             instance_of = common.qids(self.wikidata.entity(qid), "P31")
-            self._routes[qid] = (class_route(instance_of, self.sparql, self.cfg, self.cache), instance_of)
-        return self._routes[qid]
+            key = frozenset(instance_of)
+            if key not in self._classes:
+                self._classes[key] = class_route(instance_of, self.sparql, self.cfg, self.cache)
+            self._items[qid] = (self._classes[key], instance_of)
+        return self._items[qid]
 
     def _routed(self, qids: list[str]) -> list[str]:
         return [q for q in dict.fromkeys(qids) if self.route_of(q)[0] is not None]
@@ -109,12 +115,13 @@ class _Linker:
 
 
 def link_article(page: Page, outlet: str, store, judge, wikidata, sparql, cfg: dict, *, url: str,
-                 cache: Path | None = None) -> list[Mention]:
+                 cache: Path | None = None, routes: dict | None = None) -> list[Mention]:
     """Link the page's spans to Wikidata items and store the mentions the article discusses substantively
     (route None: routing is a later stage). `url` is the article's stored key in press_articles (never the page's
     own canonical link): every mention and every Jev question of the article uses it. `cache` is the class
-    closure cache (default: common.CLOSURE_CACHE)."""
-    linker = _Linker(page, outlet, url, judge, wikidata, sparql, cfg, cache)
+    closure cache (default: common.CLOSURE_CACHE); `routes` is the run's memo of class_route by set of P31
+    classes, shared across the run's articles (default: one for this article)."""
+    linker = _Linker(page, outlet, url, judge, wikidata, sparql, cfg, cache, routes)
     seen_spans: set[tuple[str, tuple[str, str] | None]] = set()
     judged: set[str] = set()
     kept: list[Mention] = []

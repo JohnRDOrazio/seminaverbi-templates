@@ -262,3 +262,17 @@ def test_a_written_work_only_item_does_not_route_to_literature(cache):
     literature, which itself queries literary works and series only."""
     assert literature.owns(["Q47461344"], FakeSparql(), cache) is False
     assert class_route(["Q47461344"], FakeSparql(), CFG, cache) is None
+
+
+def test_class_route_is_asked_once_per_set_of_classes_in_a_run(store, cache, monkeypatch):
+    calls = []
+    music = SimpleNamespace(owns=lambda instance_of, sparql, cache=None: calls.append(list(instance_of)) or True)
+    monkeypatch.setattr(domains, "DOMAINS", {"music": music})
+    pg = page(["Silence e Ben-Hur."], [Span("Silence", 0, "italic"), Span("Ben-Hur", 0, "italic")])
+    wd = FakeWikidata({"Q1": entity(["Q7366"]), "Q2": entity(["Q7366"])},
+                      search={("Silence", "it"): ["Q1"], ("Ben-Hur", "it"): ["Q2"]})
+    routes = {}
+    link_article(pg, "sir", store, FakeJudge(), wd, FakeSparql(), CFG, cache=cache, url=URL, routes=routes)
+    link_article(pg, "sir", PressStore(sqlite3.connect(":memory:")), FakeJudge(), wd, FakeSparql(), CFG,
+                 cache=cache, url="https://example.org/b", routes=routes)
+    assert calls == [["Q7366"]]

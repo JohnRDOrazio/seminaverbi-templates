@@ -88,3 +88,26 @@ def test_future_dated_cache_entry_is_stale(tmp_path):
     sparql = FakeSparql({"wd:Q7366": [{"sub": "Q7366"}]})
     assert common.class_closure(sparql, ["Q7366"], cache) == {"Q7366"}
     assert len(sparql.queries) == 1
+
+
+def test_closure_cache_file_is_read_once_per_process(tmp_path, monkeypatch):
+    """owns() is asked several times per hit: the cache file is parsed once, and kept current when it is written."""
+    from pathlib import Path
+    cache = tmp_path / "closure.json"
+    _write_closure_cache(cache, "Q7366", date.today().isoformat(), ["Q7366", "Q1"])
+    reads = []
+    real = Path.read_text
+
+    def counting(self, *a, **k):
+        if self == cache:
+            reads.append(self)
+        return real(self, *a, **k)
+    monkeypatch.setattr(Path, "read_text", counting)
+    sparql = FakeSparql({"wd:Q3305213": [{"sub": "Q3305213"}]})
+    for _ in range(5):
+        assert common.owns(["Q1"], ["Q7366"], sparql, cache)
+    assert len(reads) == 1 and sparql.queries == []
+    assert common.class_closure(sparql, ["Q3305213"], cache) == {"Q3305213"}  # fetched and written
+    assert common.class_closure(sparql, ["Q3305213", "Q7366"], cache) == {"Q3305213", "Q7366", "Q1"}
+    assert len(reads) == 1 and len(sparql.queries) == 1
+    assert json.loads(real(cache))["Q3305213"]["subclasses"] == ["Q3305213"]

@@ -184,12 +184,30 @@ def domain_config(cfg: dict, name: str) -> dict:
     return {**cfg, **{key: value for key, value in block.items() if key in cfg}}
 
 
+_CLOSURE_MEMO: dict[Path, tuple[tuple[int, int] | None, dict]] = {}  # cache path -> (file stamp, parsed content)
+
+
+def _stamp(cache: Path) -> tuple[int, int] | None:
+    try:
+        st = cache.stat()
+    except OSError:
+        return None
+    return st.st_mtime_ns, st.st_size
+
+
 def _read_closure_cache(cache: Path) -> dict:
+    """The parsed cache file, read once per process (again only when the file changed under us)."""
+    stamp = _stamp(cache)
+    memo = _CLOSURE_MEMO.get(cache)
+    if memo is not None and memo[0] == stamp:
+        return memo[1]
     try:
         data = json.loads(cache.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return {}
-    return data if isinstance(data, dict) else {}
+        data = {}
+    data = data if isinstance(data, dict) else {}
+    _CLOSURE_MEMO[cache] = (stamp, data)
+    return data
 
 
 def _fresh_entry(entry) -> list[str] | None:
@@ -225,6 +243,7 @@ def class_closure(sparql, classes: Iterable[str], cache: Path | None = None) -> 
     if fetched:
         cache.parent.mkdir(parents=True, exist_ok=True)
         cache.write_text(json.dumps(stored, indent=1, sort_keys=True), encoding="utf-8")
+        _CLOSURE_MEMO[cache] = (_stamp(cache), stored)
     return closure
 
 
