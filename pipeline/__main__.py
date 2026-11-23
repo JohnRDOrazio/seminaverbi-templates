@@ -15,6 +15,8 @@ from pipeline import calibration, load_config, stages
 from pipeline.domains import DOMAINS
 from pipeline.domains.common import domain_config
 from pipeline.publish import approved_report, publish, sync_votes
+from pipeline.press.fetch import load_press_config
+from pipeline.press.notes import press_notes
 from pipeline.press.route import release_waiting
 from pipeline.press.store import PressStore
 from pipeline.queue import Queue
@@ -104,7 +106,10 @@ def _stage_functions(domain, queue, cfg) -> dict:
         return _wikipedia(lang, project)
 
     def dossier(row):
-        return domain.dossier_stage(row, cfg, wiki_for, lazy.setdefault("wikidata", _wikidata()))
+        outcome, data = domain.dossier_stage(row, cfg, wiki_for, lazy.setdefault("wikidata", _wikidata()))
+        outlets = {o["id"]: o["name"] for o in load_press_config()["outlets"]}
+        data["notes"] = press_notes(PressStore.of(queue), row.qid, outlets) + data.get("notes", [])
+        return outcome, data
 
     return {
         1: lambda row: (getattr(domain, "covered", None) or stages.covered)(row, wikis()["en"], wikis()),

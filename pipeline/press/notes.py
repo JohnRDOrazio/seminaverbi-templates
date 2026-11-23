@@ -1,0 +1,19 @@
+"""Press notes for the stage-4 dossier: the stored passages of each mention, never the article."""
+
+
+def press_notes(store, qid: str, outlets: dict[str, str]) -> list[dict]:
+    """One note per mention of the work that has stored passages, newest article first.
+
+    The text is only the stored passages (at most 3 x 25 words); the article is not fetched again.
+    """
+    notes = []
+    for m in store.mentions(qid=qid):
+        art = store.article(m.url)
+        if art is None or not m.passages:
+            continue
+        name = outlets.get(art.outlet, art.outlet)
+        head = f"{name} ({art.published}): {art.title}" if art.published else f"{name}: {art.title}"
+        notes.append((art.published or "", {"lang": art.lang, "url": m.url, "heading": head,
+                                            "text": " … ".join(m.passages)}))
+    notes.sort(key=lambda t: t[0], reverse=True)
+    return [n for _, n in notes]

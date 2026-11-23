@@ -665,3 +665,11 @@ def test_dossier_links_are_proposal_sources(q):
                                     "links": ["https://en.wikisource.org/wiki/A b", "http://x/a%20b"]})
     r = q.row("Q1")
     assert "|sources=http://x/a%20b https://en.wikisource.org/wiki/A%20b\n" in proposal_call(r, r.data[5])
+
+
+def test_proposal_sources_list_the_press_url_first(q):
+    from pipeline.publish import _params
+    r = add(q)
+    r.data[4]["notes"].insert(0, {"lang": "it", "url": "http://press/art", "heading": "h", "text": "t"})
+    sources = dict(_params(r, r.data[5]))["sources"]
+    assert sources.split()[0] == "http://press/art"

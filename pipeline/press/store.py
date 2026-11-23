@@ -74,6 +74,11 @@ class PressStore:
         return [Article(r[0], r[1], r[2], r[3], r[4], r[5], r[6], json.loads(r[7]) if r[7] else {})
                 for r in self.db.execute(sql, args).fetchall()]
 
+    def article(self, url: str) -> Article | None:
+        r = self.db.execute("SELECT url, outlet, lang, title, published, stage, outcome, data_json "
+                            "FROM press_articles WHERE url=?", (url,)).fetchone()
+        return Article(r[0], r[1], r[2], r[3], r[4], r[5], r[6], json.loads(r[7]) if r[7] else {}) if r else None
+
     def set_article(self, url, stage, outcome, data: dict) -> None:
         self.db.execute("UPDATE press_articles SET stage=?, outcome=?, data_json=? WHERE url=?",
                         (stage, outcome, json.dumps(data), url))
