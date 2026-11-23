@@ -55,18 +55,8 @@ def _run(sparql, label: str, query: str) -> list[dict]:
     return common.run_query(sparql, "literature", label, query)
 
 
-def _other_domain(queue, qid: str):
-    """The row's domain when the QID is already a candidate of another domain (the queue is keyed by QID alone):
-    reported, and the caller skips it."""
-    old = queue.row(qid)
-    if old and old.domain != "literature":
-        print(f"literature candidates: {qid} is already a {old.domain} candidate, skipped")
-        return old.domain
-    return None
-
-
 def _insert(queue, row: dict, source: str, series: bool = False) -> int:
-    if _other_domain(queue, row["item"]):
+    if common.other_domain(queue, row["item"], "literature"):
         return 0
     labels, sitelinks, data = common.row_data(row)
     old = queue.row(row["item"])
@@ -132,7 +122,7 @@ def _extend_series(queue, series_qid: str, labels: dict, sitelinks: dict, data: 
                    source: str, foldable: set[str] | None = None) -> int:
     """`foldable`: the volumes whose standalone row may be marked folded (None: all of them; those of `fold` share
     an author with the series by construction). The others are only recorded on the series, for coverage."""
-    if _other_domain(queue, series_qid):
+    if common.other_domain(queue, series_qid, "literature"):
         return 0
     old = queue.row(series_qid)
     if old and old.status in CLOSED:
