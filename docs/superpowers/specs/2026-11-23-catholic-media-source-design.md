@@ -8,7 +8,7 @@ source for artists (later) plug into what this one produces; neither is built he
 
 Today the pipeline reads only Wikidata, Wikipedia and Wikiquote, so a proposal rests on what Wikipedia says about a
 work. The Catholic press reviews films, books, music and art from the faith's own point of view, which is exactly
-the reading a Seeds of the Word article needs. This source reads eleven Catholic outlets, finds the articles that
+the reading a Seeds of the Word article needs. This source reads eleven Catholic outlets (a twelfth since: see the last section), finds the articles that
 discuss a work (or an artist), and uses them in three ways:
 
 1. **Discovery:** a work an outlet discusses becomes a candidate, or an existing candidate gains a source.
@@ -259,3 +259,43 @@ problems. What changed:
   does not separate them either (*A Silvia* and *Vous n'aurez pas ma haine* are named in one paragraph). Fixing this
   needs an article-level signal (for example the article's title given to the substantive question, or a cap on
   mentions per article), which is the author's call rather than wording tuned to this sample.
+
+## Gaetano Vallini's blog (2026-11-23)
+
+Added by the author as a twelfth outlet, `vallini`: https://gaetanovallini.blogspot.com/ ("Camera con vista"), where a
+journalist of L'Osservatore Romano republishes his articles. Only the labels Cinema, Film, Musica, Letteratura, Libri
+and Romanzo. Checked with our user agent on 2026-11-23, on 53 posts (2008–2025) of the feeds.
+
+- **Discovery.** Blogger's label feeds, `orderby=updated` (newest change first), cut with `updated-max` (inclusive;
+  the cut is asked a second later so that either reading overlaps). Offsets are never used. Per feed the store keeps
+  (`press_walks`) the date the archive has been read down to and a mark; every run first reads from the top down to the
+  mark, then goes on with the archive. Both move only once every entry above them is taken, so an interrupted run
+  re-reads at most the pages since, and known URLs are dropped. A new, edited, backdated or newly labelled post has
+  changed, so it comes to the top. Conditional requests only for the top page, whose validators are kept only after a
+  complete pass. More posts changed in one second than a page holds: the page is enlarged (to 400), then reported.
+- **Reading.** The pages are a Blogger dynamic view: no text without script, also with `?m=1` and `?v=0`. Each post is
+  read from its own feed entry (`?path=`). Its content is paragraphs in any block element or none; blocks and double
+  line breaks end a paragraph. HTML of any outlet served without a charset (L'Osservatore Romano's) is now read as
+  UTF-8 when it is UTF-8: it was read as Latin-1, with garbled accents.
+- **Cap.** `max_per_run` 40, on articles added and attempted. The outlet's share of a run (at most half) is attempted
+  first; its failures count toward the cap and go behind its untried articles.
+- **Attribution.** 47 of the 53 posts state the newspaper's issue, in a paragraph of its own (2022 on) or after © or
+  "Copyright" (before), with the date as "8 novembre 2025", "21-22 ottobre 2019" (the first day is taken),
+  "18.01.2008" or "16/17.1.2006". Those forms and no other count; the newspaper named in the text does not (a 2011 post
+  quotes "«L'Osservatore Romano» del 13 ottobre"), nor do credits of different dates. The rest is the blog's own.
+- **Duplicates.** At extraction, for this pair of outlets only, the 64 smallest hashes of the text's 5-word runs are
+  kept; their overlap estimates the text in common. One article: overlap ≥ 0.50; or ≥ 0.25 with the same title (three
+  words or more) and the post's stated issue within three days of the newspaper's date. Below about 100 words there is no
+  fingerprint and no merge. On the real posts, 1378 pairs of different articles overlap by 0.016 at most; the same text
+  with 3% of its words changed overlaps by 0.56 at least (always found), with 5% 0.44 at least (50 of 53 found by the text,
+  all with title and date), with 8% by 0.38 (20 of 53 by the text). No original of a saved post was at hand, so finding
+  a pair was tested only on synthetic texts and on edited copies.
+- **What follows from a duplicate.** The second copy, either way round, is not judged: skipped, "duplicate". The
+  evidence counts for the newspaper in the queue (also for a post that states its issue but whose original was not
+  found), the dossier has one note and the enrichment page one entry, with both links; closing either URL closes it.
+- **Known limits.** Missed: originals for subscribers only (no text, so no fingerprint), partly shown or heavily edited
+  ones, posts that gather several of the paper's articles (one is cited under Vallini whole), articles filtered before
+  fingerprints existed. A false merge needs half the text in common: an article reprinted with an update. A copy found
+  after a proposal's dossier was built adds its link when the dossier is next rebuilt. The author is not checked: a post
+  with another's article is attributed to Vallini.
+- **Kept, beyond the list above:** the fingerprint (hashes only; no text can be read from them).

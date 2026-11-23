@@ -140,9 +140,9 @@ no machine-readable list.
 
 ### Catholic press
 
-`python -m pipeline press …` reads eleven Catholic outlets (`config/press.json`: L'Osservatore Romano, Vatican News,
-Avvenire, Roma Sette, EWTN, La Civiltà Cattolica, Famiglia Cristiana, Aleteia, National Catholic Register, KTO, SIR)
-and feeds every domain. Design: `docs/superpowers/specs/2026-11-23-catholic-media-source-design.md`.
+`python -m pipeline press …` reads twelve Catholic outlets (`config/press.json`: L'Osservatore Romano, Vatican News,
+Avvenire, Roma Sette, EWTN, La Civiltà Cattolica, Famiglia Cristiana, Aleteia, National Catholic Register, KTO, SIR,
+and Gaetano Vallini's blog *Camera con vista*) and feeds every domain. Design: `docs/superpowers/specs/2026-11-23-catholic-media-source-design.md`.
 
 ```
 python -m pipeline press discover   # new article URLs from each outlet's feeds and sitemaps (round-robin, max_articles_per_run)
@@ -163,6 +163,19 @@ whose text is `docs/press-bot-page.wiki`), one request at a time per outlet at l
 outlet's `Crawl-delay`. A mention whose article is only critical of the work never becomes a candidate or press evidence;
 for a work SeminaVerbi covers it goes to the enrichment page, marked critical. The bot keeps the link, title, date, outlet, language and quotations of at most 25 words; never the
 full text. Jev reads at most about 150 words per question. Read the `--dry-run` report before the first real run.
+
+**Archives, caps and republished articles** (`vallini`, for now; all per outlet in `config/press.json`):
+
+- An entry with `"walk": true` is an Atom feed (Blogger) whose whole archive is read over successive runs, newest
+  change first and cut by date, never by offset; then only its top is read. A post under several labels is one article.
+- `max_per_run` bounds the articles an outlet adds, and attempts, per run, inside `max_articles_per_run`; its share (up
+  to half of the run) is taken first, so neither it nor the others are starved.
+- `article_feed` (a URL with `{path}`) reads an article from its feed entry, for a site whose pages hold no text.
+- `republishes` and `author`: a post that states its issue ("L'Osservatore Romano dell'8 novembre 2025", "(©L'Osservatore
+  Romano, 23 luglio 2020)") is cited as "Gaetano Vallini, L'Osservatore Romano" with that date, any other as the
+  outlet's `name` with the post's date; the link is the post's. The same article in both outlets
+  (`pipeline/press/duplicates.py`) is one piece of evidence with both links, whichever came first; the second copy is
+  skipped (`skip (duplicate)`). For this pair only, a fingerprint of 64 hashes per article is kept.
 
 `filter`, `link` and `run` need `TYPESAFE_API_KEY`; `enrich` and `run` (without `--dry-run`) log in as the editor
 bot first, so run them through `~/.config/seminaverbi/runeditor.py pipeline press …`. `discover` and `route` need

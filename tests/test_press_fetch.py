@@ -131,7 +131,7 @@ def test_conditional_get_stores_new_validators():
 def test_config_agent_has_no_email():
     cfg = load_press_config()
     assert "@" not in cfg["user_agent"] and cfg["user_agent"].startswith("SeminaVerbi-press/1.0")
-    assert cfg["delay_seconds"] == 10 and len(cfg["outlets"]) == 11
+    assert cfg["delay_seconds"] == 10 and len(cfg["outlets"]) == 12
 
 
 def test_robots_429_refuses_instead_of_allowing_all():

@@ -296,7 +296,7 @@ def test_outlets_config():
     cfg = json.loads((ROOT / "config/press.json").read_text())
     ids = [o["id"] for o in cfg["outlets"]]
     assert ids == ["osservatore", "vaticannews", "avvenire", "romasette", "ewtn", "civilta", "famigliacristiana",
-                   "aleteia", "ncregister", "kto", "sir"]
+                   "aleteia", "ncregister", "kto", "sir", "vallini"]
     for o in cfg["outlets"]:
         assert o["entries"] or o.get("note"), o["id"]
     assert cfg["user_agent"].startswith("SeminaVerbi-press/1.0 ")
@@ -350,3 +350,15 @@ def test_a_wikidata_error_on_one_article_still_links_the_other_and_routes(press,
     assert f"press: sir {A1}: wikidata timed out" in captured.err
     assert "errors 1" in captured.out
     assert "press route: candidate 1" in captured.out and "press enrich:" in captured.out
+
+
+def test_the_vallini_blog_config():
+    cfg = json.loads((ROOT / "config/press.json").read_text())
+    by_id = {o["id"]: o for o in cfg["outlets"]}
+    o = by_id["vallini"]
+    labels = ("Cinema", "Film", "Musica", "Letteratura", "Libri", "Romanzo")
+    assert [e["url"] for e in o["entries"]] == [f"{o['base']}/feeds/posts/summary/-/{x}" for x in labels]
+    assert all(e["walk"] and e["lang"] == "it" for e in o["entries"])
+    assert o["max_per_run"] == 40 < cfg["max_articles_per_run"]
+    assert o["republishes"] in by_id and o["name"] == f"{o['author']}, Camera con vista"
+    assert "{path}" in o["article_feed"] and o["article_feed"].startswith(o["base"])
