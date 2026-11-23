@@ -16,7 +16,7 @@ Every proposal for a new article is read and voted on by people before anything 
 
 == How often ==
 * Once a day.
-* At most 200 articles per day, across all the outlets it reads.
+* At most 250 articles per day, across all the outlets it reads.
 * One request at a time per site, at least 10 seconds apart, or more if the site's <code>robots.txt</code> asks for a longer <code>Crawl-delay</code>.
 * It reads the site's <code>robots.txt</code> on every run and obeys it. It reads feeds and sitemaps with conditional requests, so an unchanged feed costs almost nothing.
 * If a site answers that it refuses the request (HTTP 401, 403 or 429), the bot stops reading that site for the day and does not try again by other means. A site that refuses it every day for a week is no longer read.

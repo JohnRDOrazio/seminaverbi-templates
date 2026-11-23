@@ -158,7 +158,7 @@ Article text is fetched when a stage needs it and kept in memory for that run on
 
 `sv-pipeline-press.timer`, daily at 04:30 (off the votes timer's three-hour marks), runs `press run` through
 `runeditor.py` (the enrichment page is a wiki write) with `TYPESAFE_API_KEY` from the service's environment file.
-Each run reads at most `max_articles_per_run` new articles (start 200) across outlets, round-robin, so the first
+Each run reads at most `max_articles_per_run` new articles (250) across outlets, round-robin, so the first
 backfill spreads over days. Domain stages 1–6 still run as now, by hand (`run --publish`).
 
 ## Calls made for the builder (the author may overturn any)
@@ -169,7 +169,7 @@ backfill spreads over days. Domain stages 1–6 still run as now, by hand (`run 
 - Cut-offs to start: `culture_drop` 0.40, disambiguation 0.80/0.60, `mention_keep` 0.60. A calibration run on the
   existing articles' press coverage tests them before anything is posted.
 - 25-word quotations, at most three per mention.
-- Timer daily at 04:30, 200 articles per run, 10 s between requests per outlet.
+- Timer daily at 04:30, 250 articles per run (200 until the author raised it, 2026-11-23), 10 s between requests per outlet.
 - The enrichment page on en only, like the ranking page (the pipeline writes only en's project namespace).
 - A press source counts as a seed for triage.
 - An outlet that refuses us (403, robots) is skipped and reported, never worked around.

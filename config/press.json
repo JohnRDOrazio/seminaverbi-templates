@@ -1,7 +1,7 @@
 {
   "user_agent": "SeminaVerbi-press/1.0 (+https://en.seminaverbi.bibleget.io/wiki/Semina_Verbi:Press_bot)",
   "delay_seconds": 10,
-  "max_articles_per_run": 200,
+  "max_articles_per_run": 250,
   "culture_drop": 0.4,
   "angle_drop": 0.4,
   "pick_p": 0.8,

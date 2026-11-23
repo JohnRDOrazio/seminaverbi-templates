@@ -300,12 +300,13 @@ def test_outlets_config():
     for o in cfg["outlets"]:
         assert o["entries"] or o.get("note"), o["id"]
     assert cfg["user_agent"].startswith("SeminaVerbi-press/1.0 ")
+    assert cfg["max_articles_per_run"] == 250
 
 
 def test_press_bot_page_text():
     text = (ROOT / "docs/press-bot-page.wiki").read_text()
     assert "Catholic Digital Commons Foundation" in text and "SeminaVerbi-press" in text
-    assert "25 words" in text and "200" in text and "@" not in text
+    assert "25 words" in text and "At most 250 articles per day, across all the outlets it reads." in text and "@" not in text
 
 
 def test_a_jev_error_on_one_article_still_filters_the_others(press, capsys):

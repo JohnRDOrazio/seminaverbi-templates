@@ -145,7 +145,7 @@ Avvenire, Roma Sette, EWTN, La Civiltà Cattolica, Famiglia Cristiana, Aleteia, 
 and Gaetano Vallini's blog *Camera con vista*) and feeds every domain. Design: `docs/superpowers/specs/2026-11-23-catholic-media-source-design.md`.
 
 ```
-python -m pipeline press discover   # new article URLs from each outlet's feeds and sitemaps (round-robin, max_articles_per_run)
+python -m pipeline press discover   # new article URLs from each outlet's feeds and sitemaps (round-robin, max_articles_per_run: 250)
 python -m pipeline press filter     # Jev: is the article about a work of culture or an artist (culture_drop)? with a faith or values angle (angle_drop)? below either: dropped
 python -m pipeline press link       # mentions linked to Wikidata items; kept when Jev finds them discussed substantively; with the article's stance on them (stance_keep)
 python -m pipeline press route      # each mention to its domain's queue (source press:<outlet>), the enrichment page, or waiting
