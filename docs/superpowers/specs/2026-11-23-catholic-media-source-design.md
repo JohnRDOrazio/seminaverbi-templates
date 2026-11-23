@@ -124,8 +124,8 @@ Article text is fetched when a stage needs it and kept in memory for that run on
 3. **Link.** Mentions are found in the article's markup and text: italicised or quoted titles, links to Wikipedia,
    and capitalised names next to a creator's name. Each mention is searched on Wikidata (`wbsearchentities` in the
    article's language, then en) and its hits are typed (P31/P279 against the domains' classes, Q5 for people).
-   One hit of a known type: linked. Several: one Jev `Choice` among them, given the article passage; kept only at
-   ≥ 0.80 with confidence ≥ 0.60, else dropped as ambiguous. Then one Jev `Noul` per linked mention: does the
+   One or several hits of a known type: one Jev `Choice` among them and "none", given the article passage; kept only
+   at ≥ 0.80 with confidence ≥ 0.60, else dropped as ambiguous or, for "none", as no matching item. Then one Jev `Noul` per linked mention: does the
    article discuss this work or person substantively, not in passing? Below `mention_keep` (start 0.60): dropped.
    The passages kept are the paragraphs that name the item, cut to ≤ 25 words around the mention.
 4. **Route.** Each kept mention goes:

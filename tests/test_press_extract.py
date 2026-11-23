@@ -257,6 +257,19 @@ def test_articles_listed_by_a_collection_in_the_same_graph_do_not_make_it_an_art
     assert not _article(_graph(collection, {**ART1, "isPartOf": {"@id": collection["@id"]}}))
 
 
+def test_a_listing_through_graph_level_list_items_is_read():
+    entry = {"@type": "ListItem", "@id": "#entry", "item": {"@id": ART1["@id"]}}
+    listing = {"@type": "ItemList", "itemListElement": [{"@id": "#entry"}]}
+    assert not _article(_graph(listing, entry, ART1))
+    # an entry that leads back to its own list ends
+    loop = {**entry, "item": {"@type": "ItemList", "itemListElement": [{"@id": "#entry"}, {"@id": ART1["@id"]}]}}
+    assert not _article(_graph(listing, loop, ART1))
+    # a breadcrumb's entries name the page itself
+    own = {"@type": "Article", "@id": PAGE + "#article"}
+    crumb = {"@type": "ListItem", "@id": "#entry", "item": {"@id": own["@id"]}}
+    assert _article(_graph({"@type": "BreadcrumbList", "itemListElement": [{"@id": "#entry"}]}, crumb, own))
+
+
 def test_a_collection_listed_in_the_same_graph_as_the_pages_own_article_still_counts():
     own = {"@type": "NewsArticle", "@id": PAGE + "#article", "mainEntityOfPage": {"@id": PAGE + "/#webpage"}}
     section = {"@type": "CollectionPage", "url": "https://e.test/all", "hasPart": [{"@id": own["@id"]}]}

@@ -308,6 +308,8 @@ def _listed(nodes: list[_Node], base: str) -> tuple[set[str], bool]:
     mainEntity values and ItemLists; not breadcrumbs, which name the page itself."""
     found: set[str] = set()
     embedded = False
+    items = [(iri, n) for n in nodes if "ListItem" in n.types for iri in _iris({"@id": n.data.get("@id")}, base)]
+    read: set[str] = set()
     stack = [n for n in nodes if "BreadcrumbList" not in n.types]
     while stack:
         node = stack.pop()
@@ -315,10 +317,16 @@ def _listed(nodes: list[_Node], base: str) -> tuple[set[str], bool]:
         if "mainEntity" in node.data and _primary(node) is None:
             values += _many(node.data["mainEntity"])
         for value in values:
-            found |= _iris(value, base)
-            if isinstance(value, dict):
-                found |= _iris(value.get("item"), base)
-                inner = [_node(v, node.prefixes) for v in (value, value.get("item")) if isinstance(v, dict)]
+            refs = _iris(value, base)
+            found |= refs
+            entries = [(value, node.prefixes)] if isinstance(value, dict) else []
+            for iri, entry in items:  # a ListItem of the graph, listed by reference (each read once)
+                if iri in refs and iri not in read:
+                    read.add(iri)
+                    entries.append((entry.data, entry.prefixes))
+            for data, prefixes in entries:
+                found |= _iris(data.get("item"), base)
+                inner = [_node(v, prefixes) for v in (data, *_many(data.get("item"))) if isinstance(v, dict)]
                 embedded = embedded or any(n.types & ARTICLE_TYPES for n in inner)
                 stack += [n for n in inner if "BreadcrumbList" not in n.types]
     return found, embedded
