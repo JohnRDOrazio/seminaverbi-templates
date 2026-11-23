@@ -249,3 +249,29 @@ def test_music_candidate_queries_keep_the_floor_of_their_source(tmp_path, monkey
     artists = [x for x in bounded if "wdt:P175|wdt:P86|wdt:P676" in x]
     assert artists and all("FILTER(?sitelinks >= 20)" in x for x in artists)
     assert all("FILTER(?sitelinks >= 10)" in x for x in bounded if x not in artists)
+
+
+# --- review fixes (PR #57) ---
+
+def test_stored_parts_do_not_hide_the_other_parts_of_the_whole():
+    wd = FakeWikidataEntities({"Q1": entity(P527=["P1", "P2"]), "P2": entity(sitelinks={"enwiki": "Gloria"})})
+    pages = {("en", "wikipedia"): {"Mass": [], "Kyrie": [("Music", "k")], "Gloria": [("Music", "g")]}}
+    parts = {"P1": {"sitelinks": {"enwiki": "Kyrie"}, "count": 9}}
+    d = music.dossier(drow({"enwiki": "Mass"}, parts), DC, wiki_for_pages(pages), wd)
+    assert [n["heading"] for n in d["notes"] if n["heading"] != "Wikidata"] == ["Kyrie / Music", "Gloria / Music"]
+
+
+def test_calibration_skips_a_qid_of_another_domain(q, capsys):
+    q.add("Q8", "literature", "author", {}, {}, data={"count": 30})
+    q.set_outcome("Q8", 2, "drop", {"reason": "x"})
+    sparql = FakeSparql({"VALUES ?item": [item("Q8", "Song", 50, "Q7366")]})
+    assert music.add_calibration(q, sparql, ["Q8"]) == 0
+    row = q.row("Q8")
+    assert row.domain == "literature" and row.calibration is False and row.outcomes[2] == "drop"
+    assert "already a literature candidate" in capsys.readouterr().out
+
+
+def test_calibration_still_upgrades_a_music_row(q):
+    q.add("Q8", "music", "form", {}, {}, data={"count": 30})
+    music.add_calibration(q, FakeSparql({"VALUES ?item": [item("Q8", "Song", 50, "Q7366")]}), ["Q8"])
+    assert q.row("Q8").calibration

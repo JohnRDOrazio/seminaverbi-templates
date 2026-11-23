@@ -687,3 +687,38 @@ def test_benchmark_rows_are_not_translation_suggestions(q):
     q.set_outcome("Q3", 1, "pass", {"have": ["it"], "missing": ["en"]})
     text = ranking(q)
     assert "Trinity" not in text and "Angelus" in text  # an ordinary calibration row still is one
+
+
+# --- a retired (folded) open part leaves publication, the ranking and the vote count ---
+
+def retire(q, qid):
+    q.add(qid, "music", "s", {}, {}, data={"folded_into": "Q9", "retired": True})
+
+
+def test_a_retired_part_is_not_published_again(q):
+    add(q, "Q1", "One", domain="music"); add(q, "Q2", "Part", domain="music")
+    q.set_status("Q2", "open", page=PREFIX + "Part")
+    retire(q, "Q2")
+    en = FakeEn()
+    publish_all(q, en, {})
+    assert [e["title"] for e in en.edits] == [PREFIX + "One", RANK]
+
+
+def test_a_retired_part_leaves_the_ranking(q):
+    add(q, "Q1", "One", domain="music"); add(q, "Q2", "Part", domain="music")
+    q.set_status("Q1", "open", page=PREFIX + "One"); q.set_status("Q2", "open", page=PREFIX + "Part")
+    retire(q, "Q2")
+    text = ranking(q)
+    assert PREFIX + "One" in text and PREFIX + "Part" not in text
+
+
+def test_a_retired_part_is_not_counted_or_approved_but_a_decline_is_read_back(q):
+    en = FakeEn()
+    open_page(q, en, "Q1", "One")
+    open_page(q, en, "Q2", "Two", status="declined")
+    for qid in ("Q1", "Q2"):
+        retire(q, qid)
+    en.votes[PREFIX + "One"] = 9
+    assert sync_votes(q, en, CFG) == {"approved": [], "declined": ["Q2"]}
+    assert q.row("Q1").status == "open" and q.row("Q2").status == "declined"
+    assert not [e for e in en.edits if e["title"] == PREFIX + "One"]

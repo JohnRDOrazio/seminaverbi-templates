@@ -157,8 +157,14 @@ def _display(title: str) -> str:
     return title.removeprefix(PREFIX)
 
 
+def _retired(row) -> bool:
+    """A part folded into its whole after its proposal was published (see domains.common._fold_into_whole)."""
+    return bool(row.data.get(0, {}).get("retired"))
+
+
 def ranking(queue) -> str:
-    rows = [r for r in queue.by_status_in(KEPT_STATUSES + ("open",)) if r.page and not r.calibration]
+    rows = [r for r in queue.by_status_in(KEPT_STATUSES + ("open",)) if r.page and not r.calibration
+            and not (r.status == "open" and _retired(r))]
     # "every three hours": the schedule of deploy/systemd/sv-pipeline-votes.timer, which rewrites this page
     lines = ["Article proposals of the SeminaVerbi pipeline, by votes. Vote on the proposal page: your vote is "
              "counted as soon as you cast it, but the counts on this list are updated every three hours.", ""]
@@ -274,7 +280,8 @@ def publish(queue, en, cfg, domain: str | None = None) -> int:
     then the ranking page. A wiki error on one page skips it with a note; the others go on."""
     written = 0
     for row in queue.with_outcome(5, "pass"):
-        if row.calibration or row.status == "declined" or (domain is not None and row.domain != domain):
+        if (row.calibration or row.status == "declined" or _retired(row)
+                or (domain is not None and row.domain != domain)):
             continue
         try:
             written += _publish_row(queue, en, row)
@@ -402,7 +409,7 @@ def sync_votes(queue, en, cfg) -> dict:
             _read_back(queue, row, row.page, params)
             if status == "declined":
                 declined.append(row.qid)
-        else:
+        elif not _retired(row):  # a retired part is neither counted nor approved
             voting.append(row)
     counts = count_votes(en, [r.page for r in voting]) if voting else {}
     for row in voting:

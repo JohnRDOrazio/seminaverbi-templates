@@ -235,3 +235,25 @@ def test_bounded_without_a_floor_is_unchanged():
     query = common.bounded("  ?item wdt:P1 ?x .", "Q1")
     assert "FILTER(?sitelinks" not in query
     assert "  ?item wdt:P31/wdt:P279* wd:Q1 .\n  ?item wikibase:sitelinks ?sitelinks .\n  } ORDER BY" in query
+
+
+def test_an_open_part_that_folds_is_retired_and_reported(q, no_closure_cache, capsys):
+    q.add("Q10", "music", "form", {}, {})
+    q.set_outcome("Q10", 5, "pass", {})
+    q.set_status("Q10", "open", page="P/Kyrie")
+    sparql = FakeSparql({"wdt:P361": [{"item": "Q10", "whole": "Q1"}], "VALUES ?item { wd:Q1 }": [whole_row("Q1", 40)]})
+    common.fold_parts(q, sparql, [part_row("Q10", 25)], "form", "music", ["Q105543609"])
+    part = q.row("Q10")
+    assert part.data[0]["folded_into"] == "Q1" and part.data[0]["retired"] is True
+    assert part.status == "open" and part.outcomes[5] == "pass"  # nothing deleted: its page is live
+    out = capsys.readouterr().out
+    assert "Q10 folded into Q1" in out and "P/Kyrie" in out and "by hand" in out
+
+
+@pytest.mark.parametrize("status", ["approved", "created", "declined"])
+def test_a_closed_part_that_folds_is_left_alone(q, no_closure_cache, status):
+    q.add("Q10", "music", "form", {}, {})
+    q.set_status("Q10", status)
+    sparql = FakeSparql({"wdt:P361": [{"item": "Q10", "whole": "Q1"}], "VALUES ?item { wd:Q1 }": [whole_row("Q1", 40)]})
+    common.fold_parts(q, sparql, [part_row("Q10", 25)], "form", "music", ["Q105543609"])
+    assert "retired" not in q.row("Q10").data[0]

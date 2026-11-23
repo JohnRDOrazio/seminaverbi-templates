@@ -128,12 +128,14 @@ def candidates(queue, sparql, wikipedia, cfg: dict, wikidata=None) -> int:
     patterns.append(("genre", "genres",
                      f"  VALUES ?genre {{ {common.values(art['genres'])} }}\n  ?item wdt:P136 ?genre ."))
     added = 0
-    for source, label, pattern in patterns:
-        rows = _gather(sparql, pattern, label, floor)
-        added += common.fold_parts(queue, sparql, rows, source, "art", WORK_CLASSES, STOP_CLASSES)
-    listed = _listed(sparql, [w["qid"] for w in art["works"]])
-    added += common.fold_parts(queue, sparql, listed, "list", "art", WORK_CLASSES, STOP_CLASSES)
-    _hold_benchmark(queue, art.get("benchmark", []))
+    try:
+        for source, label, pattern in patterns:
+            rows = _gather(sparql, pattern, label, floor)
+            added += common.fold_parts(queue, sparql, rows, source, "art", WORK_CLASSES, STOP_CLASSES)
+        listed = _listed(sparql, [w["qid"] for w in art["works"]])
+        added += common.fold_parts(queue, sparql, listed, "list", "art", WORK_CLASSES, STOP_CLASSES)
+    finally:  # a failed source keeps the rows already written: the benchmark works among them are held all the same
+        _hold_benchmark(queue, art.get("benchmark", []))
     return added
 
 
@@ -172,8 +174,8 @@ def _wanted(heading: str, lang: str) -> bool:
 def _year(entity: dict) -> str | None:
     for claim in entity.get("claims", {}).get("P571", []):
         time = claim.get("mainsnak", {}).get("datavalue", {}).get("value", {}).get("time", "")
-        if match := re.match(r"[+-]?(\d+)-", time):
-            return str(int(match.group(1)))
+        if match := re.match(r"([+-]?)(\d+)-", time):
+            return str(int(match.group(2))) + (" BCE" if match.group(1) == "-" else "")
     return None
 
 
@@ -201,9 +203,10 @@ def _label(wikidata, qid: str, lang: str = "en") -> str | None:
 
 
 def _part_pages(entity: dict, stage0: dict, wikidata) -> list[dict[str, str]]:
-    """Sitelinks of each part of a whole: the stored `parts`, else the whole's parts (P527)."""
+    """Sitelinks of each part of a whole: the stored `parts` (their stored sitelinks first), then the whole's
+    other parts (P527)."""
     parts = stage0.get("parts")
-    qids = list(parts) if parts else common.qids(entity, "P527")
+    qids = list(dict.fromkeys([*(parts or {}), *common.qids(entity, "P527")]))
     return [(parts or {}).get(qid, {}).get("sitelinks") or common.entity_sitelinks(wikidata.entity(qid))
             for qid in qids]
 
@@ -293,13 +296,16 @@ def add_calibration(queue, sparql, qids: list[str], benchmark: list[dict] | None
     """Add the art works SeminaVerbi already covers, flagged as calibration, and every benchmark work with
     stage-0 data {"benchmark": True, "benchmark_kind": kind} (held back until `release-benchmark`); returns the
     rows added. A QID that answers to no work class, or is a person, is reported and skipped; a benchmark work
-    need not be of a work class (a chapel's frescos, a cycle). A row that already has a status is left alone."""
+    need not be of a work class (a chapel's frescos, a cycle). A row that already has a status, or belongs to
+    another domain, is left alone (reported)."""
     benchmark = load_config()["art"]["benchmark"] if benchmark is None else benchmark
     kinds = {b["qid"]: b["kind"] for b in benchmark}
-    kinds = {qid: kind for qid, kind in kinds.items() if not _released(queue, qid) and not _settled(queue, qid)}
+    kinds = {qid: kind for qid, kind in kinds.items()
+             if not common.other_domain(queue, qid, "art") and not _released(queue, qid) and not _settled(queue, qid)}
     found: set[str] = set()
     added = 0
-    ordinary = [q for q in qids if q not in kinds and not _released(queue, q) and not _settled(queue, q)]
+    ordinary = [q for q in qids if q not in kinds and not common.other_domain(queue, q, "art")
+                and not _released(queue, q) and not _settled(queue, q)]
     for i in range(0, len(ordinary), common.CHUNK):
         values = f"  VALUES ?item {{ {common.values(ordinary[i:i + common.CHUNK])} }}\n"
         for cls in WORK_CLASSES:

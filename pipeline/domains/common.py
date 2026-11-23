@@ -309,7 +309,8 @@ def _insert_row(queue, row: dict, source: str, domain: str) -> int:
 
 def _fold_into_whole(queue, whole_qid: str, whole_row: dict, parts: list[dict], source: str, domain: str) -> int:
     """Add or extend the whole's row with `parts` (`query` rows); the part rows already in the queue are marked
-    `folded_into` (triage then drops them). A whole already closed gets nothing."""
+    `folded_into` (triage then drops them; an open one is also marked `retired`). A whole already closed gets
+    nothing."""
     if other_domain(queue, whole_qid, domain):
         return 0
     parts = [p for p in parts if not other_domain(queue, p["item"], domain)]  # another domain's part stays there
@@ -331,6 +332,12 @@ def _fold_into_whole(queue, whole_qid: str, whole_row: dict, parts: list[dict], 
             queue.add(part["item"], domain, own.sources[0], {}, {}, False, {"folded_into": whole_qid})
             if own.status is None:
                 queue.redo(2, part["item"])
+            elif own.status == "open":
+                # its proposal page is live, with votes: nothing is deleted, the row leaves publication and the
+                # ranking, and the page is the author's to decline or redirect
+                queue.add(part["item"], domain, own.sources[0], {}, {}, False, {"retired": True})
+                print(f"{domain} candidates: {part['item']} folded into {whole_qid} but already open: retired; "
+                      f"decline or redirect {own.page} by hand")
             else:
                 print(f"{domain} candidates: {part['item']} folded into {whole_qid} but already "
                       f"{own.status}, left alone")

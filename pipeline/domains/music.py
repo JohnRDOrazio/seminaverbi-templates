@@ -199,9 +199,10 @@ def _creator_names(entity: dict, lang: str, wikidata) -> list[str]:
 
 
 def _part_pages(entity: dict, stage0: dict, wikidata) -> list[dict[str, str]]:
-    """Sitelinks of each part of a whole: the stored `parts`, else the whole's parts (P527)."""
+    """Sitelinks of each part of a whole: the stored `parts` (their stored sitelinks first), then the whole's
+    other parts (P527)."""
     parts = stage0.get("parts")
-    qids = list(parts) if parts else common.qids(entity, "P527")
+    qids = list(dict.fromkeys([*(parts or {}), *common.qids(entity, "P527")]))
     return [(parts or {}).get(qid, {}).get("sitelinks") or common.entity_sitelinks(wikidata.entity(qid))
             for qid in qids]
 
@@ -265,7 +266,8 @@ def dossier_stage(row, cfg: dict, wiki_for, wikidata) -> tuple[str, dict]:
 
 def add_calibration(queue, sparql, qids: list[str]) -> int:
     """Add the music works SeminaVerbi already covers, flagged as calibration; returns the rows added. A QID that
-    answers to no work class, or is a person or group, is reported and skipped."""
+    answers to no work class, or is a person or group, or belongs to another domain, is reported and skipped."""
+    qids = [qid for qid in qids if not common.other_domain(queue, qid, "music")]
     found: set[str] = set()
     added = 0
     for i in range(0, len(qids), common.CHUNK):

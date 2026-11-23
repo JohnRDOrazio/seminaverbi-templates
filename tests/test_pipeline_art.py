@@ -341,3 +341,58 @@ def test_depicts_saints_starts_from_the_saints(q):
     art.candidates(q, sparql, None, load_config())
     saints = [x for x in sparql.queries if "wdt:P411" in x]
     assert saints and all(x.index("?d wdt:P411 [] .") < x.index("?item wdt:P180 ?d .") for x in saints)
+
+
+# --- review fixes (PR #57) ---
+
+class FailingAfter(FakeSparql):
+    """Answers like FakeSparql, but raises on the first query that contains `marker`."""
+
+    def __init__(self, answers, marker):
+        super().__init__(answers)
+        self.marker = marker
+
+    def select(self, query):
+        if self.marker in query:
+            self.queries.append(query)
+            raise RuntimeError("timeout")
+        return super().select(query)
+
+
+def test_a_benchmark_work_is_held_back_even_when_a_later_source_fails(q):
+    cfg = load_config()
+    cfg["art"]["benchmark"] = [{"qid": "Q1", "name": "x", "kind": "strong"}]
+    sparql = FailingAfter({"wdt:P180": [item("Q1", "A", 30, "Q3305213")]}, "wdt:P1257")
+    with pytest.raises(RuntimeError, match="timeout"):
+        art.candidates(q, sparql, None, cfg)
+    row = q.row("Q1")
+    assert row.calibration and row.data[0]["benchmark"] and "Q1" not in [r.qid for r in q.open_rows("art")]
+
+
+def test_a_date_before_the_common_era_keeps_its_era():
+    ent = entity(P170=["Q2"])
+    ent["claims"]["P571"] = [{"mainsnak": {"datavalue": {"value": {"time": "-00000000500-00-00T00:00:00Z"}}}}]
+    assert "date: 500 BCE" in art.wikidata_note({**ent, "id": "Q9"}, {"Q2": "Anon"}.get)["text"]
+    ent["claims"]["P571"] = [time_claim(1411)]
+    assert "date: 1411." in art.wikidata_note({**ent, "id": "Q9"}, {"Q2": "Anon"}.get)["text"]
+
+
+def test_calibration_skips_a_qid_of_another_domain(q, capsys):
+    for qid in ("Q1", "Q2"):
+        q.add(qid, "music", "form", {"en": qid}, {"enwiki": qid}, data={"count": 30})
+        q.set_outcome(qid, 2, "drop", {"reason": "x"})
+    sparql = FakeSparql({"VALUES ?item": [item("Q1", "A", 50, "Q3305213"), item("Q2", "B", 50, "Q3305213")]})
+    assert art.add_calibration(q, sparql, ["Q1"], benchmark=[{"qid": "Q2", "name": "x", "kind": "strong"}]) == 0
+    for qid in ("Q1", "Q2"):
+        row = q.row(qid)
+        assert row.domain == "music" and row.calibration is False and row.outcomes[2] == "drop"
+        assert "benchmark" not in row.data[0]
+    assert "already a music candidate" in capsys.readouterr().out
+
+
+def test_stored_parts_do_not_hide_the_other_parts_of_the_whole():
+    wd = FakeWikidataEntities({"Q1": entity(P527=["P1", "P2"]), "P2": entity(sitelinks={"enwiki": "Wing"})})
+    pages = {("en", "wikipedia"): {"Altar": [], "Panel": [("Iconography", "i")], "Wing": [("Subject", "s")]}}
+    parts = {"P1": {"sitelinks": {"enwiki": "Panel"}, "count": 9}}
+    d = art.dossier(drow({"enwiki": "Altar"}, parts), DC, wiki_for_pages(pages), wd)
+    assert [n["heading"] for n in d["notes"] if n["heading"] != "Wikidata"] == ["Panel / Iconography", "Wing / Subject"]
