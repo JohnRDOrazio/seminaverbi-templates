@@ -95,6 +95,12 @@ def test_part_folds_into_its_whole(q, no_closure_cache):
     assert row.data[0]["parts"]["Q10"]["count"] == 25
 
 
+def test_unqueued_part_is_not_added_when_it_folds(q, no_closure_cache):
+    sparql = FakeSparql({"wdt:P361": [{"item": "Q10", "whole": "Q1"}], "VALUES ?item { wd:Q1 }": [whole_row("Q1", 40)]})
+    common.fold_parts(q, sparql, [part_row("Q10", 25)], "form", "music", ["Q105543609"])
+    assert q.row("Q10") is None and q.row("Q1") is not None
+
+
 def test_whole_count_is_the_highest_of_its_parts(q, no_closure_cache):
     sparql = FakeSparql({"wdt:P361": [{"item": "Q10", "whole": "Q1"}], "VALUES ?item { wd:Q1 }": [whole_row("Q1", 5)]})
     common.fold_parts(q, sparql, [part_row("Q10", 25)], "form", "music", ["Q105543609"])
