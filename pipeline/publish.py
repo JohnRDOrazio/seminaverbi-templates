@@ -186,6 +186,7 @@ def ranking(queue) -> str:
     # existing articles (calibration rows) missing on some wikis are translation work too
     suggestions = queue.with_outcome(1, "translation") + [
         r for r in queue.with_outcome(1, "pass") if r.calibration and r.data.get(1, {}).get("missing")]
+    suggestions = [r for r in suggestions if not (r.calibration and r.data.get(0, {}).get("benchmark"))]  # held back
     if not suggestions:
         lines.append("''None.''")
     for r in suggestions:

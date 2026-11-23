@@ -474,3 +474,40 @@ def test_literature_domain_is_accepted_and_stage_2_reads_its_floor(wired, monkey
     assert cli.main(["covered", "--domain", "literature", "--db", str(path)]) == 0
     assert cli.main(["triage", "--domain", "literature", "--db", str(path)]) == 0
     assert seen == [8] and config["sitelink_floor"] == 15
+
+
+# --- release-benchmark ---
+
+@pytest.fixture
+def bench(tmp_path):
+    path = tmp_path / "q.db"
+    queue = Queue(path)
+    queue.add("Q1", "art", "calibration", {"en": "Plain"}, {}, calibration=True, data={"count": 30})
+    queue.add("Q2", "art", "calibration", {"en": "Trinity"}, {"enwiki": "Trinity"}, calibration=True,
+              data={"count": 30, "benchmark": True, "benchmark_kind": "strong"})
+    return path, queue
+
+
+def test_release_turns_one_benchmark_row_into_a_candidate(bench, capsys):
+    path, queue = bench
+    assert cli.main(["--domain", "art", "release-benchmark", "Q2", "--db", str(path)]) == 0
+    assert "released Q2" in capsys.readouterr().out
+    row = Queue(path).row("Q2")
+    assert row.calibration is False and not row.data[0].get("benchmark")
+    assert row.data[0]["count"] == 30 and "Q2" in [r.qid for r in Queue(path).open_rows("art")]
+    assert Queue(path).row("Q1").calibration is True
+
+
+def test_release_refuses_a_non_benchmark_qid(bench, capsys):
+    path, queue = bench
+    assert cli.main(["--domain", "art", "release-benchmark", "Q1", "Q404", "--db", str(path)]) != 0
+    out = capsys.readouterr().out
+    assert "Q1 is not a benchmark row, nothing changed" in out and "Q404 is not a benchmark row" in out
+    row = Queue(path).row("Q1")
+    assert row.calibration is True and Queue(path).row("Q2").data[0]["benchmark"]
+
+
+def test_release_releases_the_valid_qids_even_when_another_is_refused(bench, capsys):
+    path, _ = bench
+    assert cli.main(["release-benchmark", "Q2", "Q1", "--db", str(path)]) != 0
+    assert Queue(path).row("Q2").calibration is False and Queue(path).row("Q1").calibration is True

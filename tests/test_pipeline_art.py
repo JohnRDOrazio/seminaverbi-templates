@@ -136,3 +136,124 @@ def test_art_people_and_other_domains_are_left(q, capsys):
     art.candidates(q, sparql, None, load_config())
     assert q.row("Q8").domain == "literature" and q.row("Q9") is None
     assert "person" in capsys.readouterr().out
+
+
+# --- dossier ---
+
+from test_pipeline_film import FakeWikidataEntities, claim, entity, wiki_for_pages  # noqa: E402
+
+DC = {"dossier_languages": 3}
+
+
+def drow(sitelinks, parts=None, calibration=False):
+    data = {"count": 30, "instance_of": ["Q3305213"]}
+    if parts is not None:
+        data["parts"] = parts
+    return Row("Q1", "art", ["depicts"], {}, sitelinks, calibration, data={0: data})
+
+
+def test_every_language_has_history_and_description_headings():
+    assert set(art.HEADINGS) == set(common.LANGS)
+    for lang, words in art.HEADINGS.items():
+        assert len(words) >= 10, lang
+    for words in art.HEADINGS.values():
+        assert any(w.startswith(("hist", "storia", "geschichte", "provenien", "provenan", "origin",
+                                 "entstehung")) for w in words)
+        assert any(w.startswith(("descri", "beschreibung")) for w in words)
+        assert any(w.startswith(("iconogra", "ikono")) for w in words)
+
+
+def test_the_dossier_reads_english_then_italian_without_an_original_language_rule():
+    wd = FakeWikidataEntities({"Q1": entity(P407=["Q188"])})  # a German label on the work: no effect on the order
+    pages = {("en", "wikipedia"): {"T": [("History", "h"), ("Provenance", "p"), ("Iconography", "i"),
+                                         ("Gallery", "g")]},
+             ("it", "wikipedia"): {"T it": [("Storia", "s"), ("Descrizione", "d")]},
+             ("de", "wikipedia"): {"T de": [("Beschreibung", "b")]}}
+    d = art.dossier(drow({"dewiki": "T de", "itwiki": "T it", "enwiki": "T"}), {"dossier_languages": 3},
+                    wiki_for_pages(pages), wd)
+    assert list(d["languages"]) == ["en", "it", "de"]
+    assert [n["heading"] for n in d["notes"] if n["lang"] == "en"] == ["History", "Provenance", "Iconography"]
+
+
+def test_a_panel_page_is_read_with_the_altarpiece():
+    parts = {"P1": {"sitelinks": {"enwiki": "Panel"}, "count": 9}}
+    pages = {("en", "wikipedia"): {"Altar": [("Description", "d")], "Panel": [("Iconography", "i")]}}
+    d = art.dossier(drow({"enwiki": "Altar"}, parts), DC, wiki_for_pages(pages), FakeWikidataEntities({"Q1": entity()}))
+    assert [n["heading"] for n in d["notes"]] == ["Description", "Panel / Iconography"]
+
+
+def time_claim(year):
+    return {"mainsnak": {"datavalue": {"value": {"time": f"+{year}-00-00T00:00:00Z"}}}}
+
+
+def test_wikidata_note_names_what_depicts_who_made_it_and_where_it_is():
+    ent = entity("Trinity", P180=["Q1"], P170=["Q2"], P195=["Q3"], P276=["Q4"], P144=["Q5"])
+    ent["claims"]["P571"] = [time_claim(1411)]
+    labels = {"Q1": "Trinity", "Q2": "Rublev", "Q3": "Tretyakov Gallery", "Q4": "Moscow", "Q5": "Genesis 18"}
+    note = art.wikidata_note({**ent, "id": "Q9"}, labels.get)
+    assert note["heading"] == "Wikidata" and note["lang"] == "en"
+    assert note["url"] == "https://www.wikidata.org/wiki/Q9"
+    for word in ("Depicts: Trinity", "creator: Rublev", "date: 1411", "collection: Tretyakov Gallery",
+                 "location: Moscow", "based on: Genesis 18"):
+        assert word in note["text"]
+
+
+def test_wikidata_note_without_facts_is_none():
+    assert art.wikidata_note({"id": "Q1", **entity()}, {}.get) is None
+
+
+def test_dossier_stage_drops_an_empty_dossier_but_not_calibration():
+    wd = FakeWikidataEntities({"Q1": entity(P170=["Q100"]), "Q100": entity("Rublev")})
+    pages = wiki_for_pages({("en", "wikipedia"): {"T": []}})
+    assert art.dossier_stage(drow({"enwiki": "T"}), DC, pages, wd) == ("drop", {"reason": "empty dossier"})
+    assert art.dossier_stage(drow({"enwiki": "T"}, calibration=True), DC, pages, wd)[0] == "pass"
+
+
+def test_the_dossier_carries_one_wikidata_note():
+    wd = FakeWikidataEntities({"Q1": entity(P170=["Q100"]), "Q100": entity("Rublev")})
+    d = art.dossier(drow({"enwiki": "T"}), DC, wiki_for_pages({("en", "wikipedia"): {"T": [("History", "h")]}}), wd)
+    assert [n["heading"] for n in d["notes"]].count("Wikidata") == 1 and d["languages"] == {"en": 1}
+
+
+# --- calibration and the benchmark ---
+
+def test_calibration_roots_are_the_visual_arts_and_crafts_without_comics(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(common, "calibration_qids", lambda wikis, wd, tree, roots: seen.update(tree=tree, roots=roots) or ([], []))
+    tree = {"root": {"names": {}}, "themes_root": {"names": {}}, "themes": [],
+            "fields": [{"key": "arts", "names": {}, "children": [
+                {"key": "visual-arts", "names": {}, "children": [{"key": "comics", "names": {}}, {"key": "painting", "names": {}}]},
+                {"key": "crafts", "names": {}}]}]}
+    art.calibration_qids({}, wikidata=object(), tree=tree)
+    assert seen["roots"] == {"visual-arts", "crafts"}
+    assert "comics" not in common.field_keys(seen["tree"], seen["roots"])
+    assert "painting" in common.field_keys(seen["tree"], seen["roots"])
+
+
+def test_benchmark_rows_are_flagged(q):
+    sparql = FakeSparql({"VALUES ?item": [item("Q1", "A", 50), item("Q2", "B", 50)]})
+    cfg_benchmark = [{"qid": "Q2", "name": "Rublev Trinity", "kind": "strong"}]
+    art.add_calibration(q, sparql, ["Q1"], benchmark=cfg_benchmark)
+    assert q.row("Q2").calibration and q.row("Q2").data[0]["benchmark"]
+    assert q.row("Q2").data[0]["benchmark_kind"] == "strong"
+    assert not q.row("Q1").data[0].get("benchmark")
+
+
+def test_a_benchmark_work_need_not_be_of_a_work_class(q):
+    sparql = FakeSparql({"VALUES ?item { wd:Q2 }": [item("Q2", "Chapel", 40, "Q16970")]})
+    assert art.add_calibration(q, sparql, [], benchmark=[{"qid": "Q2", "name": "x", "kind": "control"}]) == 1
+    assert q.row("Q2").calibration and q.row("Q2").data[0]["benchmark_kind"] == "control"
+
+
+def test_benchmark_defaults_to_the_config(q, monkeypatch):
+    monkeypatch.setattr(art, "load_config", lambda: {"art": {"benchmark": [{"qid": "Q2", "name": "x", "kind": "implicit"}]}})
+    art.add_calibration(q, FakeSparql({"VALUES ?item { wd:Q2 }": [item("Q2", "B", 40)]}), [])
+    assert q.row("Q2").data[0]["benchmark"]
+
+
+def test_the_configured_benchmark_is_a_hand_picked_list():
+    bench = load_config()["art"]["benchmark"]
+    assert 15 <= len(bench) <= 25
+    assert len({b["qid"] for b in bench}) == len(bench)
+    assert {b["kind"] for b in bench} == {"strong", "implicit", "control"}
+    assert all(b["qid"].startswith("Q") and b["name"] for b in bench)

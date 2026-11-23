@@ -665,3 +665,12 @@ def test_dossier_links_are_proposal_sources(q):
                                     "links": ["https://en.wikisource.org/wiki/A b", "http://x/a%20b"]})
     r = q.row("Q1")
     assert "|sources=http://x/a%20b https://en.wikisource.org/wiki/A%20b\n" in proposal_call(r, r.data[5])
+
+
+def test_benchmark_rows_are_not_translation_suggestions(q):
+    q.add("Q2", "art", "calibration", {"en": "Trinity"}, {}, calibration=True, data={"benchmark": True})
+    q.set_outcome("Q2", 1, "translation", {"have": ["it"], "missing": ["en", "es", "fr", "de", "pt"]})  # covered in a language
+    q.add("Q3", "art", "calibration", {"en": "Angelus"}, {}, calibration=True)
+    q.set_outcome("Q3", 1, "pass", {"have": ["it"], "missing": ["en"]})
+    text = ranking(q)
+    assert "Trinity" not in text and "Angelus" in text  # an ordinary calibration row still is one

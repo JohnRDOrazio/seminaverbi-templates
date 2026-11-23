@@ -5,8 +5,13 @@ Stage-0 data on a row: ``count`` (sitelinks), ``instance_of`` (P31 QIDs) and ``f
 """
 from __future__ import annotations
 
-from collections.abc import Iterable
+import re
+from collections.abc import Callable, Iterable
 from pathlib import Path
+
+from pipeline import load_config
+from sync import categories
+from sync.wikidata import WikidataClient
 
 from . import common
 
@@ -126,3 +131,176 @@ def candidates(queue, sparql, wikipedia, cfg: dict, wikidata=None) -> int:
         added += common.fold_parts(queue, sparql, rows, source, "art", WORK_CLASSES, STOP_CLASSES)
     listed = _listed(sparql, [w["qid"] for w in art["works"]])
     return added + common.fold_parts(queue, sparql, listed, "list", "art", WORK_CLASSES, STOP_CLASSES)
+
+
+# ---- stage 4: the dossier ----
+
+# lower-case fragments of the section headings worth reading, per language (matched at a word start)
+HEADINGS: dict[str, tuple[str, ...]] = {
+    "en": ("background", "context", "history", "provenance", "origin", "commission", "description", "iconography",
+           "subject", "composition", "symbolism", "interpretation", "analysis", "theme", "meaning", "reception"),
+    "it": ("contesto", "storia", "provenienza", "origine", "committenza", "descrizione", "iconografia", "soggetto",
+           "composizione", "simbolismo", "interpretazione", "analisi", "tema", "significato", "accoglienza",
+           "ricezione"),
+    "es": ("antecedentes", "contexto", "historia", "procedencia", "origen", "encargo", "descripción",
+           "iconografía", "tema", "composición", "simbolismo", "interpretación", "análisis", "significado",
+           "recepción"),
+    "fr": ("contexte", "histoire", "provenance", "origine", "commande", "description", "iconographie", "sujet",
+           "composition", "symbolisme", "interprétation", "analyse", "thème", "signification", "réception",
+           "accueil"),
+    "de": ("hintergrund", "geschichte", "provenienz", "entstehung", "auftrag", "beschreibung", "ikonographie",
+           "ikonografie", "bildthema", "komposition", "symbolik", "interpretation", "analyse", "bedeutung",
+           "rezeption"),
+    "pt": ("antecedentes", "contexto", "história", "proveniência", "origem", "encomenda", "descrição",
+           "iconografia", "tema", "composição", "simbolismo", "interpretação", "análise", "significado",
+           "recepção"),
+}
+CREATOR = "P170"
+WIKIDATA_FACTS = (("P180", "depicts"), ("P170", "creator"), ("P195", "collection"), ("P276", "location"),
+                  ("P144", "based on"))
+
+
+def _wanted(heading: str, lang: str) -> bool:
+    low = heading.lower()
+    return any(re.search(rf"\b{re.escape(word)}", low) for word in HEADINGS[lang])
+
+
+def _year(entity: dict) -> str | None:
+    for claim in entity.get("claims", {}).get("P571", []):
+        time = claim.get("mainsnak", {}).get("datavalue", {}).get("value", {}).get("time", "")
+        if match := re.match(r"[+-]?(\d+)-", time):
+            return str(int(match.group(1)))
+    return None
+
+
+def wikidata_note(entity: dict, labels_of: Callable[[str], str | None]) -> dict | None:
+    """One note of what Wikidata records about the work: what it depicts (P180), creator (P170), date (P571),
+    collection (P195), location (P276) and what it is based on (P144). Names only. None when there is nothing
+    to say."""
+    facts = []
+    for prop, role in WIKIDATA_FACTS:
+        names = [n for q in common.qids(entity, prop) if (n := labels_of(q))]
+        if names:
+            facts.append(f"{role}: {', '.join(names)}")
+        if prop == CREATOR and (year := _year(entity)):
+            facts.append(f"date: {year}")
+    if not facts:
+        return None
+    qid = entity.get("id", "")
+    text = "; ".join(facts)
+    return {"lang": "en", "url": f"https://www.wikidata.org/wiki/{qid}", "heading": "Wikidata",
+            "text": text[0].upper() + text[1:] + "."}
+
+
+def _label(wikidata, qid: str, lang: str = "en") -> str | None:
+    return wikidata.entity(qid).get("labels", {}).get(lang, {}).get("value")
+
+
+def _part_pages(entity: dict, stage0: dict, wikidata) -> list[dict[str, str]]:
+    """Sitelinks of each part of a whole: the stored `parts`, else the whole's parts (P527)."""
+    parts = stage0.get("parts")
+    qids = list(parts) if parts else common.qids(entity, "P527")
+    return [(parts or {}).get(qid, {}).get("sitelinks") or common.entity_sitelinks(wikidata.entity(qid))
+            for qid in qids]
+
+
+def _read_page(wikipedia, title: str, lang: str, label: str | None = None) -> list[dict]:
+    """The lead and the wanted sections of one page, headed by `label` ("<part> / <heading>") for a part."""
+    notes = []
+    if lead := wikipedia.lead(title):
+        notes.append({"lang": lang, "url": wikipedia.url(title), "heading": label or "Lead", "text": lead})
+    for heading, text in common.sections(wikipedia, title):
+        if text and _wanted(heading, lang):
+            notes.append({"lang": lang, "url": wikipedia.url(title),
+                          "heading": f"{label} / {heading}" if label else heading, "text": text})
+    return notes
+
+
+def dossier(row, cfg: dict, wiki_for, wikidata) -> dict:
+    """Stage 4: research notes {"notes": [{lang, url, heading, text}], "languages": {lang: notes}}.
+
+    Languages are en, it, es, fr, de, pt (an artwork has no original-language rule), limited to those the work
+    has a Wikipedia page in and to cfg['dossier_languages']. Per language: the lead and wanted sections of the
+    work's page and of each part's page (headed "<part> / <heading>"); Wikiquote sections naming the creator.
+    One Wikidata note closes the list (names and dates)."""
+    entity = {**wikidata.entity(row.qid), "id": row.qid}
+    languages = [l for l in common.LANGS if f"{l}wiki" in row.sitelinks][:cfg["dossier_languages"]]
+    notes: list[dict] = []
+    parts = _part_pages(entity, row.data.get(0, {}), wikidata)
+    for lang in languages:
+        wikipedia = wiki_for(lang, "wikipedia")
+        title = row.sitelinks[f"{lang}wiki"]
+        notes += _read_page(wikipedia, title, lang)
+        read = {title}
+        for page in (p[f"{lang}wiki"] for p in parts if f"{lang}wiki" in p):
+            if page not in read:
+                read.add(page)
+                notes += _read_page(wikipedia, page, lang, page)
+        if lang in ("en", "it"):
+            creators = [label.lower() for q in common.qids(entity, CREATOR) if (label := _label(wikidata, q, lang))]
+            quote = wiki_for(lang, "wikiquote")
+            for heading, text in common.sections(quote, title) if creators else []:
+                if text and any(name in heading.lower() for name in creators):
+                    notes.append({"lang": lang, "url": quote.url(title), "heading": heading, "text": text})
+    counts = {lang: sum(n["lang"] == lang for n in notes) for lang in languages}
+    note = wikidata_note(entity, lambda qid: _label(wikidata, qid))
+    return {"notes": notes + ([note] if note else []), "languages": counts}
+
+
+def dossier_stage(row, cfg: dict, wiki_for, wikidata) -> tuple[str, dict]:
+    """Stage 4 function for run_stage: a non-calibration row with no Wikipedia or Wikiquote note is dropped (the
+    Wikidata note alone is a list of names, not evidence)."""
+    result = dossier(row, cfg, wiki_for, wikidata)
+    if not any(n["heading"] != "Wikidata" for n in result["notes"]) and not row.calibration:
+        return "drop", {"reason": "empty dossier"}
+    return "pass", result
+
+
+# ---- calibration and the benchmark ----
+
+def add_calibration(queue, sparql, qids: list[str], benchmark: list[dict] | None = None) -> int:
+    """Add the art works SeminaVerbi already covers, flagged as calibration, and every benchmark work with
+    stage-0 data {"benchmark": True, "benchmark_kind": kind} (held back until `release-benchmark`); returns the
+    rows added. A QID that answers to no work class, or is a person, is reported and skipped; a benchmark work
+    need not be of a work class (a chapel's frescos, a cycle)."""
+    benchmark = load_config()["art"]["benchmark"] if benchmark is None else benchmark
+    kinds = {b["qid"]: b["kind"] for b in benchmark}
+    found: set[str] = set()
+    added = 0
+    ordinary = [q for q in qids if q not in kinds]
+    for i in range(0, len(ordinary), common.CHUNK):
+        values = f"  VALUES ?item {{ {common.values(ordinary[i:i + common.CHUNK])} }}\n"
+        for cls in WORK_CLASSES:
+            rows = common.run_query(sparql, "art", f"calibration ({cls})",
+                                    common.query(values + f"  ?item wdt:P31/wdt:P279* wd:{cls} ."),
+                                    limit=common.LIMIT)
+            for row in rows:
+                if row["item"] in found or PERSON in row.get("types", "").split():
+                    continue
+                labels, sitelinks, data = common.row_data(row)
+                found.add(row["item"])
+                added += queue.add(row["item"], "art", "calibration", labels, sitelinks, True, data)
+    for qid in ordinary:
+        if qid not in found:
+            print(f"art calibration: {qid} skipped (a person, or not an art work)")
+    for row in (r for r in _listed(sparql, list(kinds)) if r["item"] in kinds):
+        labels, sitelinks, data = common.row_data(row)
+        data = {**data, "benchmark": True, "benchmark_kind": kinds[row["item"]]}
+        added += queue.add(row["item"], "art", "calibration", labels, sitelinks, True, data)
+    return added
+
+
+def _without(tree: dict, key: str) -> dict:
+    """A copy of the category tree with the `key` node and its subtree removed."""
+    def prune(items):
+        return [{**item, "children": prune(item["children"])} if "children" in item else item
+                for item in items if item["key"] != key]
+    return {**tree, "fields": prune(tree.get("fields", []))} if "fields" in tree else tree
+
+
+def calibration_qids(wikis: dict, wikidata=None, tree: dict | None = None) -> tuple[list[str], list[str]]:
+    """Wikidata QIDs of the articles in the visual arts and crafts categories of every wiki, comics excluded,
+    and the 'lang:Title' of those with no local item or no Wikipedia sitelink (reported, never guessed)."""
+    wikidata = wikidata or WikidataClient()
+    tree = tree or categories.load(Path(__file__).resolve().parents[2])
+    return common.calibration_qids(wikis, wikidata, _without(tree, "comics"), {"visual-arts", "crafts"})

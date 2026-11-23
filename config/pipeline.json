@@ -174,6 +174,27 @@
     "iconclass_prefixes": ["7", "11"],
     "genres": ["Q2864737", "Q645717"],
     "works": [],
-    "benchmark": []
+    "benchmark": [
+      {"qid": "Q570188", "name": "Rublev, Trinity", "kind": "strong"},
+      {"qid": "Q591762", "name": "Grünewald, Isenheim Altarpiece", "kind": "strong"},
+      {"qid": "Q128910", "name": "Leonardo, The Last Supper", "kind": "strong"},
+      {"qid": "Q235242", "name": "Michelangelo, Pietà (St Peter's)", "kind": "strong"},
+      {"qid": "Q969377", "name": "Caravaggio, The Calling of Saint Matthew", "kind": "strong"},
+      {"qid": "Q512755", "name": "Rembrandt, The Return of the Prodigal Son", "kind": "strong"},
+      {"qid": "Q2571560", "name": "Millet, The Angelus", "kind": "strong"},
+      {"qid": "Q963954", "name": "Giotto, Scrovegni Chapel frescoes (the chapel's item)", "kind": "strong"},
+      {"qid": "Q2378534", "name": "Fra Angelico, Annunciation (San Marco fresco)", "kind": "strong"},
+      {"qid": "Q844675", "name": "Michelangelo, Sistine Chapel ceiling", "kind": "strong"},
+      {"qid": "Q2528741", "name": "Velázquez, Christ Crucified", "kind": "strong"},
+      {"qid": "Q25749", "name": "Dalí, Christ of Saint John of the Cross", "kind": "strong"},
+      {"qid": "Q568847", "name": "Rogier van der Weyden, The Descent from the Cross", "kind": "strong"},
+      {"qid": "Q1368055", "name": "Millet, The Gleaners", "kind": "implicit"},
+      {"qid": "Q154469", "name": "Van Gogh, The Potato Eaters", "kind": "implicit"},
+      {"qid": "Q1091086", "name": "Goya, The Third of May 1808", "kind": "implicit"},
+      {"qid": "Q175036", "name": "Picasso, Guernica", "kind": "implicit"},
+      {"qid": "Q2417715", "name": "Serrano, Piss Christ", "kind": "control"},
+      {"qid": "Q19609193", "name": "Mondrian, Composition II in Red, Blue, and Yellow", "kind": "control"},
+      {"qid": "Q1206847", "name": "Duchamp, Fountain", "kind": "control"}
+    ]
   }
 }
