@@ -56,3 +56,15 @@ def test_feed_cache():
     assert s.feed_cache("f") == (None, None)
     s.set_feed_cache("f", "e1", "lm1"); s.set_feed_cache("f", "e2", None)
     assert s.feed_cache("f") == ("e2", None)
+
+
+def test_readd_without_route_keeps_existing_route():
+    s = PressStore(sqlite3.connect(":memory:")); s.add_article("u", "sir", "it")
+    m = Mention("u", "Q1", "Silence", "work", "film", 0.7, ["a"], None)
+    s.add_mention(m); s.set_route("u", "Q1", "enrichment")
+    s.add_mention(replace(m, p=0.9, label="Silenzio"))
+    got = s.mentions(qid="Q1")[0]
+    assert (got.route, got.p, got.label) == ("enrichment", 0.9, "Silenzio")
+    assert s.unrouted() == []
+    s.add_mention(replace(m, route="waiting"))
+    assert s.mentions(qid="Q1")[0].route == "waiting"

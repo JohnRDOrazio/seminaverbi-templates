@@ -83,8 +83,12 @@ class PressStore:
         for p in m.passages:
             if len(p.split()) > MAX_PASSAGE_WORDS:
                 raise ValueError(f"passage over {MAX_PASSAGE_WORDS} words")
-        self.db.execute("INSERT OR REPLACE INTO press_mentions VALUES (?,?,?,?,?,?,?,?)",
-                        (m.url, m.qid, m.label, m.kind, m.domain, m.p, json.dumps(m.passages), m.route))
+        # Upsert: evidence fields are refreshed, an existing route survives a re-find with route=None.
+        self.db.execute(
+            "INSERT INTO press_mentions VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(url, qid) DO UPDATE SET "
+            "label=excluded.label, kind=excluded.kind, domain=excluded.domain, p=excluded.p, "
+            "passages_json=excluded.passages_json, route=COALESCE(excluded.route, route)",
+            (m.url, m.qid, m.label, m.kind, m.domain, m.p, json.dumps(m.passages), m.route))
         self.db.commit()
 
     def _mentions(self, where: str, args: list) -> list[Mention]:
