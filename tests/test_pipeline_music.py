@@ -53,3 +53,10 @@ def test_wording_has_the_four_connections():
     assert set(music.QUESTIONS["connections"]) == {"direct", "seeds", "entertainment", "none"}
     assert "song, verse or movement" in music.QUESTIONS["connection"]
     assert "song, verse or movement" in music.QUESTIONS["connections"]["seeds"]
+
+
+def test_a_work_class_shields_a_row_from_the_recording_and_group_drops():
+    assert music.triage(mrow(["form"], 40, ["Q7366", "Q3302947"]), CFG)[0] == "pass"
+    assert music.triage(mrow(["form"], 40, ["Q3302947"]), CFG)[0] == "drop"
+    assert music.triage(mrow(["form"], 40, ["Q482994", "Q215380"]), CFG)[0] == "pass"
+    assert music.triage(mrow(["form"], 40, ["Q7366", "Q5"]), CFG) == ("drop", "a person, not a work")

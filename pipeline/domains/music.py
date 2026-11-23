@@ -56,9 +56,12 @@ def triage(row, cfg: dict) -> tuple[str, str]:
         return "pass", "calibration"
     data = row.data.get(0, {})
     classes = set(data.get("instance_of", []))
-    if PERSON in classes or classes & GROUPS:
+    if PERSON in classes:
         return "drop", "a person, not a work"
-    if classes & RECORDINGS:
+    is_work = bool(classes & set(WORK_CLASSES))  # a song also tagged as a recording or group stays a work
+    if not is_work and classes & GROUPS:
+        return "drop", "a person, not a work"
+    if not is_work and classes & RECORDINGS:
         return "drop", "a recording or edition, not a work of its own"
     if data.get("folded_into"):
         return "drop", f"folded into {data['folded_into']}"
