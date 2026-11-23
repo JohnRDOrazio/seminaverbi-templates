@@ -602,3 +602,27 @@ def test_run_takes_a_candidate_to_a_proposal(domain, monkeypatch, tmp_path):
     proposals = [t for t in editor.pages if t.startswith("Semina Verbi:Article proposals/")]
     assert len(proposals) == 1 and "Sample Work" in proposals[0]
     assert f"=== {domain.capitalize()} ===" in editor.pages["Semina Verbi:Article proposals"][1]
+
+
+@pytest.mark.parametrize("domain, source, passing, dropped, floor", [
+    ("music", "artist", 25, 15, 20),  # an artist-only row: the artist floor (20), not the music floor (10)
+    ("art", "depicts", 20, 10, 15),
+])
+def test_triage_reads_the_real_config_for_the_domain(domain, source, passing, dropped, floor, monkeypatch, tmp_path,
+                                                     capsys):
+    from pipeline import load_config
+    from pipeline.domains import DOMAINS
+    module, path = DOMAINS[domain], tmp_path / "data" / "pipeline.sqlite"
+    monkeypatch.setattr(cli, "load_config", load_config)
+    monkeypatch.setattr(module, "covered", lambda row, repo, wikis: ("pass", {}), raising=False)
+    monkeypatch.setattr(stages, "covered", lambda row, repo, wikis: ("pass", {}))
+    monkeypatch.setattr(cli, "_wikis", lambda: {lang: object() for lang in cli.LANGS})
+    queue = Queue(path)
+    for qid, n in (("Q1", passing), ("Q2", dropped)):
+        queue.add(qid, domain, source, {"en": qid}, {"enwiki": qid},
+                  data={"instance_of": list(module.WORK_CLASSES[:1]), "count": n})
+    assert cli.main(["covered", "--domain", domain, "--db", str(path)]) == 0
+    assert cli.main(["triage", "--domain", domain, "--db", str(path)]) == 0
+    assert Queue(path).row("Q1").outcomes[2] == "pass"
+    assert Queue(path).row("Q2").outcomes[2] == "drop"
+    assert f"under the floor of {floor}" in str(Queue(path).row("Q2").data.get(2))

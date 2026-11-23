@@ -5,7 +5,7 @@ from pipeline.domains import DOMAINS, common, music
 from pipeline.queue import Queue, Row
 from test_pipeline_film import (FakeSparql, FakeWikidataEntities, claim, entity, item, wiki_for_pages)
 
-CFG = {"sitelink_floor": 10, "artist_sitelink_floor": 20}
+CFG = {"sitelink_floor": 10, "music": {"sitelink_floor": 10, "artist_sitelink_floor": 20}}
 
 
 def mrow(sources, count, instance_of=("Q7366",), calibration=False, **data):

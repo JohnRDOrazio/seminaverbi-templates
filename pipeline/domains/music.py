@@ -69,7 +69,9 @@ def triage(row, cfg: dict) -> tuple[str, str]:
         return "drop", "a recording or edition, not a work of its own"
     if data.get("folded_into"):
         return "drop", f"folded into {data['folded_into']}"
-    floor = cfg["artist_sitelink_floor"] if set(row.sources) == {"artist"} else cfg["sitelink_floor"]
+    # the artist floor is music's own key: domain_config lifts only the keys the top level has (the sitelink floor)
+    artist_only = set(row.sources) == {"artist"}
+    floor = cfg["music"]["artist_sitelink_floor"] if artist_only else cfg["sitelink_floor"]
     count = data.get("count", 0)
     if count < floor:
         return "drop", f"{count} sitelinks, under the floor of {floor}"
