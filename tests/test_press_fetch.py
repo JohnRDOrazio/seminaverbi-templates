@@ -148,3 +148,44 @@ def test_robots_403_is_recorded_without_raising():
     assert pc.get("o", "https://x.example/b") is None
     assert pc.refused == {"o": "robots 403"}
     assert [u for u, _ in s.calls] == [ROBOTS]
+
+
+BLOB = "https://blob.example"
+
+
+def test_a_cross_host_redirect_reads_the_new_hosts_robots_and_waits_for_it():
+    pc, s, c = client({ROBOTS: Resp(""), "https://x.example/sitemap.xml": Resp(
+                           status=301, headers={"Location": f"{BLOB}/s/sitemap.xml"}),
+                       f"{BLOB}/robots.txt": Resp("User-agent: *\nCrawl-delay: 30\n"),
+                       f"{BLOB}/s/sitemap.xml": Resp("S"), f"{BLOB}/s/two.xml": Resp("T")})
+    assert pc.get("o", "https://x.example/sitemap.xml").text == "S"
+    assert [u for u, _ in s.calls] == [ROBOTS, "https://x.example/sitemap.xml", f"{BLOB}/robots.txt",
+                                       f"{BLOB}/s/sitemap.xml"]
+    assert all(kw.get("allow_redirects") is False for u, kw in s.calls if not u.endswith("robots.txt"))
+    assert all(kw["headers"]["User-Agent"] == UA for _, kw in s.calls)
+    c.sleeps.clear()
+    pc.get("o", f"{BLOB}/s/two.xml")
+    assert c.sleeps and max(c.sleeps) == 30  # the new host's own crawl delay
+
+
+def test_a_redirect_to_a_host_whose_robots_forbids_it_is_not_followed():
+    pc, s, _ = client({ROBOTS: Resp(""), "https://x.example/a": Resp(status=302, headers={"Location": f"{BLOB}/p"}),
+                       f"{BLOB}/robots.txt": Resp("User-agent: *\nDisallow: /\n")})
+    assert pc.get("o", "https://x.example/a") is None
+    assert f"{BLOB}/p" not in [u for u, _ in s.calls]
+    pc, s, _ = client({ROBOTS: Resp(""), "https://x.example/a": Resp(status=302, headers={"Location": f"{BLOB}/p"}),
+                       f"{BLOB}/robots.txt": Resp(status=429)})
+    with pytest.raises(Refused) as e:
+        pc.get("o", "https://x.example/a")
+    assert e.value.reason == "robots 429" and pc.refused == {"o": "robots 429"}
+
+
+def test_redirects_stop_after_five_hops():
+    import requests
+    routes = {ROBOTS: Resp("")}
+    for i in range(7):
+        routes[f"https://x.example/{i}"] = Resp(status=302, headers={"Location": f"/{i + 1}"})
+    pc, s, _ = client(routes)
+    with pytest.raises(requests.TooManyRedirects):
+        pc.get("o", "https://x.example/0")
+    assert len(s.calls) == 1 + 6  # robots, the first request and five hops

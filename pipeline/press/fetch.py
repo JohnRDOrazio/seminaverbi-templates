@@ -3,16 +3,21 @@
 One request at a time per host, at least `delay` seconds apart (more when
 robots.txt asks for a larger Crawl-delay), robots.txt read each run, our own
 honest user agent. A 401/403/429 stops that outlet for the run: it is recorded
-in `refused` and never retried around.
+in `refused` and never retried around. Redirects are followed by hand (at most five hops), each new host with
+its own robots.txt and delay.
 """
 import json
 import time
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 from urllib.robotparser import RobotFileParser
+
+import requests
 
 CONFIG = Path(__file__).resolve().parents[2] / "config" / "press.json"
 REFUSING = (401, 403, 429)
+REDIRECTS = (301, 302, 303, 307, 308)
+MAX_HOPS = 5
 TIMEOUT = 30
 
 
@@ -48,11 +53,12 @@ class PoliteClient:
                 self.sleep(gap)
         self._last[host] = self.clock()
 
-    def _request(self, host: str, url: str, delay: float, headers: dict | None = None):
+    def _request(self, host: str, url: str, delay: float, headers: dict | None = None, follow: bool = True):
         self._wait(host, delay)
         h = {"User-Agent": self.user_agent, **(headers or {})}
+        extra = {} if follow else {"allow_redirects": False}
         try:
-            return self.session.get(url, headers=h, timeout=TIMEOUT)
+            return self.session.get(url, headers=h, timeout=TIMEOUT, **extra)
         finally:
             self._last[host] = self.clock()
 
@@ -84,11 +90,6 @@ class PoliteClient:
         """Response, or None (disallowed by robots.txt, or 304 on a conditional get)."""
         if outlet in self.refused and outlet not in self._blocked:
             raise Refused(outlet, self.refused[outlet])
-        parts = urlsplit(url)
-        rp = self._rules(outlet, parts.scheme, parts.netloc)
-        if not rp.can_fetch(self.user_agent, url):
-            return None
-        delay = max(self.delay, float(rp.crawl_delay(self.user_agent) or 0))
         headers = {}
         if conditional and self.store:
             etag, modified = self.store.feed_cache(url)
@@ -96,7 +97,20 @@ class PoliteClient:
                 headers["If-None-Match"] = etag
             if modified:
                 headers["If-Modified-Since"] = modified
-        r = self._request(parts.netloc, url, delay, headers)
+        target = url
+        for _ in range(MAX_HOPS + 1):
+            parts = urlsplit(target)
+            rp = self._rules(outlet, parts.scheme, parts.netloc)
+            if not rp.can_fetch(self.user_agent, target):
+                return None
+            delay = max(self.delay, float(rp.crawl_delay(self.user_agent) or 0))
+            r = self._request(parts.netloc, target, delay, headers, follow=False)
+            location = r.headers.get("Location") if r.status_code in REDIRECTS else None
+            if not location:
+                break
+            target = urljoin(target, location)
+        else:
+            raise requests.TooManyRedirects(f"{url}: more than {MAX_HOPS} redirects")
         if r.status_code in REFUSING:
             self._refuse(outlet, str(r.status_code))
         if r.status_code == 304:
