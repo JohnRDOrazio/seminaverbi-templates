@@ -6,6 +6,7 @@ notes) is kept as written, and an entry whose URL is closed there is left out of
 from __future__ import annotations
 
 import re
+from urllib.parse import quote, unquote
 
 from pipeline.press.notes import MAX_PASSAGES
 from pipeline.publish import _write
@@ -15,23 +16,54 @@ INTRO = ("Articles of the Catholic press on works SeminaVerbi already covers. Wo
          "then add <code><nowiki>{{SV press done|<url>}}</nowiki></code> below to close it.")
 BEGIN = "<!-- press:begin -->"
 END = "<!-- press:end -->"
-_DONE = re.compile(r"\{\{\s*SV press done\s*\|\s*([^|}\s]+)\s*\}\}")
+_DONE = re.compile(r"\{\{\s*(?:(?i:template)\s*:\s*)?[Ss]V[ _]+press[ _]+done\s*\|\s*(?:1\s*=\s*)?([^|}\s]+)\s*(?:\|[^}]*)?\}\}")
+
+
+def _norm(url: str) -> str:
+    """A URL as compared: percent-escapes decoded, http as https, no trailing slash."""
+    url = unquote(url.strip()).rstrip("/")
+    return "https://" + url[len("http://"):] if url.startswith("http://") else url
+
+
+def _tail(old_text: str | None) -> str | None:
+    """The editors' part of the old page: after the first end marker that follows the first begin marker; the whole
+    text when the markers are not both there; None when there is no old text."""
+    if not old_text or not old_text.strip():
+        return None
+    i = old_text.find(BEGIN)
+    j = old_text.find(END, i + len(BEGIN)) if i >= 0 else -1
+    if j >= 0:
+        return old_text[j + len(END):]
+    return "\n\n" + old_text
 
 
 def done_urls(text: str | None) -> set[str]:
-    """The URLs closed with `{{SV press done|url}}` in the page text."""
-    return set(_DONE.findall(text or ""))
+    """The (normalised) URLs closed with `{{SV press done|url}}` in the editors' part of the page text."""
+    return {_norm(u) for u in _DONE.findall(_tail(text) or "")}
 
 
-def _tail(old_text: str | None) -> str:
-    if old_text and BEGIN in old_text and END in old_text:
-        return old_text.split(END, 1)[1]
-    return "\n\n" + old_text if old_text and old_text.strip() else "\n"
+_ENT = {"[": "&#91;", "]": "&#93;", "{": "&#123;", "}": "&#125;", "|": "&#124;", "<": "&#60;", ">": "&#62;"}
+
+
+def _text(s: str) -> str:
+    """External text made inert in wikitext: one line, no markup characters, no bot markers."""
+    s = " ".join(str(s).replace("press:begin", "press&#58;begin").replace("press:end", "press&#58;end").split())
+    return "".join(_ENT.get(c, c) for c in s)
+
+
+def _quote(s: str) -> str:
+    """A passage in quotes inside nowiki; `<` is an entity, so neither `</nowiki>` nor `<!--` survives."""
+    s = " ".join(str(s).replace("press:begin", "press&#58;begin").replace("press:end", "press&#58;end").split())
+    return '"<nowiki>' + s.replace("&", "&amp;").replace("<", "&lt;") + '</nowiki>"'
+
+
+def _url(url: str) -> str:
+    return quote(url, safe=":/?#@!$&'()*+,;=%~-._")
 
 
 def _item(label: str, titles: dict | None) -> str:
-    links = [f"[[:{lang}:{title}]]" for lang, title in sorted((titles or {}).items())]
-    return ", ".join(links) if links else label
+    links = [f"[[:{_text(lang)}:{_text(title)}]]" for lang, title in sorted((titles or {}).items())]
+    return ", ".join(links) if links else _text(label)
 
 
 def enrichment(store, outlets: dict[str, str], old_text: str | None, titles: dict | None = None) -> str:
@@ -40,7 +72,7 @@ def enrichment(store, outlets: dict[str, str], old_text: str | None, titles: dic
     entries: dict[str, list] = {}
     for m in store.mentions(route="enrichment"):
         art = store.article(m.url)
-        if m.url in done or art is None:
+        if _norm(m.url) in done or art is None:
             continue
         entries.setdefault(m.qid, []).append((art.published or "", m, art))
     # newest article first within an item; items by their newest article
@@ -49,12 +81,12 @@ def enrichment(store, outlets: dict[str, str], old_text: str | None, titles: dic
     for qid, items in groups:
         lines.append(f"* {_item(items[0][1].label, (titles or {}).get(qid))}")
         for published, m, art in sorted(items, key=lambda e: e[0], reverse=True):
-            name = outlets.get(art.outlet, art.outlet)
-            date = f", {published}" if published else ""
-            quotes = " ".join(f'"{p}"' for p in m.passages[:MAX_PASSAGES])
-            lines.append(f"** {name}{date}, [{m.url} {art.title or m.url}] ({art.lang})" + (f": {quotes}" if quotes else ""))
+            name = _text(outlets.get(art.outlet, art.outlet))
+            date = f", {_text(published)}" if published else ""
+            quotes = " ".join(_quote(p) for p in m.passages[:MAX_PASSAGES])
+            lines.append(f"** {name}{date}, [{_url(m.url)} {_text(art.title or m.url)}] ({_text(art.lang)})" + (f": {quotes}" if quotes else ""))
     block = "\n".join(lines)
-    return f"{INTRO}\n\n{BEGIN}\n{block}\n{END}" + _tail(old_text)
+    return f"{INTRO}\n\n{BEGIN}\n{block}\n{END}" + (_tail(old_text) or "\n")
 
 
 def publish_enrichment(store, en, outlets: dict[str, str], titles: dict | None = None) -> bool:
