@@ -1,7 +1,7 @@
 """Polite HTTP for the press pipeline: the one place the politeness rules live.
 
 One request at a time per host and per outlet, at least `delay` seconds apart (more when a host's
-robots.txt asks for a larger Crawl-delay), robots.txt read each run, our own
+robots.txt asks for a larger Crawl-delay), robots.txt read each run (see robots), our own
 honest user agent. A 401/403/429, from an article or feed or from the outlet's own robots.txt, stops that outlet
 for the run and, kept in the store, for every later run of the same UTC day: nothing is asked of it, robots.txt
 included, and it is never retried around. An outlet removed after a week of refusals (see store.PressStore) is never
@@ -12,9 +12,10 @@ import json
 import time
 from pathlib import Path
 from urllib.parse import urljoin, urlsplit
-from urllib.robotparser import RobotFileParser
 
 import requests
+
+from pipeline.press.robots import Robots
 
 CONFIG = Path(__file__).resolve().parents[2] / "config" / "press.json"
 REFUSING = (401, 403, 429)
@@ -33,6 +34,19 @@ class Refused(Exception):
         self.outlet, self.reason = outlet, reason
 
 
+def _path(url: str) -> str:
+    """The path and query requests sends for the URL (dot segments resolved, no fragment)."""
+    prepared = requests.PreparedRequest()
+    prepared.prepare_url(url, None)
+    return prepared.path_url
+
+
+def _robots_text(r) -> str:
+    """The file is UTF-8 by definition, whatever charset its header names or leaves out."""
+    content = getattr(r, "content", None)
+    return r.text if content is None else content.decode("utf-8", "replace")
+
+
 class RobotsUnavailable(requests.RequestException):
     """A redirect target's host (not the outlet's own) has a robots.txt we cannot use: that one fetch fails."""
 
@@ -46,7 +60,7 @@ class PoliteClient:
         self.refused: dict[str, str] = store.stopped() if store else {}
         self._last: dict[str, float] = {}
         self._last_outlet: dict[str, float] = {}
-        self._robots: dict[str, RobotFileParser] = {}
+        self._robots: dict[str, Robots] = {}
         self._blocked: set[str] = set()  # recorded in `refused` but answered None, not raised
         self._foreign_down: dict[str, str] = {}  # redirect targets' hosts whose robots.txt failed this run
 
@@ -89,7 +103,7 @@ class PoliteClient:
             url = urljoin(url, location)
         return None
 
-    def _rules(self, outlet: str, scheme: str, host: str, foreign: bool = False) -> RobotFileParser:
+    def _rules(self, outlet: str, scheme: str, host: str, foreign: bool = False) -> Robots:
         """The host's robots.txt rules. On the outlet's own host, trouble refuses or blocks the outlet; on a
         redirect target's host (`foreign`), it only fails this fetch (RobotsUnavailable, and the host is not asked
         again this run), leaving the outlet alone."""
@@ -97,7 +111,6 @@ class PoliteClient:
             raise RobotsUnavailable(f"{host}: {self._foreign_down[host]}")
         if host in self._robots:
             return self._robots[host]
-        rp = RobotFileParser()
         try:
             r = self._robots_txt(outlet, scheme, host)
         except Exception:
@@ -111,13 +124,13 @@ class PoliteClient:
         if code == 429 or trouble == "robots unreachable":
             self._refuse(outlet, trouble, keep=code == 429)
         if code in (401, 403):
-            rp.disallow_all = True
+            rp = Robots("User-agent: *\nDisallow: /", self.user_agent)
             self._record(outlet, trouble)
             self._blocked.add(outlet)
         elif code >= 400:
-            rp.allow_all = True
+            rp = Robots("", self.user_agent)
         else:
-            rp.parse(r.text.splitlines())
+            rp = Robots(_robots_text(r), self.user_agent)
         self._robots[host] = rp
         return rp
 
@@ -141,9 +154,9 @@ class PoliteClient:
         for _ in range(MAX_HOPS + 1):
             parts = urlsplit(target)
             rp = self._rules(outlet, parts.scheme, parts.netloc, foreign=parts.netloc != home)
-            if not rp.can_fetch(self.user_agent, target):
+            if not rp.allowed(_path(target)):
                 return None
-            delay = max(self.delay, float(rp.crawl_delay(self.user_agent) or 0))
+            delay = max(self.delay, rp.crawl_delay)
             r = self._request(outlet, parts.netloc, target, delay, headers)
             location = r.headers.get("Location") if r.status_code in REDIRECTS else None
             if not location:
