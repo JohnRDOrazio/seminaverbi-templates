@@ -67,7 +67,7 @@ editors' list of press articles on the works SeminaVerbi already has.
   `Crawl-delay` when larger; robots.txt re-read each run; a 401/403/429 stops that outlet for the run and is
   reported, never retried around. Conditional requests (`If-Modified-Since`/ETag) for feeds and sitemaps.
 - User agent: a config value naming the project and a generic contact URL, e.g.
-  `SeminaVerbi-press/1.0 (+<contact URL>)`. No personal name or email (author's call pending on the URL, below).
+  `SeminaVerbi-press/1.0 (+https://en.seminaverbi.bibleget.io/wiki/Semina_Verbi:Press_bot)`. No personal name or email (decision 3 below).
 - Quotations: at most 25 words each (the pipeline's `EXCERPT_WORDS`), always with outlet, title, date and link.
 - `TYPESAFE_API_KEY` from the environment, never printed. Jev answers are cached as everywhere else.
 - Test fixtures are synthetic feeds, sitemaps and article pages written for the tests, never copies of real articles.
@@ -118,7 +118,7 @@ Article text is fetched when a stage needs it and kept in memory for that run on
    sitemap URL and have no `/rss` or `/feed`; La Civiltà Cattolica answers 403 to `/feed/` for our agent; EWTN's
    sitemap lists its television programmes (its news is on sister sites the author may add). The builder settles
    each outlet's entries and culture paths in `config/press.json` and lists what was not reachable.
-2. **Filter (culture).** One Jev `Noul` on the article's title and opening paragraphs: is this article mainly about
+2. **Filter (culture).** One Jev `Noul` on the article's title and its first ~150 words: is this article mainly about
    a work of culture (film, series, book, music, art, theatre) or an artist? Below `culture_drop` (start 0.40)
    the article is dropped and never fetched again.
 3. **Link.** Mentions are found in the article's markup and text: italicised or quoted titles, links to Wikipedia,
@@ -143,11 +143,11 @@ Article text is fetched when a stage needs it and kept in memory for that run on
 ### What a press source changes downstream
 
 - **Triage (stage 2):** `press:<outlet>` is a seed source, like the Vatican list: an outlet chose the work. A
-  press-only candidate is therefore not held to the sitelink floor. (Author's call pending, below.)
+  press-only candidate whose mention was kept at ≥ 0.60 is not held to the sitelink floor (decision 2 below).
 - **Dossier (stage 4):** the domain's dossier gains one note per press mention of the item (outlet, language, URL,
   the passages), placed first, so Jev's themes and connection read the Catholic reading first. When the article
-  is fetched again for this, the note may carry its culture-relevant paragraphs for Jev, but only the passages are
-  stored (see the TypeSafe question below).
+  is fetched again for this, Jev reads the paragraphs around the mention (≤ ~150 words), and only the passages are
+  stored (decision 1 below).
 - **Proposal (stage 6):** `sources` lists the press articles with their outlet, date and link, and a theme's
   evidence may be a press passage (still ≤ 25 words).
 - **Ranking page:** unchanged, except that a proposal's line may show the outlets that discussed it (builder's call).
@@ -189,14 +189,17 @@ backfill spreads over days. Domain stages 1–6 still run as now, by hand (`run 
 - Mention detection rules and the Jev question wording, which calibration then tests.
 - Test doubles for the outlets (synthetic fixtures), Wikidata and Jev, like the existing tests.
 
-## Author's calls pending
+## Decided after the builder check (author, 2026-11-23)
 
-1. **What Jev may read.** TypeSafe is a third-party model; sending it an outlet's text is AI input, though not
-   training. Send only the paragraphs around each mention (≤ ~150 words per question), or whole articles? Proposed:
-   paragraphs only, plus TypeSafe's confirmation that it does not train on API inputs.
-2. **Press-only works and the sitelink floor.** Exempt them (a Catholic outlet chose the work), lower the floor
-   (e.g. 5), or require two outlets? Proposed: exempt when the mention was kept at ≥ 0.60; otherwise the domain's
-   floor.
-3. **The contact in the user agent.** Proposed: a page `Semina Verbi:Press bot` on en saying who reads, why, how
-   often, what is kept, and how an outlet can ask to be left out (no personal email).
-4. **Outlets that refuse us** (La Civiltà Cattolica's 403 today). Skip and report (proposed), or write to them.
+1. **What Jev reads:** only the paragraphs around each mention, at most ~150 words per question (the culture filter
+   reads the title and the first ~150 words). Never whole articles. **Prerequisite before the first live run (not
+   before building):** TypeSafe's written confirmation that it does not train on API inputs, recorded in
+   `docs/content-tasks.md` with its date.
+2. **Press-only works and the minimum of Wikipedia languages:** exempt when the mention was kept at ≥ 0.60
+   (`mention_keep`); a lower-scored press-only work is held to the domain's floor.
+3. **Contact in the user agent:** the page `Semina Verbi:Press bot` on en: who reads (the SeminaVerbi pipeline of the
+   BibleGet project, operated by the Catholic Digital Commons Foundation, a non-profit), why, how often, what is kept
+   and for how long, and how an outlet asks to be left out. No personal email. Its text is part of the plan; it is
+   published only with the author's approval in session, like any wiki edit.
+4. **Outlets that refuse us** (a 401/403/429, a robots `Disallow`, La Civiltà Cattolica's 403 today): skipped and
+   reported, never written around.
