@@ -223,7 +223,9 @@ problems. What changed:
    (`NewsArticle`, `Article`, `BlogPosting`; KTO's programme pages `VideoObject`), no section page's does but KTO's
    home page (never discovered: its feed lists only programme pages), while og:type misleads (L'Osservatore
    Romano's articles say `website`). The node that describes the page (by `url`, `@id` or `mainEntityOfPage`)
-   decides; articles another node lists do not count. Without JSON-LD og:type decides; a page with no signal, or
+   decides, or its one `mainEntity`; articles another node lists do not count. Only evidence rejects (a collection
+   type describing the page, or articles only as listed members): inconclusive JSON-LD leaves it to og:type, except
+   breadcrumbs alone without og:type (Avvenire's sections), which are a section. A page with no signal, or
    with a block that cannot be read, counts as an article. A page that is not one is skipped for good ("not an
    article"). JSON-LD is read leniently: one Osservatore article has a raw carriage return inside a string. No
    outlet needs a rule of its own.
