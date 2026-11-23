@@ -123,3 +123,26 @@ def test_passage_is_accepted_by_the_store():
     s.add_article("u", "sir", "it")
     p = passage(" ".join(["w"] * 100 + ["Silence"] + ["w"] * 100), "Silence")
     s.add_mention(Mention("u", "Q1", "Silence", "work", "film", 0.7, [p], "candidate"))
+
+
+def test_window_of_a_long_paragraph_is_centred_on_the_mention():
+    """A mention late in a long paragraph is inside what Jev reads."""
+    para = " ".join(f"w{i}" for i in range(400)) + " Silence " + " ".join(f"v{i}" for i in range(400))
+    w = window([para], 0, needle="Silence")
+    assert "Silence" in w and len(w.split()) == 150
+    assert w.split().index("Silence") in (74, 75)
+    late = " ".join(f"w{i}" for i in range(300)) + " *The Mission*, alla fine."
+    w = window([late], 0, needle="The Mission")
+    assert "*The Mission*," in w and len(w.split()) <= 150
+    assert window([para], 0).split()[0] == "w0"  # no needle: the first words, as before
+    assert window([para], 0, needle="absent").split()[0] == "w0"
+
+
+def test_passage_anchors_on_the_whole_title_not_a_stray_word():
+    para = " ".join(["the"] + [f"w{i}" for i in range(60)] + ["*The", "Mission*,"] + [f"v{i}" for i in range(60)])
+    p = passage(para, "The Mission")
+    assert "*The Mission*," in p and len(p.split()) <= 25
+    assert "«Silenzio»" in passage(" ".join(["w"] * 60 + ["«Silenzio»"] + ["w"] * 60), "Silenzio")
+    assert "dell'Infinito" in passage(" ".join(["w"] * 60 + ["dell'Infinito"] + ["w"] * 60), "Infinito")
+    # truly absent: the paragraph's first words
+    assert passage(" ".join(["the"] + ["w"] * 60), "The Mission").startswith("the w")

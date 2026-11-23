@@ -130,7 +130,7 @@ def link_article(page: Page, outlet: str, store, judge, wikidata, sparql, cfg: d
         if key in seen_spans or not span.text.strip():
             continue
         seen_spans.add(key)
-        context = window(page.paragraphs, span.paragraph)
+        context = window(page.paragraphs, span.paragraph, needle=span.text)
         if not context:  # a span outside the paragraphs: nothing for Jev to read
             continue
         qid = linker.resolve(span, context)

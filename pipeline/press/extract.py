@@ -250,13 +250,51 @@ def extract(html: str, url: str, default_lang: str) -> Page:
                 _canonical(parser.canonical_href, url), paragraphs, spans)
 
 
-def window(paragraphs: list[str], index: int, words: int = 150) -> str:
-    """The paragraph with the mention plus its neighbours, cut to `words` words."""
+def _norm(token: str) -> str:
+    return re.sub(r"^\W+|\W+$", "", token).casefold()
+
+
+def locate(tokens: list[str], needle: str) -> tuple[int, int] | None:
+    """(first token, token count) of `needle` among whitespace `tokens`, casefolded: first as whole words with
+    punctuation around them ignored ("*The Mission*," matches "The Mission"), then inside tokens ("dell'Infinito"
+    holds "Infinito"); None when the needle is not there."""
+    target = [t for t in (_norm(x) for x in needle.split()) if t]
+    n = len(target)
+    if n:
+        low = [_norm(t) for t in tokens]
+        for i in range(len(tokens) - n + 1):
+            if low[i:i + n] == target:
+                return i, n
+    flat = " ".join(needle.split()).casefold()
+    if not flat:
+        return None
+    at = " ".join(tokens).casefold().find(flat)
+    if at < 0:
+        return None
+    ends, pos = [], 0
+    for t in tokens:
+        pos += len(t)
+        ends.append(pos)
+        pos += 1
+    first = next(i for i, end in enumerate(ends) if end > at)
+    last = next(i for i, end in enumerate(ends) if end >= at + len(flat))
+    return first, last - first + 1
+
+
+def window(paragraphs: list[str], index: int, words: int = 150, needle: str | None = None) -> str:
+    """The paragraph with the mention plus its neighbours, cut to `words` words; a paragraph longer than that is
+    cut around `needle` (centred on it), or to its first words when the needle is not given or not found."""
     if not 0 <= index < len(paragraphs):
         return ""
     cur = paragraphs[index].split()
     if len(cur) >= words:
-        return " ".join(cur[:words])
+        found = locate(cur, needle) if needle else None
+        if found is None:
+            return " ".join(cur[:words])
+        start, n = found
+        lo = max(0, start + n // 2 - words // 2)
+        hi = min(len(cur), lo + words)
+        return " ".join(cur[max(0, hi - words):hi])
     prev = paragraphs[index - 1].split() if index > 0 else []
     nxt = paragraphs[index + 1].split() if index + 1 < len(paragraphs) else []
     budget = words - len(cur)
@@ -268,24 +306,11 @@ def window(paragraphs: list[str], index: int, words: int = 150) -> str:
 
 
 def passage(paragraph: str, needle: str, words: int = 25) -> str:
-    """At most `words` words around `needle`, with … at cut ends."""
+    """At most `words` words around `needle`, with … at cut ends; the paragraph's first words when the needle is
+    not in it."""
     toks = paragraph.split()
-    n = len(needle.split())
-    start = None
-    low = [t.lower() for t in toks]
-    target = [t.lower() for t in needle.split()]
-    for i in range(len(toks) - n + 1):
-        if n and low[i:i + n] == target:
-            start = i
-            break
-    if start is None:
-        for i, t in enumerate(low):  # needle inside a token (punctuation attached)
-            if target and target[0] in t:
-                start = i
-                break
-    if start is None:
-        start = 0
-        n = 0
+    found = locate(toks, needle)
+    start, n = found if found else (0, 0)
     n = min(n, words)
     left = max(0, (words - n) // 2)
     lo = max(0, start - left)
