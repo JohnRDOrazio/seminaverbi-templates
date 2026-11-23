@@ -71,8 +71,9 @@ class FakeJudge:
         self.picks, self.substantives = [], []
 
     def pick(self, url, passage, label, options):
+        """The configured answer; by default the first option, surely."""
         self.picks.append({"url": url, "passage": passage, "label": label, "options": options})
-        return self._pick
+        return self._pick if self._pick is not None else (next(iter(options)), 0.95, 0.9)
 
     def substantive(self, url, label, passage):
         self.substantives.append({"url": url, "label": label, "passage": passage})
@@ -111,17 +112,36 @@ def test_wikilink_resolves_without_search(store, cache):
     assert store.mentions() == out
 
 
-def test_one_typed_hit_is_taken_without_jev_pick(store, cache):
+def test_one_typed_hit_is_still_asked_whether_the_passage_means_it(store, cache):
     pg = page(["Il romanzo Il Signore degli Anelli parla di misericordia e di sacrificio."],
               [Span("Il Signore degli Anelli", 0, "italic")])
-    # three hits, only one of a class that routes: the others are discarded before any pick
-    wd = FakeWikidata({"Q15228": entity(["Q8261"]), "Q1": entity(["Q4167410"]), "Q2": entity([])},
+    # three hits, only one of a class that routes: the others are discarded before the pick
+    wd = FakeWikidata({"Q15228": entity(["Q8261"], {"it": "Il Signore degli Anelli"}, {"it": "romanzo di Tolkien"}),
+                       "Q1": entity(["Q4167410"]), "Q2": entity([])},
                       search={("Il Signore degli Anelli", "it"): ["Q1", "Q15228", "Q2"]})
-    judge = FakeJudge(substantive=0.75)
+    judge = FakeJudge(pick=("Q15228", 0.85, 0.7), substantive=0.75)
     out = run(pg, store, judge, wd, cache)
-    assert judge.picks == []
+    assert [p["options"] for p in judge.picks] == [{"Q15228": "Il Signore degli Anelli — romanzo di Tolkien"}]
     assert [(m.qid, m.domain, m.p) for m in out] == [("Q15228", "literature", 0.75)]
     assert wd.searches == [("Il Signore degli Anelli", "it")]  # a routed hit in the page's lang: no en search
+
+
+@pytest.mark.parametrize("answer", [(None, 0.9, 0.9), ("Q123303166", 0.7, 0.9), ("Q123303166", 0.9, 0.5)])
+def test_one_typed_hit_jev_does_not_take_is_dropped(store, cache, answer, capsys):
+    """"free climbing" (the activity) was taken unasked as Q123303166, a 1986 film: a sole hit now needs the same
+    pick as several, at the same cut."""
+    pg = page(["Il free climbing nasce sulle pareti delle Dolomiti."], [Span("free climbing", 0, "italic")])
+    wd = FakeWikidata({"Q123303166": entity(["Q11424"], {"en": "Free Climbing"}, {"en": "1986 film"})},
+                      search={("free climbing", "it"): ["Q123303166"]})
+    judge = FakeJudge(pick=answer)
+    assert run(pg, store, judge, wd, cache) == []
+    assert judge.substantives == [] and store.mentions() == []
+    err = capsys.readouterr().err
+    if answer[0] is None:
+        assert "'free climbing' no matching item (p=0.90, confidence=0.90), dropped" in err
+        assert "ambiguous" not in err
+    else:
+        assert "ambiguous (Q123303166" in err
 
 
 def test_search_falls_back_to_english(store, cache):

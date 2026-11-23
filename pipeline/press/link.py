@@ -2,7 +2,8 @@
 
 A span (italic or quoted title, Wikipedia link) becomes a list of Wikidata hits: a link through its sitelink, any
 other span through Wikidata search in the page's language, then in English. Hits whose class routes to no domain
-are discarded; one routed hit is taken, several go to Jev's `pick`, taken only above the configured cut. Jev then
+are discarded; a link's item is taken, a search's routed hits (one or several) go to Jev's `pick` (those items
+or none), taken only above the configured cut. Jev then
 judges, on the paragraphs around the mention (at most 150 words, centred on it), whether the article discusses the
 item substantively, asking again at each later mention in another window until one is kept; a kept mention is stored
 with up to three passages of at most 25 words.
@@ -88,18 +89,21 @@ class _Linker:
         return []
 
     def resolve(self, span: Span, context: str) -> str | None:
-        """The one item the span names, or None (no routed hit, or an ambiguity Jev does not settle)."""
+        """The one item the span names, or None: no routed hit, Jev picks none of them, or its pick is under the
+        cut. A sole search hit is asked too (that one option or none): a name can mean something else (an activity,
+        a saying) that happens to share a title with an item. A Wikipedia link names its item itself."""
         hits = self.hits(span)
-        if len(hits) == 1:
-            return hits[0]
         if not hits:
             return None
+        if span.kind == "wikilink" and span.wiki:  # the article itself links the item: nothing to ask
+            return hits[0]
         options = {q: _option(q, self.wikidata.entity(q), self.page.lang) for q in sorted(hits)}
         qid, p, confidence = self.judge.pick(self.url, context, span.text, options)
         if qid in options and p >= self.cfg["pick_p"] and confidence >= self.cfg["pick_confidence"]:
             return qid
-        print(f"press: {self.outlet} {self.url}: {span.text!r} ambiguous ({qid}, p={p:.2f}, "
-              f"confidence={confidence:.2f}), dropped", file=sys.stderr)
+        why = "no matching item (" if qid is None else f"ambiguous ({qid}, "
+        print(f"press: {self.outlet} {self.url}: {span.text!r} {why}p={p:.2f}, confidence={confidence:.2f}), "
+              "dropped", file=sys.stderr)
         return None
 
     def passages(self, span: Span) -> list[str]:
