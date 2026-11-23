@@ -203,6 +203,11 @@ def test_ranking_links_the_new_domains(q):
     assert "=== Art ===" in text and "=== Music ===" in text
 
 
+def test_ranking_explains_when_the_counts_update(q):
+    intro = ranking(q).splitlines()[0]
+    assert "counted as soon as" in intro and "every three hours" in intro
+
+
 def test_colliding_titles_get_the_qid(q):
     q.add("Q1", "film", "s", {}, {"enwiki": "A|B"}); q.add("Q2", "film", "s", {}, {"enwiki": "AB"})
     a, b = q.pending(1)
