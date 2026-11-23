@@ -430,6 +430,27 @@ def fold_parts(queue, sparql, rows: list[dict], source: str, domain: str, whole_
     return added
 
 
+def press_parts(qid: str, entity: dict, sparql, domain: str, whole_classes: Iterable[str],
+                stop_classes: Iterable[str] = ()) -> dict:
+    """The stage-0 data coverage needs for a whole the press found that no query of `domain` added: its parts
+    (items part of it, P361, or listed as its parts, P527) as `fold_parts` stores them, so `covered_with_parts`
+    sees a part SeminaVerbi already has. {} for an item outside the closure of `whole_classes`, inside that of
+    `stop_classes`, or with no parts."""
+    instance_of = qids(entity, "P31")
+    if not owns(instance_of, whole_classes, sparql) or (stop_classes and owns(instance_of, stop_classes, sparql)):
+        return {}
+    pattern = f"  {{ ?item wdt:P361 wd:{qid} }} UNION {{ wd:{qid} wdt:P527 ?item }}"
+    parts = {}
+    for row in run_query(sparql, domain, "parts of a press whole", query(pattern)):
+        if row["item"] != qid:
+            _, sitelinks, data = row_data(row)
+            parts[row["item"]] = {"sitelinks": sitelinks, "count": data["count"]}
+    if not parts:
+        return {}
+    own = len([s for s in entity_sitelinks(entity) if s.endswith("wiki") and s not in NON_WIKIPEDIA])
+    return {"parts": parts, "count": max([own, *(p["count"] for p in parts.values())])}
+
+
 def _part_title(qid: str, sitelinks: dict) -> str:
     return sitelinks.get("enwiki") or next(iter(sitelinks.values()), None) or qid
 

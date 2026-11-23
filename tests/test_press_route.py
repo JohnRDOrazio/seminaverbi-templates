@@ -225,3 +225,66 @@ def test_release_uses_the_domains_own_covered(q, store, uncovered, monkeypatch):
     store.set_route(URL, "Q7", "waiting")
     assert release_waiting(store, q, "music", None, {}, FakeWikidata({"Q7": ent()})) == {"enrichment": 1}
     assert asked == ["music"] and uncovered == [] and q.row("Q7") is None
+
+
+class PartsSparql:
+    """Closure queries answer the class itself; the parts query answers P1 as a part of W1."""
+
+    def __init__(self):
+        self.queries = []
+
+    def select(self, query):
+        self.queries.append(query)
+        if "SELECT ?sub WHERE" in query:
+            import re
+            return [{"sub": re.search(r"wd:(Q\d+)", query).group(1)}]
+        if "P361" in query:
+            return [{"item": "P1", "s_en": "https://en.wikipedia.org/wiki/Part_One", "n": "4", "types": "Q1"}]
+        return []
+
+
+def whole_ent(*classes):
+    return {"labels": {"en": {"value": "Whole"}},
+            "claims": {"P31": [{"mainsnak": {"datavalue": {"value": {"id": c}}}} for c in classes]},
+            "sitelinks": {"frwiki": {"title": "Whole"}}}
+
+
+def _whole_class(domain):
+    from pipeline.domains import art, music
+    return music.FOLD_WHOLES[0] if domain == "music" else art.WORK_CLASSES[0]
+
+
+@pytest.mark.parametrize("domain", ["music", "art"])
+def test_a_whole_covered_through_a_part_goes_to_enrichment(q, store, monkeypatch, closure_cache, domain):
+    """music and art stage 1 (covered_with_parts) call a whole covered when one of its parts is: routing must
+    agree, so a whole SeminaVerbi covers through a part is never proposed."""
+    seen = []
+
+    def covered(row, repo, wikis):
+        seen.append(row.qid)
+        return ("drop", {"have": ["en", "it", "es", "fr", "de", "pt"]}) if row.qid == "P1" else ("pass", {})
+    monkeypatch.setattr(stages, "covered", covered)
+    store.add_mention(mention("W1", domain))
+    wd = FakeWikidata({"W1": whole_ent(_whole_class(domain))})
+    assert route(store, q, None, {}, wd, PartsSparql()) == {"enrichment": 1}
+    assert q.row("W1") is None and seen == ["W1", "P1"]
+
+
+@pytest.mark.parametrize("domain", ["music", "art"])
+def test_a_new_whole_candidate_carries_its_parts(q, store, uncovered, closure_cache, domain):
+    store.add_mention(mention("W1", domain))
+    wd = FakeWikidata({"W1": whole_ent(_whole_class(domain))})
+    assert route(store, q, None, {}, wd, PartsSparql()) == {"candidate": 1}
+    stage0 = q.row("W1").data[0]
+    assert stage0["parts"] == {"P1": {"sitelinks": {"enwiki": "Part One"}, "count": 4}}
+    assert stage0["count"] == 4 and stage0["press"] == {"sir": 0.8}
+
+
+@pytest.mark.parametrize("domain,classes", [("music", ["Q7366"]), ("music", ["Q105543609", "Q482994"]),
+                                            ("art", ["Q41176"])])
+def test_an_item_that_is_no_whole_gets_no_parts(closure_cache, domain, classes):
+    """A song is not a composition; an album (music) or a building (art) never takes parts."""
+    from pipeline import domains
+    sparql = PartsSparql()
+    assert domains.DOMAINS[domain].press_stage0("W1", whole_ent(*classes), sparql) == {}
+    assert not any("P361" in qy for qy in sparql.queries)

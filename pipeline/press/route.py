@@ -50,8 +50,8 @@ def decide(mention, domain: str, entity: dict, repo, wikis, sparql=None) -> tupl
     """("enrichment" or "candidate", stage-0 data) for the mention's item under `domain`, with the coverage check
     stage 1 runs: the domain's own `covered` when it has one (literature: a series covered through a volume),
     else stages.covered. A domain module may give `press_stage0(qid, entity, sparql) -> dict`, the stage-0 data
-    that check needs for an item none of its queries added (literature: a series' volumes; music and art can
-    give their parts the same way); it is asked only when `sparql` is given."""
+    that check needs for an item none of its queries added (literature: a series' volumes; music and art: a
+    whole's parts); it is asked only when `sparql` is given."""
     module = domains.DOMAINS.get(domain)  # None: a domain not loaded here (tests), stages.covered alone
     hook = getattr(module, "press_stage0", None)
     stage0 = hook(mention.qid, entity, sparql) if hook and sparql is not None else {}

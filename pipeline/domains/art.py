@@ -53,6 +53,11 @@ QUESTIONS = {
 covered = common.covered_with_parts  # stage 1 applies the parts rule
 
 
+def press_stage0(qid: str, entity: dict, sparql) -> dict:
+    """Stage-0 data for a whole the press found: its parts, so coverage through a part routes it to enrichment."""
+    return common.press_parts(qid, entity, sparql, "art", WORK_CLASSES, STOP_CLASSES)
+
+
 def owns(instance_of: Iterable[str], sparql, cache: Path | None = None) -> bool:
     """True when a P31 QID is one of the art classes or a subclass of one (the Catholic media hook)."""
     return common.owns(instance_of, WORK_CLASSES, sparql, cache)
