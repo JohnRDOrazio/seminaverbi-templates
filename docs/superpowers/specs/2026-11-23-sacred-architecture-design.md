@@ -35,8 +35,7 @@ as its own domain". This is that domain.
 - **Classes (`WORK_CLASSES`).** The closure of church building (Q16970), cathedral (Q2977), basilica (Q163687),
   chapel (Q108325), abbey (Q160742) and monastery (Q44613), with `common.owns` as art does. Measured on
   2026-11-23: 951 items typed directly with one of these classes have ≥ 15 sitelinks (all Wikimedia sites);
-  23 have ≥ 50 (Notre-Dame
-  de Paris 125, Sagrada Família 110, Sistine Chapel 90...).
+  23 have ≥ 50 (Notre-Dame de Paris 125, Sagrada Família 110, Sistine Chapel 90...).
 - **Candidates (stage 0).** Buildings of those classes with a Christian religion (P140) or a Christian
   dedication, above `sitelink_floor` (15, like art), ordered by sitelinks, in bounded queries as art's; plus
   `works`, a hand list (the Sagrada Família, Q48435, first). A UNESCO World Heritage designation (P1435) is a
@@ -44,6 +43,9 @@ as its own domain". This is that domain.
 - **Triage (2).** As art: the floor, with the press exemption (≥ 0.60), and the queue's other-domain guard (a
   building already queued under art stays there). The floor is also waived for a candidate from the UNESCO source or
   from `works`, as literature waives it for sources that name a work directly; it still meets the significance check.
+  A row dropped below the floor that gains an exempt source (UNESCO, `works`, or the press as today) is triaged
+  again: its stage-2 drop is cleared, for rows with no status only. Every candidates run clears it for any such row it
+  finds, not only for those it has just added to, so a run stopped halfway is made good by the next.
 - **Quick check (3): significance.** Jev's `plausible` wording for architecture:
   > Does the building described in `text` shape how the Christian faith is lived or understood (through its
   > liturgy, as a place of pilgrimage, or through a theology expressed in its forms), or express the beauty of
