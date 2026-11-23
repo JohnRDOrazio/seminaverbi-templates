@@ -5,6 +5,7 @@ from pipeline.press.store import Mention, PressStore
 from pipeline.queue import Queue
 from tests.test_pipeline_publish import FakeEn
 
+BEGIN_MARK = "<!-- press:begin -->"
 OUTLETS = {"avvenire": "Avvenire", "vn": "Vatican News"}
 
 
@@ -64,3 +65,19 @@ def test_unchanged_page_is_not_rewritten(store):
     assert en.edits[0]["title"] == ENRICH_TITLE
     assert publish_enrichment(store, en, OUTLETS) is False
     assert len(en.edits) == 1
+
+
+def test_intro_shows_the_template_call_without_transcluding(store):
+    head = enrichment(store, OUTLETS, None).split(BEGIN_MARK)[0]
+    assert "<code><nowiki>{{SV press done|<url>}}</nowiki></code>" in head
+    assert "{{SV press done" not in head.replace("<nowiki>{{SV press done", "")
+
+
+def test_old_page_without_markers_is_kept_below(store):
+    add(store, "https://x/a")
+    old = "Editors wrote this.\n{{SV press done|https://x/a}}\n"
+    text = enrichment(store, OUTLETS, old)
+    assert text.endswith(old)
+    assert "https://x/a" not in text.split("<!-- press:end -->")[0]
+    only_begin = "x\n<!-- press:begin -->\nhalf"
+    assert enrichment(store, OUTLETS, only_begin).endswith(only_begin)

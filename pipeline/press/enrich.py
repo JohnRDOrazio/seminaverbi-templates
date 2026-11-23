@@ -12,7 +12,7 @@ from pipeline.publish import _write
 
 ENRICH_TITLE = "Semina Verbi:Press for existing articles"
 INTRO = ("Articles of the Catholic press on works SeminaVerbi already covers. Work an article into the entry, "
-         "then add `{{SV press done|<url>}}` below to close it.")
+         "then add <code><nowiki>{{SV press done|<url>}}</nowiki></code> below to close it.")
 BEGIN = "<!-- press:begin -->"
 END = "<!-- press:end -->"
 _DONE = re.compile(r"\{\{\s*SV press done\s*\|\s*([^|}\s]+)\s*\}\}")
@@ -24,9 +24,9 @@ def done_urls(text: str | None) -> set[str]:
 
 
 def _tail(old_text: str | None) -> str:
-    if old_text and END in old_text:
+    if old_text and BEGIN in old_text and END in old_text:
         return old_text.split(END, 1)[1]
-    return "\n"
+    return "\n\n" + old_text if old_text and old_text.strip() else "\n"
 
 
 def _item(label: str, titles: dict | None) -> str:
