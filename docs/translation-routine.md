@@ -10,8 +10,8 @@ what translation needs.
 - Translate from the most complete version: en or it (read both when both exist, and carry over anything one
   has and the other lacks only if it is sourced). Never translate a translation of a translation when the
   original is there.
-- One page per target wiki, connected to the **same item** as the source (sitelink `it`, `es`… on the en
-  repository with `wikibase-edit-entity`). Never create a second item.
+- One page per target wiki, connected to the **same item** as the source (sitelink `it`, `es`… on the
+  repository wiki, the one `config/wikis.json` names, with `wikibase-edit-entity`). Never create a second item.
 - Title: the name the subject has in that language (the target-language Wikipedia's title is a good guide; the
   en Wikipedia page's langlinks give it). Songs follow the wiki's convention (en `X (song)`, it
   `X (brano musicale)`); on es/fr/de/pt use `X (canción)`, `X (chanson)`, `X (Lied)`, `X (canção)` only when
@@ -77,5 +77,5 @@ from the item: never add category lines.
    for Wisdom). Once the BibleGet extension renders quotes at parse time, the preview shows the passage text:
    then compare that text with the cited passage instead.
 5. `create-page` with a summary in the target language naming the source page.
-6. `wikibase-edit-entity` on en: add the sitelink for the target wiki to the item.
+6. `wikibase-edit-entity` on the repository wiki (above): add the sitelink for the target wiki to the item.
 7. Report: the URL, anything left unlinked, any quotation translated by us, any fix made to the source.

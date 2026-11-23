@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import time
+from pathlib import Path
 from typing import NamedTuple
 from urllib.parse import urlsplit
 
@@ -22,6 +23,22 @@ def _retry_wait(retry_after, attempt: int) -> float:
     except (TypeError, ValueError):  # missing, or the HTTP-date form
         return min(2.0 ** attempt, 30.0)
 USER_AGENT = "seminaverbi-templates-sync/1.0 (https://github.com/JohnRDOrazio/seminaverbi-templates)"
+
+
+WIKIS = Path(__file__).resolve().parent.parent / "config" / "wikis.json"
+
+
+def load_repo_wiki(path: Path = WIKIS) -> str:
+    """The wiki that holds the Wikibase repository: "en", or "data" once the repository has its own wiki."""
+    value = json.loads(Path(path).read_text(encoding="utf-8")).get("repository")
+    if value not in ("en", "data"):  # the two wikis that can hold the repository
+        raise ValueError(f"{path}: repository must be en or data, not {value!r}")
+    return value
+
+
+# Entities are read and written here. Not a page wiki: the languages are sync.pages.LANGS, and the sitelinks'
+# site IDs stay en…pt whatever this is.
+REPO_WIKI = load_repo_wiki()
 
 
 class SyncError(Exception):
@@ -460,3 +477,9 @@ class WikiClient:
                                         languages=lang), "entities")
         return self._dig(entities, item).get("labels", {}).get(lang, {}).get("value")
 
+
+def repo_client(clients: dict | None = None, factory=None):
+    """The client to the repository: the one among `clients` (wiki -> client) when the repository is one of
+    those wikis, else a new one (`factory(wiki)`, by default WikiClient), not logged in."""
+    found = (clients or {}).get(REPO_WIKI)
+    return found if found is not None else (factory or WikiClient)(REPO_WIKI)

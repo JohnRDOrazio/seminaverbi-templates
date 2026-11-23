@@ -1,13 +1,14 @@
 ---
 name: seminaverbi-editor
-description: Use when reading, writing, porting, translating or categorizing pages on the SeminaVerbi wikis ({en,it,es,fr,de,pt}.seminaverbi.bibleget.io) through the seminaverbi MCP server, or when running the repository's category helper.
+description: Use when reading, writing, porting, translating or categorizing pages on the SeminaVerbi wikis ({en,it,es,fr,de,pt}.seminaverbi.bibleget.io), or the items of their Wikibase repository (on en, or on data.seminaverbi.bibleget.io after it has moved there), through the seminaverbi MCP server, or when running the repository's category helper.
 ---
 
 # SeminaVerbi editor
 
 You edit the six SeminaVerbi wikis as **SV editor bot** through the `seminaverbi` MCP server (wiki keys
-`en it es fr de pt`). Edits go live immediately, flagged as bot edits and tagged `seminaverbi-mcp`; the
-author is driving and reviews as you go, so report every save.
+`en it es fr de pt`; `data` holds only items and properties, and is used only when it is the repository wiki:
+see Wikibase). Edits go live immediately, flagged as bot edits and tagged
+`seminaverbi-mcp`; the author is driving and reviews as you go, so report every save.
 
 Source of truth for templates, categories and these notes: the repository
 `~/development/seminaverbi-templates` (github.com/JohnRDOrazio/seminaverbi-templates). Never edit `SV …`
@@ -57,7 +58,7 @@ templates or `Module:SV/…` on a wiki: they are overwritten by the sync. Change
   biblical story) is carried by the themes, the links and the infobox, never by a second field category.
 - **Field and themes are statements on the article's item**, not category lines: `SV field` once (the
   one field node), `SV Gospel theme` once per theme, each pointing to the node's item (the `item` in
-  `config/categories.json`). Write them with `wikibase-add-statement` on en. `{{SV infobox}}` (or
+  `config/categories.json`). Write them with `wikibase-add-statement` on the repository wiki (see Wikibase). `{{SV infobox}}` (or
   `{{SV categories}}` on a page without an infobox) outputs the categories on every language's page,
   within about a minute of the statement.
 - Themes: only leaf themes (never a theme group), only those the text genuinely explores. **The page
@@ -110,13 +111,15 @@ Jev's `applied` field and themes go on the item as statements (above); `author` 
 the author. Jev judges; it does not write. Never let a Jev answer override the author, and when Jev is unavailable,
 ask the author instead of guessing.
 
-## Wikibase (items live on en)
+## Wikibase (items live on the repository wiki)
 
+- **The repository wiki is the one `config/wikis.json` names: `en`, or `data` after the repository has moved.**
+  Pass it as `wiki` to every `wikibase-*` tool; pages stay on their own wikis.
 - Translations and categories are linked across languages through **sitelinks** on the item, never with
   `[[fr:…]]` lines in the text. Use `wikibase-get-entity` / `wikibase-edit-entity`.
 - The SeminaVerbi wikis' site IDs are `en`, `it`, `es`, `fr`, `de`, `pt`. Never `enwiki`, `itwiki`…:
   those are **Wikipedia**. The repository mirrors Wikidata items, Wikipedia sitelinks included.
-- **A new article: the item first, then the page, then the link.** Search the local Wikibase on en with
+- **A new article: the item first, then the page, then the link.** Search the local Wikibase with
   `wikibase-search-entities` (local IDs differ from Wikidata IDs). If the subject is not there, it is
   imported from Wikidata on the server with `server/EnrichItems.php --import Q…` (see
   `server/README.md`). Then save the page (its bare `{{SV infobox}}` fills in once the page is linked)

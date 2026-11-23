@@ -169,9 +169,9 @@ def type_candidates() -> list[str]:
 
 
 def item_labels(qids: list[str]) -> dict[str, str]:
-    """English labels of local Wikibase items, read from the en wiki."""
-    from sync.wiki import WikiClient
-    client = WikiClient("en")
+    """English labels of local Wikibase items, read from the repository."""
+    from sync.wiki import repo_client
+    client = repo_client()
     out = {}
     for q in qids:
         labels = client.entity(q).get("labels", {})
