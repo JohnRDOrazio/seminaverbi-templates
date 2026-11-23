@@ -101,6 +101,10 @@ class PoliteClient:
             self._refuse(outlet, str(r.status_code))
         if r.status_code == 304:
             return None
-        if conditional and self.store and r.status_code < 300:
-            self.store.set_feed_cache(url, r.headers.get("ETag"), r.headers.get("Last-Modified"))
         return r
+
+    def remember(self, url: str, response) -> None:
+        """Store a feed's validators for the next conditional get; called once its entries are all read (a
+        stream stopped part-way keeps the old ones, so the unread entries are not hidden behind a 304)."""
+        if self.store and 200 <= response.status_code < 300:
+            self.store.set_feed_cache(url, response.headers.get("ETag"), response.headers.get("Last-Modified"))

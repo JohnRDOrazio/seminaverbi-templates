@@ -45,6 +45,9 @@ class FakeClient:
             raise r
         return r
 
+    def remember(self, url, response):
+        pass
+
 
 def store():
     return PressStore(sqlite3.connect(":memory:"))
@@ -162,3 +165,39 @@ def test_multi_language_outlet_still_filters_children_by_token():
     c = FakeClient({"https://o.example/feed": Resp(INDEX)})
     assert discover(s, c, [outlet(langs=["it", "en"])], 10) == {"o": 0}
     assert [x[1] for x in c.calls] == ["https://o.example/feed"]
+
+
+def polite(routes, s):
+    from pipeline.press.fetch import PoliteClient
+    from tests.test_press_fetch import UA, Clock, FakeSession
+    clock = Clock()
+    session = FakeSession({"https://o.example/robots.txt": FResp(""), **routes})
+    return PoliteClient(session, UA, 0, store=s, clock=clock, sleep=clock.sleep), session
+
+
+class FResp(Resp):
+    def __init__(self, text="", status=200, etag=None):
+        super().__init__(text, status)
+        self.headers = {"ETag": etag} if etag else {}
+
+
+def test_validators_are_kept_only_once_a_feed_is_read_to_the_end():
+    """A stream stopped at the run's limit keeps no ETag: the next run's conditional GET must not answer 304 and
+    hide the entries not yet read."""
+    feed = "https://o.example/feed"
+    s = store()
+    c, session = polite({feed: FResp(urlset("o.example", 5), etag='"v1"')}, s)
+    assert discover(s, c, [outlet()], 2) == {"o": 2}
+    assert s.feed_cache(feed) == (None, None)
+    assert discover(s, c, [outlet()], 10) == {"o": 3}
+    assert s.feed_cache(feed) == ('"v1"', None)
+
+
+def test_an_index_keeps_no_validators_while_a_child_fails():
+    s = store()
+    c, _ = polite({"https://o.example/feed": FResp(INDEX, etag='"i"'),
+                   "https://o.example/sitemap-1.xml": TimeoutError("slow"),
+                   "https://o.example/sitemap-2.xml": FResp(urlset("o.example", 1), etag='"c2"')}, s)
+    assert discover(s, c, [outlet()], 10) == {"o": 1}
+    assert s.feed_cache("https://o.example/feed") == (None, None)  # the failed child is read again next run
+    assert s.feed_cache("https://o.example/sitemap-2.xml") == ('"c2"', None)

@@ -63,6 +63,9 @@ class FakeClient:
             raise Refused(outlet, "403")
         return Resp(RSS) if url == FEED else Resp(PAGES[url])
 
+    def remember(self, url, response):
+        pass
+
 
 class FakeJudge:
     def __init__(self):

@@ -95,57 +95,79 @@ def _wanted(url: str, date: str | None, outlet: dict) -> bool:
 
 
 def _fetch(client, outlet: dict, url: str):
-    """Response text, or None after reporting; Refused propagates."""
+    """("ok", response), ("unchanged", None) for a 304 or a robots.txt refusal, or ("failed", None) after
+    reporting; Refused propagates."""
     oid = outlet["id"]
     try:
         r = client.get(oid, url, conditional=True)
     except (requests.RequestException, TimeoutError, ConnectionError, OSError) as e:
         print(f"press: {oid} {url}: {e}", file=sys.stderr)
-        return None
+        return "failed", None
     if r is None:
-        return None
+        return "unchanged", None
     if not 200 <= r.status_code < 300:
         print(f"press: {oid} {url}: HTTP {r.status_code}", file=sys.stderr)
-        return None
-    return r.text
+        return "failed", None
+    return "ok", r
 
 
 def _candidates(client, outlet: dict):
-    """Lazily yield (url, date, lang) for one outlet; stops quietly when the outlet is refused."""
+    """Lazily yield (url, date, lang) for one outlet; stops quietly when the outlet is refused.
+
+    The feeds' validators (ETag, Last-Modified) are stored only when the stream is read to its end, and not for
+    a feed that failed or an index with a child that failed: the next run reads them again in full."""
     from pipeline.press.fetch import Refused
     langs = outlet.get("langs") or ["en"]
     pending = []
     for e in outlet.get("entries", []):
         url, lang = (e["url"], e.get("lang")) if isinstance(e, dict) else (e, None)
-        pending.append((url, lang or (langs[0] if len(langs) == 1 else None)))
+        pending.append((url, lang or (langs[0] if len(langs) == 1 else None), None))
     seen = set()
+    read: dict[str, object] = {}  # url -> its 2xx response
+    parent: dict[str, str | None] = {}
+    failed: set[str] = set()
+
+    def fail(url):
+        while url is not None and url not in failed:
+            failed.add(url)
+            url = parent.get(url)
+
     try:
         while pending:
-            url, lang = pending.pop(0)
+            url, lang, up = pending.pop(0)
             if url in seen:
                 continue
             seen.add(url)
-            text = _fetch(client, outlet, url)
-            if text is None:
+            parent[url] = up
+            state, r = _fetch(client, outlet, url)
+            if state == "failed":
+                fail(url)
+            if r is None:
                 continue
             try:
-                kind, items = _parse(text)
+                kind, items = _parse(r.text)
             except ValueError:
                 print(f"press: {outlet['id']} {url}: not a feed or sitemap", file=sys.stderr)
+                fail(url)
                 continue
+            read[url] = r
             if kind == "index":
                 for child, _ in items:
                     if lang or len(langs) == 1:
-                        pending.append((child, lang or langs[0]))
+                        pending.append((child, lang or langs[0], url))
                         continue
                     child_lang = next((x for x in langs if _has_lang(child, x)), None)
                     if child_lang:
-                        pending.append((child, child_lang))
+                        pending.append((child, child_lang, url))
                 continue
             for item_url, date in items:
                 yield item_url, date, lang or _lang_of(item_url, langs, langs[0])
     except Refused as e:
         print(f"press: {outlet['id']} refused: {e.reason}", file=sys.stderr)
+        return
+    for url, r in read.items():
+        if url not in failed:
+            client.remember(url, r)
 
 
 def discover(store, client, outlets: list[dict], limit: int) -> dict[str, int]:

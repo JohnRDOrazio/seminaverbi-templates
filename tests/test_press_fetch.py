@@ -122,7 +122,9 @@ def test_conditional_get_stores_new_validators():
     url = "https://x.example/feed"
     pc, _, _ = client({ROBOTS: Resp(""), url: Resp("f", headers={"ETag": '"n"', "Last-Modified": "L"})},
                       store=store)
-    assert pc.get("o", url, conditional=True).text == "f"
+    r = pc.get("o", url, conditional=True)
+    assert r.text == "f" and store.feed_cache(url) == (None, None)  # stored only once its entries are read
+    pc.remember(url, r)
     assert store.feed_cache(url) == ('"n"', "L")
 
 
