@@ -17,7 +17,9 @@ CANONICAL = "https://example.org/en/cultura/a?ref=rss"  # what the page's own ca
 CLOSURE = {
     "Q11424": ["Q11424", "Q24862"],          # film, short film
     "Q5398426": ["Q5398426"],                # television series
-    "Q7725634": ["Q7725634", "Q8261"],       # literary work, novel
+    # literary work, novel, and (through literature > scholarly literature > scientific literature) scholarly article
+    "Q7725634": ["Q7725634", "Q8261", "Q8242", "Q68200780", "Q12042160", "Q13442814"],
+    "Q68200780": ["Q68200780", "Q12042160", "Q13442814"],  # scholarly literature
     "Q47461344": ["Q47461344"],
     "Q1667921": ["Q1667921"],
     "Q277759": ["Q277759"],
@@ -299,3 +301,14 @@ def test_a_passing_first_mention_does_not_hide_a_later_substantive_one(store, ca
     assert [(m.qid, m.p) for m in out] == [("Q9", 0.9)]
     assert len(judge.substantives) == 2
     assert len(judge.picks) == 1  # the same title is resolved once
+
+
+def test_a_scholarly_article_does_not_route_to_literature(cache):
+    """Wikidata files scholarly literature under literature, a literary work: its articles (Q13442814) reached
+    literature in the 2026-11-23 dry run ("Magnifica Humanitas", Q141292031). Scholarly literature is a stop
+    class of literature.owns; an item that is also a literary work in its own right stays literature's."""
+    assert "Q68200780" in literature.STOP_CLASSES
+    assert literature.owns(["Q13442814"], FakeSparql(), cache) is False
+    assert class_route(["Q13442814"], FakeSparql(), CFG, cache) is None
+    assert literature.owns(["Q13442814", "Q8261"], FakeSparql(), cache) is True
+    assert literature.owns(["Q8242"], FakeSparql(), cache) is True  # literature itself is not stopped

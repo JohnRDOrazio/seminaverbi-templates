@@ -32,11 +32,15 @@ WORK, EDITION = "Q7725634", "Q3331189"  # literary work; version, edition or tra
 # literary work and the config's series_classes (literary and book series): what literature itself queries. Not
 # written work (Q47461344): its closure takes in encyclicals, letters and scholarly articles.
 WORK_CLASSES: tuple[str, ...] = (WORK, "Q1667921", "Q277759")
+# scholarly literature: Wikidata files it under literature (Q8242), a literary work, so the closure above takes in
+# scholarly articles (Q13442814), which are not literature's to propose
+STOP_CLASSES: tuple[str, ...] = ("Q68200780",)
 
 
 def owns(instance_of: Iterable[str], sparql, cache: Path | None = None) -> bool:
-    """True when an item of these P31 classes is a literary work or series (or of a subclass)."""
-    return common.owns(instance_of, WORK_CLASSES, sparql, cache)
+    """True when an item of these P31 classes is a literary work or series (or of a subclass), other than
+    scholarly literature."""
+    return common.owns(instance_of, WORK_CLASSES, sparql, cache, stop=STOP_CLASSES)
 
 
 DIRECT = {"illustrissimi", "francis"}  # sources that name a work directly: no sitelink floor

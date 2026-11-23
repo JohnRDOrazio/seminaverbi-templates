@@ -270,9 +270,13 @@ def class_closure(sparql, classes: Iterable[str], cache: Path | None = None) -> 
     return closure
 
 
-def owns(instance_of: Iterable[str], work_classes: Iterable[str], sparql, cache: Path | None = None) -> bool:
-    """True when any QID of `instance_of` is one of `work_classes` or a subclass of one."""
-    return not set(instance_of).isdisjoint(class_closure(sparql, work_classes, cache))
+def owns(instance_of: Iterable[str], work_classes: Iterable[str], sparql, cache: Path | None = None,
+         stop: Iterable[str] = ()) -> bool:
+    """True when any QID of `instance_of` is one of `work_classes` or a subclass of one, and not one of `stop` or
+    a subclass of one (a branch of the work classes' closure the domain does not take)."""
+    stop = tuple(stop)
+    taken = class_closure(sparql, work_classes, cache) - (class_closure(sparql, stop, cache) if stop else set())
+    return not set(instance_of).isdisjoint(taken)
 
 
 def other_domain(queue, qid: str, domain: str) -> str | None:
