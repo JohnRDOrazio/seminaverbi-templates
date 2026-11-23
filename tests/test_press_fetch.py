@@ -1,0 +1,132 @@
+import sqlite3
+
+import pytest
+
+from pipeline.press.fetch import PoliteClient, Refused, load_press_config
+from pipeline.press.store import PressStore
+
+
+class Resp:
+    def __init__(self, text="", status=200, headers=None):
+        self.text, self.status_code, self.headers = text, status, headers or {}
+
+
+class FakeSession:
+    """Answers by URL; records every request."""
+
+    def __init__(self, routes):
+        self.routes, self.calls = routes, []
+
+    def get(self, url, **kwargs):
+        self.calls.append((url, kwargs))
+        r = self.routes[url]
+        if isinstance(r, Exception):
+            raise r
+        return r
+
+
+class Clock:
+    def __init__(self):
+        self.now, self.sleeps = 1000.0, []
+
+    def __call__(self):
+        return self.now
+
+    def sleep(self, s):
+        self.sleeps.append(s)
+        self.now += s
+
+
+ROBOTS = "https://x.example/robots.txt"
+UA = "SeminaVerbi-press/1.0 (+https://example/bot)"
+
+
+def client(routes, delay=10, store=None):
+    c = Clock()
+    s = FakeSession(routes)
+    return PoliteClient(s, UA, delay, store=store, clock=c, sleep=c.sleep), s, c
+
+
+def test_sends_our_agent_and_waits_between_requests():
+    pc, s, c = client({ROBOTS: Resp("User-agent: *\nDisallow:\n"),
+                       "https://x.example/a": Resp("A"), "https://x.example/b": Resp("B")})
+    pc.get("o", "https://x.example/a")
+    pc.get("o", "https://x.example/b")
+    assert all(kw["headers"]["User-Agent"] == UA for _, kw in s.calls)
+    assert len(s.calls) == 3 and c.sleeps and all(x >= 10 for x in c.sleeps)
+    assert sum(c.sleeps) >= 20
+
+
+def test_crawl_delay_wins_when_larger():
+    pc, s, c = client({ROBOTS: Resp("User-agent: *\nCrawl-delay: 30\n"),
+                       "https://x.example/a": Resp("A")})
+    pc.get("o", "https://x.example/a")
+    assert max(c.sleeps) == 30
+
+
+def test_disallowed_path_is_not_fetched():
+    pc, s, c = client({ROBOTS: Resp("User-agent: *\nDisallow: /private\n")})
+    assert pc.get("o", "https://x.example/private/x") is None
+    assert [u for u, _ in s.calls] == [ROBOTS]
+
+
+def test_403_refuses_the_outlet_for_the_run():
+    pc, s, c = client({ROBOTS: Resp(""), "https://x.example/a": Resp(status=403),
+                       "https://x.example/b": Resp("B")})
+    with pytest.raises(Refused) as e:
+        pc.get("vaticannews", "https://x.example/a")
+    assert (e.value.outlet, e.value.reason) == ("vaticannews", "403")
+    n = len(s.calls)
+    with pytest.raises(Refused):
+        pc.get("vaticannews", "https://x.example/b")
+    assert len(s.calls) == n and pc.refused == {"vaticannews": "403"}
+
+
+@pytest.mark.parametrize("status", [401, 429])
+def test_401_and_429_refuse(status):
+    pc, _, _ = client({ROBOTS: Resp(""), "https://x.example/a": Resp(status=status)})
+    with pytest.raises(Refused):
+        pc.get("o", "https://x.example/a")
+    assert pc.refused["o"] == str(status)
+
+
+@pytest.mark.parametrize("robots", [Resp(status=503), TimeoutError("t")])
+def test_unreachable_robots_skips_the_outlet(robots):
+    pc, s, _ = client({ROBOTS: robots, "https://x.example/a": Resp("A")})
+    with pytest.raises(Refused) as e:
+        pc.get("o", "https://x.example/a")
+    assert e.value.reason == "robots unreachable"
+    assert [u for u, _ in s.calls] == [ROBOTS]
+    assert pc.refused["o"] == "robots unreachable"
+
+
+def test_robots_403_disallows_all_and_404_allows_all():
+    pc, s, _ = client({ROBOTS: Resp(status=403)})
+    assert pc.get("o", "https://x.example/a") is None
+    pc, s, _ = client({ROBOTS: Resp(status=404), "https://x.example/a": Resp("A")})
+    assert pc.get("o", "https://x.example/a").text == "A"
+
+
+def test_conditional_get_uses_the_cache():
+    store = PressStore(sqlite3.connect(":memory:"))
+    url = "https://x.example/feed"
+    store.set_feed_cache(url, '"abc"', "Mon, 01 Jan 2026 00:00:00 GMT")
+    pc, s, _ = client({ROBOTS: Resp(""), url: Resp(status=304)}, store=store)
+    assert pc.get("o", url, conditional=True) is None
+    h = s.calls[-1][1]["headers"]
+    assert h["If-None-Match"] == '"abc"' and h["If-Modified-Since"].startswith("Mon")
+
+
+def test_conditional_get_stores_new_validators():
+    store = PressStore(sqlite3.connect(":memory:"))
+    url = "https://x.example/feed"
+    pc, _, _ = client({ROBOTS: Resp(""), url: Resp("f", headers={"ETag": '"n"', "Last-Modified": "L"})},
+                      store=store)
+    assert pc.get("o", url, conditional=True).text == "f"
+    assert store.feed_cache(url) == ('"n"', "L")
+
+
+def test_config_agent_has_no_email():
+    cfg = load_press_config()
+    assert "@" not in cfg["user_agent"] and cfg["user_agent"].startswith("SeminaVerbi-press/1.0")
+    assert cfg["delay_seconds"] == 10 and len(cfg["outlets"]) == 11

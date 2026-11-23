@@ -1,0 +1,170 @@
+{
+  "user_agent": "SeminaVerbi-press/1.0 (+https://en.seminaverbi.bibleget.io/wiki/Semina_Verbi:Press_bot)",
+  "delay_seconds": 10,
+  "max_articles_per_run": 200,
+  "culture_drop": 0.4,
+  "pick_p": 0.8,
+  "pick_confidence": 0.6,
+  "mention_keep": 0.6,
+  "press_exempt": 0.6,
+  "waiting_classes": {
+    "music": [
+      "Q105543609",
+      "Q7366",
+      "Q482994",
+      "Q484692"
+    ],
+    "art": [
+      "Q3305213",
+      "Q860861",
+      "Q132137",
+      "Q15711026",
+      "Q46686",
+      "Q3714446",
+      "Q21061279",
+      "Q219423"
+    ],
+    "artists": [
+      "Q5"
+    ]
+  },
+  "outlets": [
+    {
+      "id": "osservatore",
+      "name": "L'Osservatore Romano",
+      "base": "https://www.osservatoreromano.va",
+      "langs": [
+        "it",
+        "en",
+        "es",
+        "fr",
+        "de",
+        "pt"
+      ],
+      "entries": [],
+      "culture_paths": [],
+      "since": null
+    },
+    {
+      "id": "vaticannews",
+      "name": "Vatican News",
+      "base": "https://www.vaticannews.va",
+      "langs": [
+        "it",
+        "en",
+        "es",
+        "fr",
+        "de",
+        "pt"
+      ],
+      "entries": [],
+      "culture_paths": [],
+      "since": null
+    },
+    {
+      "id": "avvenire",
+      "name": "Avvenire",
+      "base": "https://www.avvenire.it",
+      "langs": [
+        "it"
+      ],
+      "entries": [],
+      "culture_paths": [],
+      "since": null
+    },
+    {
+      "id": "romasette",
+      "name": "Roma Sette",
+      "base": "https://www.romasette.it",
+      "langs": [
+        "it"
+      ],
+      "entries": [],
+      "culture_paths": [],
+      "since": null
+    },
+    {
+      "id": "ewtn",
+      "name": "EWTN",
+      "base": "https://www.ewtn.com",
+      "langs": [
+        "en"
+      ],
+      "entries": [],
+      "culture_paths": [],
+      "since": null
+    },
+    {
+      "id": "civilta",
+      "name": "La Civiltà Cattolica",
+      "base": "https://www.laciviltacattolica.it",
+      "langs": [
+        "it",
+        "en"
+      ],
+      "entries": [],
+      "culture_paths": [],
+      "since": null
+    },
+    {
+      "id": "famigliacristiana",
+      "name": "Famiglia Cristiana",
+      "base": "https://www.famigliacristiana.it",
+      "langs": [
+        "it"
+      ],
+      "entries": [],
+      "culture_paths": [],
+      "since": null
+    },
+    {
+      "id": "aleteia",
+      "name": "Aleteia",
+      "base": "https://aleteia.org",
+      "langs": [
+        "en",
+        "it",
+        "es",
+        "fr",
+        "de",
+        "pt"
+      ],
+      "entries": [],
+      "culture_paths": [],
+      "since": null
+    },
+    {
+      "id": "ncregister",
+      "name": "National Catholic Register",
+      "base": "https://www.ncregister.com",
+      "langs": [
+        "en"
+      ],
+      "entries": [],
+      "culture_paths": [],
+      "since": null
+    },
+    {
+      "id": "kto",
+      "name": "KTO",
+      "base": "https://www.ktotv.com",
+      "langs": [
+        "fr"
+      ],
+      "entries": [],
+      "culture_paths": [],
+      "since": null
+    },
+    {
+      "id": "sir",
+      "name": "SIR",
+      "base": "https://www.agensir.it",
+      "langs": [
+        "it"
+      ],
+      "entries": [],
+      "culture_paths": [],
+      "since": null
+    }
+  ]
+}
