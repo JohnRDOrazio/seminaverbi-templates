@@ -147,7 +147,7 @@ and Gaetano Vallini's blog *Camera con vista*) and feeds every domain. Design: `
 ```
 python -m pipeline press discover   # new article URLs from each outlet's feeds and sitemaps (round-robin, max_articles_per_run)
 python -m pipeline press filter     # Jev: is the article about a work of culture or an artist (culture_drop)? with a faith or values angle (angle_drop)? below either: dropped
-python -m pipeline press link       # mentions linked to Wikidata items; kept when Jev finds them discussed substantively; marked critical below stance_drop
+python -m pipeline press link       # mentions linked to Wikidata items; kept when Jev finds them discussed substantively; with the article's stance on them (stance_keep)
 python -m pipeline press route      # each mention to its domain's queue (source press:<outlet>), the enrichment page, or waiting
 python -m pipeline press enrich     # writes Semina Verbi:Press for existing articles on en (editor bot)
 python -m pipeline press run        # all five, each article fetched once
@@ -160,8 +160,8 @@ us (`press refused: …`); a 401/403/429 or a robots.txt rule stops that outlet 
 
 The bot reads politely: its own user agent (`SeminaVerbi-press/1.0`, pointing to the page `Semina Verbi:Press bot`,
 whose text is `docs/press-bot-page.wiki`), one request at a time per outlet at least `delay_seconds` (10) apart or the
-outlet's `Crawl-delay`. A mention whose article is only critical of the work never becomes a candidate or press evidence;
-for a work SeminaVerbi covers it goes to the enrichment page, marked critical. The bot keeps the link, title, date, outlet, language and quotations of at most 25 words; never the
+outlet's `Crawl-delay`. A mention whose article is neutral on the work or only critical of it never becomes a candidate or
+press evidence; for a work SeminaVerbi covers it goes to the enrichment page, the critical ones marked. The bot keeps the link, title, date, outlet, language and quotations of at most 25 words; never the
 full text. Jev reads at most about 150 words per question. Read the `--dry-run` report before the first real run.
 
 **Archives, caps and republished articles** (`vallini`, for now; all per outlet in `config/press.json`):

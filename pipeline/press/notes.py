@@ -17,8 +17,8 @@ def press_notes(store, qid: str, outlets: dict[str, str]) -> list[dict]:
     one article (see duplicates) are one note, the others' links under `also`.
     """
     notes, seen = [], set()
-    cite = {m.url: m for m in store.mentions(qid=qid) if m.passages and not m.critical}
-    for m in cite.values():  # only critical: no support for a proposal
+    cite = {m.url: m for m in store.mentions(qid=qid) if m.passages and m.supports}
+    for m in cite.values():  # neutral or only critical: no support for a proposal
         art = store.article(m.url)
         if art is None or m.url in seen:
             continue

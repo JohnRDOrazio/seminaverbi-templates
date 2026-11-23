@@ -256,7 +256,9 @@ def test_the_pair_is_one_enrichment_entry_with_both_links(store, order, both):
         assert "\n** " not in done.split("<!-- press:end -->")[0]
 
 
-def test_an_only_critical_copy_gives_no_note(store):
+@pytest.mark.parametrize("outcome", ["critical", "neutral"])
+def test_a_copy_that_does_not_support_gives_no_note(store, outcome):
     pair(store, (BLOG, PAPER), Counting())
-    store.add_mention(Mention(BLOG, "Q9", "Ordet", "work", "film", 0.8, ["x"], "dropped", critical=True))
+    store.add_mention(Mention(BLOG, "Q9", "Ordet", "work", "film", 0.8, ["x"], "dropped",
+                              stance_outcome=outcome))
     assert press_notes(store, "Q9", NAMES) == []

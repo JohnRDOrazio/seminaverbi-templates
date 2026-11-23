@@ -27,7 +27,7 @@ CLOSURE = {
     "Q3305213": ["Q3305213"],                # painting
     "Q5": ["Q5"],                            # human
 }
-CFG = {"pick_p": 0.8, "pick_confidence": 0.6, "mention_keep": 0.6, "stance_drop": 0.4,
+CFG = {"pick_p": 0.8, "pick_confidence": 0.6, "mention_keep": 0.6, "stance_keep": 0.5,
        "waiting_classes": {"music": ["Q105543609", "Q7366", "Q482994", "Q484692"],
                            "art": ["Q3305213", "Q860861"], "artists": ["Q5"]}}
 
@@ -66,13 +66,14 @@ class FakeWikidata:
 
 
 class FakeJudge:
-    def __init__(self, pick=None, substantive=0.9, stance=0.8):
+    def __init__(self, pick=None, substantive=0.9, stance=(0.8, 0.0, 0.2, 0.0)):
         self._pick, self._substantive, self._stance = pick, substantive, stance
         self.picks, self.substantives, self.stances = [], [], []
 
     def stance(self, url, label, passage, item, title):
         self.stances.append({"url": url, "label": label, "passage": passage, "item": item, "title": title})
-        return self._stance(passage) if callable(self._stance) else self._stance
+        probs = self._stance(passage) if callable(self._stance) else self._stance
+        return dict(zip(("bearing", "mixed", "neutral", "critical"), probs))
 
     def pick(self, url, passage, label, options):
         """The configured answer; by default the first option, surely."""
@@ -370,29 +371,38 @@ def test_a_title_without_hits_is_searched_once(store, cache):
     assert wd.searches == [("Nulla", "it"), ("Nulla", "en")]
 
 
-@pytest.mark.parametrize("score,critical", [(0.39, True), (0.4, False)])
-def test_the_stance_of_a_kept_mention_is_stored(store, cache, score, critical):
+@pytest.mark.parametrize("probs,stance,outcome", [
+    ((0.6, 0.2, 0.1, 0.1), 0.8, "bearing"),
+    ((0.2, 0.3, 0.3, 0.2), 0.5, "mixed"),          # bearing and mixed together reach stance_keep
+    ((0.2, 0.2, 0.6, 0.0), 0.4, "neutral"),
+    ((0.0, 0.1, 0.2, 0.7), 0.1, "critical"),
+    ((0.0, 0.2, 0.4, 0.4), 0.2, "neutral"),         # criticism less likely than not: not marked critical
+])
+def test_the_stance_of_a_kept_mention_is_stored(store, cache, probs, stance, outcome):
     pg = page(["Silence racconta il dubbio."], [Span("Silence", 0, "italic")])
     wd = FakeWikidata({"Q1": entity(["Q11424"], {"it": "Silence"}, {"it": "film"})},
                       search={("Silence", "it"): ["Q1"]})
-    judge = FakeJudge(stance=score)
+    judge = FakeJudge(stance=probs)
     run(pg, store, judge, wd, cache)
-    assert [(m.stance, m.critical) for m in store.mentions()] == [(score, critical)]
+    [m] = store.mentions()
+    assert m.stance == pytest.approx(stance) and m.stance_outcome == outcome
+    assert (m.supports, m.critical) == (outcome in ("bearing", "mixed"), outcome == "critical")
     assert judge.stances == [{"url": URL, "label": "Silence", "passage": "Silence racconta il dubbio.",
                               "item": "Silence — film", "title": "T"}]
 
 
-def test_a_mixed_judgment_seen_in_a_later_window_is_not_critical(store, cache):
+def test_the_stance_is_read_from_at_most_three_windows_until_one_supports(store, cache):
     filler = " ".join(f"parola{i}" for i in range(200))
     pg = page([f"Silence stroncato. {filler}", filler, f"Silence però commuove. {filler}", filler,
                f"Silence ancora. {filler}", filler, f"Silence quarta. {filler}"], [Span("Silence", 0, "italic")])
     wd = FakeWikidata({"Q1": entity(["Q11424"])}, search={("Silence", "it"): ["Q1"]})
-    judge = FakeJudge(stance=lambda passage: 0.7 if "commuove" in passage else 0.1)
-    assert [(m.stance, m.critical) for m in run(pg, store, judge, wd, cache)] == [(0.7, False)]
-    assert len(judge.stances) == 2
-    judge = FakeJudge(stance=0.1)
-    run(pg, PressStore(sqlite3.connect(":memory:")), judge, wd, cache)
-    assert len(judge.stances) == 3  # at most three windows
+    judge = FakeJudge(stance=lambda p: (0.2, 0.5, 0.2, 0.1) if "commuove" in p else (0.0, 0.0, 0.1, 0.9))
+    [m] = run(pg, store, judge, wd, cache)
+    assert (m.stance, m.stance_outcome) == (pytest.approx(0.7), "mixed") and len(judge.stances) == 2
+    # critical in one window, nothing found in any: critical, however neutral the others
+    judge = FakeJudge(stance=lambda p: (0.0, 0.0, 0.1, 0.9) if "ancora" in p else (0.1, 0.1, 0.8, 0.0))
+    [m] = run(pg, PressStore(sqlite3.connect(":memory:")), judge, wd, cache)
+    assert m.stance_outcome == "critical" and len(judge.stances) == 3
     assert all(len((s["title"] + " " + s["passage"]).split()) <= 150 for s in judge.stances)
 
 

@@ -6,7 +6,7 @@ are discarded; a link's item is taken, a search's routed hits (one or several) g
 or none), taken only above the configured cut. Jev then judges, on the paragraphs around the mention (at most 150
 words, centred on it), whether the item (named by its label and description) is one of the subjects the article
 discusses, asking again at each later mention in another window until one is kept; a kept mention is stored
-with up to three passages of at most 25 words and the article's stance on the item (critical below stance_drop).
+with up to three passages of at most 25 words and the article's stance on the item.
 
 Class membership comes only from the domains' `owns()` and `common.owns()`, backed by the cached subclass closure:
 this module runs no SPARQL of its own.
@@ -104,11 +104,14 @@ class _Linker:
               "dropped", file=sys.stderr)
         return None
 
-    def stance(self, span: Span, qid: str, cut: float) -> float:
-        """The best stance score of the article on the item, over at most three windows around its label (its own
-        mention's first), each sent with the title within 150 words; no further window once one reaches `cut`."""
-        needle, best, asked = span.text.casefold(), 0.0, set()
+    def stance(self, span: Span, qid: str) -> tuple[float, str]:
+        """(probability that the article finds something bearing on the Gospel in the item, alone or beside
+        criticism; outcome), over at most three windows around its label (its own mention's first), each sent with
+        the title within 150 words. The best window counts, and none is asked after one that reaches stance_keep.
+        Without one, the outcome is "critical" when a window says so at stance_keep or more, else "neutral"."""
+        cut, needle = self.cfg["stance_keep"], span.text.casefold()
         item = _option(qid, self.wikidata.entity(qid), self.page.lang)
+        best, outcome, asked = 0.0, "neutral", set()
         for i in [span.paragraph] + [i for i in range(len(self.page.paragraphs)) if i != span.paragraph]:
             if i != span.paragraph and needle not in self.page.paragraphs[i].casefold():
                 continue
@@ -116,10 +119,16 @@ class _Linker:
             if context in asked:
                 continue
             asked.add(context)
-            best = max(best, self.judge.stance(self.url, span.text, context, item, short_title(self.page)))
-            if best >= cut or len(asked) == MAX_STANCE_WINDOWS:
+            probs = self.judge.stance(self.url, span.text, context, item, short_title(self.page))
+            p = round(probs["bearing"] + probs["mixed"], 6)
+            best = max(best, p)
+            if p >= cut:
+                return p, "bearing" if probs["bearing"] >= probs["mixed"] else "mixed"
+            if probs["critical"] >= cut:
+                outcome = "critical"
+            if len(asked) == MAX_STANCE_WINDOWS:
                 break
-        return best
+        return best, outcome
 
     def passages(self, span: Span) -> list[str]:
         """Up to three passages from the paragraphs naming the label, the mention's own paragraph first."""
@@ -176,11 +185,11 @@ def link_article(page: Page, outlet: str, store, judge, wikidata, sparql, cfg: d
         p = judge.substantive(url, span.text, context, _option(qid, wikidata.entity(qid), page.lang))
         if p < cfg["mention_keep"]:
             continue
-        stance = linker.stance(span, qid, cfg["stance_drop"])
+        stance, outcome = linker.stance(span, qid)
         done.add(qid)
         domain, instance_of = linker.route_of(qid)
         mention = Mention(url, qid, span.text, "person" if PERSON in instance_of else "work", domain, p,
-                          linker.passages(span), stance=stance, critical=stance < cfg["stance_drop"])
+                          linker.passages(span), stance=stance, stance_outcome=outcome)
         store.add_mention(mention)
         kept.append(mention)
     return kept

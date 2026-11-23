@@ -121,6 +121,7 @@ Article text is fetched when a stage needs it and kept in memory for that run on
 2. **Filter (culture).** One Jev `Noul` on the article's title and its first ~150 words: is this article mainly about
    a work of culture (film, series, book, music, art, theatre) or an artist? Below `culture_drop` (start 0.40)
    the article is dropped and never fetched again.
+   A second `Noul` then asks for a faith or values angle (`angle_drop`; see "Angle and stance" below).
 3. **Link.** Mentions are found in the article's markup and text: italicised or quoted titles, links to Wikipedia,
    and capitalised names next to a creator's name. Each mention is searched on Wikidata (`wbsearchentities` in the
    article's language, then en) and its hits are typed (P31/P279 against the domains' classes, Q5 for people).
@@ -223,7 +224,9 @@ problems. What changed:
    (`NewsArticle`, `Article`, `BlogPosting`; KTO's programme pages `VideoObject`), no section page's does but KTO's
    home page (never discovered: its feed lists only programme pages), while og:type misleads (L'Osservatore
    Romano's articles say `website`). The node that describes the page (by `url`, `@id` or `mainEntityOfPage`)
-   decides; articles another node lists do not count. Without JSON-LD og:type decides; a page with no signal, or
+   decides, or its one `mainEntity`; articles another node lists do not count. Only evidence rejects (a collection
+   type describing the page, or articles only as listed members): inconclusive JSON-LD leaves it to og:type, except
+   breadcrumbs alone without og:type (Avvenire's sections), which are a section. A page with no signal, or
    with a block that cannot be read, counts as an article. A page that is not one is skipped for good ("not an
    article"). JSON-LD is read leniently: one Osservatore article has a raw carriage return inside a string. No
    outlet needs a rule of its own.
@@ -259,6 +262,49 @@ problems. What changed:
   does not separate them either (*A Silvia* and *Vous n'aurez pas ma haine* are named in one paragraph). Fixing this
   needs an article-level signal (for example the article's title given to the substantive question, or a cap on
   mentions per article), which is the author's call rather than wording tuned to this sample.
+
+## Angle and stance (author, 2026-11-23)
+
+Decided by the author: "Yes the article filter should ask for a faith or values angle, because an article could be
+critiquing an author or work that doesn't belong in SeminaVerbi, so we need the context to pick it up as a
+candidate".
+
+1. **Angle (filter).** An article at or above `culture_drop` is asked, as a question of its own, whether it treats the
+   work or artist with a faith or values angle, or through the human questions the Gospel addresses (mercy,
+   forgiveness, suffering, hope, justice...), favourably or critically, rather than as entertainment or industry
+   news. The angle may be implicit. Jev reads the title and opening; below the cut, at most three texts of the title
+   and the paragraphs around a mention (never other parts of the article), and the best score counts. Both that and
+   the opening's score are stored. `angle_drop` 0.40, as `culture_drop`: a drop is for good, while an article kept
+   wrongly still meets the pick, the substantive question, the stance and the votes.
+2. **Stance (link).** Each kept mention is asked, over at most three windows of at most 150 words with the title, what
+   the article makes of the item (its label and description) in the light of the Gospel: a Jev `Choice` of `bearing`
+   (finds something that bears on the Gospel), `mixed` (that, and criticism), `neutral` (neither) and `critical` (only
+   criticism). `stance_keep` 0.50 applies to the best window's bearing + mixed: the four probabilities sum to 1, so
+   above half means that finding something is likelier than not, and the best of three windows is already lenient.
+   Otherwise the outcome is `critical` when a window gives that 0.50 or more, else `neutral`.
+   - Bearing and mixed may become candidates. Neutral and critical may not (route `dropped`): no queue evidence, no
+     sitelink-floor exemption, no dossier note. This holds for mentions released from `waiting` too.
+   - For a work SeminaVerbi covers, every mention goes to the enrichment list; only `critical` is marked there, since
+     it can inform the discernment section.
+   - Existing stores gain the columns by a guarded ALTER. A mention without an outcome (never asked, or with the first
+     version's single score) stays as it is and is not critical.
+
+The first version asked one score ("finds something that bears on the Gospel rather than only criticising") and took
+a low one as critical. On real pages it marked *Heidi* (0.07) and *Jeeg* (0.08), named in a list in an article on the
+Panini album, as critical: neutral mentions.
+
+**Replay of the dry run's 200 articles** (the single-score version, f2b8251, with the page detection of 6b2d257):
+129 dropped by culture (the same 129 as before), 13 dropped by angle, 11 section or home pages skipped (6 of them
+among the 135 the culture filter had dropped, 5 among the 65 kept), 2 Avvenire articles not read (HTTP 503), 45 kept
+and linked, 12 mentions (31 before). Of the 58 asked for the angle the opening showed it for 42, a later text for 3.
+The Pattinson article went at the angle (0.08), and its Bond titles and *The Batman* with it. No linked mention was
+critical (the one article that looks critical by its title, on the Tg1, fell at the angle, 0.37), so **the `critical`
+and `mixed` outcomes are untested on real pages**. L'Osservatore Romano's pages were read with garbled accents
+(served without a charset; fixed in 8321aa5 on another branch), so their verdicts are provisional.
+
+**Stance asked again** with the Choice for those 12 mentions: 8 bearing, 4 neutral (*Heidi*, *Jeeg*, *The Birth of
+Venus* 0.33, and *Una pura formalità* 0.31, a wanted find), none critical or mixed. A cut of 0.40 gives the same
+outcomes. The combined code has not had a full run.
 
 ## Gaetano Vallini's blog (2026-11-23)
 

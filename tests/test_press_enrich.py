@@ -154,12 +154,12 @@ def test_literal_and_commented_done_calls_do_not_close(store, literal):
     assert done_urls(old + "{{SV press done|https://x/a}}\n") == {"https://x/a"}
 
 
-def test_a_critical_article_is_marked(store):
-    add(store, "https://x/a")
-    add(store, "https://x/b")
-    store.add_mention(Mention("https://x/b", "Q1", "Silenzio", "work", "film", 0.9, ["a b c"], "enrichment",
-                              stance=0.1, critical=True))
-    lines = enrichment(store, OUTLETS, None).splitlines()
-    [a] = [l for l in lines if "https://x/a" in l]
-    [b] = [l for l in lines if "https://x/b" in l]
-    assert "(it, critical)" in b and "critical" not in a
+def test_only_a_critical_article_is_marked(store):
+    for name in ("bearing", "mixed", "neutral", "critical"):
+        add(store, f"https://x/{name}")
+        store.add_mention(Mention(f"https://x/{name}", "Q1", "Silenzio", "work", "film", 0.9, ["a b c"], "enrichment",
+                                  stance=0.1, stance_outcome=name))
+    lines = [l for l in enrichment(store, OUTLETS, None).splitlines() if l.startswith("**")]
+    assert len(lines) == 4
+    assert ["https://x/critical" in l for l in lines] == ["(it, critical)" in l for l in lines]
+    assert sum("(it)" in l for l in lines) == 3
