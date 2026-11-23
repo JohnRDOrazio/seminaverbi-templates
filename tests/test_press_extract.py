@@ -276,7 +276,7 @@ def test_a_single_object_graph_and_non_object_entries():
     assert _article(_head("website", '{"@graph": {"@type": "NewsArticle"}}'))
     assert not _article(_head("article", '{"@graph": {"@type": "CollectionPage"}}'))
     assert _article(_head("website", '[3, null, "x", {"@graph": [1, null, "NewsArticle", {"@type": "Article"}]}]'))
-    assert not _article(_head("article", '{"@graph": [null, "NewsArticle", {"@type": "WebPage", "@id": 4, '
+    assert not _article(_head("website", '{"@graph": [null, "NewsArticle", {"@type": "WebPage", "@id": 4, '
                                          '"url": ["x"], "mainEntityOfPage": 7, "hasPart": 1}]}'))
 
 
@@ -289,3 +289,53 @@ def test_compact_and_full_types_are_resolved():
     assert _article(_head("website", '{"@type": "https://schema.org/Article"}'))
     assert not _article(_graph({"@type": "o:Article"}, context='{"o": "https://other.test/"}'))
     assert _article(_head("website", '{"@type": "schema:NewsArticle"}'))  # the usual prefix, undeclared
+
+
+def _og(og, *nodes):
+    import json
+    return _head(og, *[json.dumps(n) for n in nodes])
+
+
+def test_the_pages_main_entity_is_followed():
+    page = {"@type": "WebPage", "url": PAGE}
+    inline = {"@type": "NewsArticle", "mainEntityOfPage": PAGE}
+    for entity in (inline, [inline], {"@type": "NewsArticle"}, {"@type": "s:NewsArticle"}):
+        node = {"@context": {"s": "https://schema.org/"}, **page, "mainEntity": entity}
+        assert _article(_og("website", node)), entity
+    own = {"@type": "Article", "@id": PAGE + "#article"}
+    for entity in ({"@id": own["@id"]}, [{"@id": own["@id"]}], own["@id"], [own["@id"]]):
+        assert _article(_graph({**page, "mainEntity": entity}, own)), entity
+
+
+def test_several_main_entities_or_an_item_list_are_a_listing():
+    page = {"@type": "WebPage", "url": PAGE}
+    ref = {"@id": ART1["@id"]}
+    items = {"@type": "ItemList", "itemListElement": [{"@type": "ListItem", "item": ref}]}
+    for entity in ([ref, {"@id": "https://e.test/a2"}], items, [items]):
+        assert not _article(_graph({**page, "mainEntity": entity}, ART1)), entity
+        assert not _article(_og("article", {**page, "mainEntity": entity}, ART1)), entity
+    # articles embedded in a listing are members too, not the page
+    for listing in ({"hasPart": [{"@type": "NewsArticle"}]}, {"mainEntity": [{"@type": "Article"}, {"@type": "Article"}]}):
+        assert not _article(_og("article", {**page, **listing})), listing
+
+
+def test_another_pages_main_entity_is_not_followed():
+    other = {"@type": "WebPage", "url": "https://e.test/other", "mainEntity": {"@type": "NewsArticle"}}
+    assert not _article(_og("website", other))
+
+
+def test_inconclusive_jsonld_falls_back_to_og_type_then_to_an_article():
+    page = {"@type": "WebPage", "url": PAGE}
+    assert _article(_og("article", page)) and _article(_og(None, page))
+    assert not _article(_og("website", page))
+    elsewhere = {"@type": "CollectionPage", "url": "https://e.test/all"}  # the section it belongs to
+    assert _article(_og("article", page, elsewhere)) and _article(_og(None, page, elsewhere))
+    assert not _article(_og("article", {**elsewhere, "url": PAGE}))
+    assert not _article(_og("article", {"@type": "CollectionPage"}))
+
+
+def test_breadcrumbs_alone_without_og_type_stay_a_section():
+    """Avvenire's section pages (/agora/cultura): breadcrumbs, no other JSON-LD and no og:type."""
+    crumbs = {"@type": "BreadcrumbList", "itemListElement": []}
+    assert not _article(_og(None, crumbs))
+    assert _article(_og("article", crumbs))
