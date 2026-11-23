@@ -95,14 +95,17 @@ def test_angle_is_its_own_question(queue):
         PressJudge(fake, queue).angle(URL, " ".join(["w"] * 151))
 
 
-def test_stance_names_the_item_and_the_title_within_the_bound(queue):
-    from pipeline.press.judge import STANCE
-    fake = Counting({"stance": 0.2})
+def test_stance_is_a_choice_of_four_outcomes(queue):
+    from pipeline.press.judge import STANCE, STANCES
+    probs = {"bearing": 0.1, "mixed": 0.2, "neutral": 0.6, "critical": 0.1}
+    fake = Counting({"stance": choice(probs, 0.5)})
     judge = PressJudge(fake, queue)
-    assert judge.stance(URL, "Ben-Hur", "passage", "Ben-Hur — 1959 film", "Titolo") == 0.2
-    assert fake.calls[0]["questions"]["stance"].instructions == STANCE
+    assert judge.stance(URL, "Ben-Hur", "passage", "Ben-Hur — 1959 film", "Titolo") == probs
+    q = fake.calls[0]["questions"]["stance"]
+    assert q.instructions == STANCE and q.criteria == {k: {"name": v} for k, v in STANCES.items()}
+    assert list(STANCES) == ["bearing", "mixed", "neutral", "critical"]
     assert fake.calls[0]["state"] == {"title": "Titolo", "text": "passage", "mention": "Ben-Hur",
                                       "item": "Ben-Hur — 1959 film"}
-    assert "mixed" in STANCE.lower() and "`item`" in STANCE and "`title`" in STANCE
+    assert "`item`" in STANCE and "`title`" in STANCE
     with pytest.raises(ValueError):  # title and passage together
         judge.stance(URL, "X", " ".join(["w"] * 149), "X", "two words")

@@ -464,47 +464,58 @@ def test_the_dry_run_preview_goes_on_past_a_failed_lookup(q, store, uncovered, c
     assert "Q8" in capsys.readouterr().err
 
 
-def critical(**kw):
-    m = mention(**kw)
-    m.stance, m.critical = 0.1, True
-    return m
+@pytest.fixture(params=["neutral", "critical"])
+def unsupporting(request):
+    def make(**kw):
+        m = mention(**kw)
+        m.stance, m.stance_outcome = 0.1, request.param
+        return m
+    return make
 
 
-def test_a_critical_mention_never_becomes_a_candidate(q, store, uncovered):
-    store.add_mention(critical())
+def test_a_neutral_or_critical_mention_never_becomes_a_candidate(q, store, unsupporting, uncovered):
+    store.add_mention(unsupporting())
     assert route(store, q, None, {}, FakeWikidata({"Q9": ent()})) == {"dropped": 1}
     assert q.row("Q9") is None and store.mentions()[0].route == "dropped"
 
 
-def test_a_critical_mention_adds_nothing_to_an_existing_row(q, store, uncovered):
+def test_a_neutral_or_critical_mention_adds_nothing_to_an_existing_row(q, store, unsupporting, uncovered):
     q.add("Q9", "film", "facet", {"en": "Ordet"}, {"enwiki": "Ordet"}, data={"count": 2, "instance_of": ["Q11424"]})
     q.set_outcome("Q9", 2, "drop", {"reason": "floor"})
     before = (q.row("Q9").sources, q.row("Q9").data, q.row("Q9").outcomes)
-    store.add_mention(critical(p=0.95))
+    store.add_mention(unsupporting(p=0.95))
     assert route(store, q, None, {}, FakeWikidata({"Q9": ent()})) == {"dropped": 1}
     r = q.row("Q9")
     assert (r.sources, r.data, r.outcomes) == before and not common.press_exempt(r)
 
 
-def test_a_critical_mention_of_a_covered_work_still_goes_to_enrichment(q, store, monkeypatch):
+def test_a_neutral_or_critical_mention_of_a_covered_work_still_goes_to_enrichment(q, store, unsupporting, monkeypatch):
     monkeypatch.setattr(stages, "covered", lambda row, repo, wikis: ("drop", {"have": ["en"]}))
-    store.add_mention(critical())
+    store.add_mention(unsupporting())
     assert route(store, q, None, {}, FakeWikidata({"Q9": ent()})) == {"enrichment": 1}
 
 
-def test_a_released_critical_mention_is_dropped_too(q, store, uncovered):
-    store.add_mention(critical(qid="Q7", domain="waiting:music"))
+def test_a_released_neutral_or_critical_mention_is_dropped_too(q, store, unsupporting, uncovered):
+    store.add_mention(unsupporting(qid="Q7", domain="waiting:music"))
     wd = FakeWikidata({"Q7": ent("Canto")})
     assert route(store, q, None, {}, wd) == {"waiting": 1}
     assert release_waiting(store, q, "music", None, {}, wd) == {"dropped": 1}
     assert q.row("Q7") is None
 
 
-def test_the_preview_shows_the_drop_and_the_scores(q, store, uncovered):
+def test_the_preview_shows_the_drop_and_the_scores(q, store, unsupporting, uncovered):
     from pipeline.press.stages import preview
     store.set_article(URL, "linked", "keep", {"culture": 0.9, "angle": 0.55})
-    store.add_mention(critical())
+    store.add_mention(unsupporting())
     store.add_mention(mention("Q8", url=URL + "2"))
     lines = preview(store, None, {}, FakeWikidata({"Q9": ent(), "Q8": ent()}), queue=q)
-    assert lines[0].split()[0] == "dropped" and "culture=0.90 angle=0.55 stance=0.10 critical" in lines[0]
+    assert lines[0].split()[0] == "dropped" and "culture=0.90 angle=0.55 stance=0.10 (" in lines[0]
     assert lines[1].split()[0] == "candidate" and "stance" not in lines[1]
+
+
+@pytest.mark.parametrize("outcome", ["bearing", "mixed", None])
+def test_a_bearing_or_mixed_mention_or_one_never_asked_becomes_a_candidate(q, store, uncovered, outcome):
+    m = mention()
+    m.stance_outcome = outcome
+    store.add_mention(m)
+    assert route(store, q, None, {}, FakeWikidata({"Q9": ent()})) == {"candidate": 1}

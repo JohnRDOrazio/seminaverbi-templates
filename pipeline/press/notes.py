@@ -13,7 +13,7 @@ def press_notes(store, qid: str, outlets: dict[str, str]) -> list[dict]:
     notes = []
     for m in store.mentions(qid=qid):
         art = store.article(m.url)
-        if art is None or not m.passages or m.critical:  # only critical: no support for a proposal
+        if art is None or not m.passages or not m.supports:
             continue
         name = outlets.get(art.outlet, art.outlet)
         head = f"{name} ({art.published}): {art.title}" if art.published else f"{name}: {art.title}"

@@ -183,7 +183,7 @@ def preview(store, repo, wikis, wikidata, sparql=None, queue=None) -> list[str]:
         scores = {"culture": art.data.get("culture"), "angle": art.data.get("angle")} if art else {}
         scores["stance"] = m.stance
         c = "".join(f" {k}={v:.2f}" for k, v in scores.items() if isinstance(v, (int, float)))
-        c += " critical" if m.critical else ""
+        c += f" ({m.stance_outcome})" if m.stance_outcome else ""
         lines.append(f"  {kind:<10} {m.qid} {m.label!r} ({m.domain}) p={m.p:.2f}{c} {m.url}")
     hits = sum(1 for _, kind in routed if kind == "enrichment")
     share = f"{100 * hits / len(routed):.0f}%" if routed else "-"

@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS press_articles (
   found_at REAL, stage TEXT DEFAULT 'found', outcome TEXT, data_json TEXT, attempted_at REAL);
 CREATE TABLE IF NOT EXISTS press_mentions (
   url TEXT, qid TEXT, label TEXT, kind TEXT, domain TEXT, p REAL,
-  passages_json TEXT, route TEXT, stance REAL, critical INTEGER, PRIMARY KEY (url, qid));
+  passages_json TEXT, route TEXT, stance REAL, stance_outcome TEXT, PRIMARY KEY (url, qid));
 CREATE TABLE IF NOT EXISTS press_feeds (url TEXT PRIMARY KEY, etag TEXT, last_modified TEXT);
 """
 
@@ -44,8 +44,17 @@ class Mention:
     p: float
     passages: list[str] = field(default_factory=list)
     route: str | None = None  # "candidate" | "enrichment" | "waiting" | "dropped" | None until routed
-    stance: float | None = None  # Jev's probability that the article finds something in the item (None: not asked)
-    critical: bool = False  # stance below stance_drop when asked
+    stance: float | None = None  # probability that the article finds something in the item (None: not asked)
+    stance_outcome: str | None = None  # "bearing" | "mixed" | "neutral" | "critical"; None: not asked (or an old score)
+
+    @property
+    def critical(self) -> bool:
+        return self.stance_outcome == "critical"
+
+    @property
+    def supports(self) -> bool:
+        """The mention may make a candidate and be evidence for one."""
+        return self.stance_outcome not in ("neutral", "critical")
 
 
 class PressStore:
@@ -55,7 +64,7 @@ class PressStore:
         if "attempted_at" not in {r[1] for r in db.execute("PRAGMA table_info(press_articles)")}:
             db.execute("ALTER TABLE press_articles ADD COLUMN attempted_at REAL")  # a store made before it
         columns = {r[1] for r in db.execute("PRAGMA table_info(press_mentions)")}
-        for name, kind in (("stance", "REAL"), ("critical", "INTEGER")):
+        for name, kind in (("stance", "REAL"), ("stance_outcome", "TEXT")):
             if name not in columns:
                 db.execute(f"ALTER TABLE press_mentions ADD COLUMN {name} {kind}")
         db.commit()
@@ -104,22 +113,22 @@ class PressStore:
                 raise ValueError(f"passage over {MAX_PASSAGE_WORDS} words")
         # Upsert: evidence fields are refreshed, an existing route survives a re-find with route=None.
         self.db.execute(
-            "INSERT INTO press_mentions (url, qid, label, kind, domain, p, passages_json, route, stance, critical) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(url, qid) DO UPDATE SET "
+            "INSERT INTO press_mentions (url, qid, label, kind, domain, p, passages_json, route, "
+            "stance, stance_outcome) VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(url, qid) DO UPDATE SET "
             "label=excluded.label, kind=excluded.kind, domain=excluded.domain, p=excluded.p, "
             "passages_json=excluded.passages_json, route=COALESCE(excluded.route, route), "
-            "critical=CASE WHEN excluded.stance IS NULL THEN critical ELSE excluded.critical END, "
-            "stance=COALESCE(excluded.stance, stance)",
+            "stance=COALESCE(excluded.stance, stance), "
+            "stance_outcome=COALESCE(excluded.stance_outcome, stance_outcome)",
             (m.url, m.qid, m.label, m.kind, m.domain, m.p, json.dumps(m.passages), m.route, m.stance,
-             int(m.critical)))
+             m.stance_outcome))
         self.db.commit()
 
     def _mentions(self, where: str, args: list) -> list[Mention]:
         rows = self.db.execute(
-            "SELECT url, qid, label, kind, domain, p, passages_json, route, stance, critical FROM press_mentions"
+            "SELECT url, qid, label, kind, domain, p, passages_json, route, stance, stance_outcome FROM press_mentions"
             + where + " ORDER BY url, qid", args).fetchall()
-        return [Mention(r[0], r[1], r[2], r[3], r[4], r[5], json.loads(r[6] or "[]"), r[7], r[8],
-                        bool(r[9])) for r in rows]
+        return [Mention(r[0], r[1], r[2], r[3], r[4], r[5], json.loads(r[6] or "[]"), r[7], r[8], r[9])
+                for r in rows]
 
     def mentions(self, qid=None, route=None) -> list[Mention]:
         conds, args = [], []

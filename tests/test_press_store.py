@@ -70,17 +70,18 @@ def test_readd_without_route_keeps_existing_route():
     assert s.mentions(qid="Q1")[0].route == "waiting"
 
 
-def test_an_old_store_gains_the_stance_columns_and_its_mentions_are_not_critical():
-    import sqlite3
-    db = sqlite3.connect(":memory:")
-    db.execute("CREATE TABLE press_mentions (url TEXT, qid TEXT, label TEXT, kind TEXT, domain TEXT, p REAL, "
-               "passages_json TEXT, route TEXT, PRIMARY KEY (url, qid))")
-    db.execute("INSERT INTO press_mentions VALUES ('u', 'Q1', 'x', 'work', 'film', 0.9, '[]', NULL)")
-    store = PressStore(db)
-    assert [(m.stance, m.critical) for m in store.mentions()] == [(None, False)]
-    PressStore(db)  # again: the migration is guarded
-    store.add_mention(Mention("u", "Q1", "x", "work", "film", 0.9, [], stance=0.1, critical=True))
-    store.add_mention(Mention("u", "Q1", "x", "work", "film", 0.9, []))  # re-found without a score: kept
-    assert [(m.stance, m.critical) for m in store.mentions()] == [(0.1, True)]
-    store.add_mention(Mention("u", "Q1", "x", "work", "film", 0.9, [], stance=0.8))
-    assert [(m.stance, m.critical) for m in store.mentions()] == [(0.8, False)]
+def test_old_stores_gain_the_stance_columns_and_their_mentions_stay_as_they_are():
+    base = ("CREATE TABLE press_mentions (url TEXT, qid TEXT, label TEXT, kind TEXT, domain TEXT, p REAL, "
+            "passages_json TEXT, route TEXT%s, PRIMARY KEY (url, qid))")
+    values = "'u', 'Q1', 'x', 'work', 'film', 0.9, '[]', NULL"
+    for columns, extra, stance in (("", "", None), (", stance REAL, critical INTEGER", ", 0.07, 1", 0.07)):
+        db = sqlite3.connect(":memory:")
+        db.execute(base % columns)
+        db.execute(f"INSERT INTO press_mentions VALUES ({values}{extra})")
+        store = PressStore(db)
+        [m] = store.mentions()
+        assert (m.stance, m.stance_outcome, m.critical, m.supports) == (stance, None, False, True)
+        PressStore(db)  # again: the migration is guarded
+        store.add_mention(Mention("u", "Q1", "x", "work", "film", 0.9, [], stance=0.1, stance_outcome="critical"))
+        store.add_mention(Mention("u", "Q1", "x", "work", "film", 0.9, []))  # re-found without a stance: kept
+        assert [(m.stance, m.critical) for m in store.mentions()] == [(0.1, True)]

@@ -124,10 +124,10 @@ def test_press_notes_count_in_the_languages_of_a_passing_dossier(store, queue, m
     assert stages._first_wiki(data["languages"]) == "it"
 
 
-def test_a_critical_mention_gives_no_note():
+def test_a_neutral_or_critical_mention_gives_no_note():
     store = PressStore.of(Queue(":memory:"))
-    for u, crit in (("https://x/a", False), ("https://x/b", True)):
-        store.add_article(u, "sir", "it", "T", "2026-11-20")
-        store.add_mention(Mention(u, "Q1", "x", "work", "film", 0.9, ["parole"], stance=0.1 if crit else 0.9,
-                                  critical=crit))
-    assert [n["url"] for n in press_notes(store, "Q1", {})] == ["https://x/a"]
+    for outcome in ("bearing", "mixed", "neutral", "critical", None):
+        url = f"https://x/{outcome}"
+        store.add_article(url, "sir", "it", "T", "2026-11-20")
+        store.add_mention(Mention(url, "Q1", "x", "work", "film", 0.9, ["parole"], stance_outcome=outcome))
+    assert {n["url"] for n in press_notes(store, "Q1", {})} == {"https://x/bearing", "https://x/mixed", "https://x/None"}
