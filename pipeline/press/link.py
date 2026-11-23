@@ -108,12 +108,12 @@ class _Linker:
         return out
 
 
-def link_article(page: Page, outlet: str, store, judge, wikidata, sparql, cfg: dict,
-                 cache: Path | None = None, url: str | None = None) -> list[Mention]:
+def link_article(page: Page, outlet: str, store, judge, wikidata, sparql, cfg: dict, *, url: str,
+                 cache: Path | None = None) -> list[Mention]:
     """Link the page's spans to Wikidata items and store the mentions the article discusses substantively
-    (route None: routing is a later stage). `url` is the article's key in the press store (default: the page's
-    canonical URL); `cache` is the class closure cache (default: common.CLOSURE_CACHE)."""
-    url = url or page.canonical
+    (route None: routing is a later stage). `url` is the article's stored key in press_articles (never the page's
+    own canonical link): every mention and every Jev question of the article uses it. `cache` is the class
+    closure cache (default: common.CLOSURE_CACHE)."""
     linker = _Linker(page, outlet, url, judge, wikidata, sparql, cfg, cache)
     seen_spans: set[tuple[str, tuple[str, str] | None]] = set()
     judged: set[str] = set()

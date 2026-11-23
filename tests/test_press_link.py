@@ -10,7 +10,8 @@ from pipeline.press.extract import Page, Span
 from pipeline.press.link import class_route, link_article
 from pipeline.press.store import PressStore
 
-URL = "https://example.org/cultura/a"
+URL = "https://example.org/cultura/a"  # the stored article URL (press_articles key)
+CANONICAL = "https://example.org/en/cultura/a?ref=rss"  # what the page's own canonical link says
 
 # class -> its subclasses (P279*), as the closure query would answer
 CLOSURE = {
@@ -87,11 +88,11 @@ def cache(tmp_path):
 
 
 def page(paragraphs, spans, lang="it"):
-    return Page(title="T", published="2026-11-20", lang=lang, canonical=URL, paragraphs=paragraphs, spans=spans)
+    return Page(title="T", published="2026-11-20", lang=lang, canonical=CANONICAL, paragraphs=paragraphs, spans=spans)
 
 
 def run(pg, store, judge, wikidata, cache, cfg=CFG):
-    return link_article(pg, "sir", store, judge, wikidata, FakeSparql(), cfg, cache=cache)
+    return link_article(pg, "sir", store, judge, wikidata, FakeSparql(), cfg, cache=cache, url=URL)
 
 
 def test_wikilink_resolves_without_search(store, cache):
@@ -232,6 +233,25 @@ def test_no_sparql_of_its_own(store, cache):
     wd = FakeWikidata({"Q1": entity(["Q11424"]), "Q2": entity(["Q11424"])},
                       search={("Silence", "it"): ["Q1"], ("Ben-Hur", "it"): ["Q2"]})
     sparql = FakeSparql()
-    link_article(pg, "sir", store, FakeJudge(), wd, sparql, CFG, cache=cache)
+    link_article(pg, "sir", store, FakeJudge(), wd, sparql, CFG, cache=cache, url=URL)
     assert all(q.startswith("SELECT ?sub WHERE") for q in sparql.queries)
     assert len(sparql.queries) == len(set(sparql.queries))
+
+
+def test_mentions_and_jev_are_keyed_by_the_stored_url_not_the_canonical(store, cache):
+    pg = page(["Ben-Hur resta un classico."], [Span("Ben-Hur", 0, "italic")])
+    assert pg.canonical != URL
+    wd = FakeWikidata({"Q9": entity(["Q11424"]), "Q3": entity(["Q11424"])}, search={("Ben-Hur", "it"): ["Q9", "Q3"]})
+    judge = FakeJudge(pick=("Q9", 0.9, 0.9))
+    out = run(pg, store, judge, wd, cache)
+    assert [m.url for m in out] == [URL]
+    assert [m.url for m in store.mentions()] == [URL]
+    assert [c["url"] for c in judge.picks + judge.substantives] == [URL, URL]
+
+
+def test_url_is_a_required_keyword(store, cache):
+    pg = page(["Silence."], [Span("Silence", 0, "italic")])
+    with pytest.raises(TypeError):
+        link_article(pg, "sir", store, FakeJudge(), FakeWikidata({}), FakeSparql(), CFG, cache=cache)
+    with pytest.raises(TypeError):
+        link_article(pg, "sir", store, FakeJudge(), FakeWikidata({}), FakeSparql(), CFG, URL)
