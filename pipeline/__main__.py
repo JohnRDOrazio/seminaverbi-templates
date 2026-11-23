@@ -4,9 +4,14 @@ Stages: 0 candidates, 1 covered, 2 triage, 3 quick, 4 dossier, 5 adjudicate, 6 p
 Commands that write to the wiki (publish, run --publish, votes) log in as the editor bot with
 SV_EDITOR_USER / SV_EDITOR_PASSWORD (run --publish logs in before any stage); the Jev client is only made
 for quick, adjudicate and calibrate. `skip QID --reason TEXT` drops a row that breaks a stage.
+
+`press discover|filter|link|route|enrich|run [--dry-run]` runs the Catholic-press source (pipeline/press/): filter
+and link ask Jev (TYPESAFE_API_KEY), enrich and run write the enrichment page as the editor bot; `--dry-run` writes
+neither the candidates queue nor the wiki.
 """
 import argparse
 import os
+import sqlite3
 import sys
 
 from typesafe_sdk import TypeSafeError
@@ -16,8 +21,10 @@ from pipeline.domains import DOMAINS
 from pipeline.domains.common import domain_config
 from pipeline.publish import approved_report, publish, sync_votes
 from pipeline.press.fetch import load_press_config
+from pipeline.press import stages as press_stages
+from pipeline.press.enrich import ENRICH_TITLE, enrichment, publish_enrichment
 from pipeline.press.notes import press_notes
-from pipeline.press.route import release_waiting
+from pipeline.press.route import release_waiting, route
 from pipeline.press.store import PressStore
 from pipeline.queue import Queue
 from sync import categories
@@ -76,6 +83,18 @@ def _login_editor() -> WikiClient:
 
 def _editor() -> WikiClient:
     return _login_editor()
+
+
+def _press_client(pcfg: dict, store):
+    import requests
+    from pipeline.press.fetch import PoliteClient
+    return PoliteClient(requests.Session(), pcfg["user_agent"], pcfg["delay_seconds"], store)
+
+
+def _press_judge(queue):
+    from pipeline.press.judge import PressJudge
+    from tools import jev
+    return PressJudge(jev.make_client(), queue)
 
 
 # ---- commands ----
@@ -217,6 +236,69 @@ def cmd_redo(args, queue, cfg):
     print(f"redo: stages {args.stage}+ cleared" + (f" for {args.qid}" if args.qid else ""))
 
 
+PRESS_ACTIONS = ("discover", "filter", "link", "route", "enrich", "run")
+
+
+def _counts(counts: dict) -> str:
+    return ", ".join(f"{k} {v}" for k, v in sorted(counts.items())) or "none"
+
+
+def _refused(client) -> None:
+    refused = getattr(client, "refused", {}) if client is not None else {}
+    print("press refused: " + (", ".join(f"{o} ({r})" for o, r in sorted(refused.items())) or "none"))
+
+
+def cmd_press(args, queue, cfg):
+    """The press stages; `run` = discover, filter, link, route, enrich. `--dry-run`: discover into a throwaway
+    store and list the URLs; route (and run) only print each mention's would-be route; enrich prints the page."""
+    pcfg, action, dry = load_press_config(), args.action, args.dry_run
+    if action in ("filter", "link", "run") and not os.environ.get("TYPESAFE_API_KEY"):
+        raise CliError("TYPESAFE_API_KEY is not set; press filter and link ask Jev")
+    editor = _login_editor() if action in ("enrich", "run") and not dry else None  # before any stage runs
+    store = PressStore.of(queue)
+    outlets = {o["id"]: o["name"] for o in pcfg["outlets"]}
+    client = None
+    if action in ("discover", "filter", "link", "run"):
+        if action == "discover" and dry:  # a throwaway store: no articles, no feed caches kept
+            store = PressStore(sqlite3.connect(":memory:"))
+        client = _press_client(pcfg, store)
+    pages = press_stages.Pages(client) if client is not None else None
+    judge = _press_judge(queue) if action in ("filter", "link", "run") else None
+    lazy: dict = {}
+
+    def wikidata():
+        return lazy.setdefault("wikidata", _wikidata())
+
+    def wikis():
+        return lazy.setdefault("wikis", _wikis())
+
+    if action in ("discover", "run"):
+        print("press discover: " + _counts(press_stages.run_discover(store, client, pcfg)))
+        if action == "discover" and dry:
+            for oid in outlets:
+                for art in store.articles("found", outlet=oid):
+                    print(f"  {oid} {art.lang} {art.url}")
+    if action in ("filter", "run"):
+        print("press filter: " + _counts(press_stages.run_filter(store, pages, judge, pcfg)))
+    if action in ("link", "run"):
+        print("press link: " + _counts(press_stages.run_link(store, pages, judge, wikidata(), _sparql(), pcfg)))
+    if action in ("route", "run"):
+        if dry:
+            print("\n".join(press_stages.preview(store, wikis()["en"], wikis(), wikidata())))
+        else:
+            print("press route: " + _counts(route(store, queue, wikis()["en"], wikis(), wikidata())))
+    if action in ("enrich", "run") and not dry:
+        titles = press_stages.titles(store, wikis()["en"], wikidata())
+        written = publish_enrichment(store, editor, outlets, titles)
+        print("press enrich: " + ("page written" if written else "page unchanged"))
+    elif action == "enrich":
+        current = wikis()["en"].revision(ENRICH_TITLE)
+        print(enrichment(store, outlets, current[1] if current else None,
+                         press_stages.titles(store, wikis()["en"], wikidata())))
+    if client is not None:
+        _refused(client)
+
+
 def build_parser() -> argparse.ArgumentParser:
     # the common options are accepted before or after the command
     common = argparse.ArgumentParser(add_help=False, argument_default=argparse.SUPPRESS)
@@ -237,6 +319,9 @@ def build_parser() -> argparse.ArgumentParser:
     skip = sub.add_parser("skip", parents=[common])
     skip.add_argument("qid")
     skip.add_argument("--reason", required=True)
+    press = sub.add_parser("press", parents=[common])
+    press.add_argument("action", choices=PRESS_ACTIONS)
+    press.add_argument("--dry-run", action="store_true")
     return parser
 
 
@@ -253,7 +338,7 @@ def parse_args(argv=None, parser=None) -> argparse.Namespace:
 
 
 COMMANDS = {"candidates": cmd_candidates, "publish": cmd_publish, "run": cmd_run, "calibrate": cmd_calibrate,
-            "votes": cmd_votes, "approved": cmd_approved, "redo": cmd_redo, "skip": cmd_skip,
+            "votes": cmd_votes, "approved": cmd_approved, "redo": cmd_redo, "skip": cmd_skip, "press": cmd_press,
             **{n: cmd_stage for n in NAMES.values()}}
 
 

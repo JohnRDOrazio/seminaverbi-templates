@@ -1,0 +1,10 @@
+[Unit]
+Description=SeminaVerbi article pipeline: Catholic press daily at 04:30
+# Not enabled before TypeSafe's written confirmation that it does not train on API inputs (docs/content-tasks.md).
+
+[Timer]
+OnCalendar=*-*-* 04:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

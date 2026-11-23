@@ -1,0 +1,8 @@
+[Unit]
+Description=SeminaVerbi article pipeline: read the Catholic press and update the enrichment page
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/development/seminaverbi-templates
+EnvironmentFile=%h/.config/seminaverbi/pipeline.env
+ExecStart=%h/development/seminaverbi-templates/.venv/bin/python %h/.config/seminaverbi/runeditor.py pipeline press run

@@ -1,0 +1,40 @@
+<!-- Draft of [[Semina Verbi:Press bot]] on en.seminaverbi.bibleget.io. No code publishes this page: it goes on the
+     wiki only with the author's approval, like any other wiki edit. -->
+'''SeminaVerbi-press''' is the program that reads Catholic newspapers and magazines for SeminaVerbi. It introduces itself to the sites it visits with this user agent:
+
+<code>SeminaVerbi-press/1.0 (+https://en.seminaverbi.bibleget.io/wiki/Semina_Verbi:Press_bot)</code>
+
+== Who reads ==
+The reader is the article pipeline of SeminaVerbi, part of the BibleGet project. It is operated by the '''Catholic Digital Commons Foundation''', a non-profit organization. It is not a search engine and it sells nothing.
+
+== Why ==
+SeminaVerbi writes about works of culture (films, series, books, music, art) and about artists, in the light of the Gospel. The Catholic press often discusses such works seriously. The bot looks for those articles so that our editors can:
+* find works worth an article that SeminaVerbi does not have yet;
+* cite the Catholic press, with a link to the article, in the articles that SeminaVerbi already has.
+
+Every proposal for a new article is read and voted on by people before anything is written.
+
+== How often ==
+* Once a day.
+* At most 200 articles per day, across all the outlets it reads.
+* One request at a time per site, at least 10 seconds apart, or more if the site's <code>robots.txt</code> asks for a longer <code>Crawl-delay</code>.
+* It reads the site's <code>robots.txt</code> on every run and obeys it. It reads feeds and sitemaps with conditional requests, so an unchanged feed costs almost nothing.
+* If a site answers that it refuses the request (HTTP 401, 403 or 429), the bot stops reading that site for the day and does not try again by other means.
+
+== What is kept ==
+For each article: its link, title, date, outlet and language, and, for each work or person it discusses, at most three short quotations of no more than 25 words each, always shown with the outlet, the title, the date and the link.
+
+The full text of an article is never stored. It is read only while the bot works on it, and an automated assistant reads only the paragraphs around a mention (about 150 words at a time) to judge whether the article really discusses the work. Nothing read is used to train any model.
+
+== For how long ==
+As long as a SeminaVerbi article or an article proposal cites it. A link and its short quotations stay with the article that cites them, like any other source.
+
+== How to be left out ==
+An outlet that does not want to be read can:
+* write on the talk page of this page; or
+* add a rule for <code>SeminaVerbi-press</code> to its <code>robots.txt</code>, for example:
+<pre>
+User-agent: SeminaVerbi-press
+Disallow: /
+</pre>
+The bot obeys it from its next run.
