@@ -171,10 +171,12 @@ backfill spreads over days. Domain stages 1–6 still run as now, by hand (`run 
 - The enrichment page on en only, like the ranking page (the pipeline writes only en's project namespace).
 - A press source counts as a seed for triage.
 - An outlet that refuses us (403, robots) is skipped and reported, never worked around.
-- **Routing by class:** each domain module exposes `CLASSES` (the P31 roots it accepts: film Q11424 and Q5398426,
-  literature its work and series classes from `config/pipeline.json`); `link.py` checks a hit's P31/P279* against
-  them, so a new domain is routed to by adding its module. `covered()` is called with a provisional row built from
-  the item's Wikidata sitelinks.
+- **Routing by class:** each domain module exposes `WORK_CLASSES` and `owns(instance_of, sparql, cache=None)`, built
+  on `common.owns` and its cached subclass closure, the interface of the music/art design (its plan's Task 1, which
+  lands first as its own PR). `link.py` asks each present module's `owns()` in `DOMAINS` order; a mention of a
+  domain with no module yet is held as `waiting:<domain>` by the classes in `config/press.json`. A new domain is
+  routed to by adding its module. `covered()` is called with a provisional row built from the item's Wikidata
+  sitelinks.
 - **Calibration before routing:** `press run --dry-run` runs discover, filter and link on the first backfill and
   prints every route with its probabilities, and the share of mentions that hit an existing SeminaVerbi article;
   nothing enters the candidates queue or the wiki until the author has read it.

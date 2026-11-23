@@ -10,12 +10,15 @@ editors.
 **Architecture:** A package `pipeline/press/` with one module per responsibility (store, polite fetch, discovery,
 extraction, Jev questions, linking, routing, enrichment page), its own tables in the existing SQLite queue, and a
 `press` subcommand family in `pipeline/__main__.py`. Domain stages change only at three seams: each domain exposes
-`CLASSES`, triage exempts kept press mentions from the sitelink floor, and the dossier stage prepends press notes.
+`WORK_CLASSES` and `owns()`, triage exempts kept press mentions from the sitelink floor, and the dossier stage prepends press notes.
 
 **Tech Stack:** Python 3 standard library (`html.parser`, `xml.etree.ElementTree`, `urllib.robotparser`, `sqlite3`),
 `requests==2.34.2`, `typesafe-sdk==0.7.5` (Jev), pytest 9.2. No new dependency.
 
 **Spec:** `docs/superpowers/specs/2026-11-23-catholic-media-source-design.md`
+
+**Prerequisite:** Task 1 of the music/art plan (`docs/superpowers/plans/2026-11-23-music-art-domains.md`, PR #54:
+`common.class_closure` and `common.owns(instance_of: Iterable[str], work_classes: Iterable[str], sparql, cache: Path | None = None) -> bool`) lands first as its own PR; this plan starts from it and does not build it.
 
 ## Global Constraints
 
@@ -33,6 +36,7 @@ extraction, Jev questions, linking, routing, enrichment page), its own tables in
 - `TYPESAFE_API_KEY` from the environment, never printed; Jev answers cached in the `jev` table under `press:<sha1 of url>`.
 - Test fixtures are synthetic feeds, sitemaps and article pages written for the tests, never copies of real articles.
 - Prerequisite before the first live run (not before building): TypeSafe's written confirmation that it does not train on API inputs, recorded in `docs/content-tasks.md` with its date. The timer is not enabled before it.
+- Prerequisite: `common.owns(instance_of: Iterable[str], work_classes: Iterable[str], sparql, cache: Path | None = None) -> bool` and its closure cache (`data/class_closure.json`) exist, from the music/art plan's Task 1, merged before Task 6 here.
 - Music, art and artists have no domain module yet: their mentions route to `waiting:music`, `waiting:art`, `waiting:artists`.
 
 ## Review Focus
@@ -107,7 +111,9 @@ def test_mention_upsert_and_route():
   `client.refused: dict[str, str]` (outlet → reason, for the run report).
 - `config/press.json` keys: `user_agent` (the exact string in Global Constraints), `delay_seconds` 10,
   `max_articles_per_run` 200, `culture_drop` 0.40, `pick_p` 0.80, `pick_confidence` 0.60, `mention_keep` 0.60,
-  `press_exempt` 0.60, `waiting_classes` (`{"music": ["Q2188189", "Q482994"], "art": ["Q838948"], "artists": ["Q5"]}`),
+  `press_exempt` 0.60, `waiting_classes` (used only while a domain has no module: `{"music": ["Q105543609", "Q7366", "Q482994", "Q484692"],
+  "art": ["Q3305213", "Q860861", "Q132137", "Q15711026", "Q46686", "Q3714446", "Q21061279", "Q219423"],
+  "artists": ["Q5"]}`, the music/art plan's `WORK_CLASSES`),
   `outlets` (list, filled in Task 10; here one placeholder-free entry per outlet with `id`, `name`, `base`, `langs`,
   `entries: []`, `culture_paths: []`, `since: null`).
 
@@ -232,17 +238,22 @@ def test_text_over_150_words_is_refused():
 
 **Files:**
 - Create: `pipeline/press/link.py`
-- Modify: `pipeline/domains/film.py`, `pipeline/domains/literature.py` (add `CLASSES`)
+- Modify: `pipeline/domains/film.py`, `pipeline/domains/literature.py` (add `WORK_CLASSES` and `owns`)
 - Test: `tests/test_press_link.py`
 
 **Interfaces:**
 - Consumes: `Page`, `Span`, `window`, `passage` (Task 4); `PressJudge` (Task 5); `PressStore.add_mention` (Task 1);
   `WikidataClient.search(text, lang) -> list[str]`, `.by_sitelink(site, titles) -> dict`, `.entity(qid)`;
-  `Sparql.select`.
-- Produces: `film.CLASSES = ("Q11424", "Q5398426")`; `literature.CLASSES` = `("Q7725634", "Q47461344")` plus
-  `config/pipeline.json` literature `series_classes`; `class_routes(sparql, qids, routes: dict[str, list[str]]) ->
-  dict[str, str]` (qid → domain name or `waiting:<name>`; domains checked first in `DOMAINS` order, then
-  `waiting_classes` in config order, P31/P279* via one SPARQL per ≤ 50 qids); `link_article(page, outlet, store,
+  from the prerequisite: `common.owns(instance_of: Iterable[str], work_classes: Iterable[str], sparql, cache: Path | None = None) -> bool`; `music.owns` / `art.owns`
+  (`owns(instance_of: Iterable[str], sparql, cache: Path | None = None) -> bool`) when those modules exist.
+- Produces: `film.WORK_CLASSES: tuple[str, ...] = ("Q11424", "Q5398426")` and `literature.WORK_CLASSES: tuple[str, ...] =
+  ("Q7725634", "Q47461344", "Q1667921", "Q277759")` (literary work, written work, and the config's `series_classes`);
+  `film.owns` and `literature.owns(instance_of: Iterable[str], sparql, cache: Path | None = None) -> bool` =
+  `common.owns(instance_of, WORK_CLASSES, sparql, cache)`;
+  `class_route(instance_of: list[str], sparql, cfg, cache: Path | None = None) -> str | None` (the first module in
+  `DOMAINS` order whose `owns()` is True → its name; else the first `waiting_classes` entry, for a domain absent from
+  `DOMAINS`, with `common.owns(instance_of, classes, sparql, cache)` True → `"waiting:<name>"`; else None);
+  `instance_of` is the hit's P31 from `wikidata.entity(qid)`; `link_article(page, outlet, store,
   judge, wikidata, sparql, cfg) -> list[Mention]` (route `None` until Task 7).
 - Rules: a `wikilink` span resolves through `by_sitelink`; other spans through `search` in the page's lang, then en.
   Hits whose class routes nowhere are discarded. One routed hit: taken. Several: `pick`, taken only at
@@ -257,14 +268,16 @@ def test_one_typed_hit_is_taken_without_jev_pick(): ...
 def test_ambiguous_title_is_dropped_below_the_cut():  # two film hits, pick p=0.7 -> no mention
 def test_passing_mention_is_dropped():                 # substantive 0.5 < 0.60 -> no mention
 def test_routes_music_art_and_people_to_waiting():
-    assert class_routes(fake_sparql, ["Qsong", "Qpaint", "Qhuman"], routes) == \
-        {"Qsong": "waiting:music", "Qpaint": "waiting:art", "Qhuman": "waiting:artists"}
-def test_film_wins_over_a_broader_class(): ...         # a film that is also a work of art -> "film"
+    # DOMAINS = film, literature only; closure fake: Q7366 ⊂ music, Q3305213 ⊂ art, Q5 ⊂ artists
+    assert [class_route(p31, fake_sparql, cfg, tmp_path / "c.json") for p31 in (["Q7366"], ["Q3305213"], ["Q5"])] == \
+        ["waiting:music", "waiting:art", "waiting:artists"]
+def test_a_present_module_takes_its_items(): ...      # monkeypatch DOMAINS with a fake music module whose owns() is True -> "music"
+def test_film_wins_over_a_broader_class(): ...         # P31 both film and painting -> "film" (DOMAINS order)
 def test_at_most_three_passages_each_25_words(): ...
 ```
 
 - [ ] **Step 2: Run** `.venv/bin/python -m pytest tests/test_press_link.py -q` — Expected: FAIL.
-- [ ] **Step 3: Implement**; the SPARQL `VALUES ?item {…} ?item wdt:P31/wdt:P279* ?class . VALUES ?class {…}`.
+- [ ] **Step 3: Implement**; no SPARQL of its own: class membership comes only from `owns()` and its cached closure.
 - [ ] **Step 4: Run** — Expected: PASS; full suite green.
 - [ ] **Step 5: Commit** `git add pipeline/press/link.py pipeline/domains/film.py pipeline/domains/literature.py tests/test_press_link.py && git commit -m "press: link mentions to Wikidata and route by class"`
 
