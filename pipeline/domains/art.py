@@ -1,6 +1,6 @@
 """Art: the owned classes, Jev's significance wording and triage (stage 2).
 
-Sources, tagged on each queue row: ``depicts``, ``scene``, ``iconclass``, ``genre``, ``list`` and ``calibration``.
+Sources, tagged on each queue row: ``depicts`` (what the work shows, scenes included), ``iconclass``, ``genre``, ``list`` and ``calibration``.
 Stage-0 data on a row: ``count`` (sitelinks), ``instance_of`` (P31 QIDs) and ``folded_into``.
 """
 from __future__ import annotations
@@ -73,3 +73,56 @@ def triage(row, cfg: dict) -> tuple[str, str]:
     if count < cfg["sitelink_floor"]:
         return "drop", f"{count} sitelinks, under the floor of {cfg['sitelink_floor']}"
     return "pass", ""
+
+
+def _gather(sparql, pattern: str, label: str) -> list[dict]:
+    """The rows of `pattern` bounded to each work class (its subclasses a VALUES list from the closure), one
+    row per item; people are reported and left out."""
+    found: dict[str, dict] = {}
+    for cls in WORK_CLASSES:
+        query = common.bounded(pattern, cls, common.class_closure(sparql, [cls]))
+        for row in common.run_query(sparql, "art", f"{label} ({cls})", query):
+            if PERSON in row.get("types", "").split():
+                print(f"art candidates: {row['item']} is a person, skipped")
+            else:
+                found.setdefault(row["item"], row)
+    return list(found.values())
+
+
+def _listed(sparql, qids: list[str]) -> list[dict]:
+    """The curated works by QID: one query per chunk, no class filter (a listed work need not be of a work
+    class), the query limit kept; people are reported and left out."""
+    found: list[dict] = []
+    for i in range(0, len(qids), common.CHUNK):
+        pattern = f"  VALUES ?item {{ {common.values(qids[i:i + common.CHUNK])} }}"
+        for row in common.run_query(sparql, "art", f"listed works {i // common.CHUNK + 1}", common.query(pattern)):
+            if PERSON in row.get("types", "").split():
+                print(f"art candidates: {row['item']} is a person, skipped")
+            else:
+                found.append(row)
+    return found
+
+
+def candidates(queue, sparql, wikipedia, cfg: dict, wikidata=None) -> int:
+    """Stage 0: add the depicts, Iconclass, genre and curated-list candidates to the queue; returns the rows
+    added. Panels and scenes fold into their altarpiece or cycle (never into a building); `wikipedia` and
+    `wikidata` are unused."""
+    art = cfg["art"]
+    shown = common.values([*art["depicts"], *art["scene_classes"]])  # scenes are events: depicted, not P31
+    link = "?item wdt:P180 ?d ."
+    patterns: list[tuple[str, str, str]] = [
+        ("depicts", "depicts", f"  VALUES ?d {{ {shown} }}\n  {link}"),
+        ("depicts", "depicts saints", f"  {link}\n  ?d wdt:{common.SAINT_PROPERTY} [] ."),
+        ("depicts", "depicts biblical characters",
+         f"  VALUES ?class {{ {common.values(art['biblical_classes'])} }}\n  ?d wdt:P31 ?class .\n  {link}"),
+    ]
+    prefixes = " || ".join(f'STRSTARTS(STR(?ic), "{p}")' for p in art["iconclass_prefixes"])
+    patterns.append(("iconclass", "Iconclass", f"  ?item wdt:P1257 ?ic .\n  FILTER({prefixes})"))
+    patterns.append(("genre", "genres",
+                     f"  VALUES ?genre {{ {common.values(art['genres'])} }}\n  ?item wdt:P136 ?genre ."))
+    added = 0
+    for source, label, pattern in patterns:
+        rows = _gather(sparql, pattern, label)
+        added += common.fold_parts(queue, sparql, rows, source, "art", WORK_CLASSES, STOP_CLASSES)
+    listed = _listed(sparql, [w["qid"] for w in art["works"]])
+    return added + common.fold_parts(queue, sparql, listed, "list", "art", WORK_CLASSES, STOP_CLASSES)
