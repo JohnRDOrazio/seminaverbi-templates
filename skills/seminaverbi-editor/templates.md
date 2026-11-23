@@ -154,6 +154,14 @@ Fields per `type`:
 - `work`: image, title, creator, publication_date, genre, country_of_origin
 - `group`: image, inception, genre, record_label, country_of_origin
 
+## SV press done
+
+Closes an entry of the press enrichment list.
+
+| parameter | meaning |
+|---|---|
+| `1` | the article URL |
+
 ## SV proposal
 
 The box of one article proposal on the en wiki (written by the pipeline bot at the top of a proposal page): the work, its connection to the Gospel, field, themes with evidence, outline, sources, and the vote button while the proposal is open. The author or a sysop sets status=declined and a reason.

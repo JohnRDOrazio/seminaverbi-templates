@@ -91,6 +91,12 @@
       "sortkey": "sort key for the item's categories"
     }
   },
+  "SV press done": {
+    "summary": "Closes an entry of the press enrichment list.",
+    "params": {
+      "1": "the article URL"
+    }
+  },
   "SV proposal": {
     "summary": "The box of one article proposal on the en wiki (written by the pipeline bot at the top of a proposal page): the work, its connection to the Gospel, field, themes with evidence, outline, sources, and the vote button while the proposal is open. The author or a sysop sets status=declined and a reason.",
     "params": {
