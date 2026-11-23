@@ -2,7 +2,11 @@
 the calibration walk over the category tree."""
 from __future__ import annotations
 
+import json
 import re
+from datetime import date, timedelta
+from pathlib import Path
+from typing import Iterable
 from urllib.parse import unquote
 
 from sync import categories
@@ -12,6 +16,8 @@ LANGS = ("en", "it", "es", "fr", "de", "pt")
 SAINT_PROPERTY = "P411"
 LIMIT = 500  # per query: keeps each one well under the endpoint's 60 s timeout
 CHUNK = 50
+CLOSURE_CACHE = Path("data/class_closure.json")  # git-ignored with the rest of data/
+CLOSURE_DAYS = 30
 NON_WIKIPEDIA = {"commonswiki", "wikidatawiki", "metawiki", "specieswiki", "mediawikiwiki"}
 
 # keep the patterns in the order written: left to the optimizer, the wide joins time out on WDQS
@@ -169,3 +175,60 @@ def domain_config(cfg: dict, name: str) -> dict:
     overrides it; the domain's block stays in the copy. `cfg` is not changed."""
     block = cfg.get(name, {})
     return {**cfg, **{key: value for key, value in block.items() if key in cfg}}
+
+
+def _read_closure_cache(cache: Path) -> dict:
+    try:
+        data = json.loads(cache.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _fresh_entry(entry) -> list[str] | None:
+    """The cached subclasses of an entry younger than CLOSURE_DAYS; None when it is missing, old or malformed."""
+    try:
+        if date.today() - date.fromisoformat(entry["date"]) < timedelta(days=CLOSURE_DAYS):
+            subclasses = entry["subclasses"]
+            if isinstance(subclasses, list):
+                return subclasses
+    except (KeyError, TypeError, ValueError):
+        pass
+    return None
+
+
+def class_closure(sparql, classes: Iterable[str], cache: Path | None = None) -> set[str]:
+    """The `classes` and all their subclasses (P279*), one query per class not cached within CLOSURE_DAYS; the
+    cache is a JSON file {class: {"date": ..., "subclasses": [...]}}. A fetch failure is logged and raised."""
+    cache = cache or CLOSURE_CACHE
+    stored = _read_closure_cache(cache)
+    closure: set[str] = set()
+    fetched = False
+    for cls in classes:
+        subclasses = _fresh_entry(stored.get(cls))
+        if subclasses is None:
+            rows = run_query(sparql, "closure", cls, f"SELECT ?sub WHERE {{ ?sub wdt:P279* wd:{cls} . }}", limit=10**9)
+            subclasses = sorted({cls} | {row["sub"] for row in rows if row.get("sub")})
+            stored[cls] = {"date": date.today().isoformat(), "subclasses": subclasses}
+            fetched = True
+        closure.update(subclasses)
+        closure.add(cls)
+    if fetched:
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_text(json.dumps(stored, indent=1, sort_keys=True), encoding="utf-8")
+    return closure
+
+
+def owns(instance_of: Iterable[str], work_classes: Iterable[str], sparql, cache: Path | None = None) -> bool:
+    """True when any QID of `instance_of` is one of `work_classes` or a subclass of one."""
+    return not set(instance_of).isdisjoint(class_closure(sparql, work_classes, cache))
+
+
+def other_domain(queue, qid: str, domain: str) -> str | None:
+    """The row's domain when the QID is already a candidate of another domain (the queue is keyed by QID alone):
+    reported, and the caller skips it."""
+    old = queue.row(qid)
+    if old and old.domain != domain:
+        print(f"{domain} candidates: {qid} is already a {old.domain} candidate, skipped")
+        return old.domain
+    return None
