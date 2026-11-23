@@ -371,11 +371,16 @@ def test_caption_names_the_layout_in_the_wiki_language():
     assert '<span class="sv-infobox-kind">Book</span>' in render(lang="en")
 
 
-def test_footer_links_the_item_on_the_repository():
-    out = render()
+@pytest.mark.parametrize("lang", ["en", "it", "es", "fr", "de", "pt"])
+def test_footer_links_the_item_on_the_repository(lang):
+    # the same interwiki link on all six wikis, en included: it follows the repository when that moves
+    footer = render(lang=lang).split('<td colspan="2" class="sv-infobox-source">')[1].split("</td>")[0]
+    assert footer.endswith("[[svdata:Item:Q4178|Q4178]]") and footer.count("Item:") == 1
+
+
+def test_footer_names_the_item():
     assert ('<tr><td colspan="2" class="sv-infobox-source">Dati dall\'elemento '
-            '[[seminaverbi:Item:Q4178|Q4178]]</td></tr>') in out
-    assert "[[Item:Q4178|Q4178]]" in render(lang="en")
+            '[[svdata:Item:Q4178|Q4178]]</td></tr>') in render()
 
 
 def test_no_footer_without_an_item():
