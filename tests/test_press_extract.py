@@ -218,9 +218,9 @@ def test_a_page_without_any_signal_counts_as_an_article():
 
 
 def test_a_jsonld_block_with_a_raw_control_character_still_counts():
-    """L'Osservatore Romano's NewsArticle block carried a raw tab inside a string (invalid strict JSON): the
+    """L'Osservatore Romano's NewsArticle block carried a raw carriage return inside a string (invalid strict JSON): the
     article was skipped as a section in the 2026-11-23 measurement."""
-    html = _head("website", '{"@type": "WebSite"}', '{"@type": "NewsArticle", "headline": "Collodi\tal Tufello"}')
+    html = _head("website", '{"@type": "WebSite"}', '{"@type": "NewsArticle", "headline": "Collodi\ral Tufello"}')
     assert extract(html, "https://e.test/a", "it").article
 
 
@@ -228,3 +228,64 @@ def test_an_unreadable_jsonld_block_leaves_the_page_an_article():
     """A block that is not JSON at all may be the article's own: the page is not judged a section on the rest."""
     assert extract(_head("website", '{"@type": "WebSite"}', '{"@type": "NewsArticle",'), "https://e.test/a",
                    "it").article
+
+
+PAGE = "https://e.test/cinema"
+
+
+def _graph(*nodes, context='"https://schema.org"'):
+    import json
+    return _head("website", '{"@context": %s, "@graph": %s}' % (context, json.dumps(list(nodes))))
+
+
+def _article(html, url=PAGE):
+    return extract(html, url, "it").article
+
+
+ART1 = {"@type": "NewsArticle", "@id": "https://e.test/a1#article", "url": "https://e.test/a1"}
+
+
+def test_articles_listed_by_a_collection_in_the_same_graph_do_not_make_it_an_article():
+    collection = {"@type": "CollectionPage", "@id": PAGE + "/#page", "url": PAGE + "/"}
+    assert not _article(_graph({**collection, "hasPart": [{"@id": ART1["@id"]}]}, ART1))
+    items = [{"@type": "ListItem", "position": 1, "item": {"@id": ART1["@id"]}}]
+    assert not _article(_graph({**collection, "mainEntity": {"@type": "ItemList", "itemListElement": items}}, ART1))
+    # the list by URL, on a page with no node of its own for this URL
+    assert not _article(_graph({"@type": "ItemList", "itemListElement": [{"@type": "ListItem",
+                                                                           "url": "https://e.test/a1"}]}, ART1))
+    # the page's own node is a collection: an article that only says it is part of it does not count
+    assert not _article(_graph(collection, {**ART1, "isPartOf": {"@id": collection["@id"]}}))
+
+
+def test_a_collection_listed_in_the_same_graph_as_the_pages_own_article_still_counts():
+    own = {"@type": "NewsArticle", "@id": PAGE + "#article", "mainEntityOfPage": {"@id": PAGE + "/#webpage"}}
+    section = {"@type": "CollectionPage", "url": "https://e.test/all", "hasPart": [{"@id": own["@id"]}]}
+    assert _article(_graph(section, own))
+
+
+def test_a_webpage_and_its_article_count():
+    webpage = {"@type": "WebPage", "@id": PAGE + "/", "url": PAGE + "/"}
+    crumbs = {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "item": PAGE + "#article"}]}
+    for link in ({"isPartOf": {"@id": PAGE + "/"}}, {"mainEntityOfPage": {"@id": PAGE + "/"}}, {}):
+        assert _article(_graph(webpage, crumbs, {"@type": "Article", "@id": PAGE + "#article", **link})), link
+    assert _article(_graph({**webpage, "mainEntity": {"@id": PAGE + "#article"}},
+                           {"@type": "Article", "@id": PAGE + "#article"}))
+
+
+def test_a_single_object_graph_and_non_object_entries():
+    assert _article(_head("website", '{"@graph": {"@type": "NewsArticle"}}'))
+    assert not _article(_head("article", '{"@graph": {"@type": "CollectionPage"}}'))
+    assert _article(_head("website", '[3, null, "x", {"@graph": [1, null, "NewsArticle", {"@type": "Article"}]}]'))
+    assert not _article(_head("article", '{"@graph": [null, "NewsArticle", {"@type": "WebPage", "@id": 4, '
+                                         '"url": ["x"], "mainEntityOfPage": 7, "hasPart": 1}]}'))
+
+
+def test_compact_and_full_types_are_resolved():
+    for context in ('{"schema": "https://schema.org/"}', '["https://x.test/c", {"schema": {"@id": "http://schema.org/"}}]'):
+        assert _article(_graph({"@type": "schema:NewsArticle"}, context=context))
+        assert not _article(_graph({"@type": "schema:CollectionPage"}, context=context))
+    assert _article(_head("website", '{"@context": {"s": "https://schema.org/"}, "@type": ["s:BlogPosting"]}'))
+    assert _article(_graph({"@context": {"n": "https://schema.org/"}, "@type": "n:Article"}))
+    assert _article(_head("website", '{"@type": "https://schema.org/Article"}'))
+    assert not _article(_graph({"@type": "o:Article"}, context='{"o": "https://other.test/"}'))
+    assert _article(_head("website", '{"@type": "schema:NewsArticle"}'))  # the usual prefix, undeclared

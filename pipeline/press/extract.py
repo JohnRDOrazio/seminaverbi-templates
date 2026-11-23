@@ -22,6 +22,7 @@ QUOTED = re.compile(r"«([^»]+)»|“([^”]+)”|\"([^\"]+)\"")
 ARTICLE_TYPES = {"Article", "NewsArticle", "AnalysisNewsArticle", "BackgroundNewsArticle", "OpinionNewsArticle",
                  "ReportageNewsArticle", "ReviewNewsArticle", "BlogPosting", "LiveBlogPosting", "Report",
                  "ScholarlyArticle", "TechArticle", "SatiricalArticle", "VideoObject"}
+COLLECTION_TYPES = {"CollectionPage", "SearchResultsPage", "MediaGallery", "ImageGallery", "VideoGallery"}
 
 
 @dataclass
@@ -203,12 +204,46 @@ def _jsonld_date(blobs: list[str]) -> str | None:
     return None
 
 
-def _ld_types(blobs: list[str]) -> list[str] | None:
-    """The schema.org types of the page's own JSON-LD nodes: each block's top-level objects and the members of
-    their @graph (not nested values: a collection page lists articles in its parts), without the schema.org
-    prefix. Control characters inside strings are accepted (an outlet's block had a raw tab); None when a block
-    is still unreadable, since it may be the article's own."""
-    found: list[str] = []
+SCHEMA_IRI = re.compile(r"^https?://(?:www\.)?schema\.org/(?:#)?(.+)$", re.IGNORECASE)
+LISTING = ("hasPart", "itemListElement", "blogPost", "blogPosts")  # what a page lists, as against what it is
+
+
+def _many(value) -> list:
+    return value if isinstance(value, list) else [value]
+
+
+def _prefixes(context) -> dict[str, str]:
+    """The prefixes a JSON-LD @context declares."""
+    found: dict[str, str] = {}
+    for part in _many(context):
+        for term, iri in part.items() if isinstance(part, dict) else ():
+            iri = iri.get("@id") if isinstance(iri, dict) else iri
+            if isinstance(iri, str):
+                found[term] = iri
+    return found
+
+
+def _type_names(node: dict, prefixes: dict[str, str]) -> set[str]:
+    """The node's types, schema.org ones by their bare name ("schema:X" and full IRIs too); others unchanged."""
+    found = set()
+    for kind in _many(node.get("@type")):
+        if not isinstance(kind, str) or not kind.strip():
+            continue
+        kind = kind.strip()
+        prefix, colon, name = kind.partition(":")
+        if colon and not name.startswith("//") and prefix in prefixes:
+            iri = prefixes[prefix]
+            kind = iri + ("" if iri.endswith(("/", "#")) else "/") + name
+        m = SCHEMA_IRI.match(kind)
+        found.add(m.group(1) if m else kind)
+    return found
+
+
+def _ld_nodes(blobs: list[str]) -> list[tuple[dict, set[str]]] | None:
+    """(node, type names) of the page's JSON-LD: each block's top-level objects and the members of their @graph,
+    not nested values. Control characters inside strings are accepted (an outlet's block had a raw carriage
+    return); None when a block is still unreadable, since it may be the article's own."""
+    found = []
     for blob in blobs:
         if not blob.strip():
             continue
@@ -216,23 +251,88 @@ def _ld_types(blobs: list[str]) -> list[str] | None:
             data = json.loads(blob, strict=False)
         except (ValueError, RecursionError):
             return None
-        nodes = data if isinstance(data, list) else [data]
-        for node in [n for n in nodes if isinstance(n, dict)]:
-            graph = node.get("@graph")
-            for n in [node] + [g for g in (graph if isinstance(graph, list) else []) if isinstance(g, dict)]:
-                kinds = n.get("@type")
-                for kind in kinds if isinstance(kinds, list) else [kinds]:
-                    if isinstance(kind, str) and kind.strip():
-                        found.append(kind.strip().rsplit("/", 1)[-1])
+        for top in _many(data):
+            if not isinstance(top, dict):
+                continue
+            outer = {"schema": "https://schema.org/"} | _prefixes(top.get("@context"))
+            found.append((top, _type_names(top, outer)))
+            for node in _many(top.get("@graph")):
+                if isinstance(node, dict):
+                    found.append((node, _type_names(node, outer | _prefixes(node.get("@context")))))
     return found
 
 
-def is_article(ld_types: list[str] | None, og_type: str) -> bool:
+def _iris(value, base: str) -> set[str]:
+    """The absolute IRIs a value (a string, or an object by its @id and url, or a list of them) refers to."""
+    found = set()
+    for v in _many(value):
+        for ref in (v.get("@id"), v.get("url")) if isinstance(v, dict) else (v,):
+            if isinstance(ref, str) and ref.strip():
+                try:
+                    found.add(urljoin(base, ref.strip()))
+                except ValueError:
+                    pass
+    return found
+
+
+def _address(iri: str) -> str:
+    """An IRI as a page address, for comparison: no scheme, www., fragment or final slash, percent-decoded."""
+    iri = re.sub(r"^https?://(?:www\.)?", "", iri.partition("#")[0], flags=re.IGNORECASE)
+    return unquote(iri).rstrip("/")
+
+
+def _describes(node: dict, urls: set[str], base: str) -> bool:
+    """The node is the page itself (its @id without fragment, or url) or has it as its mainEntityOfPage."""
+    own = _iris(node.get("url"), base) | {i for i in _iris(node.get("@id"), base) if "#" not in i}
+    return not urls.isdisjoint(_address(i) for i in own | _iris(node.get("mainEntityOfPage"), base))
+
+
+def _listed(nodes: list[tuple[dict, set[str]]], base: str) -> set[str]:
+    """The IRIs the nodes list (LISTING, or several mainEntity values), breadcrumbs aside: they name the page."""
+    found: set[str] = set()
+    stack = [n for n, types in nodes if "BreadcrumbList" not in types]
+    while stack:
+        node = stack.pop()
+        for key in LISTING + (("mainEntity",) if isinstance(node.get("mainEntity"), list) else ()):
+            for value in _many(node.get(key)):
+                found |= _iris(value, base)
+                if isinstance(value, dict):
+                    found |= _iris(value.get("item"), base)
+                    stack.append(value)
+        main = node.get("mainEntity")
+        if isinstance(main, dict) and "BreadcrumbList" not in _many(main.get("@type")):
+            stack.append(main)
+    return found
+
+
+def _ld_types(blobs: list[str], urls: set[str], base: str) -> set[str] | None:
+    """The types the page's JSON-LD gives the page at `urls` (its address, and its canonical one), None when a block
+    is unreadable. An article, or a collection, that describes this page decides; otherwise every node counts but
+    those another node lists."""
+    nodes = _ld_nodes(blobs)
+    if nodes is None:
+        return None
+    urls = {_address(u) for u in urls}
+    own = [types for node, types in nodes if _describes(node, urls, base)]
+    for deciding in (ARTICLE_TYPES, COLLECTION_TYPES):
+        for types in own:
+            if types & deciding:
+                return types & deciding
+    listed = _listed(nodes, base)
+    found: set[str] = set()
+    for node, types in nodes:
+        names = _iris(node, base) | _iris(node.get("mainEntityOfPage"), base)
+        if names.isdisjoint(listed):
+            found |= types
+    return found
+
+
+def is_article(ld_types: set[str] | None, og_type: str) -> bool:
     """Whether the page is one article rather than a section or index page. Its JSON-LD decides when it has any
-    (an article type among its own nodes), else its og:type when it has one ("article", "video.*"); a page with
+    (an article type, see _ld_types), else its og:type when it has one ("article", "video.*"); a page with
     neither signal, or with an unreadable JSON-LD block (`ld_types` None), counts as an article. Measured on one
     article and one section page of each outlet (2026-11-23): every article names an article type (L'Osservatore
-    Romano's says og:type "website"), no section does."""
+    Romano's says og:type "website"), no section does but KTO's home page, which its feed does not list."""
     if ld_types is None:
         return True
     if ld_types:
@@ -293,9 +393,10 @@ def extract(html: str, url: str, default_lang: str) -> Page:
                  or (parser.time_datetime or "").strip()
                  or _jsonld_date(parser.jsonld))
     lang = parser.html_lang.strip()[:2].lower() if parser.html_lang.strip() else ""
+    canonical = _canonical(parser.canonical_href, url)
     return Page(title, published or None, lang if lang.isalpha() and len(lang) == 2 else default_lang,
-                _canonical(parser.canonical_href, url), paragraphs, spans,
-                is_article(_ld_types(parser.jsonld), parser.meta.get("og:type", "")))
+                canonical, paragraphs, spans,
+                is_article(_ld_types(parser.jsonld, {url, canonical}, canonical), parser.meta.get("og:type", "")))
 
 
 def _norm(token: str) -> str:
