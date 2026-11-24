@@ -95,7 +95,14 @@ there, and the press gives an item that is both an artwork and a building to art
 - Hagia Sophia and other buildings now of another class or religion come only through `architecture.works`, where no
   class or religion is asked. A listed building that is also in the benchmark, as Hagia Sophia and the Sagrada Família
   are, is held back like the rest of it; once released, it keeps its `list` source and needs no floor.
-- The dossier reads a building's own pages only: the art in it stays in `art`, and no part is folded.
+- The dossier reads a building's own pages only: the art in it stays in `art`, and no part is folded. A wanted heading
+  brings its subsections, up to a limit of characters per heading; the leads come first, then art and liturgy,
+  architecture and history, because Jev is sent the start of a long dossier.
+- Buildings are judged in the order they were queued: a run queues the `works` first, then the others by sitelinks, most
+  first. The new rows of a later run come after those already queued.
+- `candidates` triages again a row the floor dropped that has gained an exempt source. A row dropped for another reason,
+  or skipped by hand (`skip`), stays as it is; a kept press mention and the benchmark do not bring a skipped row back
+  either, in any domain. `redo` and `release-benchmark` do.
 - `config/infobox_types.json` has no building layout. Proposals do not need one; pages do, in a separate change.
 - The benchmark (`architecture.benchmark`: 18 buildings, 11 strong, 4 weak and 3 secular controls) is added by
   `calibrate --domain architecture` and held back like art's. It needs the author's approval before the first live

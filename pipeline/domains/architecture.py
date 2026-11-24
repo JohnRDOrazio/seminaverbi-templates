@@ -250,40 +250,78 @@ def _finish(queue, cfg: dict, found: list[tuple[str, dict]], works: list[str], a
 
 # ---- stage 4: the dossier ----
 
-# lower-case fragments of the section headings worth reading, per language, matched at a word start; one with a
+# lower-case fragments of the section headings worth reading, per language, in the order the judge should read them (it
+# is sent at most stages.MAX_DOSSIER_CHARS of a dossier, from the start): art, iconography, symbolism and liturgy;
+# architecture; history. A heading is of the first group it matches. A fragment is matched at a word start; one with a
 # trailing blank is a whole word ("art " is not "articles", "bau " not "Bauernkrieg"). German compounds are listed by
 # their first word, the only one a word start reaches.
-HEADINGS: dict[str, tuple[str, ...]] = {
-    "en": ("architectur", "histor", "construction", "design ", "designs ", "designed ", "plan ", "plans ", "exterior",
-           "interior", "decorat", "art ", "arts ", "artwork", "artistic", "iconograph", "symbol", "mosaic",
-           "stained glass", "stained-glass", "sculpture", "façade", "facade", "liturg", "worship", "pilgrimage",
-           "consecration", "dedication", "significance", "interpretation"),
-    "it": ("architettur", "storia", "storic", "costruzion", "progett", "pianta", "piante ", "estern", "interno",
-           "interni ", "interna ", "interne ", "decorazion", "arte ", "arti ", "artist", "iconografi", "simbol",
-           "mosaic", "vetrat", "scultur", "facciat", "liturgi", "culto", "culti ", "pellegrinagg", "consacrazion",
-           "dedicazion", "significat", "interpretazion"),
-    "es": ("arquitect", "historia", "históric", "construcci", "diseño", "proyecto", "planta ", "plantas ", "exterior",
-           "interior", "decoraci", "arte ", "artes ", "artístic", "iconograf", "simbol", "símbol", "mosaico",
-           "vidriera", "vitral", "escultur", "fachada", "liturgia", "litúrgic", "culto", "peregrinaci", "consagraci",
-           "dedicaci", "significado", "interpretaci"),
-    "fr": ("architectur", "histoire", "histori", "construction", "conception", "projet", "plan ", "plans ",
-           "extérieur", "intérieur", "décor", "art ", "arts ", "artistique", "œuvre", "iconograph", "symbol",
-           "mosaïque", "vitra", "sculptur", "façade", "facade", "liturgi", "culte", "pèlerinage", "consécration",
-           "dédicace", "signification", "interprétation"),
-    "de": ("architektur", "geschichte", "bau ", "bauabschnitt", "bauarbeit", "baubeginn", "baubeschreibung", "bauform",
-           "baugeschichte", "baugestalt", "baukunst", "baukörper", "bauphase", "bauplan", "baustil", "bauten",
-           "bautätigkeit", "bauwerk", "bauzeit", "kirchenbau", "neubau", "anbau", "aufbau", "ausbau", "umbau",
-           "wiederaufbau", "entstehung", "entwurf", "entwürf", "plan ", "pläne", "planung", "grundriss", "äußere",
-           "außenansicht", "außenbau", "außenfassade", "außengestalt", "inneres ", "innere ", "innenansicht",
-           "innenarchitektur", "innenausstattung", "innenbau", "inneneinrichtung", "innenraum", "ausstattung",
-           "ausmalung", "kunst", "ikonographi", "ikonografi", "symbol", "mosaik", "fenster", "kirchenfenster",
-           "glasfenster", "glasmalerei", "buntglas", "wandmalerei", "deckenmalerei", "malerei", "fresken", "skulptur",
-           "fassade", "liturgi", "gottesdienst", "wallfahrt", "weihe", "patrozinium", "bedeutung", "deutung",
-           "interpretation"),
-    "pt": ("arquitet", "arquitect", "história", "históric", "construç", "projeto", "projecto", "planta ", "plantas ",
-           "exterior", "interior", "decoraç", "arte ", "artes ", "artístic", "iconograf", "simbol", "símbol",
-           "mosaico", "vitra", "escultur", "fachada", "liturgia", "litúrgic", "culto", "peregrinaç", "consagraç",
-           "dedicaç", "significado", "interpretaç"),
+GROUPS: dict[str, tuple[tuple[str, ...], ...]] = {
+    "en": (
+        ("decorat", "art ", "arts ", "artwork", "artistic", "iconograph", "symbol", "mosaic", "stained glass",
+         "stained-glass", "sculpture", "liturg", "worship", "pilgrimage", "significance", "interpretation"),
+        ("architectur", "descri", "design ", "designs ", "designed ", "plan ", "plans ", "exterior", "interior",
+         "façade", "facade"),
+        ("histor", "construction", "consecration", "dedication"),
+    ),
+    "it": (
+        ("decorazion", "arte ", "arti ", "artist", "iconografi", "simbol", "mosaic", "vetrat", "scultur",
+         "liturgi", "culto", "culti ", "pellegrinagg", "significat", "interpretazion"),
+        ("architettur", "descri", "progett", "pianta", "piante ", "estern", "interno", "interni ", "interna ",
+         "interne ", "facciat"),
+        ("storia", "storic", "costruzion", "consacrazion", "dedicazion"),
+    ),
+    "es": (
+        ("decoraci", "arte ", "artes ", "artístic", "iconograf", "simbol", "símbol", "mosaico", "vidriera",
+         "vitral", "escultur", "liturgia", "litúrgic", "culto", "peregrinaci", "significado", "interpretaci"),
+        ("arquitect", "descri", "diseño", "proyecto", "planta ", "plantas ", "exterior", "interior", "fachada"),
+        ("historia", "históric", "construcci", "consagraci", "dedicaci"),
+    ),
+    "fr": (
+        ("décor", "art ", "arts ", "artistique", "œuvre", "iconograph", "symbol", "mosaïque", "vitra",
+         "sculptur", "liturgi", "culte", "pèlerinage", "signification", "interprétation"),
+        ("architectur", "descri", "conception", "projet", "plan ", "plans ", "extérieur", "intérieur", "façade",
+         "facade"),
+        ("histoire", "histori", "construction", "consécration", "dédicace"),
+    ),
+    "de": (
+        ("ausstattung", "innenausstattung", "ausmalung", "kunst", "ikonographi", "ikonografi", "symbol",
+         "mosaik", "fenster", "kirchenfenster", "glasfenster", "glasmalerei", "buntglas", "wandmalerei",
+         "deckenmalerei", "malerei", "fresken", "skulptur", "liturgi", "gottesdienst", "wallfahrt", "bedeutung",
+         "deutung", "interpretation"),
+        ("architektur", "beschreibung", "baubeschreibung", "bauform", "baugestalt", "baukunst", "baukörper",
+         "bauplan", "baustil", "bauwerk", "entwurf", "entwürf", "plan ", "pläne", "planung", "grundriss",
+         "äußere", "außenansicht", "außenbau", "außenfassade", "außengestalt", "inneres ", "innere ",
+         "innenansicht", "innenarchitektur", "innenbau", "inneneinrichtung", "innenraum", "fassade"),
+        ("geschichte", "bau ", "bauabschnitt", "bauarbeit", "baubeginn", "baugeschichte", "bauphase", "bauten",
+         "bautätigkeit", "bauzeit", "kirchenbau", "neubau", "anbau", "aufbau", "ausbau", "umbau",
+         "wiederaufbau", "entstehung", "weihe", "patrozinium"),
+    ),
+    "pt": (
+        ("decoraç", "arte ", "artes ", "artístic", "iconograf", "simbol", "símbol", "mosaico", "vitra",
+         "escultur", "liturgia", "litúrgic", "culto", "peregrinaç", "significado", "interpretaç"),
+        ("arquitet", "arquitect", "descri", "projeto", "projecto", "planta ", "plantas ", "exterior",
+         "interior", "fachada"),
+        ("história", "históric", "construç", "consagraç", "dedicaç"),
+    ),
+}
+HEADINGS = {lang: tuple(word for group in groups for word in group) for lang, groups in GROUPS.items()}
+# The most characters read of a page's lead, and of one wanted heading with its subsections, by group: chosen on seven
+# pages (2026-11-24: Chartres en, it and es, the Votivkirche de, San Vitale it, the Sainte-Chapelle fr, the Sagrada
+# Família es), so that no history or façade fills what the judge is sent (the Sagrada Família's history alone is 22,350).
+# A building rich in art in three languages (Chartres) still fills the first MAX_DOSSIER_CHARS with leads and art, for
+# the connection and the field; the themes are asked of the rest too. The subsections share the cap, the first ones first when there are too many for MIN_SHARE each.
+LEAD_CAP = 2500
+CAPS = (6000, 3000, 2000)
+MIN_SHARE = 500
+# subsections of a wanted heading that say nothing of what the building means: instruments and bells (technical
+# specifications), measurements, visitor information and popular culture. A heading that is wanted is never stopped.
+STOP: dict[str, tuple[str, ...]] = {
+    "en": ("organ ", "organs ", "bell ", "bells ", "statistics", "dimensions", "tourism", "popular culture"),
+    "it": ("organo ", "organi ", "campana ", "campane ", "dimensioni", "turismo", "cultura di massa"),
+    "es": ("órgano", "campana ", "campanas ", "dimensiones", "turismo", "cultura popular"),
+    "fr": ("orgue", "cloche", "dimensions", "tourisme", "culture populaire"),
+    "de": ("orgel", "chororgel", "glocke", "maße ", "tourismus", "populärkultur"),
+    "pt": ("órgão", "órgãos ", "sino ", "sinos ", "dimensões", "turismo", "cultura popular"),
 }
 # the headings of the link and reference sections, whole and lower-case: never read, though a fragment may match
 LINK_SECTIONS = frozenset({
@@ -315,21 +353,74 @@ def wikidata_note(entity: dict, labels_of: Callable[[str], str | None]) -> dict 
     return common.facts_note(entity, facts)
 
 
+def _group(heading: str, lang: str) -> int | None:
+    """The first group of GROUPS the heading matches; None for an unwanted one."""
+    return next((n for n, words in enumerate(GROUPS[lang]) if common.wanted(heading, words)), None)
+
+
+_OUT = object()  # a section left out with everything under it
+
+
+def _blocks(tree: list[tuple[int, str, str]], lang: str) -> list[tuple[int, list[tuple[str, str]]]]:
+    """(group, [(heading, text)]) of each wanted heading of a page and its subtree: a subsection belongs to the nearest
+    wanted heading above it, unless it is wanted itself (it is then a block of its own), so no section is read twice. A link section (LINK_SECTIONS) or a stopped heading (STOP) leaves its subtree out."""
+    blocks: list[tuple[int, list[tuple[str, str]]]] = []
+    above: list[tuple] = []  # (level, the block, its first heading) of the sections the current one is in
+    for level, head, text in tree:
+        while above and above[-1][0] >= level:
+            above.pop()
+        block, root = above[-1][1:] if above else (None, None)
+        group = _group(head, lang)
+        if block is _OUT or head.strip().lower() in LINK_SECTIONS or (
+                group is None and common.wanted(head, STOP[lang])):
+            block = _OUT
+        elif group is not None:
+            block, root = (group, []), head
+            blocks.append(block)
+        above.append((level, block, root))
+        if text and block is not None and block is not _OUT:
+            block[1].append((head if head is root else f"{root} / {head}", text))
+    return blocks
+
+
+def _cut(text: str, room: int) -> str:
+    return text if len(text) <= room else (text[:room - 2].rsplit(None, 1) or [""])[0] + " …"
+
+
+def _capped(sections: list[tuple[str, str]], cap: int) -> list[tuple[str, str]]:
+    """The sections cut to `cap` characters of text in all: an equal share each, what a short one leaves going to the
+    longer ones; only as many as get MIN_SHARE."""
+    sections = sections[:cap // MIN_SHARE]
+    room, left = {}, cap
+    for done, n in enumerate(sorted(range(len(sections)), key=lambda n: len(sections[n][1]))):
+        room[n] = min(len(sections[n][1]), left // (len(sections) - done))
+        left -= room[n]
+    return [(head, _cut(text, room[n])) for n, (head, text) in enumerate(sections)]
+
+
 def dossier(row, cfg: dict, wiki_for, wikidata) -> dict:
     """Stage 4: research notes {"notes": [{lang, url, heading, text}], "languages": {lang: notes}}.
 
-    Per language (common.dossier_languages): the lead and wanted sections of the building's own page. No part or
-    whole is read: the art a building holds has its own rows. One Wikidata note closes the list."""
+    Per language (common.dossier_languages), of the building's own page: the lead and each wanted heading with its
+    subsections ("<heading> / <subsection>"), within LEAD_CAP and CAPS. The leads come first, then the art and liturgy
+    of every language, the architecture, the history. No part or whole is read: the art a building holds has its own
+    rows. One Wikidata note closes the list."""
     entity = {**wikidata.entity(row.qid), "id": row.qid}
-    notes: list[dict] = []
-    languages = {}
-    for lang in common.dossier_languages(row, cfg):
-        page = common.read_page(wiki_for(lang, "wikipedia"), row.sitelinks[f"{lang}wiki"], lang, HEADINGS[lang],
-                                skip=LINK_SECTIONS)
-        notes += page
-        languages[lang] = len(page)
+    leads: list[dict] = []
+    grouped: list[list[dict]] = [[] for _ in CAPS]
+    languages = common.dossier_languages(row, cfg)
+    for lang in languages:
+        wikipedia, title = wiki_for(lang, "wikipedia"), row.sitelinks[f"{lang}wiki"]
+        source = {"lang": lang, "url": wikipedia.url(title)}
+        if lead := wikipedia.lead(title):
+            leads.append({**source, "heading": "Lead", "text": _cut(lead, LEAD_CAP)})
+        for group, sections in _blocks(common.section_tree(wikipedia, title), lang):
+            grouped[group] += [{**source, "heading": head, "text": text}
+                               for head, text in _capped(sections, CAPS[group])]
+    notes = [*leads, *(n for group in grouped for n in group)]
+    counts = {lang: sum(n["lang"] == lang for n in notes) for lang in languages}
     note = wikidata_note(entity, lambda qid: common.label(wikidata, qid))
-    return {"notes": notes + ([note] if note else []), "languages": languages}
+    return {"notes": notes + ([note] if note else []), "languages": counts}
 
 
 def dossier_stage(row, cfg: dict, wiki_for, wikidata) -> tuple[str, dict]:

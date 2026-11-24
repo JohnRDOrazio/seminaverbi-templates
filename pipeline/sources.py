@@ -109,6 +109,10 @@ class Wikipedia:
 
     def sections(self, title: str) -> list[tuple[str, str]]:
         """(heading, plain text) for each numbered section; subsection text is left to its own entry."""
+        return [(head, text) for _, head, text in self.section_tree(title)]
+
+    def section_tree(self, title: str) -> list[tuple[int, str, str]]:
+        """(level, heading, plain text) of each section of `sections`, in page order; the top level is 1."""
         listing = self._wiki._call("GET", action="parse", page=title, prop="sections", redirects=1)
         out = []
         for sec in listing.get("parse", {}).get("sections", []):
@@ -116,7 +120,7 @@ class Wikipedia:
                 continue
             data = self._wiki._call("GET", action="parse", page=title, prop="wikitext",
                                     section=sec["index"], redirects=1)
-            out.append((sec["line"], _plain_text(data["parse"]["wikitext"])))
+            out.append((int(sec.get("toclevel", 1)), sec["line"], _plain_text(data["parse"]["wikitext"])))
         return out
 
     def season(self, title: str) -> list[tuple[str, str]]:

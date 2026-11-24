@@ -543,8 +543,8 @@ def test_the_dossier_reads_the_lead_and_wanted_sections_of_each_language():
                              wiki_for_pages(pages), FakeWikidataEntities({"Q1": entity()}))
     assert d["languages"] == {"en": 4, "it": 2, "es": 1}  # the German page is past dossier_languages
     assert [(n["lang"], n["heading"]) for n in d["notes"]] == [
-        ("en", "Lead"), ("en", "Architecture"), ("en", "Façade"), ("en", "Stained glass"),
-        ("it", "Cenni storici"), ("it", "Mosaici"), ("es", "Historia")]
+        ("en", "Lead"), ("en", "Stained glass"), ("it", "Mosaici"), ("en", "Architecture"), ("en", "Façade"),
+        ("it", "Cenni storici"), ("es", "Historia")]
     assert d["notes"][0] == {"lang": "en", "url": "https://en.wikipedia.org/wiki/T", "heading": "Lead",
                              "text": "A church."}
 
@@ -582,32 +582,38 @@ WANTED = {
            "Exterior", "Interior", "Decoration", "Art and treasures", "Iconography", "Symbolism", "Mosaics",
            "Stained glass", "Stained-glass windows", "Sculptures", "Façade", "West facade", "Liturgical use", "Worship",
            "Pilgrimage", "Consecration", "Dedication", "Significance", "Interpretations",
-           "Art", "Works of art", "Arts", "Artworks", "Artistic features", "Floor plan", "Plans", "Plan and elevation", "Designs", "Designed spaces", "Decorative scheme"],
+           "Art", "Works of art", "Arts", "Artworks", "Artistic features", "Floor plan", "Plans", "Plan and elevation", "Designs", "Designed spaces", "Decorative scheme",
+           "Plan, 1200", "Art: the choir", "Plan–elevation", "Description"],
     "it": ["Storia", "Cenni storici", "Costruzione", "Architettura", "Progetto", "Pianta", "Esterno", "Interni",
            "Decorazioni", "Opere d'arte", "Iconografia", "Simbolismo", "Mosaici", "Vetrate", "Sculture", "La scultura",
            "Facciate", "Liturgia", "Culto", "Pellegrinaggi", "Consacrazione", "Dedicazione", "Significato",
            "Interpretazioni",
-           "Progetti", "Esterni", "Interno", "Culti", "Arti figurative", "Arte", "Artisti", "Piante"],
+           "Progetti", "Esterni", "Interno", "Culti", "Arti figurative", "Arte", "Artisti", "Piante",
+           "Descrizione"],
     "es": ["Historia", "Contexto histórico", "Construcción", "Arquitectura", "Diseño", "Planta", "Exterior",
            "Interiores", "Decoración", "Arte", "Iconografía", "Simbología", "Símbolos", "Mosaicos", "Vidrieras",
            "Vitrales", "Esculturas", "Fachadas", "Liturgia", "Uso litúrgico", "Culto", "Peregrinación",
            "Consagración", "Dedicación", "Significado", "Interpretaciones",
-           "Proyectos", "Diseños", "Artes decorativas", "Artísticas", "Obras de arte"],
+           "Proyectos", "Diseños", "Artes decorativas", "Artísticas", "Obras de arte",
+           "Planta-baja", "Descripción"],
     "fr": ["Histoire", "Historique", "Construction", "Architecture", "Conception", "Plan", "Extérieur", "Intérieur",
            "Décoration", "Décors", "Œuvres d'art", "Art sacré", "Iconographie", "Symbolique", "Mosaïques", "Vitraux",
            "Sculptures", "Façades", "Liturgie", "Culte", "Pèlerinage", "Consécration", "Dédicace", "Signification",
            "Interprétations",
-           "Art", "L'art", "L’art", "Arts décoratifs", "Projets", "Plans", "Œuvres"],
+           "Art", "L'art", "L’art", "Arts décoratifs", "Projets", "Plans", "Œuvres",
+           "Art, mobilier", "Description"],
     "de": ["Geschichte", "Baugeschichte", "Bau", "Architektur", "Baubeschreibung", "Entwurf", "Grundriss", "Äußeres",
            "Außenbau", "Inneres", "Innenraum", "Ausstattung", "Kunstwerke", "Ikonographie", "Ikonografie",
            "Symbolik", "Mosaiken", "Fenster", "Glasfenster", "Glasmalereien", "Skulpturen", "Fassade", "Liturgie",
            "Gottesdienste", "Wallfahrt", "Weihe", "Patrozinium", "Bedeutung", "Deutung", "Interpretation",
-           "Entwürfe", "Pläne", "Plan", "Wandmalerei", "Wandmalereien", "Deckenmalerei", "Wiederaufbau", "Aufbau", "Umbau", "Umbauten", "Kirchenfenster", "Bauzeit", "Bauphasen", "Bauwerk", "Neubau", "Innenausstattung", "Äußere Gestalt", "Fresken"],
+           "Entwürfe", "Pläne", "Plan", "Wandmalerei", "Wandmalereien", "Deckenmalerei", "Wiederaufbau", "Aufbau", "Umbau", "Umbauten", "Kirchenfenster", "Bauzeit", "Bauphasen", "Bauwerk", "Neubau", "Innenausstattung", "Äußere Gestalt", "Fresken",
+           "Bau- und Nutzungsgeschichte", "Plan (1200)", "Beschreibung"],
     "pt": ["História", "Contexto histórico", "Construção", "Arquitetura", "Arquitectura", "Projeto", "Planta",
            "Exterior", "Interior", "Decoração", "Arte", "Iconografia", "Simbolismo", "Símbolos", "Mosaicos",
            "Vitrais", "Esculturas", "Fachadas", "Liturgia", "Uso litúrgico", "Culto", "Peregrinações", "Consagração",
            "Dedicação", "Significado", "Interpretação",
-           "Projetos", "Obras de arte", "Artes", "Artístico", "Plantas"],
+           "Projetos", "Obras de arte", "Artes", "Artístico", "Plantas",
+           "Arte, talha", "Descrição"],
 }
 UNWANTED = {
     "en": ["See also", "References", "External links", "Gallery", "Bibliography",
@@ -630,6 +636,8 @@ def test_the_headings_read(lang):
     words = architecture.HEADINGS[lang]
     assert len(words) == len(set(words)) and all(w == w.lower() for w in words)
     skip = architecture.LINK_SECTIONS
+    stop = architecture.STOP[lang]
+    assert all(w == w.lower() for w in stop) and len(architecture.GROUPS[lang]) == len(architecture.CAPS)
     assert [h for h in WANTED[lang] if not common.wanted(h, words, skip)] == []
     assert [h for h in UNWANTED[lang] if common.wanted(h, words, skip)] == []
 
@@ -645,6 +653,65 @@ def test_link_sections_are_left_out_of_the_dossier():
     d = architecture.dossier(drow({"itwiki": "T", "frwiki": "T"}), DC, wiki_for_pages(pages),
                              FakeWikidataEntities({"Q1": entity()}))
     assert [n["heading"] for n in d["notes"]] == ["Progetti", "Projets"]
+
+
+def en_dossier(*sections, lead="", **other):
+    pages = {("en", "wikipedia"): {"T": list(sections), "#lead:T": lead}}
+    pages |= {(lang, "wikipedia"): {"T": value} for lang, value in other.items()}
+    links = {"enwiki": "T", **{f"{lang}wiki": "T" for lang in other}}
+    notes = architecture.dossier(drow(links), DC, wiki_for_pages(pages), FakeWikidataEntities({"Q1": entity()}))["notes"]
+    return [(n["heading"], n["text"]) for n in notes]
+
+
+def test_a_wanted_heading_takes_its_subtree():
+    assert en_dossier(("The portals and their sculpture", "stub", 1), ("Royal Portal", "west", 2),
+                      ("Central tympanum", "Christ", 3), ("Towers", "t", 1), ("Clock", "c", 2)) == [
+        ("The portals and their sculpture", "stub"),
+        ("The portals and their sculpture / Royal Portal", "west"),
+        ("The portals and their sculpture / Central tympanum", "Christ")]
+
+
+def test_a_parent_with_no_text_of_its_own_still_gives_its_subtree():
+    assert en_dossier(("Stained glass windows", "", 1), ("12th century", "blue", 2)) == [
+        ("Stained glass windows / 12th century", "blue")]
+
+
+def test_a_wanted_subsection_is_read_once():
+    assert en_dossier(("Architecture", "a", 1), ("Interior", "i", 2), ("Nave", "n", 3), ("Mosaics", "m", 2)) == [
+        ("Mosaics", "m"), ("Architecture", "a"), ("Interior", "i"), ("Interior / Nave", "n")]
+
+
+def test_link_sections_and_stopped_headings_lose_their_subtree():
+    assert en_dossier(("Interior", "i", 1), ("Organ", "o", 2), ("History", "of the organ", 3), ("Nave", "n", 2),
+                      ("See also", "s", 1), ("History", "h", 2), ("Bells", "b", 1), ("History", "x", 2)) == [
+        ("Interior", "i"), ("Interior / Nave", "n")]
+
+
+def test_a_stopped_word_in_a_wanted_heading_does_not_stop_it():
+    assert en_dossier(("Organ and stained glass", "o", 1)) == [("Organ and stained glass", "o")]
+
+
+def test_art_precedes_architecture_which_precedes_history_in_every_language():
+    assert en_dossier(("History", "h", 1), ("Liturgical use", "l", 2), ("Architecture", "a", 1), ("Iconography", "i", 1),
+                      lead="L", it=[("Storia", "s"), ("Interno", "n"), ("Mosaici", "m")]) == [
+        ("Lead", "L"), ("Liturgical use", "l"), ("Iconography", "i"), ("Mosaici", "m"), ("Architecture", "a"),
+        ("Interno", "n"), ("History", "h"), ("Storia", "s")]
+
+
+def test_a_long_subtree_is_capped_and_shared_by_its_sections():
+    long, (art, _, history) = "word " * 5000, architecture.CAPS
+    notes = dict(en_dossier(("History", long, 1), ("Wars", long, 2), ("Fire", "short", 2), ("Iconography", long, 1)))
+    assert notes["History / Fire"] == "short"
+    assert history * 0.9 < sum(len(t) for h, t in notes.items() if h.startswith("History")) <= history
+    assert len(notes["History"]) > history * 0.4 and len(notes["History / Wars"]) > history * 0.4
+    assert art * 0.9 < len(notes["Iconography"]) <= art and notes["Iconography"].endswith("word …")
+    assert len(dict(en_dossier(lead=long))["Lead"]) <= architecture.LEAD_CAP
+
+
+def test_a_subtree_of_many_sections_keeps_the_first_ones_readable():
+    notes = en_dossier(("History", "", 1), *((f"Year {n}", "word " * 300, 2) for n in range(30)))
+    assert len(notes) == architecture.CAPS[2] // architecture.MIN_SHARE
+    assert all(len(t) > architecture.MIN_SHARE * 0.9 for _, t in notes) and notes[0][0] == "History / Year 0"
 
 
 # --- calibration and the benchmark ---

@@ -121,8 +121,17 @@ def entity_sitelinks(entity: dict) -> dict[str, str]:
 
 def sections(wiki, title: str) -> list[tuple[str, str]]:
     """The page's sections, or none when the page does not exist; any other API error propagates."""
+    return [(heading(h), t) for h, t in _unless_missing(wiki.sections, title)]
+
+
+def section_tree(wiki, title: str) -> list[tuple[int, str, str]]:
+    """`sections`, each with its level before it."""
+    return [(level, heading(h), t) for level, h, t in _unless_missing(wiki.section_tree, title)]
+
+
+def _unless_missing(read, title: str) -> list:
     try:
-        return [(heading(h), t) for h, t in wiki.sections(title)]
+        return read(title)
     except SyncError as exc:
         if "missingtitle" in str(exc) or "nosuchpage" in str(exc):
             return []
@@ -131,15 +140,15 @@ def sections(wiki, title: str) -> list[tuple[str, str]]:
 
 def wanted(heading: str, words: Iterable[str], skip: Iterable[str] = ()) -> bool:
     """True when one of `words` (lower-case fragments) starts a word of the section heading; a fragment with a trailing
-    blank is a whole word, at the end of the heading too. A heading of `skip` (whole, lower-case) is not wanted."""
+    blank is a whole word, whatever follows it (the end of the heading, punctuation, a hyphen). A heading of `skip` (whole, lower-case) is not wanted."""
     if heading.strip().lower() in skip:
         return False
-    low = heading.lower() + " "
-    return any(re.search(rf"\b{re.escape(word)}", low) for word in words)
+    low = heading.lower()
+    return any(re.search(rf"\b{re.escape(word.rstrip())}" + (r"\b" if word.endswith(" ") else ""), low)
+               for word in words)
 
 
-def read_page(wikipedia, title: str, lang: str, words: Iterable[str], label: str | None = None,
-              skip: Iterable[str] = ()) -> list[dict]:
+def read_page(wikipedia, title: str, lang: str, words: Iterable[str], label: str | None = None) -> list[dict]:
     """The lead and the sections of one page whose heading is `wanted`, as dossier notes, headed by `label`
     ("<label> / <heading>") for a page read with another."""
     words = tuple(words)
@@ -147,7 +156,7 @@ def read_page(wikipedia, title: str, lang: str, words: Iterable[str], label: str
     if lead := wikipedia.lead(title):
         notes.append({"lang": lang, "url": wikipedia.url(title), "heading": label or "Lead", "text": lead})
     for head, text in sections(wikipedia, title):
-        if text and wanted(head, words, skip):
+        if text and wanted(head, words):
             notes.append({"lang": lang, "url": wikipedia.url(title),
                           "heading": f"{label} / {head}" if label else head, "text": text})
     return notes

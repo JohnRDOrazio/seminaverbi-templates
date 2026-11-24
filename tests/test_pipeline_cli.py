@@ -564,6 +564,9 @@ class DomainWikipedia:
     def sections(self, title):
         return [("Reception", f"{title} was read as a parable of mercy.")]
 
+    def section_tree(self, title):
+        return [(1, *s) for s in self.sections(title)]
+
     def url(self, title):
         return f"https://{self.lang}.{self.project}.org/wiki/{title.replace(' ', '_')}"
 
