@@ -71,8 +71,8 @@ def _sources(old: list[str], press: dict[str, float]) -> list[str]:
 
 def _reconcile(store, queue, qid: str, routing=None) -> None:
     """Make the row's press evidence what its supporting mentions say (see _evidence). Its evidence is corrected whatever
-    its status; its outcomes only when it has none: it is triaged again when it gained or lost the exemption from the
-    sitelink floor (never a benchmark row), and else its dossier is built again."""
+    its status; its outcomes only when it has none and the author has not skipped it: it is triaged again when the floor dropped it and it
+    is now exempt, or it lost the exemption (never a benchmark row), and else its dossier is built again."""
     row = queue.row(qid)
     if row is None:
         return
@@ -82,10 +82,10 @@ def _reconcile(store, queue, qid: str, routing=None) -> None:
     if press == old and sources == row.sources and routing is None:
         return
     redo = None
-    if row.status is None and (press != old or routing is not None):
+    if row.status is None and not row.skipped and (press != old or routing is not None):
         was, triage = common.press_exempt(row), row.outcomes.get(2)
         now = common.press_exempt(replace(row, data={**row.data, 0: {**stage0, "press": press}}))
-        if triage == "drop" and now and (routing is not None or not was):
+        if common.floor_drop(row) and now and (routing is not None or not was):
             redo = 2  # dropped (under the sitelink floor) before this evidence
         elif triage == "pass" and was and not now and not row.calibration:
             redo = 2  # it may have passed by the exemption alone

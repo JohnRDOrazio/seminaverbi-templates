@@ -2,7 +2,8 @@ import pytest
 import requests
 
 from pipeline import load_config, stages
-from pipeline.domains import art, common, film, literature, music
+from pipeline.domains import architecture, art, common, film, literature, music
+from pipeline.press.link import class_route
 from pipeline.press.route import release_waiting, route
 from pipeline.press.store import Mention, PressStore
 from pipeline.queue import Queue, Row
@@ -292,6 +293,57 @@ def test_an_item_that_is_no_whole_gets_no_parts(closure_cache, domain, classes):
     assert not any("P361" in qy for qy in sparql.queries)
 
 
+def building_ent(label, *classes, religion=None):
+    claims = {"P31": [{"mainsnak": {"datavalue": {"value": {"id": c}}}} for c in classes]}
+    if religion:
+        claims["P140"] = [{"mainsnak": {"datavalue": {"value": {"id": religion}}}}]
+    return {"labels": {"en": {"value": label}}, "claims": claims, "sitelinks": {"enwiki": {"title": label}}}
+
+
+def route_building(q, store, qid, entity):
+    """Link's own class route, then route()."""
+    sparql = PartsSparql()
+    store.add_mention(mention(qid, class_route(common.qids(entity, "P31"), sparql, {})))
+    return route(store, q, None, {}, FakeWikidata({qid: entity}), sparql)
+
+
+def test_a_church_becomes_an_architecture_candidate_with_its_press_evidence(q, store, uncovered, closure_cache):
+    assert route_building(q, store, "Q20", building_ent("Church", "Q16970")) == {"candidate": 1}
+    r = q.row("Q20")
+    assert (r.domain, r.sources) == ("architecture", ["press:sir"])
+    assert r.data[0] == {"count": 1, "instance_of": ["Q16970"], "press": {"sir": 0.8}}
+    assert [row.domain for row in uncovered] == ["architecture"]
+    m = store.mentions()[0]
+    assert (m.domain, m.route) == ("architecture", "candidate")
+    cfg = common.domain_config(load_config(), "architecture")
+    assert architecture.triage(r, cfg) == ("pass", "")  # one sitelink: the press exemption from the floor
+
+
+def test_a_chapel_queued_under_art_stays_there(q, store, uncovered, closure_cache, capsys):
+    q.add("Q21", "art", "depicts", {"en": "Chapel"}, {"enwiki": "Chapel"}, data={"count": 20, "instance_of": ["Q108325"]})
+    entity = building_ent("Chapel", "Q108325")
+    assert class_route(["Q108325"], PartsSparql(), {}) == "architecture"  # what the mention comes with
+    assert route_building(q, store, "Q21", entity) == {"candidate": 1}
+    r = q.row("Q21")
+    assert (r.domain, r.sources) == ("art", ["depicts", "press:sir"])
+    assert r.data[0] == {"count": 20, "instance_of": ["Q108325"], "press": {"sir": 0.8}}
+    assert [row.domain for row in uncovered] == ["art"]
+    m = store.mentions()[0]
+    assert (m.domain, m.route) == ("art", "candidate")
+    assert "already a art candidate, routed as art" in capsys.readouterr().err
+
+
+def test_a_buddhist_monastery_in_the_press_becomes_a_candidate(q, store, uncovered, closure_cache):
+    """Accepted: the press routes by class alone, so the Christian test of the domain's own queries is not asked;
+    such a row goes on to Jev's significance and connection questions, which are to reject it."""
+    entity = building_ent("Monastery", "Q44613", religion="Q748")
+    assert route_building(q, store, "Q22", entity) == {"candidate": 1}
+    r = q.row("Q22")
+    assert (r.domain, r.sources) == ("architecture", ["press:sir"])
+    cfg = common.domain_config(load_config(), "architecture")
+    assert architecture.triage(r, cfg) == ("pass", "")
+
+
 def test_a_qid_of_another_domains_row_is_routed_under_that_domain(q, store, uncovered):
     """The queue is keyed by QID alone: a press 'film' mention of a literature row is that row's evidence, decided
     and recorded under literature, never a film candidate without a film row."""
@@ -481,7 +533,7 @@ def test_a_neutral_or_critical_mention_never_becomes_a_candidate(q, store, unsup
 
 def test_a_neutral_or_critical_mention_adds_nothing_to_an_existing_row(q, store, unsupporting, uncovered):
     q.add("Q9", "film", "facet", {"en": "Ordet"}, {"enwiki": "Ordet"}, data={"count": 2, "instance_of": ["Q11424"]})
-    q.set_outcome("Q9", 2, "drop", {"reason": "floor"})
+    q.set_outcome("Q9", 2, "drop", {"reason": "3 sitelinks, under the floor of 15"})
     before = (q.row("Q9").sources, q.row("Q9").data, q.row("Q9").outcomes)
     store.add_mention(unsupporting(p=0.95))
     assert route(store, q, None, {}, FakeWikidata({"Q9": ent()})) == {"dropped": 1}
@@ -534,3 +586,68 @@ def test_music_and_art_triage_exempt_a_kept_press_mention(domain, mod, cls):
     assert result(0.9, classes=("Q5",)) == "drop" and result(0.9, folded_into="Q2") == "drop"
     if domain == "music":
         assert result(0.6, sources=("artist", "press:sir")) == "pass"
+
+
+# --- a row skipped by hand stays skipped; only the floor's drop is triaged again ---
+
+def skip(q, tmp_path, qid="Q9"):
+    from pipeline import __main__ as cli
+    assert cli.main(["skip", qid, "--reason", "not now", "--db", str(tmp_path / "q.db")]) == 0
+
+
+@pytest.mark.parametrize("domain", ["film", "literature", "music", "art", "architecture"])
+@pytest.mark.parametrize("stage", [2, 3, 4, 5])
+def test_press_evidence_does_not_bring_back_a_skipped_row(q, store, uncovered, tmp_path, domain, stage, monkeypatch):
+    monkeypatch.setattr({"film": film, "literature": literature, "music": music, "art": art,
+                         "architecture": architecture}[domain], "covered", lambda *a: ("pass", {}), raising=False)
+    q.add("Q9", domain, "x", {}, {}, data={"count": 3, "instance_of": []})
+    for n in range(1, stage):
+        q.set_outcome("Q9", n, "pass")
+    skip(q, tmp_path)
+    store.add_mention(mention(domain=domain))
+    assert route(store, q, None, {}, FakeWikidata({"Q9": ent()})) == {"candidate": 1}
+    row = q.row("Q9")
+    assert row.data[0]["press"] == {"sir": 0.8}
+    assert set(row.outcomes) == set(range(stage + 1)) and row.data[stage]["skipped"]
+
+
+def test_a_skip_of_a_floor_drop_survives_the_press(q, store, uncovered, tmp_path):
+    q.add("Q9", "film", "x", {}, {}, data={"count": 3, "instance_of": []})
+    q.set_outcome("Q9", 1, "pass")
+    q.set_outcome("Q9", 2, "drop", {"reason": "3 sitelinks, under the floor of 15"})
+    skip(q, tmp_path)  # at the quick check, the next stage without an outcome
+    store.add_mention(mention())
+    route(store, q, None, {}, FakeWikidata({"Q9": ent()}))
+    assert q.row("Q9").outcomes[2] == "drop" and q.row("Q9").data[3]["skipped"]
+
+
+@pytest.mark.parametrize("reason", ["a person, not a work", "folded into Q2", "an episode, trailer or clip"])
+def test_press_evidence_leaves_a_drop_that_is_not_the_floors(q, store, uncovered, reason):
+    q.add("Q9", "film", "x", {}, {}, data={"count": 3, "instance_of": []})
+    q.set_outcome("Q9", 2, "drop", {"reason": reason})
+    store.add_mention(mention())
+    route(store, q, None, {}, FakeWikidata({"Q9": ent()}))
+    assert q.row("Q9").outcomes[2] == "drop"
+
+
+@pytest.mark.parametrize("floor", [15, 8, 120])
+@pytest.mark.parametrize("domain, module, classes", [
+    ("film", film, "Q11424"), ("literature", literature, "Q7725634"), ("music", music, "Q7366"),
+    ("art", art, "Q3305213"), ("architecture", architecture, "Q16970")])
+def test_the_floor_drop_of_every_domain_is_recognised(q, domain, module, classes, floor):
+    """The reason is triage's own text, at whatever floor is configured; a drop for another reason is not the floor's."""
+    cfg = common.domain_config({**load_config(), domain: {**load_config()[domain], "sitelink_floor": floor}}, domain)
+    if domain == "music":
+        cfg["music"]["artist_sitelink_floor"] = floor
+    cfg["sitelink_floor"] = floor
+    q.add("Q9", domain, "facet", {}, {}, data={"count": floor - 1, "instance_of": [classes]})
+    q.set_outcome("Q9", 1, "pass")
+    outcome, reason = module.triage(q.row("Q9"), cfg)
+    assert outcome == "drop" and str(floor) in reason
+    q.set_outcome("Q9", 2, outcome, {"reason": reason})
+    assert common.floor_drop(q.row("Q9"))
+    q.add("Q9", domain, "facet", {}, {}, data={"instance_of": ["Q5"], "folded_into": "Q2"})
+    outcome, reason = module.triage(q.row("Q9"), cfg)
+    q.set_outcome("Q9", 2, outcome, {"reason": reason})
+    if "under the floor" not in reason:  # film has no such drop
+        assert not common.floor_drop(q.row("Q9"))

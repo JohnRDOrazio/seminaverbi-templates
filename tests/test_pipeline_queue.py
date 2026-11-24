@@ -114,3 +114,16 @@ def test_set_domain_moves_a_row_to_another_domain(q):
     q.set_domain("Q1", "music")
     assert q.row("Q1").domain == "music"
     assert [r.qid for r in q.pending(1, domain="literature")] == []
+
+
+def test_added_at_is_indexed_in_a_new_queue_and_in_one_made_before(tmp_path):
+    import sqlite3
+    path = tmp_path / "old.db"
+    Queue(path).add("Q1", "film", "x", {}, {})
+    old = sqlite3.connect(path)
+    old.execute("DROP INDEX IF EXISTS candidates_added_at")
+    old.commit()
+    q = Queue(path)
+    assert [r.qid for r in q.pending(1)] == ["Q1"]
+    plan = " ".join(r["detail"] for r in q.db.execute("EXPLAIN QUERY PLAN SELECT MAX(added_at) FROM candidates"))
+    assert "SEARCH candidates USING COVERING INDEX candidates_added_at" in plan

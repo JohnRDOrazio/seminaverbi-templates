@@ -69,8 +69,8 @@ only source is an artist need 20 (`music.sitelink_floor`, `music.artist_sitelink
 act) is folded into its whole. Art candidates come from what a work depicts, Iconclass codes (Wikidata's P1257
 only), genres and a curated list; the floor is 15 sitelinks (`art.sitelink_floor`) and rows from the curated
 `list` pass without it. Jev's quick question for art asks about significance, not plausibility. Recordings and
-editions, and art copies, are dropped at triage. Run `python -m pipeline calibrate --domain music` (or `art`) and read the
-report before the first `publish` of that domain.
+editions, and art copies, are dropped at triage. Run `python -m pipeline calibrate --domain music` (or `art`,
+`architecture`) and read the report before the first `publish` of that domain.
 
 **Art benchmark.** `calibrate --domain art` also adds a benchmark of 21 works (strong, implicit and controls) held back as
 calibration rows. Open item: the author approves the benchmark list in `art.benchmark` before the first live art
@@ -80,6 +80,36 @@ the sitelink floor, the quick drop and `max_new_per_run` apply to it as to any c
 only if it passes them, not because it passed them as calibration (a QID that is not a benchmark row changes nothing
 and makes the command exit with an error).
 
+Sacred architecture (`--domain architecture`) runs the same stages over churches, cathedrals, basilicas, chapels, abbeys
+and monasteries (with their subclasses), for pages under the field `sacred-architecture`. Candidates are the buildings
+of those classes with 15 sitelinks (`architecture.sitelink_floor`), those with a UNESCO designation and the curated
+`architecture.works`; the last two, and a building with a press mention kept at 0.60 or more, pass without the floor.
+Jev's quick question asks about significance, as art's does. A building already queued under another domain stays
+there, and the press gives an item that is both an artwork and a building to art. Decisions (design:
+`docs/superpowers/specs/2026-11-23-sacred-architecture-design.md`):
+
+- Churches and cathedrals are Christian by definition and need no statement. A basilica, chapel, abbey or monastery
+  needs a Christian religion (P140, `architecture.christian_religions`), or a dedication (P825) when it states no
+  religion. A building of any class whose stated religions are none of them Christian is left out. The press routes by
+  class alone, so a non-Christian monastery it mentions may become a candidate, for Jev's questions to reject.
+- Hagia Sophia and other buildings now of another class or religion come only through `architecture.works`, where no
+  class or religion is asked. A listed building that is also in the benchmark, as Hagia Sophia and the Sagrada Família
+  are, is held back like the rest of it; once released, it keeps its `list` source and needs no floor.
+- The dossier reads a building's own pages only: the art in it stays in `art`, and no part is folded. A wanted heading
+  brings its subsections, up to a limit of characters per heading; the leads come first, then art and liturgy,
+  architecture and history, because Jev is sent the start of a long dossier.
+- Buildings are judged in the order they were queued: a run queues the `works` first, then the others by sitelinks, most
+  first. The new rows of a later run come after those already queued.
+- `candidates` triages again a row the floor dropped that has gained an exempt source. A row dropped for another reason,
+  or skipped by hand (`skip`), stays as it is; a kept press mention and the benchmark do not bring a skipped row back
+  either, in any domain. `redo` and `release-benchmark` do.
+- `config/infobox_types.json` has no building layout. Proposals do not need one; pages do, in a separate change.
+- The benchmark (`architecture.benchmark`: 18 buildings, 11 strong, 4 weak and 3 secular controls) is added by
+  `calibrate --domain architecture` and held back like art's. It needs the author's approval before the first live
+  architecture run; this is not done yet. Both domains' benchmark works are held whatever source brought them in, the
+  press included: by `candidates` and `press route` when they add rows, and before each stage, `run` and `publish`.
+  A live row held that way starts again at stage 1, as calibration.
+
 Commands (options `--db PATH`, default `data/pipeline.sqlite`, and `--domain`, default `film`, go before or after the command):
 
 ```
@@ -88,7 +118,7 @@ python -m pipeline run [--publish]    # stages 0-5, at most max_new_per_run ente
 python -m pipeline calibrate          # add the articles SeminaVerbi already has, run stages 1-5 on them, print the report
 python -m pipeline redo STAGE [--qid Q]   # clear that stage and later ones (STAGE 0 is refused)
 python -m pipeline skip QID --reason TEXT # drop a row that breaks a stage, at its next stage without an outcome
-python -m pipeline release-benchmark QID [QID ...]   # art: turn held-back benchmark works into candidates
+python -m pipeline release-benchmark QID [QID ...]   # art, architecture: turn held-back benchmark works into candidates
 python -m pipeline publish | votes | approved
 ```
 

@@ -254,6 +254,10 @@ class FakeSections:
             raise SyncError("missingtitle")
         return self.pages[title]
 
+    def section_tree(self, title):
+        """The sections of `sections`, a third value being the level (1 when there is none)."""
+        return [(s[2] if len(s) > 2 else 1, s[0], s[1]) for s in self.sections(title)]
+
     def lead(self, title):
         return self.pages.get(f"#lead:{title}", "")
 

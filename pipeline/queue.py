@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS candidates (
     qid TEXT PRIMARY KEY, domain TEXT NOT NULL, sources TEXT NOT NULL,
     labels TEXT NOT NULL, sitelinks TEXT NOT NULL, calibration INTEGER NOT NULL,
     status TEXT, page TEXT, reason TEXT, votes INTEGER, added_at REAL NOT NULL);
+CREATE INDEX IF NOT EXISTS candidates_added_at ON candidates (added_at, qid);
 CREATE TABLE IF NOT EXISTS outcomes (
     qid TEXT NOT NULL, stage INTEGER NOT NULL, outcome TEXT NOT NULL,
     data_json TEXT NOT NULL, at REAL NOT NULL, PRIMARY KEY (qid, stage));
@@ -36,6 +37,11 @@ class Row:
     status: str | None = None
     page: str | None = None
     votes: int | None = None
+
+    @property
+    def skipped(self) -> bool:
+        """The author has skipped the row (`skip`), at whatever stage it was."""
+        return any(stage and data.get("skipped") for stage, data in self.data.items())
 
 
 class Queue:
@@ -69,14 +75,16 @@ class Queue:
                 self.db.commit()
             if calibration and not row["calibration"]:
                 # a film article first found by a facet must still be a calibration row, run through every
-                # stage: the drops and translations it had as a candidate are cleared
+                # stage: the drops and translations it had as a candidate are cleared (not a skip, the author's own)
                 self.db.execute("UPDATE candidates SET calibration=1 WHERE qid=?", (qid,))
-                self.db.execute("DELETE FROM outcomes WHERE qid=? AND stage>=1 AND outcome!='pass'", (qid,))
+                self.db.execute("DELETE FROM outcomes WHERE qid=? AND stage>=1 AND outcome!='pass'"
+                                " AND json_extract(data_json, '$.skipped') IS NULL", (qid,))
                 self.db.commit()
             return False
         self.db.execute(
             "INSERT INTO candidates (qid, domain, sources, labels, sitelinks, calibration, added_at)"
-            " VALUES (?,?,?,?,?,?,?)",
+            # rows are read by added_at: each one comes after all the others, whatever the clock's resolution
+            " VALUES (?,?,?,?,?,?,MAX(?, COALESCE((SELECT MAX(added_at) FROM candidates), 0) + 1e-5))",
             (qid, domain, json.dumps([source]), json.dumps(labels), json.dumps(sitelinks),
              int(calibration), time.time()))
         self.db.commit()

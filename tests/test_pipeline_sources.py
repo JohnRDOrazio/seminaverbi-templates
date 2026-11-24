@@ -142,6 +142,15 @@ def test_sections_strips_wikitext():
     assert s.calls[1][1]["params"]["prop"] == "wikitext"
 
 
+def test_section_tree_gives_the_level_of_each_section():
+    s = FakeSession(
+        Resp({"parse": {"sections": [{"line": "Art", "index": "1", "toclevel": 1},
+                                     {"line": "Box", "index": "T-1", "toclevel": 1},
+                                     {"line": "Glass", "index": "2", "toclevel": 2}]}}),
+        Resp({"parse": {"wikitext": "== Art ==\nA."}}), Resp({"parse": {"wikitext": "=== Glass ===\nG."}}))
+    assert Wikipedia("en", s).section_tree("T") == [(1, "Art", "A."), (2, "Glass", "G.")]
+
+
 def test_url():
     assert Wikipedia("it").url("Il Padrino") == "https://it.wikipedia.org/wiki/Il_Padrino"
 

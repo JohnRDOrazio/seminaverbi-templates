@@ -48,12 +48,14 @@ def query(pattern: str, key: str = "") -> str:
             f"GROUP BY {key}?item\nLIMIT {LIMIT}")
 
 
-def bounded(pattern: str, cls: str, subclasses: Iterable[str] | None = None, floor: int | None = None) -> str:
+def bounded(pattern: str, cls: str, subclasses: Iterable[str] | None = None, floor: int | None = None,
+            test: str = "") -> str:
     """The query of `pattern` on items of class `cls`, at most LIMIT items: the most linked ones (sitelink
     count), so a truncated result drops the least notable. `subclasses` (a class closure) of up to VALUES_MAX
     classes replaces the `P31/P279*` path by a list of classes (`FILTER IN`: a VALUES list, joined before the
     pattern, timed out on WDQS); a larger closure keeps the path, walked up from the item. `floor` keeps only
-    items with at least that many sitelinks, tested right after the pattern, before the class."""
+    items with at least that many sitelinks, tested right after the pattern, before the class. `test` is a pattern
+    on ?item and ?sitelinks, tested last (its lines end with a newline)."""
     listed = None if subclasses is None else set(subclasses) | {cls}
     if listed is None:
         kind = f"  ?item wdt:P31/wdt:P279* wd:{cls} .\n"
@@ -65,6 +67,7 @@ def bounded(pattern: str, cls: str, subclasses: Iterable[str] | None = None, flo
         body = f"{pattern}\n{kind}  ?item wikibase:sitelinks ?sitelinks .\n"
     else:
         body = f"{pattern}\n  ?item wikibase:sitelinks ?sitelinks . FILTER(?sitelinks >= {int(floor)})\n{kind}"
+    body += test
     return query(f"  {{ SELECT DISTINCT ?item ?sitelinks WHERE {{\n{_ORDERED}{body}"
                  f"  }} ORDER BY DESC(?sitelinks) LIMIT {LIMIT} }}")
 
@@ -118,12 +121,86 @@ def entity_sitelinks(entity: dict) -> dict[str, str]:
 
 def sections(wiki, title: str) -> list[tuple[str, str]]:
     """The page's sections, or none when the page does not exist; any other API error propagates."""
+    return [(heading(h), t) for h, t in _unless_missing(wiki.sections, title)]
+
+
+def section_tree(wiki, title: str) -> list[tuple[int, str, str]]:
+    """`sections`, each with its level before it."""
+    return [(level, heading(h), t) for level, h, t in _unless_missing(wiki.section_tree, title)]
+
+
+def _unless_missing(read, title: str) -> list:
     try:
-        return [(heading(h), t) for h, t in wiki.sections(title)]
+        return read(title)
     except SyncError as exc:
         if "missingtitle" in str(exc) or "nosuchpage" in str(exc):
             return []
         raise
+
+
+def wanted(heading: str, words: Iterable[str], skip: Iterable[str] = ()) -> bool:
+    """True when one of `words` (lower-case fragments) starts a word of the section heading; a fragment with a trailing
+    blank is a whole word, whatever follows it (the end of the heading, punctuation, a hyphen). A heading of `skip` (whole, lower-case) is not wanted."""
+    if heading.strip().lower() in skip:
+        return False
+    low = heading.lower()
+    return any(re.search(rf"\b{re.escape(word.rstrip())}" + (r"\b" if word.endswith(" ") else ""), low)
+               for word in words)
+
+
+def read_page(wikipedia, title: str, lang: str, words: Iterable[str], label: str | None = None) -> list[dict]:
+    """The lead and the sections of one page whose heading is `wanted`, as dossier notes, headed by `label`
+    ("<label> / <heading>") for a page read with another."""
+    words = tuple(words)
+    notes = []
+    if lead := wikipedia.lead(title):
+        notes.append({"lang": lang, "url": wikipedia.url(title), "heading": label or "Lead", "text": lead})
+    for head, text in sections(wikipedia, title):
+        if text and wanted(head, words):
+            notes.append({"lang": lang, "url": wikipedia.url(title),
+                          "heading": f"{label} / {head}" if label else head, "text": text})
+    return notes
+
+
+def dossier_languages(row, cfg: dict) -> list[str]:
+    """The languages of LANGS the work has a Wikipedia page in, at most cfg['dossier_languages']."""
+    return [l for l in LANGS if f"{l}wiki" in row.sitelinks][:cfg["dossier_languages"]]
+
+
+def dossier_outcome(result: dict, calibration: bool) -> tuple[str, dict]:
+    """Stage 4 on a built dossier: a non-calibration one with no note but the Wikidata one is dropped (it is a list
+    of names, not evidence)."""
+    if not any(n["heading"] != "Wikidata" for n in result["notes"]) and not calibration:
+        return "drop", {"reason": "empty dossier"}
+    return "pass", result
+
+
+def label(wikidata, qid: str, lang: str = "en") -> str | None:
+    return wikidata.entity(qid).get("labels", {}).get(lang, {}).get("value")
+
+
+def inception_year(entity: dict) -> str | None:
+    """The year of the first P571 statement that has one."""
+    for claim in entity.get("claims", {}).get("P571", []):
+        time = claim.get("mainsnak", {}).get("datavalue", {}).get("value", {}).get("time", "")
+        if match := re.match(r"([+-]?)(\d+)-", time):
+            return str(int(match.group(2))) + (" BCE" if match.group(1) == "-" else "")
+    return None
+
+
+def named_fact(entity: dict, prop: str, role: str, labels_of) -> list[str]:
+    """["<role>: <names>"] of the items `prop` states, [] when it states none with a label."""
+    names = [n for q in qids(entity, prop) if (n := labels_of(q))]
+    return [f"{role}: {', '.join(names)}"] if names else []
+
+
+def facts_note(entity: dict, facts: list[str]) -> dict | None:
+    """The dossier's Wikidata note of these facts; None when there are none."""
+    if not facts:
+        return None
+    text = "; ".join(facts)
+    return {"lang": "en", "url": f"https://www.wikidata.org/wiki/{entity.get('id', '')}", "heading": "Wikidata",
+            "text": text[0].upper() + text[1:] + "."}
 
 
 def wikidata_qid(repo, wikidata, lang: str, title: str) -> str | None:
@@ -289,6 +366,7 @@ def other_domain(queue, qid: str, domain: str) -> str | None:
     return None
 
 
+_FLOOR_REASON = re.compile(r"\d+ sitelinks, under the floor of \d+")  # the reason every domain's triage gives
 CLOSED = ("approved", "created", "declined")  # a whole with one of these statuses absorbs nothing
 
 
@@ -397,6 +475,25 @@ def _recheck_open_whole(queue, whole_qid: str, domain: str, recheck) -> None:
     if covered:
         print(f"{domain} candidates: {whole_qid} gained parts and is now covered ({outcome}) but already open: "
               f"retired; decline or redirect {row.page} by hand")
+
+
+def floor_drop(row) -> bool:
+    """True when the row's stage-2 drop is the sitelink floor's and the author has not skipped the row."""
+    return (row.outcomes.get(2) == "drop" and not row.skipped
+            and bool(_FLOOR_REASON.fullmatch(row.data.get(2, {}).get("reason", ""))))
+
+
+def retriage(queue, domain: str, triage, cfg: dict) -> int:
+    """Stage 2 again for the rows of `domain` the sitelink floor dropped that a later source may now exempt (a floor
+    drop that gained `unesco`): a row with no status, not calibration, which is a `floor_drop` and which `triage`, on
+    the row as stored now, passes has its outcomes from stage 2 on cleared. A row with a status, one skipped by hand
+    and one dropped for another reason are never touched. Returns how many were cleared."""
+    cleared = 0
+    for row in queue.open_rows(domain):
+        if floor_drop(row) and triage(row, cfg)[0] == "pass":
+            queue.redo(2, row.qid)
+            cleared += 1
+    return cleared
 
 
 def recheck_pending(queue, domain: str, recheck) -> None:
