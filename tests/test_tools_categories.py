@@ -1,6 +1,6 @@
 import pytest
 
-from sync.wiki import PageInfo, SyncError
+from sync.wiki import REPO_WIKI, PageInfo, SyncError
 from tools import categories as cat
 
 LANGS = ["en", "it", "es", "fr", "de", "pt"]
@@ -214,7 +214,7 @@ def test_link_to_a_same_named_page_in_another_namespace_is_a_conflict():
 
 def test_cli_reports_taken_sitelink(env, capsys):
     items = {"Q10": {"en": "Category:Music", "fr": "Category:Old music"}}
-    clients = {"fr": Fake("fr", ALL_FR, items), "en": Fake("en", items=items)}
+    clients = {"fr": Fake("fr", ALL_FR, items), REPO_WIKI: Fake(REPO_WIKI, items=items)}
     for c in clients.values():
         c.login = lambda user, password: None
     assert cat.main(["check", "--wiki", "fr", "--create"], client_factory=clients.__getitem__, data=DATA) == 1

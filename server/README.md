@@ -4,8 +4,7 @@
 lack them (WikibaseImport's own script skips items that already have any statement).
 
 Install outside the docroot, next to the MediaWiki install, and run on the wiki that holds the Wikibase
-repository: `<repo-wiki>` below is the one `config/wikis.json` names (`en` until the repository moves to its
-own wiki, `data`).
+repository: `<repo-wiki>` below is the one `config/wikis.json` names, `data`.
 `<vhost-user>`/`<group>` are the web server's system user and group, `<tools-dir>` the install
 directory and `<mw-root>` the MediaWiki root (the script falls back to `../seminaverbi_1_44/w` from
 its own directory when `MW_INSTALL_PATH` is unset):

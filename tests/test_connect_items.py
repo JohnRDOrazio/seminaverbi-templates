@@ -1,5 +1,6 @@
 import pytest
 
+from sync.wiki import REPO_WIKI
 from tools import connect_items as ci
 from tools.connect_items import Article, Connect
 
@@ -243,7 +244,7 @@ def test_import_needed_without_log_prints_the_command_and_stops(capsys):
     assert ci.run(rows, repo, apply=True, tools_dir="/srv/tools") == 3
     assert repo.calls == []
     out = capsys.readouterr().out
-    assert "php maintenance/run.php /srv/tools/EnrichItems.php --wiki=en --import Q790484 --import Q7339\n" in out
+    assert f"php maintenance/run.php /srv/tools/EnrichItems.php --wiki={REPO_WIKI} --import Q790484 --import Q7339\n" in out
 
 
 def test_import_output_parsed(capsys):
@@ -327,7 +328,7 @@ def test_main_wires_the_cli(tmp_path, capsys):
     clients = {"en": Client("en", repo, {"Main Page": "", "Christmas tree": "Text.", "Nek": "x"})}
     assert ci.main(["--apply", "--tools-dir", "/t", "--create", "Nek=singer"], repo=repo, clients=clients,
                    wikidata=wd) == 3
-    assert "/t/EnrichItems.php --wiki=en --import Q47128" in capsys.readouterr().out
+    assert f"/t/EnrichItems.php --wiki={REPO_WIKI} --import Q47128" in capsys.readouterr().out
     log = tmp_path / "import.log"
     log.write_text("IMPORT Q47128 = Q48100 (created)\n", encoding="utf-8")
     filed = []

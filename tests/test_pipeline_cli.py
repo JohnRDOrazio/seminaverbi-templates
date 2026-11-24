@@ -4,6 +4,7 @@ from pipeline import __main__ as cli
 from pipeline import calibration, stages
 from pipeline.domains import film
 from pipeline.queue import Queue
+from sync.wiki import REPO_WIKI
 
 SV_FIELD, SV_THEME = "P10768", "P10769"
 
@@ -143,7 +144,7 @@ def test_calibrate_reports_field_disagreement():
             "themes": [{"key": "mercy", "item": "Q20", "names": {"en": "Mercy"}},
                        {"key": "grace", "item": "Q21", "names": {"en": "Grace"}}]}
     wiki = FakeWiki({SV_FIELD: ["Q10"], SV_THEME: ["Q20", "Q21"]})
-    out = calibration.report(q, {"en": wiki}, tree=tree, unmapped=["it:Orphan"])
+    out = calibration.report(q, {REPO_WIKI: wiki}, tree=tree, unmapped=["it:Orphan"])
     assert "The Film" in out and "direct (0.83)" in out
     assert "DISAGREE" in out  # television vs film
     assert "grace" in out  # on the item, not found by Jev
@@ -230,7 +231,7 @@ class ClientWiki:
 
 
 class RepoWiki(ClientWiki):
-    """The en wiki, which is also the farm's Wikibase repository."""
+    """The farm's Wikibase repository."""
     def __init__(self, members, items, links, values):
         super().__init__(members)
         self.items, self.links, self.values = items, links, values
@@ -265,16 +266,19 @@ class CalibrationJudge:
         return 0
 
 
-def test_calibrate_end_to_end_asks_only_the_repository(base, monkeypatch, capsys):
+def test_calibrate_end_to_end_asks_only_the_repository(base, use_repository, monkeypatch, capsys):
     from pipeline import judge as judge_module
     from sync import categories
     tree = categories.load(judge_module.ROOT)
-    repo = RepoWiki({"Category:Feature films": [("Ordet", 0)]},
+    en_members = {"Category:Feature films": [("Ordet", 0)]}
+    repo = RepoWiki(en_members if REPO_WIKI == "en" else {},
                     {("en", "Ordet"): "Q10", ("it", "Ordet"): "Q10", ("enwiki", "Ordet (film)"): "Q10"},
                     {"Q10": {"en": "Ordet", "it": "Ordet", "enwiki": "Ordet (film)"}},
                     {("Q10", SV_FIELD): ["Q48192"]})
-    wikis = {"en": repo, **{lang: ClientWiki() for lang in cli.LANGS if lang != "en"}}
+    wikis = {lang: ClientWiki() for lang in cli.LANGS}
+    wikis["en"] = ClientWiki(en_members)
     wikis["it"] = ClientWiki({"Category:Lungometraggi": [("Ordet", 0)]})
+    use_repository(repo, wikis)
     monkeypatch.setattr(cli, "_wikis", lambda: wikis)
     monkeypatch.setattr(cli, "_tree", lambda: tree)
     monkeypatch.setattr(cli, "_sparql", lambda: ListSparql([item_row("Q500", "Ordet (film)")]))
@@ -411,23 +415,23 @@ def calibration_row(q, labels, sitelinks, field="feature-films", themes=(("mercy
 def test_a_deeper_field_under_the_items_field_agrees():
     q = Queue(":memory:")
     calibration_row(q, {"en": "The Film"}, {"enwiki": "The Film"})
-    out = calibration.report(q, {"en": FakeWiki({SV_FIELD: ["Q10"], SV_THEME: ["Q20"]})}, tree=TREE)
+    out = calibration.report(q, {REPO_WIKI: FakeWiki({SV_FIELD: ["Q10"], SV_THEME: ["Q20"]})}, tree=TREE)
     assert "feature-films | film (agree, deeper) |" in out and "DISAGREE" not in out
 
 
 def test_a_row_without_an_english_label_is_named_by_another_label_or_its_sitelink():
     q = Queue(":memory:")
     calibration_row(q, {"it": "Il miglio verde"}, {"enwiki": "The Green Mile (film)"})
-    assert "### Il miglio verde (Q1)" in calibration.report(q, {"en": FakeWiki({})}, tree=TREE)
+    assert "### Il miglio verde (Q1)" in calibration.report(q, {REPO_WIKI: FakeWiki({})}, tree=TREE)
     q = Queue(":memory:")
     calibration_row(q, {}, {"enwiki": "Pulp Fiction"})
-    assert "### Pulp Fiction (Q1)" in calibration.report(q, {"en": FakeWiki({})}, tree=TREE)
+    assert "### Pulp Fiction (Q1)" in calibration.report(q, {REPO_WIKI: FakeWiki({})}, tree=TREE)
 
 
 def test_a_missed_theme_shows_jevs_score():
     q = Queue(":memory:")
     calibration_row(q, {"en": "F"}, {"enwiki": "F"}, scores={"mercy": 0.7, "grace": 0.31})
-    out = calibration.report(q, {"en": FakeWiki({SV_FIELD: ["Q12"], SV_THEME: ["Q20", "Q21"]})}, tree=TREE)
+    out = calibration.report(q, {REPO_WIKI: FakeWiki({SV_FIELD: ["Q12"], SV_THEME: ["Q20", "Q21"]})}, tree=TREE)
     assert "not found by Jev: grace (0.31)" in out
 
 
@@ -440,7 +444,7 @@ def test_the_report_says_whether_a_new_candidate_would_be_proposed(quick, themes
     monkeypatch.setattr(calibration, "load_config", lambda: {"quick_drop": 0.25})
     q = Queue(":memory:")
     calibration_row(q, {"en": "F"}, {}, themes=themes, quick=quick)
-    assert f"| verdict | {verdict} | |" in calibration.report(q, {"en": FakeWiki({})}, tree=TREE)
+    assert f"| verdict | {verdict} | |" in calibration.report(q, {REPO_WIKI: FakeWiki({})}, tree=TREE)
 
 
 def test_the_verdict_of_a_confident_direct_connection_without_a_theme(monkeypatch):
@@ -449,7 +453,7 @@ def test_the_verdict_of_a_confident_direct_connection_without_a_theme(monkeypatc
     calibration_row(q, {"en": "F"}, {}, themes=())
     q.set_outcome("Q1", 5, "pass", {**q.row("Q1").data[5],
                                     "connection": {"choice": "direct", "probabilities": {"direct": 0.99}}})
-    assert "| verdict | would be proposed (direct connection) | |" in calibration.report(q, {"en": FakeWiki({})}, tree=TREE)
+    assert "| verdict | would be proposed (direct connection) | |" in calibration.report(q, {REPO_WIKI: FakeWiki({})}, tree=TREE)
 
 
 def test_a_saved_theme_under_the_current_cutoff_is_neither_shown_nor_counted(monkeypatch):
@@ -457,7 +461,7 @@ def test_a_saved_theme_under_the_current_cutoff_is_neither_shown_nor_counted(mon
     monkeypatch.setattr(calibration, "load_config", lambda: {"quick_drop": 0.25})
     q = Queue(":memory:")
     calibration_row(q, {"en": "F"}, {"enwiki": "F"}, themes=(("mercy", 0.45),))
-    out = calibration.report(q, {"en": FakeWiki({SV_THEME: ["Q20"]})}, tree=TREE)
+    out = calibration.report(q, {REPO_WIKI: FakeWiki({SV_THEME: ["Q20"]})}, tree=TREE)
     assert "| verdict | would be dropped: no theme at 0.50 | |" in out
     assert "| themes | none |" in out and "not found by Jev: mercy (0.45)" in out
 
@@ -663,10 +667,11 @@ def test_triage_reads_the_real_config_for_the_domain(domain, source, passing, dr
 
 
 @pytest.mark.parametrize("domain", ["music", "art"])
-def test_candidates_give_music_and_art_the_coverage_recheck(domain, monkeypatch, tmp_path):
+def test_candidates_give_music_and_art_the_coverage_recheck(domain, use_repository, monkeypatch, tmp_path):
     from pipeline.domains import DOMAINS
     module, seen = DOMAINS[domain], {}
-    wikis = {lang: object() for lang in cli.LANGS}
+    wikis, repo = {lang: object() for lang in cli.LANGS}, object()
+    use_repository(repo, wikis)
 
     def candidates(queue, sparql, wikipedia, cfg, wikidata=None, covered=None):
         seen["outcome"] = covered("row")
@@ -679,7 +684,7 @@ def test_candidates_give_music_and_art_the_coverage_recheck(domain, monkeypatch,
     monkeypatch.setattr(cli, "_wikipedia", lambda lang, project="wikipedia": None)
     monkeypatch.setattr(cli, "_wikis", lambda: wikis)
     assert cli.main(["candidates", "--domain", domain, "--db", str(tmp_path / "q.sqlite")]) == 0
-    assert seen == {"outcome": ("drop", {}), "repo": wikis["en"], "wikis": wikis}
+    assert seen == {"outcome": ("drop", {}), "repo": repo, "wikis": wikis}
 
 
 @pytest.mark.parametrize("domain", ["music", "art"])

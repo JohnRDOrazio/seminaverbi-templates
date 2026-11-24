@@ -4,7 +4,7 @@ from pipeline.domains import DOMAINS, film
 from pipeline.domains.film import calibration_qids, candidates, triage
 from pipeline.queue import Queue, Row
 from pipeline.stages import run_stage
-from sync.wiki import SyncError
+from sync.wiki import REPO_WIKI, SyncError
 
 CFG = {
     "sitelink_floor": 15,
@@ -180,7 +180,7 @@ class FakeWiki:
 
 
 class FakeRepo(FakeWiki):
-    """The en wiki, which is also the Wikibase repository: items keyed by (site, title)."""
+    """The Wikibase repository: items keyed by (site, title)."""
     def __init__(self, members, items, links):
         super().__init__(members)
         self._items, self._links = items, links
@@ -192,16 +192,19 @@ class FakeRepo(FakeWiki):
         return 1, self._links.get(item, {})
 
 
-def test_calibration_qids_map_through_the_local_item_and_report_unmapped():
+def test_calibration_qids_map_through_the_local_item_and_report_unmapped(use_repository):
+    members = {"Category:Feature films": [("Ordet", 0), ("Category:Sub", 14), ("Lonely", 0), ("NoLink", 0)],
+               "Category:Television": [("Show", 0)]}
+    repo = FakeRepo(members if REPO_WIKI == "en" else {},
+                    {("en", "Ordet"): "Q10", ("en", "Show"): "Q11", ("en", "NoLink"): "Q12", ("it", "Ordet"): "Q10",
+                     ("it", "Solo"): "Q13"},
+                    {"Q10": {"en": "Ordet", "it": "Ordet", "enwiki": "Ordet (film)"}, "Q11": {"enwiki": "Show"},
+                     "Q12": {"en": "NoLink"}, "Q13": {"it": "Solo", "itwiki": "Solo (film)"}})
     wikis = {
-        "en": FakeRepo({"Category:Feature films": [("Ordet", 0), ("Category:Sub", 14), ("Lonely", 0), ("NoLink", 0)],
-                        "Category:Television": [("Show", 0)]},
-                       {("en", "Ordet"): "Q10", ("en", "Show"): "Q11", ("en", "NoLink"): "Q12", ("it", "Ordet"): "Q10",
-                        ("it", "Solo"): "Q13"},
-                       {"Q10": {"en": "Ordet", "it": "Ordet", "enwiki": "Ordet (film)"}, "Q11": {"enwiki": "Show"},
-                        "Q12": {"en": "NoLink"}, "Q13": {"it": "Solo", "itwiki": "Solo (film)"}}),
+        "en": FakeWiki(members),
         "it": FakeWiki({"Category:Film drammatici": [("Ordet", 0), ("Solo", 0)]}),
     }
+    use_repository(repo, wikis)
     wikidata = FakeWikidata({"Ordet (film)": "Q500", "Show": "Q501", "Solo (film)": "Q502"})
     tree = {"root": {"names": {}}, "fields": [
         {"key": "film", "names": {"en": "Film", "it": "Cinema"}, "children": [
