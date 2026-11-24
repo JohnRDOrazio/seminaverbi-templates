@@ -17,6 +17,7 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS press_articles (
   url TEXT PRIMARY KEY, outlet TEXT, lang TEXT, title TEXT, published TEXT,
   found_at REAL, stage TEXT DEFAULT 'found', outcome TEXT, data_json TEXT, attempted_at REAL);
+CREATE INDEX IF NOT EXISTS press_articles_found ON press_articles (found_at, outlet);
 CREATE TABLE IF NOT EXISTS press_mentions (
   url TEXT, qid TEXT, label TEXT, kind TEXT, domain TEXT, p REAL,
   passages_json TEXT, route TEXT, stance REAL, stance_outcome TEXT, PRIMARY KEY (url, qid));
@@ -139,6 +140,8 @@ class PressStore:
         """Add an article discovery found while the day's count is under `limit` and its outlet's under `cap` (None: no
         cap), in one statement, so processes cannot overrun them: "added"; else "known" (the URL was there), "day full" or
         "outlet full"."""
+        if self.article(url) is not None:
+            return "known"
         now = utc_now()
         start = datetime.combine(now.date(), datetime.min.time(), timezone.utc).timestamp()
         count = "(SELECT COUNT(*) FROM press_articles WHERE found_at >= ?"

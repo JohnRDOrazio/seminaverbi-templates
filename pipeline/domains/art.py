@@ -65,8 +65,8 @@ def owns(instance_of: Iterable[str], sparql, cache: Path | None = None) -> bool:
 
 def triage(row, cfg: dict) -> tuple[str, str]:
     """Stage 2: ('drop', reason) for a person, a copy or study (unless the row is also of a work class), a part
-    folded into its whole, or a row under the sitelink floor (a `list` row passes without a floor).
-    Calibration always passes."""
+    folded into its whole, or a row under the sitelink floor (a `list` row, and one with a kept press mention, pass
+    without a floor). Calibration always passes."""
     if row.calibration:
         return "pass", "calibration"
     data = row.data.get(0, {})
@@ -77,7 +77,7 @@ def triage(row, cfg: dict) -> tuple[str, str]:
         return "drop", "a copy or study, not a work of its own"
     if data.get("folded_into"):
         return "drop", f"folded into {data['folded_into']}"
-    if "list" in row.sources:
+    if "list" in row.sources or common.press_exempt(row):
         return "pass", ""
     count = data.get("count", 0)
     if count < cfg["sitelink_floor"]:

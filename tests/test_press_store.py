@@ -85,3 +85,15 @@ def test_old_stores_gain_the_stance_columns_and_their_mentions_stay_as_they_are(
         store.add_mention(Mention("u", "Q1", "x", "work", "film", 0.9, [], stance=0.1, stance_outcome="critical"))
         store.add_mention(Mention("u", "Q1", "x", "work", "film", 0.9, []))  # re-found without a stance: kept
         assert [(m.stance, m.critical) for m in store.mentions()] == [(0.1, True)]
+
+
+def test_the_days_counts_use_an_index_and_a_known_url_does_not_count():
+    s = PressStore(sqlite3.connect(":memory:"))
+    plan = " ".join(r[3] for r in s.db.execute(
+        "EXPLAIN QUERY PLAN SELECT COUNT(*) FROM press_articles WHERE found_at >= ? AND outlet=?", (0, "x")))
+    assert "press_articles_found" in plan
+    s.discovered("https://x/1", "o", "it", None, limit=9, cap=None)
+    asked = []
+    s.db.set_trace_callback(asked.append)
+    assert s.discovered("https://x/1", "o", "it", None, limit=9, cap=None) == "known"
+    assert not any("COUNT(" in q for q in asked)
