@@ -309,19 +309,29 @@ HEADINGS = {lang: tuple(word for group in groups for word in group) for lang, gr
 # pages (2026-11-24: Chartres en, it and es, the Votivkirche de, San Vitale it, the Sainte-Chapelle fr, the Sagrada
 # Família es), so that no history or façade fills what the judge is sent (the Sagrada Família's history alone is 22,350).
 # A building rich in art in three languages (Chartres) still fills the first MAX_DOSSIER_CHARS with leads and art, for
-# the connection and the field; the themes are asked of the rest too. The subsections share the cap, the first ones first when there are too many for MIN_SHARE each.
+# the connection and the field; the themes are asked of the rest too. The subsections share the
+# cap, the first ones only when there are too many for about MIN_SHARE each.
 LEAD_CAP = 2500
 CAPS = (6000, 3000, 2000)
 MIN_SHARE = 500
 # subsections of a wanted heading that say nothing of what the building means: instruments and bells (technical
-# specifications), measurements, visitor information and popular culture. A heading that is wanted is never stopped.
+# specifications), measurements, visitor information and popular culture. A heading that is wanted is never stopped, nor
+# one that names the part of the building an instrument is in, or its case (HOLDERS): a bell tower is architecture.
 STOP: dict[str, tuple[str, ...]] = {
     "en": ("organ ", "organs ", "bell ", "bells ", "statistics", "dimensions", "tourism", "popular culture"),
     "it": ("organo ", "organi ", "campana ", "campane ", "dimensioni", "turismo", "cultura di massa"),
-    "es": ("órgano", "campana ", "campanas ", "dimensiones", "turismo", "cultura popular"),
-    "fr": ("orgue", "cloche", "dimensions", "tourisme", "culture populaire"),
-    "de": ("orgel", "chororgel", "glocke", "maße ", "tourismus", "populärkultur"),
-    "pt": ("órgão", "órgãos ", "sino ", "sinos ", "dimensões", "turismo", "cultura popular"),
+    "es": ("órgano ", "órganos ", "campana ", "campanas ", "dimensiones", "turismo", "cultura popular"),
+    "fr": ("orgue ", "orgues ", "cloche ", "cloches ", "dimensions", "tourisme", "culture populaire"),
+    "de": ("orgel ", "orgeln ", "chororgel ", "glocke ", "glocken ", "geläut", "maße ", "tourismus", "populärkultur"),
+    "pt": ("órgão ", "órgãos ", "sino ", "sinos ", "dimensões", "turismo", "cultura popular"),
+}
+HOLDERS: dict[str, tuple[str, ...]] = {
+    "en": ("tower", "belfry", "loft", "gallery", "case "),
+    "it": ("torre ", "torri ", "cella ", "cantoria", "cassa "),
+    "es": ("torre ", "torres ", "tribuna", "caja "),
+    "fr": ("tour ", "tours ", "tribune", "buffet"),
+    "de": ("turm ", "türme ", "empore"),
+    "pt": ("torre ", "torres ", "tribuna", "caixa "),
 }
 # the headings of the link and reference sections, whole and lower-case: never read, though a fragment may match
 LINK_SECTIONS = frozenset({
@@ -363,7 +373,8 @@ _OUT = object()  # a section left out with everything under it
 
 def _blocks(tree: list[tuple[int, str, str]], lang: str) -> list[tuple[int, list[tuple[str, str]]]]:
     """(group, [(heading, text)]) of each wanted heading of a page and its subtree: a subsection belongs to the nearest
-    wanted heading above it, unless it is wanted itself (it is then a block of its own), so no section is read twice. A link section (LINK_SECTIONS) or a stopped heading (STOP) leaves its subtree out."""
+    wanted heading above it, unless it is wanted itself (it is then a block of its own), so no section is read twice.
+    A link section (LINK_SECTIONS) or a stopped heading (STOP) leaves its subtree out."""
     blocks: list[tuple[int, list[tuple[str, str]]]] = []
     above: list[tuple] = []  # (level, the block, its first heading) of the sections the current one is in
     for level, head, text in tree:
@@ -372,7 +383,7 @@ def _blocks(tree: list[tuple[int, str, str]], lang: str) -> list[tuple[int, list
         block, root = above[-1][1:] if above else (None, None)
         group = _group(head, lang)
         if block is _OUT or head.strip().lower() in LINK_SECTIONS or (
-                group is None and common.wanted(head, STOP[lang])):
+                group is None and common.wanted(head, STOP[lang]) and not common.wanted(head, HOLDERS[lang])):
             block = _OUT
         elif group is not None:
             block, root = (group, []), head
@@ -389,8 +400,15 @@ def _cut(text: str, room: int) -> str:
 
 def _capped(sections: list[tuple[str, str]], cap: int) -> list[tuple[str, str]]:
     """The sections cut to `cap` characters of text in all: an equal share each, what a short one leaves going to the
-    longer ones; only as many as get MIN_SHARE."""
-    sections = sections[:cap // MIN_SHARE]
+    longer ones. All of them when they fit; else the first ones, until MIN_SHARE of each (all of a shorter one) has
+    filled the cap."""
+    kept, spent = [], 0
+    for head, text in sections:
+        if spent >= cap:
+            break
+        kept.append((head, text))
+        spent += min(len(text), MIN_SHARE)
+    sections = kept
     room, left = {}, cap
     for done, n in enumerate(sorted(range(len(sections)), key=lambda n: len(sections[n][1]))):
         room[n] = min(len(sections[n][1]), left // (len(sections) - done))

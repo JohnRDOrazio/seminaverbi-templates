@@ -628,3 +628,26 @@ def test_press_evidence_leaves_a_drop_that_is_not_the_floors(q, store, uncovered
     store.add_mention(mention())
     route(store, q, None, {}, FakeWikidata({"Q9": ent()}))
     assert q.row("Q9").outcomes[2] == "drop"
+
+
+@pytest.mark.parametrize("floor", [15, 8, 120])
+@pytest.mark.parametrize("domain, module, classes", [
+    ("film", film, "Q11424"), ("literature", literature, "Q7725634"), ("music", music, "Q7366"),
+    ("art", art, "Q3305213"), ("architecture", architecture, "Q16970")])
+def test_the_floor_drop_of_every_domain_is_recognised(q, domain, module, classes, floor):
+    """The reason is triage's own text, at whatever floor is configured; a drop for another reason is not the floor's."""
+    cfg = common.domain_config({**load_config(), domain: {**load_config()[domain], "sitelink_floor": floor}}, domain)
+    if domain == "music":
+        cfg["music"]["artist_sitelink_floor"] = floor
+    cfg["sitelink_floor"] = floor
+    q.add("Q9", domain, "facet", {}, {}, data={"count": floor - 1, "instance_of": [classes]})
+    q.set_outcome("Q9", 1, "pass")
+    outcome, reason = module.triage(q.row("Q9"), cfg)
+    assert outcome == "drop" and str(floor) in reason
+    q.set_outcome("Q9", 2, outcome, {"reason": reason})
+    assert common.floor_drop(q.row("Q9"))
+    q.add("Q9", domain, "facet", {}, {}, data={"instance_of": ["Q5"], "folded_into": "Q2"})
+    outcome, reason = module.triage(q.row("Q9"), cfg)
+    q.set_outcome("Q9", 2, outcome, {"reason": reason})
+    if "under the floor" not in reason:  # film has no such drop
+        assert not common.floor_drop(q.row("Q9"))

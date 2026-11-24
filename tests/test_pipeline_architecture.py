@@ -714,6 +714,53 @@ def test_a_subtree_of_many_sections_keeps_the_first_ones_readable():
     assert all(len(t) > architecture.MIN_SHARE * 0.9 for _, t in notes) and notes[0][0] == "History / Year 0"
 
 
+def test_a_subtree_within_the_cap_is_read_whole():
+    sections = [("History", "", 1), *((f"Year {n}", "x" * 149, 2) for n in range(10))]
+    assert [t for _, t in en_dossier(*sections)] == ["x" * 149] * 10
+
+
+def test_a_stub_takes_no_place_from_the_text():
+    notes = en_dossier(("History", "stub", 1), *((f"Year {n}", "word " * 300, 2) for n in range(30)))
+    assert notes[0] == ("History", "stub")
+    assert [h for h, _ in notes[1:]] == [f"History / Year {n}" for n in range(4)]
+    assert 0.9 * architecture.CAPS[2] < sum(len(t) for _, t in notes) <= architecture.CAPS[2]
+
+
+def test_short_sections_leave_room_for_the_later_ones():
+    many = [(f"Note {n}", "x" * 100, 2) for n in range(8)]
+    notes = dict(en_dossier(("History", "", 1), *many, ("Fire", "word " * 1000, 2)))
+    assert len(notes) == 9 and len(notes["History / Fire"]) > 1100
+
+
+STOPPED = {
+    "en": ["Bells", "The bells", "Organ", "Grand Organ", "Organs", "Statistics", "Dimensions", "Tourism",
+           "Popular culture"],
+    "it": ["Campane", "Le campane", "Organo", "Organi a canne", "Dimensioni", "Turismo", "Nella cultura di massa"],
+    "es": ["Campanas", "El órgano", "Órganos", "Dimensiones", "Turismo", "En la cultura popular"],
+    "fr": ["Cloches", "La cloche", "Orgue", "Les orgues", "Dimensions", "Tourisme", "Dans la culture populaire"],
+    "de": ["Glocken", "Glocke", "Geläut", "Orgel", "Orgeln", "Große Orgel", "Chororgel", "Maße", "Tourismus"],
+    "pt": ["Sinos", "Órgão", "Órgãos", "Dimensões", "Turismo", "Na cultura popular"],
+}
+NOT_STOPPED = {  # the parts of the building that hold them, and the art of their cases
+    "en": ["Bell tower", "Bell towers", "Tower of the bells", "Organ loft", "Organ case", "Organ gallery"],
+    "it": ["Campanile", "Torre delle campane", "Cella campanaria", "Cantoria dell'organo", "Cassa dell'organo"],
+    "es": ["Campanario", "Torre de las campanas", "Tribuna del órgano", "Caja del órgano"],
+    "fr": ["Clocher", "Clochers", "Clocheton", "Tour des cloches", "Tribune d'orgue", "Buffet d'orgue",
+           "Tribune des orgues"],
+    "de": ["Glockenturm", "Glockentürme", "Turm mit Glocken", "Orgelempore", "Orgelprospekt", "Empore der Orgel"],
+    "pt": ["Campanário", "Torre sineira", "Torre dos sinos", "Tribuna do órgão", "Caixa do órgão"],
+}
+
+
+@pytest.mark.parametrize("lang", common.LANGS)
+def test_the_instruments_are_stopped_and_the_towers_and_lofts_are_not(lang):
+    def stopped(heading):
+        tree = [(1, next(h for h in WANTED[lang]), "a"), (2, heading, "b"), (3, "xyz", "c")]
+        return len(architecture._blocks(tree, lang)[0][1]) == 1
+    assert [h for h in STOPPED[lang] if not stopped(h)] == []
+    assert [h for h in NOT_STOPPED[lang] if stopped(h)] == []
+
+
 # --- calibration and the benchmark ---
 
 KINDS = [{"qid": "Q2", "name": "x", "kind": "strong"}, {"qid": "Q3", "name": "y", "kind": "weak"},
