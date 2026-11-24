@@ -310,8 +310,20 @@ def test_retriage_leaves_other_domains_calibration_and_other_outcomes(q):
     q.set_domain("Q1", "art")
     dropped(q, "Q2", sources=("building", "unesco"))
     q.set_outcome("Q2", 2, "translation")
+    q.add("Q3", "architecture", "calibration", {}, {}, True, {"count": 3, "instance_of": ["Q16970"]})
+    q.set_outcome("Q3", 2, "drop")
+    assert architecture.triage(q.row("Q3"), CFG)[0] == "pass"
     assert common.retriage(q, "architecture", architecture.triage, CFG) == 0
     assert q.row("Q1").outcomes[2] == "drop" and q.row("Q2").outcomes[2] == "translation"
+    assert q.row("Q3").outcomes[2] == "drop"
+
+
+def test_a_cleared_row_loses_its_later_outcomes(q):
+    dropped(q, sources=("building", "unesco"))
+    for stage in (3, 4, 5):
+        q.set_outcome("Q1", stage, "pass")
+    assert common.retriage(q, "architecture", architecture.triage, CFG) == 1
+    assert set(q.row("Q1").outcomes) == {0, 1}
 
 
 def test_retriage_never_triages_a_row_with_a_status(q):
@@ -351,3 +363,46 @@ def test_a_failed_source_still_retriages_and_the_error_propagates(q):
     with pytest.raises(RuntimeError, match="timeout"):
         stage0(q, sparql, works=[{"qid": "Q3", "name": "C"}])
     assert "unesco" in q.row("Q1").sources and 2 not in q.row("Q1").outcomes
+
+
+def broken(monkeypatch, name, ran):
+    real = getattr(architecture.benchmark_code if name == "hold" else common, name)
+    module = architecture.benchmark_code if name == "hold" else common
+
+    def boom(*args):
+        ran.append(name)
+        raise ValueError(f"{name} failed")
+
+    def spy(*args):
+        ran.append(name)
+        return real(*args)
+
+    monkeypatch.setattr(module, name, boom)
+    other, other_name = (common, "retriage") if name == "hold" else (architecture.benchmark_code, "hold")
+    real_other = getattr(other, other_name)
+
+    def spy_other(*args):
+        ran.append(other_name)
+        return real_other(*args)
+
+    monkeypatch.setattr(other, other_name, spy_other)
+
+
+@pytest.mark.parametrize("name", ["retriage", "hold"])
+def test_the_source_error_survives_a_failing_finish(q, monkeypatch, capsys, name):
+    ran = []
+    broken(monkeypatch, name, ran)
+    sparql = FailingOn({}, "wdt:P1435")
+    with pytest.raises(RuntimeError, match="timeout"):
+        stage0(q, sparql)
+    assert ran == ["hold", "retriage"]
+    assert f"architecture candidates: {name} failed" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("name", ["retriage", "hold"])
+def test_a_failing_finish_alone_propagates_and_both_ran(q, monkeypatch, name):
+    ran = []
+    broken(monkeypatch, name, ran)
+    with pytest.raises(ValueError, match=f"{name} failed"):
+        stage0(q, FakeSparql({}))
+    assert ran == ["hold", "retriage"]

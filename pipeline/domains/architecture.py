@@ -191,9 +191,25 @@ def candidates(queue, sparql, wikipedia, cfg: dict, wikidata=None) -> int:
                     added += _add(queue, row, source)
         for row in benchmark_code.listed(sparql, "architecture", [w["qid"] for w in arch["works"]]):
             added += _add(queue, row, "list")
-    finally:  # a failed source keeps the rows already written: the benchmark works among them are held all the same
-        try:
-            benchmark_code.hold(queue, "architecture", arch.get("benchmark", []))
-        finally:  # a floor drop that gained `unesco` is triaged again, whatever failed before
-            common.retriage(queue, "architecture", triage, common.domain_config(cfg, "architecture"))
+    except BaseException:  # a failed source keeps the rows already written; its error is the one that propagates
+        _finish(queue, arch, cfg, in_flight=True)
+        raise
+    _finish(queue, arch, cfg, in_flight=False)
     return added
+
+
+def _finish(queue, arch: dict, cfg: dict, in_flight: bool) -> None:
+    """Hold the benchmark works, then triage again the floor drops that gained `unesco`; both are always attempted.
+    With an error in flight a failure here is printed and the original propagates; otherwise the first one raises."""
+    steps = (lambda: benchmark_code.hold(queue, "architecture", arch.get("benchmark", [])),
+             lambda: common.retriage(queue, "architecture", triage, common.domain_config(cfg, "architecture")))
+    first = None
+    for step in steps:
+        try:
+            step()
+        except Exception as error:  # noqa: BLE001
+            if in_flight or first is not None:
+                print(f"architecture candidates: {error}")
+            first = first or error
+    if first is not None and not in_flight:
+        raise first
