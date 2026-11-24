@@ -357,6 +357,7 @@ def other_domain(queue, qid: str, domain: str) -> str | None:
     return None
 
 
+_FLOOR_REASON = re.compile(r"\d+ sitelinks, under the floor of \d+")  # the reason every domain's triage gives
 CLOSED = ("approved", "created", "declined")  # a whole with one of these statuses absorbs nothing
 
 
@@ -467,14 +468,20 @@ def _recheck_open_whole(queue, whole_qid: str, domain: str, recheck) -> None:
               f"retired; decline or redirect {row.page} by hand")
 
 
+def floor_drop(row) -> bool:
+    """True when the row's stage-2 drop is the sitelink floor's and the author has not skipped the row."""
+    return (row.outcomes.get(2) == "drop" and not row.skipped
+            and bool(_FLOOR_REASON.fullmatch(row.data.get(2, {}).get("reason", ""))))
+
+
 def retriage(queue, domain: str, triage, cfg: dict) -> int:
-    """Stage 2 again for the rows of `domain` dropped by triage that a later source may now exempt (a floor drop that
-    gained `unesco`): a row with no status, not calibration, whose stage-2 outcome is `drop` and which `triage`, on
-    the row as stored now, passes has its outcomes from stage 2 on cleared. A row with a status is never touched.
-    Returns how many were cleared."""
+    """Stage 2 again for the rows of `domain` the sitelink floor dropped that a later source may now exempt (a floor
+    drop that gained `unesco`): a row with no status, not calibration, which is a `floor_drop` and which `triage`, on
+    the row as stored now, passes has its outcomes from stage 2 on cleared. A row with a status, one skipped by hand
+    and one dropped for another reason are never touched. Returns how many were cleared."""
     cleared = 0
     for row in queue.open_rows(domain):
-        if row.outcomes.get(2) == "drop" and triage(row, cfg)[0] == "pass":
+        if floor_drop(row) and triage(row, cfg)[0] == "pass":
             queue.redo(2, row.qid)
             cleared += 1
     return cleared

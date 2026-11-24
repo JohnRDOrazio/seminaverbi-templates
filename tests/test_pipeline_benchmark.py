@@ -190,3 +190,24 @@ def test_publish_never_writes_a_held_row(wired):
 def test_domains_without_a_benchmark_have_nothing_to_hold():
     assert [d for d, module in DOMAINS.items() if hasattr(module, "hold_benchmark")] == ["art", "architecture"]
     hold_benchmarks(None, {})  # no domain configured: the queue is not touched
+
+
+# --- a row skipped by hand stays skipped ---
+
+@pytest.mark.parametrize("stage", [1, 2, 3, 4, 5])
+def test_the_hold_keeps_the_skip_of_a_benchmark_row(wired, stage):
+    wired.live(stage=stage - 1)
+    wired.command("skip", wired.qid, "--reason", "not now")
+    wired.command("press", "route")  # holds
+    row = wired.row()
+    assert wired.held() and row.outcomes[stage] == "drop" and row.data[stage]["skipped"]
+    wired.command("run", "--publish")
+    assert wired.row().outcomes[stage] == "drop" and wired.proposals() == []
+
+
+def test_calibrate_keeps_the_skip_of_a_benchmark_row(wired):
+    wired.live(stage=2)
+    wired.command("skip", wired.qid, "--reason", "not now")
+    sparql = FakeSparql({"VALUES ?item": [item(wired.qid, "Work", 90, wired.cls)]})
+    DOMAINS[wired.domain].add_calibration(wired.queue(), sparql, [])
+    assert wired.held() and wired.row().data[3] == {"reason": "not now", "skipped": True}

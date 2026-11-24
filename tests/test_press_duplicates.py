@@ -401,8 +401,8 @@ def test_a_row_of_other_sources_keeps_them_when_the_press_falls_away(store, q, u
 
 def test_evidence_that_raises_the_row_to_the_exemption_triages_it_again(store, q, uncovered):
     routed(store, q, OTHER, 0.5, "osservatore")
-    for stage, outcome in ((1, "pass"), (2, "drop")):
-        q.set_outcome("Q9", stage, outcome)
+    q.set_outcome("Q9", 1, "pass")
+    q.set_outcome("Q9", 2, "drop", {"reason": "3 sitelinks, under the floor of 15"})
     mention(store, OTHER, 0.7, kind=None)
     reconcile(store, q)
     assert sorted(q.row("Q9").outcomes) == [0, 1]

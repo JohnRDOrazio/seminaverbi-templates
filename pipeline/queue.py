@@ -37,6 +37,11 @@ class Row:
     page: str | None = None
     votes: int | None = None
 
+    @property
+    def skipped(self) -> bool:
+        """The author has skipped the row (`skip`), at whatever stage it was."""
+        return any(stage and data.get("skipped") for stage, data in self.data.items())
+
 
 class Queue:
     def __init__(self, path: Path | str):
@@ -69,9 +74,10 @@ class Queue:
                 self.db.commit()
             if calibration and not row["calibration"]:
                 # a film article first found by a facet must still be a calibration row, run through every
-                # stage: the drops and translations it had as a candidate are cleared
+                # stage: the drops and translations it had as a candidate are cleared (not a skip, the author's own)
                 self.db.execute("UPDATE candidates SET calibration=1 WHERE qid=?", (qid,))
-                self.db.execute("DELETE FROM outcomes WHERE qid=? AND stage>=1 AND outcome!='pass'", (qid,))
+                self.db.execute("DELETE FROM outcomes WHERE qid=? AND stage>=1 AND outcome!='pass'"
+                                " AND json_extract(data_json, '$.skipped') IS NULL", (qid,))
                 self.db.commit()
             return False
         self.db.execute(

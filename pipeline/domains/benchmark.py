@@ -38,7 +38,8 @@ def hold(queue, domain: str, benchmark: list[dict]) -> None:
                 row.calibration and row.data.get(0, {}).get("benchmark")):
             queue.add(row.qid, row.domain, row.sources[0], row.labels, row.sitelinks, True,
                       {"benchmark": True, "benchmark_kind": work["kind"]})
-            queue.redo(1, row.qid)
+            if not row.skipped:  # the author's skip stays
+                queue.redo(1, row.qid)
 
 
 def settled(queue, domain: str, qid: str) -> bool:

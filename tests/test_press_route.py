@@ -533,7 +533,7 @@ def test_a_neutral_or_critical_mention_never_becomes_a_candidate(q, store, unsup
 
 def test_a_neutral_or_critical_mention_adds_nothing_to_an_existing_row(q, store, unsupporting, uncovered):
     q.add("Q9", "film", "facet", {"en": "Ordet"}, {"enwiki": "Ordet"}, data={"count": 2, "instance_of": ["Q11424"]})
-    q.set_outcome("Q9", 2, "drop", {"reason": "floor"})
+    q.set_outcome("Q9", 2, "drop", {"reason": "3 sitelinks, under the floor of 15"})
     before = (q.row("Q9").sources, q.row("Q9").data, q.row("Q9").outcomes)
     store.add_mention(unsupporting(p=0.95))
     assert route(store, q, None, {}, FakeWikidata({"Q9": ent()})) == {"dropped": 1}
@@ -586,3 +586,45 @@ def test_music_and_art_triage_exempt_a_kept_press_mention(domain, mod, cls):
     assert result(0.9, classes=("Q5",)) == "drop" and result(0.9, folded_into="Q2") == "drop"
     if domain == "music":
         assert result(0.6, sources=("artist", "press:sir")) == "pass"
+
+
+# --- a row skipped by hand stays skipped; only the floor's drop is triaged again ---
+
+def skip(q, tmp_path, qid="Q9"):
+    from pipeline import __main__ as cli
+    assert cli.main(["skip", qid, "--reason", "not now", "--db", str(tmp_path / "q.db")]) == 0
+
+
+@pytest.mark.parametrize("domain", ["film", "literature", "music", "art", "architecture"])
+@pytest.mark.parametrize("stage", [2, 3, 4, 5])
+def test_press_evidence_does_not_bring_back_a_skipped_row(q, store, uncovered, tmp_path, domain, stage, monkeypatch):
+    monkeypatch.setattr({"film": film, "literature": literature, "music": music, "art": art,
+                         "architecture": architecture}[domain], "covered", lambda *a: ("pass", {}), raising=False)
+    q.add("Q9", domain, "x", {}, {}, data={"count": 3, "instance_of": []})
+    for n in range(1, stage):
+        q.set_outcome("Q9", n, "pass")
+    skip(q, tmp_path)
+    store.add_mention(mention(domain=domain))
+    assert route(store, q, None, {}, FakeWikidata({"Q9": ent()})) == {"candidate": 1}
+    row = q.row("Q9")
+    assert row.data[0]["press"] == {"sir": 0.8}
+    assert set(row.outcomes) == set(range(stage + 1)) and row.data[stage]["skipped"]
+
+
+def test_a_skip_of_a_floor_drop_survives_the_press(q, store, uncovered, tmp_path):
+    q.add("Q9", "film", "x", {}, {}, data={"count": 3, "instance_of": []})
+    q.set_outcome("Q9", 1, "pass")
+    q.set_outcome("Q9", 2, "drop", {"reason": "3 sitelinks, under the floor of 15"})
+    skip(q, tmp_path)  # at the quick check, the next stage without an outcome
+    store.add_mention(mention())
+    route(store, q, None, {}, FakeWikidata({"Q9": ent()}))
+    assert q.row("Q9").outcomes[2] == "drop" and q.row("Q9").data[3]["skipped"]
+
+
+@pytest.mark.parametrize("reason", ["a person, not a work", "folded into Q2", "an episode, trailer or clip"])
+def test_press_evidence_leaves_a_drop_that_is_not_the_floors(q, store, uncovered, reason):
+    q.add("Q9", "film", "x", {}, {}, data={"count": 3, "instance_of": []})
+    q.set_outcome("Q9", 2, "drop", {"reason": reason})
+    store.add_mention(mention())
+    route(store, q, None, {}, FakeWikidata({"Q9": ent()}))
+    assert q.row("Q9").outcomes[2] == "drop"

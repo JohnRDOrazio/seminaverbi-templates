@@ -281,7 +281,7 @@ def dropped(q, qid="Q1", sources=("building",), count=3, instance_of=("Q16970",)
     for extra in sources[1:]:
         q.add(qid, "architecture", extra, {}, {}, False)
     q.set_outcome(qid, 1, "pass")
-    q.set_outcome(qid, 2, "drop", {"reason": "x"})
+    q.set_outcome(qid, 2, "drop", {"reason": f"{count} sitelinks, under the floor of 15"})
     if status:
         q.set_status(qid, status)
 
@@ -331,6 +331,30 @@ def test_a_cleared_row_loses_its_later_outcomes(q):
         q.set_outcome("Q1", stage, "pass")
     assert common.retriage(q, "architecture", architecture.triage, CFG) == 1
     assert set(q.row("Q1").outcomes) == {0, 1}
+
+
+@pytest.mark.parametrize("data", [{"reason": "a person, not a work"}, {}, {"reason": "x", "skipped": True},
+                                  {"reason": "3 sitelinks, under the floor of 15", "skipped": True}])
+def test_only_a_floor_drop_is_triaged_again(q, data):
+    dropped(q, sources=("building", "unesco"))
+    q.set_outcome("Q1", 2, "drop", data)
+    assert common.retriage(q, "architecture", architecture.triage, CFG) == 0
+    assert q.row("Q1").outcomes[2] == "drop"
+
+
+@pytest.mark.parametrize("floor_dropped", [False, True])
+def test_a_building_skipped_by_hand_is_not_brought_back_by_candidates(q, tmp_path, floor_dropped):
+    """Skipped at triage, or (a row the floor had dropped) at the quick check: either way it stays."""
+    from pipeline import __main__ as cli
+    q.add("Q1", "architecture", "building", {}, {}, False, {"count": 3, "instance_of": ["Q16970"]})
+    q.set_outcome("Q1", 1, "pass")
+    if floor_dropped:
+        q.set_outcome("Q1", 2, "drop", {"reason": "3 sitelinks, under the floor of 15"})
+    assert cli.main(["skip", "Q1", "--reason", "not now", "--db", str(tmp_path / "q.db")]) == 0
+    before = q.row("Q1").data
+    stage0(q, FakeSparql({"wdt:P1435": [item("Q1", "A", 3, "Q16970")]}))
+    row = q.row("Q1")
+    assert "unesco" in row.sources and {n: row.data[n] for n in before if n} == {n: before[n] for n in before if n}
 
 
 def test_retriage_never_triages_a_row_with_a_status(q):
