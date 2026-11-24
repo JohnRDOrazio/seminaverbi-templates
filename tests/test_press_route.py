@@ -1,8 +1,8 @@
 import pytest
 import requests
 
-from pipeline import stages
-from pipeline.domains import common, film, literature
+from pipeline import load_config, stages
+from pipeline.domains import art, common, film, literature, music
 from pipeline.press.route import release_waiting, route
 from pipeline.press.store import Mention, PressStore
 from pipeline.queue import Queue, Row
@@ -519,3 +519,18 @@ def test_a_bearing_or_mixed_mention_or_one_never_asked_becomes_a_candidate(q, st
     m.stance_outcome = outcome
     store.add_mention(m)
     assert route(store, q, None, {}, FakeWikidata({"Q9": ent()})) == {"candidate": 1}
+
+
+@pytest.mark.parametrize("domain,mod,cls", [("music", music, "Q7366"), ("art", art, "Q3305213")])
+def test_music_and_art_triage_exempt_a_kept_press_mention(domain, mod, cls):
+    """The exemption from the sitelink floor is every domain's; what triage drops for another reason stays dropped."""
+    cfg = common.domain_config(load_config(), domain)
+
+    def result(p, classes=(cls,), sources=("press:sir",), **more):
+        data = {"count": 3, "instance_of": list(classes), "press": {"sir": p}, **more}
+        return mod.triage(Row("Q1", domain, list(sources), {}, {}, False, data={0: data}), cfg)[0]
+    assert result(0.6) == "pass" and result(0.8, sources=("genre", "press:sir")) == "pass"
+    assert result(0.55) == "drop"
+    assert result(0.9, classes=("Q5",)) == "drop" and result(0.9, folded_into="Q2") == "drop"
+    if domain == "music":
+        assert result(0.6, sources=("artist", "press:sir")) == "pass"

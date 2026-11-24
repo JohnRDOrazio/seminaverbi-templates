@@ -11,7 +11,7 @@ what translation needs.
   has and the other lacks only if it is sourced). Never translate a translation of a translation when the
   original is there.
 - One page per target wiki, connected to the **same item** as the source (sitelink `it`, `es`… on the
-  repository wiki, the one `config/wikis.json` names, with `wikibase-edit-entity`). Never create a second item.
+  repository wiki, `data`, with `wikibase-edit-entity`). Never create a second item.
 - Title: the name the subject has in that language (the target-language Wikipedia's title is a good guide; the
   en Wikipedia page's langlinks give it). Songs follow the wiki's convention (en `X (song)`, it
   `X (brano musicale)`); on es/fr/de/pt use `X (canción)`, `X (chanson)`, `X (Lied)`, `X (canção)` only when
