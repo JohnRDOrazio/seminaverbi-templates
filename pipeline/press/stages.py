@@ -145,7 +145,7 @@ class _Budget:
     """The articles the stages may still read today (UTC): max_articles_per_day in all, and an outlet's max_per_day of
     its own, shared by filter and link and by every run of the day. An article counts once a day (PressStore.take).
     `hold`: how many filter leaves for the articles kept on earlier days that link has to fetch again: as many as there
-    are, at most half of the day (or of the outlet's cap)."""
+    are, at most half of the day (or of the outlet's cap) and at most what the day (or the outlet) has left."""
 
     def __init__(self, store, pages: Pages, pcfg: dict, hold: bool = False):
         self.store, limit = store, pcfg["max_articles_per_day"]
@@ -154,9 +154,10 @@ class _Budget:
         for art in store.articles("filtered") if hold else ():
             if art.outcome == "keep" and art.outlet not in pages.client.refused and not store.was_read_today(art.url):
                 waiting[art.outlet] = waiting.get(art.outlet, 0) + 1
-        self.caps_open = {oid: cap - min(waiting.get(oid, 0), cap // 2) for oid, cap in self.caps.items()}
-        held = sum(min(n, self.caps[oid] // 2) if oid in self.caps else n for oid, n in waiting.items())
-        self.open = limit - min(held, limit // 2)
+        for oid, cap in self.caps.items():
+            waiting[oid] = min(waiting.get(oid, 0), cap // 2, max(0, cap - store.read_today(oid)))
+        self.caps_open = {oid: cap - waiting[oid] for oid, cap in self.caps.items()}
+        self.open = limit - min(sum(waiting.values()), limit // 2, max(0, limit - store.read_today()))
 
     def left(self) -> int:
         return max(0, self.open - self.store.read_today())

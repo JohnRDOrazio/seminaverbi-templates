@@ -317,22 +317,26 @@ def discover(store, client, outlets: list[dict], limit: int) -> dict[str, int]:
     included), and at most `max_per_day` of an outlet that has one."""
     counts = {o["id"]: 0 for o in outlets}
     streams = {o["id"]: (o, _candidates(client, o, store)) for o in outlets}
-    total, before = store.found_today(), {oid: store.found_today(oid) for oid in counts}
-    while streams and total < limit:
+    while streams:
         for oid in list(streams):
             outlet, stream = streams[oid]
-            if before[oid] + counts[oid] >= outlet.get("max_per_day", limit):
+            cap = outlet.get("max_per_day")
+            if store.found_today() >= limit:
+                return counts
+            if cap is not None and store.found_today(oid) >= cap:
                 del streams[oid]
                 continue
             for url, date, lang in stream:
                 if not _wanted(url, date, outlet):
                     continue
-                if store.add_article(canonical(url), oid, lang, published=date):
+                # another run may have taken what was left of the day since
+                state = store.discovered(canonical(url), oid, lang, date, limit, cap)
+                if state == "day full":
+                    return counts
+                if state == "added":
                     counts[oid] += 1
-                    total += 1
+                if state != "known":
                     break
             else:
                 del streams[oid]
-            if total >= limit:
-                break
     return counts

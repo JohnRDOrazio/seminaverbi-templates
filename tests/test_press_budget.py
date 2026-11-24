@@ -209,3 +209,79 @@ def test_yesterdays_discoveries_do_not_count(store, day):  # noqa: F811
     assert store.found_today() == 4 and store.found_today("o") == 4 and store.found_today("blog") == 0
     day.set(2)
     assert store.found_today() == 0
+
+
+class Overlapped(Feed):
+    """A feed during whose request another run discovers."""
+
+    def __init__(self, n, meanwhile):
+        super().__init__(n)
+        self.meanwhile = meanwhile
+
+    def get(self, *args, **kw):
+        r = super().get(*args, **kw)
+        meanwhile, self.meanwhile = self.meanwhile, lambda: None
+        meanwhile()
+        return r
+
+
+@pytest.mark.parametrize("outlets,limit,other,mine", [
+    (OUTLETS, 4, {"o": 2, "blog": 2}, {"o": 0, "blog": 0}),  # the day's total
+    (OUTLETS[1:], 9, {"blog": 2}, {"blog": 0}),  # the outlet's own
+    (OUTLETS[::-1], 5, {"o": 3, "blog": 2}, {"o": 0, "blog": 0}),
+])
+def test_overlapping_runs_do_not_overrun_what_a_day_discovers(store, outlets, limit, other, mine):
+    got = {}
+    feed = Overlapped(9, lambda: got.update(discover(store, Feed(5), outlets, limit)))
+    assert discover(store, feed, outlets, limit) == mine
+    assert got == other
+
+
+def test_an_outlet_filled_by_another_run_leaves_the_rest_to_the_others(store):
+    feed = Overlapped(9, lambda: discover(store, Feed(5), OUTLETS[1:], 9))
+    assert discover(store, feed, OUTLETS[::-1], 9) == {"blog": 0, "o": 7}
+
+
+def test_a_known_url_is_told_from_a_spent_budget(store):
+    assert store.discovered("https://x/1", "blog", "it", None, limit=9, cap=1) == "added"
+    assert store.discovered("https://x/1", "blog", "it", None, limit=9, cap=1) == "known"
+    assert store.discovered("https://x/2", "blog", "it", None, limit=9, cap=1) == "outlet full"
+    assert store.discovered("https://x/2", "o", "it", "2026-01-01", limit=2, cap=None) == "added"
+    assert store.discovered("https://x/3", "o", "it", None, limit=2, cap=None) == "day full"
+    assert store.discovered("https://x/3", "blog", "it", None, limit=2, cap=1) == "day full"
+    assert store.article("https://x/2").published == "2026-01-01" and store.article("https://x/3") is None
+
+
+def _kept_before(store, day, n, outlet="blog"):
+    for i in range(n):
+        add(store, f"kept{i}", outlet, keep=True)
+    day.set(2)
+
+
+def _read(store, n, outlet):
+    for i in range(n):
+        assert store.take(f"https://x.example/read-{outlet}{i}", outlet, 1000, None)
+
+
+BIG = {**CFG, "max_articles_per_day": 250, "outlets": [{"id": "o"}, {"id": "blog", "max_per_day": 40}]}
+
+
+@pytest.mark.parametrize("read,open_,blog_left", [
+    (0, 230, 20),    # half of the cap held for link
+    (10, 230, 10),
+    (30, 240, 0),    # only ten more could be read: no more are held
+    (40, 250, 0),    # none could: nothing is held
+])
+def test_what_is_held_for_link_is_what_the_outlet_can_still_read(store, day, read, open_, blog_left):  # noqa: F811
+    _kept_before(store, day, 20)
+    _read(store, read, "blog")
+    budget = press_stages._Budget(store, Run(store).pages, BIG, hold=True)
+    assert budget.open == open_ and budget.left_of("blog") == blog_left
+    assert budget.left() == open_ - read
+
+
+def test_what_is_held_for_link_is_at_most_what_the_day_has_left(store, day):  # noqa: F811
+    _kept_before(store, day, 100, "o")
+    _read(store, 200, "o")
+    budget = press_stages._Budget(store, Run(store).pages, BIG, hold=True)
+    assert budget.open == 200 and budget.left() == 0  # the last 50 reads are link's
