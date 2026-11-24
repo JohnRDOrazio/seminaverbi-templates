@@ -65,20 +65,21 @@ def same_article(post, post_print: str | None, paper, paper_print: str | None) -
     if common >= TEXT:
         return True
     title, days = _title(post.title), _days(post.published, paper.published)
-    return (common >= TITLED_TEXT and len(title) >= TITLE_WORDS and title == _title(paper.title)
-            and post.counts_as == paper.outlet and days is not None and days <= DAYS)
+    return bool(common >= TITLED_TEXT and len(title) >= TITLE_WORDS and title == _title(paper.title)
+            and post.attribution and post.counts_as == paper.outlet and days is not None and days <= DAYS)
 
 
 def record(store, art, page, outlets: dict[str, dict]) -> str | None:
-    """Keep the article's fingerprint when its outlet is one of a pair, and tie it to its copy in the other; the URL of
-    a copy already judged, when there is one."""
+    """Keep the article's fingerprint when its outlet is one of a pair, and join it to its copies in the other, and
+    to theirs. The URL of a copy already judged, when there is one: a kept one if any, since a drop is for good (copies
+    judged before they were found to be one keep their own outcomes, and the kept ones' mentions stand)."""
     first = outlets.get(art.outlet, {}).get("republishes")
     others = [first] if first in outlets else [o["id"] for o in outlets.values() if o.get("republishes") == art.outlet]
     mine = fingerprint(page.paragraphs) if others else None
     if mine is None:
         return None
     store.set_fingerprint(art.url, mine)
-    judged = None
+    matched = False
     for other in others:
         for url, theirs in store.fingerprints(other):
             found = store.article(url) if overlap(mine, theirs) >= TITLED_TEXT else None
@@ -87,10 +88,9 @@ def record(store, art, page, outlets: dict[str, dict]) -> str | None:
             post, paper = (art, found) if first else (found, art)
             prints = (mine, theirs) if first else (theirs, mine)
             if same_article(post, prints[0], paper, prints[1]):
-                store.set_same(post.url, paper.url, paper.outlet)
-                for copy in (found, *store.copies(url)):  # the one judged may be another copy of the same article
-                    if copy.url != art.url and copy.outcome in ("keep", "drop"):
-                        judged = judged or copy.url
-                if first:  # a post is one article of the newspaper
-                    return judged
-    return judged
+                store.join(store.article(post.url), store.article(paper.url))
+                matched = True
+    if not matched:
+        return None
+    judged = [c for c in store.copies(art.url) if c.outcome in ("keep", "drop")]  # a copy of a copy may be the judged one
+    return min(judged, key=lambda c: c.outcome != "keep").url if judged else None

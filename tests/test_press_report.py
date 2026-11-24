@@ -117,7 +117,7 @@ def test_a_post_that_counts_as_the_newspapers_is_credited_where_it_was_read(book
 @pytest.mark.parametrize("cited", ["blog", "paper"])
 def test_the_same_article_in_two_outlets_is_credited_to_both(book, cited):
     urls = {"blog": book.article("blog"), "paper": book.article("paper", "skip", {"reason": "duplicate"})}
-    book.store.set_same(urls["blog"], urls["paper"], "paper")
+    book.store.join(book.store.article(urls["blog"]), book.store.article(urls["paper"]))
     book.mention(urls[cited], "Q1")
     book.proposal("Q1", "open", "paper")
     book.mention(urls[cited], "Q2", "enrichment")

@@ -59,8 +59,8 @@ def test_overlap_tells_the_same_text_from_another():
     assert overlap(fp(REVIEW), fp(text(2))) < 0.05
 
 
-def art(outlet, title="La scelta di Delia", published="2023-10-26", lang="it", counts_as=None):
-    return Article("u" + outlet, outlet, lang, title, published, counts_as=counts_as)
+def art(outlet, title="La scelta di Delia", published="2023-10-26", lang="it", counts_as=None, credit="Gaetano Vallini, L'Osservatore Romano"):
+    return Article("u" + outlet, outlet, lang, title, published, attribution=counts_as and credit, counts_as=counts_as)
 
 
 CREDITED = art("vallini", counts_as="osservatore")
@@ -76,6 +76,7 @@ CREDITED = art("vallini", counts_as="osservatore")
     (CREDITED, art("osservatore", published="2023-11-20"), edited(REVIEW, 12), False),
     (CREDITED, art("osservatore", published=None), edited(REVIEW, 12), False),
     (art("vallini"), art("osservatore"), edited(REVIEW, 12), False),  # the post names no issue
+    (art("vallini", counts_as="osservatore", credit=None), art("osservatore"), edited(REVIEW, 12), False),  # a copy, no credit
     (CREDITED, art("osservatore"), text(2), False),  # same title, same day, another text
     (CREDITED, art("osservatore", lang="en"), REVIEW, False),
 ])
@@ -422,3 +423,102 @@ def test_rows_the_press_never_touched_are_left_alone(store, q):
     before = list(q.db.iterdump())
     reconcile(store, q)
     assert list(q.db.iterdump()) == before
+
+
+PAPER2 = "https://x.example/news/un-film-bis"
+
+
+def arrive(store, judge, url, outlet, words=REVIEW):
+    store.add_article(url, outlet, "it", published="2024-04-24")
+    path = url.replace("https://x.example", "")
+    routes = {ROBOTS: Resp(""), PAPER: paper_page(words), PAPER2: paper_page(words), FEED.replace("{path}", path): Resp(
+        feed(entry(f"<div>{' '.join(words)}</div>", url=url)))}
+    return run_filter(store, Pages(client(routes), OUTLETS), judge, CFG)
+
+
+def group(store):
+    return {u: store.article(u).same_as for u in (PAPER, PAPER2, BLOG, BLOG2) if store.article(u)}
+
+
+@pytest.mark.parametrize("culture", [0.9, 0.1])
+@pytest.mark.parametrize("order", [(PAPER, BLOG), (BLOG, PAPER)])
+def test_a_second_newspaper_url_of_a_judged_article_is_not_judged(store, order, culture):
+    judge = Counting(culture)
+    pair(store, order, judge)
+    assert arrive(store, judge, PAPER2, "osservatore") == {"skip (duplicate)": 1}
+    assert judge.asked == [order[0]] and store.article(PAPER2).data["of"] == order[0]
+    assert group(store) == {PAPER: None, PAPER2: PAPER, BLOG: PAPER}
+    assert {a.url for a in store.copies(BLOG)} == {PAPER, PAPER2}
+
+
+def test_a_second_newspaper_url_of_unjudged_copies_is_judged(store):
+    pair(store, (PAPER, BLOG), Counting())
+    store.set_article(PAPER, "linked", "skip", {"reason": "HTTP 404"})
+    judge = Counting()
+    assert arrive(store, judge, PAPER2, "osservatore") == {"keep": 1} and judge.asked == [PAPER2]
+    assert group(store) == {PAPER: None, PAPER2: PAPER, BLOG: PAPER}
+
+
+def two_groups(store, first, second):
+    """Two newspaper URLs of one review judged apart (`first` and `second`: the culture scores), then a post of it."""
+    arrive(store, Counting(first), PAPER, "osservatore")
+    arrive(store, Counting(second), PAPER2, "osservatore")
+    assert store.article(PAPER2).same_as is None
+    judge = Counting()
+    counts = arrive(store, judge, BLOG, "vallini")
+    assert judge.asked == [] and counts == {"skip (duplicate)": 1}
+
+
+@pytest.mark.parametrize("first,second,stands", [(0.9, 0.1, PAPER), (0.1, 0.9, PAPER2), (0.1, 0.1, PAPER)])
+def test_a_copy_that_joins_two_judged_articles_puts_them_in_one_group_and_keep_wins(store, first, second, stands):
+    two_groups(store, first, second)
+    assert group(store) == {PAPER: None, PAPER2: PAPER, BLOG: PAPER}
+    assert store.article(BLOG).data["of"] == stands
+    assert [store.article(u).outcome for u in (PAPER, PAPER2)] == [
+        "keep" if c > 0.5 else "drop" for c in (first, second)]  # neither verdict is rewritten
+
+
+def test_two_groups_with_posts_are_joined_whole(store):
+    """Each newspaper URL has its own post; a later copy of both ties all together."""
+    arrive(store, Counting(), PAPER, "osservatore")
+    arrive(store, Counting(), BLOG, "vallini")
+    arrive(store, Counting(), PAPER2, "osservatore", words=text(3))
+    arrive(store, Counting(), BLOG2, "vallini", words=text(3))
+    assert group(store) == {PAPER: None, PAPER2: None, BLOG: PAPER, BLOG2: PAPER2}
+    store.join(store.article(BLOG2), store.article(PAPER))
+    assert group(store) == {PAPER: None, PAPER2: PAPER, BLOG: PAPER, BLOG2: PAPER}
+    assert {store.article(u).evidence_outlet for u in group(store)} == {"osservatore"}
+
+
+def test_joined_kept_articles_are_one_note_one_entry_and_one_outlet(store, q, uncovered):
+    two_groups(store, 0.9, 0.9)
+    mention(store, PAPER, 0.7, kind=None)
+    mention(store, PAPER2, 0.9, kind=None)
+    route(store, q, None, {}, FakeWikidata({"Q9": ent()}))
+    assert press(q) == {"osservatore": 0.9}
+    (note,) = press_notes(store, "Q9", NAMES)
+    assert note["url"] == PAPER and {a["url"] for a in note["also"]} == {PAPER2, BLOG}
+    for url in (PAPER, PAPER2):
+        store.set_route(url, "Q9", "enrichment")
+    page = enrichment(store, NAMES, None)
+    assert page.count("\n** ") == 1 and all(f"[{u} " in page for u in (PAPER, PAPER2, BLOG))
+    for url in (PAPER, PAPER2, BLOG):  # a done entry of any copy stays done for all
+        done = enrichment(store, NAMES, page + "{{SV press done|%s}}" % url)
+        assert "\n** " not in done.split("<!-- press:end -->")[0]
+
+
+def test_the_notes_of_a_joined_group_follow_the_mention_that_supports(store):
+    two_groups(store, 0.9, 0.9)
+    store.add_mention(Mention(PAPER, "Q9", "Ordet", "work", "film", 0.8, ["no"], "dropped", 0.1, "neutral"))
+    mention(store, PAPER2, passages=("sì",))
+    (note,) = press_notes(store, "Q9", NAMES)
+    assert note["text"] == "sì" and note["url"] == PAPER2
+
+
+@pytest.mark.parametrize("order", [(PAPER, BLOG, BLOG2, PAPER2), (BLOG, BLOG2, PAPER, PAPER2),
+                                   (PAPER2, PAPER, BLOG, BLOG2), (BLOG2, PAPER2, BLOG, PAPER)])
+def test_whatever_the_order_the_copies_are_one_group(store, order):
+    for url in order:
+        arrive(store, Counting(), url, "osservatore" if "/news/" in url else "vallini")
+    first = next(u for u in order if "/news/" in u)
+    assert group(store) == {u: None if u == first else first for u in group(store)} and len(group(store)) == 4

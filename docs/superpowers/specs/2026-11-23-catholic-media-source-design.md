@@ -409,6 +409,11 @@ and Romanzo. Checked with our user agent on 2026-11-23, on 53 posts (2008–2025
   stays only on a row with no other, as what found it. On a row with a status only the evidence is corrected: its outcomes,
   dossier, proposal and status stay. Benchmark rows are not triaged again. `press outlets` does not read this map: it
   credits the outlet where the article was read.
+  Copies form one group under the newspaper's first URL found, other newspaper URLs of the article included; a match with
+  members of two groups joins them whole. A new copy is judged only when no member was. Where members were judged apart
+  before they were joined, keep wins (a drop is for good): the verdicts and mentions stay as they are, so a kept article's
+  mentions stand beside a dropped copy, two kept ones count once in the evidence, the notes and the enrichment page, and
+  an entry marked done under any member's URL is done for the group.
 - **Known limits.** Missed: originals for subscribers only (no text, so no fingerprint), partly shown or heavily edited
   ones, posts that gather several of the paper's articles (one is cited under Vallini whole), articles filtered before
   fingerprints existed. A false merge needs half the text in common: an article reprinted with an update. A copy that

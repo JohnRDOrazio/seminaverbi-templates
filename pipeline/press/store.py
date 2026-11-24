@@ -135,6 +135,24 @@ class PressStore:
         self.db.commit()
         return cur.rowcount == 1
 
+    def discovered(self, url, outlet, lang, published, limit: int, cap: int | None) -> str:
+        """Add an article discovery found while the day's count is under `limit` and its outlet's under `cap` (None: no
+        cap), in one statement, so processes cannot overrun them: "added"; else "known" (the URL was there), "day full" or
+        "outlet full"."""
+        now = utc_now()
+        start = datetime.combine(now.date(), datetime.min.time(), timezone.utc).timestamp()
+        count = "(SELECT COUNT(*) FROM press_articles WHERE found_at >= ?"
+        cur = self.db.execute(
+            "INSERT OR IGNORE INTO press_articles (url, outlet, lang, published, found_at) SELECT ?,?,?,?,? "
+            f"WHERE {count}) < ? AND (? IS NULL OR {count} AND outlet=?) < ?)",
+            (url, outlet, lang, published, now.timestamp(), start, limit, cap, start, outlet, cap))
+        self.db.commit()
+        if cur.rowcount == 1:
+            return "added"
+        if self.article(url) is not None:
+            return "known"
+        return "day full" if self.found_today() >= limit else "outlet full"
+
     def articles(self, stage: str, outlet: str | None = None, limit: int | None = None,
                  tried_last: bool = False) -> list[Article]:
         """In discovery order; `tried_last`: the articles never attempted first, then the oldest attempt first."""
@@ -166,10 +184,18 @@ class PressStore:
             "SELECT url, fingerprint FROM press_articles WHERE outlet=? AND fingerprint IS NOT NULL "
             "ORDER BY found_at, rowid", (outlet,)).fetchall()]
 
-    def set_same(self, url, first: str, outlet: str) -> None:
-        """The article is a copy of `first`, an article of `outlet`: its evidence counts for that outlet."""
-        self.db.execute("UPDATE press_articles SET same_as=?, counts_as=? WHERE url=?", (first, outlet, url))
-        self.db.commit()
+    def join(self, post: Article, paper: Article) -> None:
+        """The post is a copy of the newspaper's article: both, with the copies each already has, become one group under
+        one article, the newspaper's first found (another of its URLs may be a copy too); the evidence of all counts for
+        the newspaper."""
+        roots = [post.same_as or post.url, paper.same_as or paper.url]
+        with self.db:
+            rows = self.db.execute("SELECT url, outlet, same_as FROM press_articles WHERE url IN (?,?) OR same_as IN (?,?) "
+                                   "ORDER BY found_at, rowid", roots * 2).fetchall()
+            first = next(r[0] for r in rows if r[1] == paper.outlet and r[2] is None)
+            self.db.executemany("UPDATE press_articles SET same_as=?, counts_as=? WHERE url=?",
+                                [(first, paper.outlet, r[0]) for r in rows if r[0] != first])
+            self.db.execute("UPDATE press_articles SET same_as=NULL WHERE url=?", (first,))
 
     def copies(self, url) -> list[Article]:
         """The other copies of the article, its first publication first."""
