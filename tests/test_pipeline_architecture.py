@@ -1,7 +1,8 @@
 import pytest
 
 from pipeline import load_config
-from pipeline.domains import architecture, common
+from pipeline.domains import DOMAINS, architecture, common
+from pipeline.judge import Judge
 from pipeline.queue import Queue, Row
 from test_pipeline_film import FakeSparql, item
 
@@ -14,6 +15,11 @@ PROOF_CLASSES = ("Q163687", "Q108325", "Q160742", "Q44613")
 def arow(sources, count, instance_of=("Q16970",), calibration=False, **data):
     return Row("Q1", "architecture", sources, {}, {}, calibration,
                data={0: {"count": count, "instance_of": list(instance_of), **data}})
+
+
+def test_registered_and_judged_with_its_own_wording():
+    assert DOMAINS["architecture"] is architecture
+    assert Judge._questions(arow(["building"], 30)) is architecture.QUESTIONS
 
 
 def test_the_floor():

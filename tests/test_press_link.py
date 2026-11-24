@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from pipeline import domains
-from pipeline.domains import common, film, literature
+from pipeline.domains import architecture, art, common, film, literature
 from pipeline.press.extract import Page, Span
 from pipeline.press.link import class_route, link_article
 from pipeline.press.store import PressStore
@@ -212,6 +212,20 @@ def test_music_and_art_modules_take_their_items_and_people_still_wait(cache):
         ["music", "art", "waiting:artists"]
     assert class_route(["Q4167410"], FakeSparql(), CFG, cache) is None
     assert class_route([], FakeSparql(), CFG, cache) is None
+
+
+def test_buildings_route_to_architecture_and_paintings_still_to_art(cache):
+    assert class_route(["Q2977"], FakeSparql(), CFG, cache) == "architecture"  # cathedral
+    assert class_route(["Q33506", "Q108325"], FakeSparql(), CFG, cache) == "architecture"  # museum and chapel
+    assert class_route(["Q3305213"], FakeSparql(), CFG, cache) == "art"
+    assert class_route(["Q41176"], FakeSparql(), CFG, cache) is None  # a building of no owned class
+
+
+def test_a_painting_that_is_also_a_chapel_goes_to_art(cache):
+    """class_route walks DOMAINS in order, and architecture is last; the item's own order of classes does not count."""
+    assert architecture.owns(["Q108325"], FakeSparql(), cache) and art.owns(["Q3305213"], FakeSparql(), cache)
+    assert class_route(["Q108325", "Q3305213"], FakeSparql(), CFG, cache) == "art"
+    assert list(domains.DOMAINS)[-1] == "architecture"
 
 
 def test_a_present_module_takes_its_items(monkeypatch, cache):

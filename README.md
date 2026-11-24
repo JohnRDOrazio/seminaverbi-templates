@@ -80,6 +80,23 @@ the sitelink floor, the quick drop and `max_new_per_run` apply to it as to any c
 only if it passes them, not because it passed them as calibration (a QID that is not a benchmark row changes nothing
 and makes the command exit with an error).
 
+Sacred architecture (`--domain architecture`) runs the same stages over churches, cathedrals, basilicas, chapels, abbeys
+and monasteries (with their subclasses), for pages under the field `sacred-architecture`. Candidates are the buildings
+of those classes with 15 sitelinks (`architecture.sitelink_floor`), those with a UNESCO designation and the curated
+`architecture.works`; the last two, and a building with a press mention kept at 0.60 or more, pass without the floor.
+Jev's quick question asks about significance, as art's does. A building already queued under another domain stays
+there, and the press gives an item that is both an artwork and a building to art. Decisions (design:
+`docs/superpowers/specs/2026-11-23-sacred-architecture-design.md`):
+
+- Churches and cathedrals are Christian by definition and need no statement. A basilica, chapel, abbey or monastery
+  needs a Christian religion (P140, `architecture.christian_religions`), or a dedication (P825) when it states no
+  religion. A building of any class whose stated religions are none of them Christian is left out. The press routes by
+  class alone, so a non-Christian monastery it mentions may become a candidate, for Jev's questions to reject.
+- Hagia Sophia and other buildings now of another class or religion come only through `architecture.works`, where no
+  class or religion is asked.
+- `config/infobox_types.json` has no building layout. Proposals do not need one; pages do, in a separate change.
+- The benchmark (18 buildings, held back like art's) needs the author's approval before the first live architecture run.
+
 Commands (options `--db PATH`, default `data/pipeline.sqlite`, and `--domain`, default `film`, go before or after the command):
 
 ```

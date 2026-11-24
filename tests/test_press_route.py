@@ -2,7 +2,8 @@ import pytest
 import requests
 
 from pipeline import load_config, stages
-from pipeline.domains import art, common, film, literature, music
+from pipeline.domains import architecture, art, common, film, literature, music
+from pipeline.press.link import class_route
 from pipeline.press.route import release_waiting, route
 from pipeline.press.store import Mention, PressStore
 from pipeline.queue import Queue, Row
@@ -290,6 +291,57 @@ def test_an_item_that_is_no_whole_gets_no_parts(closure_cache, domain, classes):
     sparql = PartsSparql()
     assert domains.DOMAINS[domain].press_stage0("W1", whole_ent(*classes), sparql) == {}
     assert not any("P361" in qy for qy in sparql.queries)
+
+
+def building_ent(label, *classes, religion=None):
+    claims = {"P31": [{"mainsnak": {"datavalue": {"value": {"id": c}}}} for c in classes]}
+    if religion:
+        claims["P140"] = [{"mainsnak": {"datavalue": {"value": {"id": religion}}}}]
+    return {"labels": {"en": {"value": label}}, "claims": claims, "sitelinks": {"enwiki": {"title": label}}}
+
+
+def route_building(q, store, qid, entity):
+    """Link's own class route, then route()."""
+    sparql = PartsSparql()
+    store.add_mention(mention(qid, class_route(common.qids(entity, "P31"), sparql, {})))
+    return route(store, q, None, {}, FakeWikidata({qid: entity}), sparql)
+
+
+def test_a_church_becomes_an_architecture_candidate_with_its_press_evidence(q, store, uncovered, closure_cache):
+    assert route_building(q, store, "Q20", building_ent("Church", "Q16970")) == {"candidate": 1}
+    r = q.row("Q20")
+    assert (r.domain, r.sources) == ("architecture", ["press:sir"])
+    assert r.data[0] == {"count": 1, "instance_of": ["Q16970"], "press": {"sir": 0.8}}
+    assert [row.domain for row in uncovered] == ["architecture"]
+    m = store.mentions()[0]
+    assert (m.domain, m.route) == ("architecture", "candidate")
+    cfg = common.domain_config(load_config(), "architecture")
+    assert architecture.triage(r, cfg) == ("pass", "")  # one sitelink: the press exemption from the floor
+
+
+def test_a_chapel_queued_under_art_stays_there(q, store, uncovered, closure_cache, capsys):
+    q.add("Q21", "art", "depicts", {"en": "Chapel"}, {"enwiki": "Chapel"}, data={"count": 20, "instance_of": ["Q108325"]})
+    entity = building_ent("Chapel", "Q108325")
+    assert class_route(["Q108325"], PartsSparql(), {}) == "architecture"  # what the mention comes with
+    assert route_building(q, store, "Q21", entity) == {"candidate": 1}
+    r = q.row("Q21")
+    assert (r.domain, r.sources) == ("art", ["depicts", "press:sir"])
+    assert r.data[0] == {"count": 20, "instance_of": ["Q108325"], "press": {"sir": 0.8}}
+    assert [row.domain for row in uncovered] == ["art"]
+    m = store.mentions()[0]
+    assert (m.domain, m.route) == ("art", "candidate")
+    assert "already a art candidate, routed as art" in capsys.readouterr().err
+
+
+def test_a_buddhist_monastery_in_the_press_becomes_a_candidate(q, store, uncovered, closure_cache):
+    """Accepted: the press routes by class alone, so the Christian test of the domain's own queries is not asked;
+    such a row goes on to Jev's significance and connection questions, which are to reject it."""
+    entity = building_ent("Monastery", "Q44613", religion="Q748")
+    assert route_building(q, store, "Q22", entity) == {"candidate": 1}
+    r = q.row("Q22")
+    assert (r.domain, r.sources) == ("architecture", ["press:sir"])
+    cfg = common.domain_config(load_config(), "architecture")
+    assert architecture.triage(r, cfg) == ("pass", "")
 
 
 def test_a_qid_of_another_domains_row_is_routed_under_that_domain(q, store, uncovered):

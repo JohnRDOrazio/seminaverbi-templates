@@ -645,6 +645,7 @@ def test_run_takes_a_candidate_to_a_proposal(domain, monkeypatch, tmp_path):
 @pytest.mark.parametrize("domain, source, passing, dropped, floor", [
     ("music", "artist", 25, 15, 20),  # an artist-only row: the artist floor (20), not the music floor (10)
     ("art", "depicts", 20, 10, 15),
+    ("architecture", "building", 20, 10, 15),
 ])
 def test_triage_reads_the_real_config_for_the_domain(domain, source, passing, dropped, floor, monkeypatch, tmp_path,
                                                      capsys):
@@ -698,3 +699,25 @@ def test_music_and_art_candidates_pass_the_recheck_to_the_fold(domain, monkeypat
     marker = object()
     module.candidates(Queue(tmp_path / "q.db"), FakeSparql(), None, load_config(), covered=marker)
     assert seen and all(r is marker for r in seen)
+
+
+@pytest.mark.parametrize("argv, missing", [
+    (["dossier"], "dossier_stage"),
+    (["run"], "dossier_stage"),
+    (["run", "--publish"], "dossier_stage"),
+    (["calibrate"], "dossier_stage, add_calibration, calibration_qids"),
+])
+def test_a_command_the_domain_has_no_functions_for_says_so_before_any_work(argv, missing, base, monkeypatch, capsys):
+    """A registered module may not have every stage yet: a message, before the queue, the wikis or Jev are used."""
+    from types import SimpleNamespace
+    from pipeline.domains import DOMAINS
+    done = []
+    monkeypatch.setitem(DOMAINS, "partial", SimpleNamespace(
+        candidates=lambda *a, **k: done.append("candidates") or 0, triage=lambda row, cfg: ("pass", "")))
+    for service in ("_wikis", "_wikidata", "_sparql", "_editor"):
+        monkeypatch.setattr(cli, service, lambda service=service: done.append(service))
+    monkeypatch.setattr(cli, "_judge", lambda queue: done.append("_judge"))
+    Queue(base).add("Q1", "partial", "s", {"en": "Work"}, {"enwiki": "Work"}, data={"count": 30})
+    assert cli.main([*argv, "--domain", "partial", "--db", str(base)]) == 1
+    assert capsys.readouterr().err == f"ERROR: the partial domain has no {missing} yet: {argv[0]} is not possible\n"
+    assert done == [] and Queue(base).row("Q1").outcomes == {0: "pass"}

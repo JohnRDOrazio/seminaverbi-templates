@@ -175,6 +175,13 @@ def _stage_functions(domain, queue, cfg) -> dict:
 NAMES = {1: "covered", 2: "triage", 3: "quick", 4: "dossier", 5: "adjudicate"}
 
 
+def _require(args, *functions: str) -> None:
+    """Refuse a command whose domain module lacks a function it ends up calling, before any of its work is done."""
+    missing = [f for f in functions if not hasattr(DOMAINS[args.domain], f)]
+    if missing:
+        raise CliError(f"the {args.domain} domain has no {', '.join(missing)} yet: {args.command} is not possible")
+
+
 def cmd_candidates(args, queue, cfg):
     domain = DOMAINS[args.domain]
     extra = {}
@@ -207,6 +214,8 @@ def _limit(stage: int, cfg) -> int | None:
 
 def cmd_stage(args, queue, cfg):
     stage = next(n for n, name in NAMES.items() if name == args.command)
+    if stage == 4:
+        _require(args, "dossier_stage")
     fn = _stage_functions(DOMAINS[args.domain], queue, cfg)[stage]
     _show(args.command, stages.run_stage(queue, stage, fn, limit=_limit(stage, cfg), domain=args.domain))
 
@@ -216,6 +225,7 @@ def cmd_publish(args, queue, cfg, editor=None):
 
 
 def cmd_run(args, queue, cfg):
+    _require(args, "dossier_stage")
     editor = _editor() if args.publish else None  # missing credentials fail before any stage runs
     cmd_candidates(args, queue, cfg)
     fns = _stage_functions(DOMAINS[args.domain], queue, cfg)
@@ -227,6 +237,7 @@ def cmd_run(args, queue, cfg):
 
 
 def cmd_calibrate(args, queue, cfg):
+    _require(args, "dossier_stage", "add_calibration", "calibration_qids")
     domain = DOMAINS[args.domain]
     wikis = _wikis()
     qids, unmapped = domain.calibration_qids(wikis, _wikidata(), _tree())
