@@ -60,7 +60,8 @@ def owns(instance_of: Iterable[str], sparql, cache: Path | None = None) -> bool:
 
 def triage(row, cfg: dict) -> tuple[str, str]:
     """Stage 2: ('drop', reason) for a person or group, a recording or edition, a part folded into its whole, or a
-    row under the sitelink floor (the artist floor when the artist is the only source). Calibration always passes."""
+    row under the sitelink floor (the artist floor when the artist is the only source; none for a kept press
+    mention). Calibration always passes."""
     if row.calibration:
         return "pass", "calibration"
     data = row.data.get(0, {})
@@ -74,6 +75,8 @@ def triage(row, cfg: dict) -> tuple[str, str]:
         return "drop", "a recording or edition, not a work of its own"
     if data.get("folded_into"):
         return "drop", f"folded into {data['folded_into']}"
+    if common.press_exempt(row):
+        return "pass", ""
     # the artist floor is music's own key: domain_config lifts only the keys the top level has (the sitelink floor)
     artist_only = set(row.sources) == {"artist"}
     floor = cfg["music"]["artist_sitelink_floor"] if artist_only else cfg["sitelink_floor"]
