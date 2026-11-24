@@ -6,7 +6,7 @@ are discarded; a link's item is taken, a search's routed hits (one or several) g
 or none), taken only above the configured cut. Jev then judges, on the paragraphs around the mention (at most 150
 words, centred on it), whether the item (named by its label and description) is one of the subjects the article
 discusses, asking again at each later mention in another window until one is kept; a kept mention is stored
-with up to three passages of at most 25 words.
+with up to three passages of at most 25 words and the article's stance on the item.
 
 Class membership comes only from the domains' `owns()` and `common.owns()`, backed by the cached subclass closure:
 this module runs no SPARQL of its own.
@@ -18,10 +18,11 @@ from pathlib import Path
 
 from pipeline import domains
 from pipeline.domains import common
-from pipeline.press.extract import Page, Span, passage, window
+from pipeline.press.extract import Page, Span, passage, short_title, titled_room, window
 from pipeline.press.store import Mention
 
 MAX_PASSAGES = 3
+MAX_STANCE_WINDOWS = 3
 PERSON = "Q5"
 
 
@@ -103,6 +104,32 @@ class _Linker:
               "dropped", file=sys.stderr)
         return None
 
+    def stance(self, span: Span, qid: str) -> tuple[float, str]:
+        """(probability that the article finds something bearing on the Gospel in the item, alone or beside
+        criticism; outcome), over at most three windows around its label (its own mention's first), each sent with
+        the title within 150 words. The best window counts, and none is asked after one that reaches stance_keep.
+        Without one, the outcome is "critical" when a window says so at stance_keep or more, else "neutral"."""
+        cut, needle = self.cfg["stance_keep"], span.text.casefold()
+        item = _option(qid, self.wikidata.entity(qid), self.page.lang)
+        best, outcome, asked = 0.0, "neutral", set()
+        for i in [span.paragraph] + [i for i in range(len(self.page.paragraphs)) if i != span.paragraph]:
+            if i != span.paragraph and needle not in self.page.paragraphs[i].casefold():
+                continue
+            context = window(self.page.paragraphs, i, titled_room(self.page), span.text)
+            if context in asked:
+                continue
+            asked.add(context)
+            probs = self.judge.stance(self.url, span.text, context, item, short_title(self.page))
+            p = round(probs["bearing"] + probs["mixed"], 6)
+            best = max(best, p)
+            if p >= cut:
+                return p, "bearing" if probs["bearing"] >= probs["mixed"] else "mixed"
+            if probs["critical"] >= cut:
+                outcome = "critical"
+            if len(asked) == MAX_STANCE_WINDOWS:
+                break
+        return best, outcome
+
     def passages(self, span: Span) -> list[str]:
         """Up to three passages from the paragraphs naming the label, the mention's own paragraph first."""
         needle = span.text.casefold()
@@ -158,10 +185,11 @@ def link_article(page: Page, outlet: str, store, judge, wikidata, sparql, cfg: d
         p = judge.substantive(url, span.text, context, _option(qid, wikidata.entity(qid), page.lang))
         if p < cfg["mention_keep"]:
             continue
+        stance, outcome = linker.stance(span, qid)
         done.add(qid)
         domain, instance_of = linker.route_of(qid)
         mention = Mention(url, qid, span.text, "person" if PERSON in instance_of else "work", domain, p,
-                          linker.passages(span))
+                          linker.passages(span), stance=stance, stance_outcome=outcome)
         store.add_mention(mention)
         kept.append(mention)
     return kept

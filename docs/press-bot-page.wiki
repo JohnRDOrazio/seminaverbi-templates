@@ -1,6 +1,6 @@
 <!-- Draft of [[Semina Verbi:Press bot]] on en.seminaverbi.bibleget.io. No code publishes this page: it goes on the
      wiki only with the author's approval, like any other wiki edit. -->
-'''SeminaVerbi-press''' is the program that reads Catholic newspapers and magazines for SeminaVerbi. It introduces itself to the sites it visits with this user agent:
+'''SeminaVerbi-press''' is the program that reads Catholic newspapers and magazines, and the blogs of their journalists, for SeminaVerbi. It introduces itself to the sites it visits with this user agent:
 
 <code>SeminaVerbi-press/1.0 (+https://en.seminaverbi.bibleget.io/wiki/Semina_Verbi:Press_bot)</code>
 
@@ -15,19 +15,19 @@ SeminaVerbi writes about works of culture (films, series, books, music, art) and
 Every proposal for a new article is read and voted on by people before anything is written.
 
 == How often ==
-* Once a day.
-* At most 200 articles per day, across all the outlets it reads.
+* Once a day; a run that was missed is made up for. The limits below are for the day (UTC), however many times the bot runs.
+* At most 250 articles per day, across all the outlets it reads.
 * One request at a time per site, at least 10 seconds apart, or more if the site's <code>robots.txt</code> asks for a longer <code>Crawl-delay</code>.
-* It reads the site's <code>robots.txt</code> on every run and obeys it. It reads feeds and sitemaps with conditional requests, so an unchanged feed costs almost nothing.
-* If a site answers that it refuses the request (HTTP 401, 403 or 429), the bot stops reading that site for the day and does not try again by other means.
+* On every run it reads a site's <code>robots.txt</code> before anything else there, and obeys it (RFC 9309). It reads feeds and sitemaps with conditional requests where it can, so an unchanged feed costs almost nothing; a sitemap index, and the archive of a blog while it is read for the first time, are fetched in full.
+* If a site answers that it refuses the request (HTTP 401, 403 or 429), the bot stops reading that site for the day and does not try again by other means. A site that refuses it every day for a week is no longer read.
 
 == What is kept ==
-For each article: its link, title, date, outlet and language, and, for each work or person it discusses, at most three short quotations of no more than 25 words each, always shown with the outlet, the title, the date and the link.
+For each article: its link, title, date, outlet and language, and, for each work or person it discusses, at most three short quotations of no more than 25 words each, always shown with the outlet and the link to the article, and with its title and date when the article gives them. It also keeps which work or person it found (its Wikidata item), the scores and answers the assistant gives, how the article is credited, when it was found and last tried, and, for articles from ''L'Osservatore Romano'' and its journalists' blogs, a short numeric fingerprint (hashes only) used to recognise the same article on two sites. Of a site it keeps what conditional requests need, how far a blog's archive has been read, the days the site refused it, when it was first read and on how many days.
 
-The full text of an article is never stored. It is read only while the bot works on it, and an automated assistant reads only the paragraphs around a mention (about 150 words at a time) to judge whether the article really discusses the work. Nothing read is used to train any model.
+The full text of an article is never stored. It is read only while the bot works on it, and an automated assistant reads the title and opening of an article and the paragraphs around a mention, never more than about 150 words at a time, to judge whether the article is about a work of culture, treats it in the light of faith or values, and really discusses the work, and what it makes of it. When a proposal for a new article is prepared, the assistant reads the quotations kept again, with the other notes on the work. Those passages are sent to [https://typesafe.ai TypeSafe], the service that runs the assistant. The service's terms ([https://typesafe.ai/legal/mca customer agreement], [https://typesafe.ai/legal/privacy-policy privacy policy]) state that it does not train models on what it is sent.
 
 == For how long ==
-As long as a SeminaVerbi article or an article proposal cites it. A link and its short quotations stay with the article that cites them, like any other source.
+Nothing listed above is deleted yet, also for the articles that were read and not used; the one exception is the list of the articles read in a day, which is emptied on a later day. A link and its short quotations stay with the SeminaVerbi article or the proposal that cites them, like any other source.
 
 == How to be left out ==
 An outlet that does not want to be read can:

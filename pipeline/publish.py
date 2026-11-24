@@ -65,7 +65,8 @@ def _params(row, result) -> list[tuple[str, str]]:
             p.append((f"theme{n}_source_label", ev["label"]))
     urls, labels = [], {}
     dossier = row.data.get(4) or {}
-    for url, label in ([(n["url"], n.get("label")) for n in dossier.get("notes", [])]
+    for url, label in ([(n["url"], n.get("label")) for note in dossier.get("notes", [])
+                        for n in (note, *note.get("also", ()))]  # a press note's copies in other outlets
                        + [(link, None) for link in dossier.get("links", [])]):
         url = url.replace(" ", "%20")
         if url not in urls:

@@ -122,3 +122,19 @@ def test_press_notes_count_in_the_languages_of_a_passing_dossier(store, queue, m
     assert data["languages"] == {"en": 1, "de": 0, "it": 2}
     from pipeline import stages
     assert stages._first_wiki(data["languages"]) == "it"
+
+
+def test_a_neutral_or_critical_mention_gives_no_note():
+    store = PressStore.of(Queue(":memory:"))
+    for outcome in ("bearing", "mixed", "neutral", "critical", None):
+        url = f"https://x/{outcome}"
+        store.add_article(url, "sir", "it", "T", "2026-11-20")
+        store.add_mention(Mention(url, "Q1", "x", "work", "film", 0.9, ["parole"], stance_outcome=outcome))
+    assert {n["url"] for n in press_notes(store, "Q1", {})} == {"https://x/bearing", "https://x/mixed", "https://x/None"}
+
+
+def test_an_article_without_a_title_is_named_by_its_url(store):
+    mention(store, "http://a/x", "Q1", ["words"], title=None)
+    mention(store, "http://a/y", "Q1", ["words"], title=None, published=None)
+    assert [n["label"] for n in press_notes(store, "Q1", OUTLETS)] == ["Avvenire (2026-03-01): http://a/x",
+                                                                       "Avvenire: http://a/y"]

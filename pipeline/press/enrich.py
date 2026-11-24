@@ -8,6 +8,7 @@ from __future__ import annotations
 import re
 from urllib.parse import quote
 
+from pipeline.press.credit import outlet_name
 from pipeline.press.notes import MAX_PASSAGES
 from pipeline.publish import _write
 
@@ -82,21 +83,30 @@ def enrichment(store, outlets: dict[str, str], old_text: str | None, titles: dic
     """The page text. `titles` maps a QID to {lang: page title} for the wikis that have the item."""
     done = done_urls(old_text)
     entries: dict[str, list] = {}
-    for m in store.mentions(route="enrichment"):
+    mentions = store.mentions(route="enrichment")
+    listed = {(m.qid, m.url) for m in mentions}
+    for m in mentions:
         art = store.article(m.url)
-        if _norm(m.url) in done or art is None:
+        if art is None:
             continue
-        entries.setdefault(m.qid, []).append((art.published or "", m, art))
+        copies = store.copies(m.url)  # copies of one article are one entry, closed by any of their URLs
+        if any(_norm(u) in done for u in (m.url, *(c.url for c in copies))):
+            continue
+        ahead = {c.url for c in copies if c.url == art.same_as or (art.same_as and c.url < m.url)}
+        if any((m.qid, url) in listed for url in ahead):  # listed under that copy
+            continue
+        entries.setdefault(m.qid, []).append((art.published or "", m, art, copies))
     # newest article first within an item; items by their newest article
     groups = sorted(entries.items(), key=lambda kv: max(e[0] for e in kv[1]), reverse=True)
     lines = []
     for qid, items in groups:
         lines.append(f"* {_item(items[0][1].label, (titles or {}).get(qid))}")
-        for published, m, art in sorted(items, key=lambda e: e[0], reverse=True):
-            name = _text(outlets.get(art.outlet, art.outlet))
+        for published, m, art, copies in sorted(items, key=lambda e: e[0], reverse=True):
+            name = _text(outlet_name(art, outlets))
             date = f", {_text(published)}" if published else ""
             quotes = " ".join(_quote(p) for p in m.passages[:MAX_PASSAGES])
-            lines.append(f"** {name}{date}, [{_url(m.url)} {_text(art.title or m.url)}] ({_text(art.lang)})" + (f": {quotes}" if quotes else ""))
+            also = "".join(f"; also [{_url(c.url)} {_text(outlet_name(c, outlets))}]" for c in copies)
+            lines.append(f"** {name}{date}, [{_url(m.url)} {_text(art.title or m.url)}] ({_text(art.lang)}{', critical' if m.critical else ''}{also})" + (f": {quotes}" if quotes else ""))
     block = "\n".join(lines)
     return f"{INTRO}\n\n{BEGIN}\n{block}\n{END}" + (_tail(old_text) or "\n")
 

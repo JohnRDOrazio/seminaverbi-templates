@@ -8,7 +8,8 @@ for quick, adjudicate and calibrate. `skip QID --reason TEXT` drops a row that b
 
 `press discover|filter|link|route|enrich|run [--dry-run]` runs the Catholic-press source (pipeline/press/): filter
 and link ask Jev (TYPESAFE_API_KEY), enrich and run write the enrichment page as the editor bot; `--dry-run` writes
-neither the candidates queue nor the wiki.
+neither the candidates queue nor the wiki. `press outlets` lists what each outlet has given and those that refuse us or were removed;
+`press reinstate OUTLET` puts a removed one back.
 """
 import argparse
 import inspect
@@ -26,7 +27,9 @@ from pipeline.press.fetch import load_press_config
 from pipeline.press import stages as press_stages
 from pipeline.press.enrich import ENRICH_TITLE, enrichment, publish_enrichment
 from pipeline.press.notes import press_notes
-from pipeline.press.route import release_waiting, route
+from pipeline.press.route import reconcile, release_waiting, route
+from pipeline.press import report
+from pipeline.press import store as press_store
 from pipeline.press.store import PressStore
 from pipeline.queue import Queue
 from sync import categories
@@ -261,33 +264,75 @@ def cmd_redo(args, queue, cfg):
     print(f"redo: stages {args.stage}+ cleared" + (f" for {args.qid}" if args.qid else ""))
 
 
-PRESS_ACTIONS = ("discover", "filter", "link", "route", "enrich", "run")
+PRESS_ACTIONS = ("discover", "filter", "link", "route", "enrich", "run", "outlets", "reinstate")
 
 
 def _counts(counts: dict) -> str:
     return ", ".join(f"{k} {v}" for k, v in sorted(counts.items())) or "none"
 
 
-def _refused(client) -> None:
-    refused = getattr(client, "refused", {}) if client is not None else {}
-    print("press refused: " + (", ".join(f"{o} ({r})" for o, r in sorted(refused.items())) or "none"))
+def _since(r: dict) -> str:
+    """How long an outlet has refused us, as PressStore.refusals has it."""
+    if not r["days"]:
+        return ""
+    return f"; refused every day it was read since {r['since']}, {r['days']} day{'s' if r['days'] > 1 else ''}"
+
+
+def _removed(store) -> None:
+    print("press removed: " + (", ".join(
+        f"{o} (on {r['on']}; refused since {r['since']}: {r['reason']}; `press reinstate {o}` puts it back)"
+        for o, r in store.removed().items()) or "none"))
+
+
+def _refused(client, store) -> None:
+    """The outlets nothing was asked of, or that refused us, in this run; then the removed ones."""
+    known, gone = store.refusals(), store.removed()
+    lines = [f"{o} ({why}{_since(known[o]) if o in known and why == known[o]['reason'] else ''})"
+             for o, why in sorted(client.refused.items()) if o not in gone]
+    print("press refused: " + (", ".join(lines) or "none"))
+    _removed(store)
+
+
+def _press_outlets(store, queue, outlets) -> None:
+    """`press outlets`: what each outlet has given, then those that refuse us, since when, and the removed ones; nothing
+    is asked of them."""
+    print("press outlets:\n" + "\n".join(report.lines(store, queue, outlets)))
+    today, known = store.refused_today(), store.refusals()
+    now = [f"{o} ({why}{_since(known[o]) if o in known else ''})" for o, why in today.items() if o not in store.removed()]
+    print(f"press refused today ({press_store.utc_today()} UTC): " + (", ".join(now) or "none"))
+    before = [f"{o} (on {r['on']}: {r['reason']}{_since(r)})" for o, r in known.items() if o not in today]
+    print("press refused last time read: " + (", ".join(before) or "none"))
+    _removed(store)
+
+
+def _press_reinstate(store, outlet: str) -> None:
+    if not store.reinstate(outlet):
+        raise CliError(f"{outlet} is not a removed outlet, nothing changed")
+    print(f"press reinstated: {outlet}" + (" (it refused us today: read again from tomorrow, UTC)"
+                                           if outlet in store.refused_today() else ""))
 
 
 def cmd_press(args, queue, cfg):
     """The press stages; `run` = discover, filter, link, route, enrich. `--dry-run`: discover into a throwaway
     store and list the URLs; route (and run) only print each mention's would-be route; enrich prints the page."""
-    pcfg, action, dry = load_press_config(), args.action, args.dry_run
+    action, dry = args.action, args.dry_run
+    if action == "outlets":
+        return _press_outlets(PressStore.of(queue), queue, load_press_config()["outlets"])
+    if action == "reinstate":
+        return _press_reinstate(PressStore.of(queue), args.outlet)
+    pcfg = load_press_config()
     if action in ("filter", "link", "run") and not os.environ.get("TYPESAFE_API_KEY"):
         raise CliError("TYPESAFE_API_KEY is not set; press filter and link ask Jev")
     editor = _login_editor() if action in ("enrich", "run") and not dry else None  # before any stage runs
-    store = PressStore.of(queue)
+    kept = store = PressStore.of(queue)
     outlets = {o["id"]: o["name"] for o in pcfg["outlets"]}
     client = None
     if action in ("discover", "filter", "link", "run"):
-        if action == "discover" and dry:  # a throwaway store: no articles, no feed caches kept
+        if action == "discover" and dry:  # a throwaway store: no articles, feed caches or refusals kept
             store = PressStore(sqlite3.connect(":memory:"))
+            store.copy_refusals(kept)
         client = _press_client(pcfg, store)
-    pages = press_stages.Pages(client) if client is not None else None
+    pages = press_stages.Pages(client, pcfg["outlets"]) if client is not None else None
     judge = _press_judge(queue) if action in ("filter", "link", "run") else None
     lazy: dict = {}
 
@@ -312,6 +357,8 @@ def cmd_press(args, queue, cfg):
         print("press filter: " + _counts(press_stages.run_filter(store, pages, judge, pcfg)))
     if action in ("link", "run"):
         print("press link: " + _counts(press_stages.run_link(store, pages, judge, wikidata(), _sparql(), pcfg)))
+    if action in ("filter", "link") and not dry:  # route does it too
+        reconcile(store, queue)
     if action in ("route", "run"):
         if dry:
             print("\n".join(press_stages.preview(store, repo(), wikis(), wikidata(), _sparql(), queue)))
@@ -326,7 +373,9 @@ def cmd_press(args, queue, cfg):
         print(enrichment(store, outlets, current[1] if current else None,
                          press_stages.titles(store, repo(), wikidata())))
     if client is not None:
-        _refused(client)
+        _refused(client, kept)
+    if action == "run" and not dry:
+        print(report.marked(store, queue, pcfg["outlets"]))
 
 
 def cmd_release_benchmark(args, queue, cfg):
@@ -363,6 +412,7 @@ def build_parser() -> argparse.ArgumentParser:
     skip.add_argument("--reason", required=True)
     press = sub.add_parser("press", parents=[common])
     press.add_argument("action", choices=PRESS_ACTIONS)
+    press.add_argument("outlet", nargs="?", help="the outlet's id (reinstate only)")
     press.add_argument("--dry-run", action="store_true")
     release = sub.add_parser("release-benchmark", parents=[common])
     release.add_argument("qids", nargs="+", metavar="QID")
@@ -392,6 +442,8 @@ def main(argv=None) -> int:
     args = parse_args(argv, parser)
     if args.command == "redo" and args.stage < 1:
         parser.error("redo 0 is refused: stage 0 holds the data the later stages need; run candidates again instead")
+    if args.command == "press" and (args.action == "reinstate") != (args.outlet is not None):
+        parser.error("press reinstate takes an outlet's id, the other press actions none")
     cfg = domain_config(load_config(), args.domain)  # the domain's own sitelink floor, for every command
     try:
         return COMMANDS[args.command](args, Queue(args.db), cfg) or 0

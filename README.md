@@ -142,28 +142,72 @@ no machine-readable list.
 
 ### Catholic press
 
-`python -m pipeline press …` reads eleven Catholic outlets (`config/press.json`: L'Osservatore Romano, Vatican News,
-Avvenire, Roma Sette, EWTN, La Civiltà Cattolica, Famiglia Cristiana, Aleteia, National Catholic Register, KTO, SIR)
-and feeds every domain. Design: `docs/superpowers/specs/2026-11-23-catholic-media-source-design.md`.
+`python -m pipeline press …` reads twelve Catholic outlets (`config/press.json`: L'Osservatore Romano, Vatican News,
+Avvenire, Roma Sette, EWTN, La Civiltà Cattolica, Famiglia Cristiana, Aleteia, National Catholic Register, KTO, SIR,
+and Gaetano Vallini's blog *Camera con vista*) and feeds every domain. Design: `docs/superpowers/specs/2026-11-23-catholic-media-source-design.md`.
 
 ```
-python -m pipeline press discover   # new article URLs from each outlet's feeds and sitemaps (round-robin, max_articles_per_run)
-python -m pipeline press filter     # Jev: is the article about a work of culture or an artist? below culture_drop: dropped
-python -m pipeline press link       # mentions linked to Wikidata items; kept when Jev finds them discussed substantively
+python -m pipeline press discover   # new article URLs from each outlet's feeds and sitemaps (round-robin)
+python -m pipeline press filter     # Jev: is the article about a work of culture or an artist (culture_drop)? with a faith or values angle (angle_drop)? below either: dropped
+python -m pipeline press link       # mentions linked to Wikidata items; kept when Jev finds them discussed substantively; with the article's stance on them (stance_keep)
 python -m pipeline press route      # each mention to its domain's queue (source press:<outlet>), the enrichment page, or waiting
 python -m pipeline press enrich     # writes Semina Verbi:Press for existing articles on en (editor bot)
 python -m pipeline press run        # all five, each article fetched once
 python -m pipeline press run --dry-run   # discover, filter, link; prints each mention's would-be route, writes no queue, no wiki
 ```
 
+**What each outlet gives.** `press outlets` shows per outlet: the day it was first read and on how many days, articles
+read and kept, candidates, proposals published and not declined (and how many approved or created), and enrichment
+entries apart. A useful proposal is a queue row with press evidence from it whose page is published (open, approved or
+created). Without one, 30 calendar days after its first successful read it is marked `no useful proposals for N days:
+review`, at 60 `consider dropping`, with its enrichment entries; a real `press run` ends with `press review: …`, naming
+the marked outlets. It is a report: nothing is dropped. An article is credited to the outlet where it was read, also when
+its evidence counts as another's (a Vallini post counted as L'Osservatore Romano is `vallini`'s), and to both outlets when
+it was found in both. An outlet with no entries is shown as never read and a removed one as removed, neither marked.
+
+**The day's limits** (UTC, shared by every run of the day, manual and catch-up ones included): `max_articles_per_day`
+(250) and an outlet's `max_per_day`. At most that many articles are discovered (added to the store), and at most that
+many are read. An article counts as read once a day, the first time `filter` or `link` sets out to fetch it, whatever
+comes of it: filtered and linked, or tried twice, on the same day it counts once; kept earlier and fetched again by
+`link` another day, it counts that day. `filter` leaves room for those, at most half of the day. Feeds, sitemaps and
+robots.txt are not articles. Articles over the limit wait for another day (`left for another day` in link's counts).
+
 `--dry-run` also works with `discover` (into a throwaway store: lists the URLs found per outlet, keeps nothing),
-`route` (prints the would-be routes) and `enrich` (prints the page text). Each run ends with the outlets that refused
-us (`press refused: …`); a 401/403/429 or a robots.txt rule stops that outlet for the run, never worked around.
+`route` (prints the would-be routes) and `enrich` (prints the page text).
+
+**Outlets that refuse us.** A 401/403/429, from the outlet or from its own robots.txt, stops that outlet for the rest of
+the UTC day: no later run of that day asks it anything, robots.txt included, and it is never worked around. The articles
+not read stay `found`, and the next day it is tried again. After seven days in a row of refusals the outlet is removed:
+never asked again. A day counts as refused only if nothing but robots.txt answered successfully (2xx or 304) that day; a
+successful day starts the count again; a day with neither (no run, or only timeouts, 5xx, 404, disallowed paths) neither
+counts nor breaks it. An unreachable robots.txt stops the outlet for that run only; a disallowed path is only not read.
+All of it is state in the store, not in `config/press.json`. Each run that reads outlets ends with `press refused: …` and
+`press removed: …`, with since when. `discover --dry-run` honours that state and keeps nothing of its own; `run --dry-run`
+writes to the store it is given (use a copy).
+
+```
+python -m pipeline press outlets            # what each outlet has given, those that refuse us, since when, and the removed ones; no request
+python -m pipeline press reinstate OUTLET   # puts a removed outlet back (if it refused us today, from tomorrow)
+```
 
 The bot reads politely: its own user agent (`SeminaVerbi-press/1.0`, pointing to the page `Semina Verbi:Press bot`,
 whose text is `docs/press-bot-page.wiki`), one request at a time per outlet at least `delay_seconds` (10) apart or the
-outlet's `Crawl-delay`. It keeps the link, title, date, outlet, language and quotations of at most 25 words; never the
+outlet's `Crawl-delay`, robots.txt obeyed as RFC 9309 says (`pipeline/press/robots.py`). A mention whose article is neutral on the work or only critical of it never becomes a candidate or
+press evidence; for a work SeminaVerbi covers it goes to the enrichment page, the critical ones marked. The bot keeps the link, title, date, outlet, language, scores and quotations of at most 25 words; never the
 full text. Jev reads at most about 150 words per question. Read the `--dry-run` report before the first real run.
+
+**Archives, caps and republished articles** (`vallini`, for now; all per outlet in `config/press.json`):
+
+- An entry with `"walk": true` is an Atom feed (Blogger) whose whole archive is read over successive runs, newest
+  change first and cut by date, never by offset; then only its top is read. A post under several labels is one article.
+- `max_per_day` bounds the articles an outlet adds, and those read, per day, inside `max_articles_per_day`; its share (up
+  to half of what the day has left) is taken first, so neither it nor the others are starved.
+- `article_feed` (a URL with `{path}`) reads an article from its feed entry, for a site whose pages hold no text.
+- `republishes` and `author`: a post that states its issue ("L'Osservatore Romano dell'8 novembre 2025", "(©L'Osservatore
+  Romano, 23 luglio 2020)") is cited as "Gaetano Vallini, L'Osservatore Romano" with that date, any other as the
+  outlet's `name` with the post's date; the link is the post's. The same article in both outlets
+  (`pipeline/press/duplicates.py`) is one piece of evidence with both links, whichever came first; the second copy is
+  skipped (`skip (duplicate)`). For this pair only, a fingerprint of 64 hashes per article is kept.
 
 `filter`, `link` and `run` need `TYPESAFE_API_KEY`; `enrich` and `run` (without `--dry-run`) log in as the editor
 bot first, so run them through `~/.config/seminaverbi/runeditor.py pipeline press …`. `discover` and `route` need

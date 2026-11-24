@@ -8,7 +8,7 @@ source for artists (later) plug into what this one produces; neither is built he
 
 Today the pipeline reads only Wikidata, Wikipedia and Wikiquote, so a proposal rests on what Wikipedia says about a
 work. The Catholic press reviews films, books, music and art from the faith's own point of view, which is exactly
-the reading a Seeds of the Word article needs. This source reads eleven Catholic outlets, finds the articles that
+the reading a Seeds of the Word article needs. This source reads eleven Catholic outlets (a twelfth since: see the last section), finds the articles that
 discuss a work (or an artist), and uses them in three ways:
 
 1. **Discovery:** a work an outlet discusses becomes a candidate, or an existing candidate gains a source.
@@ -89,7 +89,7 @@ editors' list of press articles on the works SeminaVerbi already has.
   (the polite HTTP client), `extract.py` (article text, title, date, language; mention spans), `link.py`
   (Wikidata matching and domain routing), `stages.py` (the press stages below).
 - `config/press.json`: the outlets (id, name, base URL, languages, discovery entries, culture filter, `since`),
-  `user_agent`, `delay_seconds`, `max_articles_per_run`, the Jev cut-offs below.
+  `user_agent`, `delay_seconds`, `max_articles_per_day`, the Jev cut-offs below.
 - `deploy/systemd/sv-pipeline-press.{service,timer}`.
 - `python -m pipeline press discover|filter|link|route|enrich|run` (one sub-stage each, plus `run`).
 
@@ -121,6 +121,7 @@ Article text is fetched when a stage needs it and kept in memory for that run on
 2. **Filter (culture).** One Jev `Noul` on the article's title and its first ~150 words: is this article mainly about
    a work of culture (film, series, book, music, art, theatre) or an artist? Below `culture_drop` (start 0.40)
    the article is dropped and never fetched again.
+   A second `Noul` then asks for a faith or values angle (`angle_drop`; see "Angle and stance" below).
 3. **Link.** Mentions are found in the article's markup and text: italicised or quoted titles, links to Wikipedia,
    and capitalised names next to a creator's name. Each mention is searched on Wikidata (`wbsearchentities` in the
    article's language, then en) and its hits are typed (P31/P279 against the domains' classes, Q5 for people).
@@ -157,7 +158,7 @@ Article text is fetched when a stage needs it and kept in memory for that run on
 
 `sv-pipeline-press.timer`, daily at 04:30 (off the votes timer's three-hour marks), runs `press run` through
 `runeditor.py` (the enrichment page is a wiki write) with `TYPESAFE_API_KEY` from the service's environment file.
-Each run reads at most `max_articles_per_run` new articles (start 200) across outlets, round-robin, so the first
+At most `max_articles_per_day` (250) new articles a UTC day across outlets, round-robin, whatever the runs, so the first
 backfill spreads over days. Domain stages 1–6 still run as now, by hand (`run --publish`).
 
 ## Calls made for the builder (the author may overturn any)
@@ -168,7 +169,7 @@ backfill spreads over days. Domain stages 1–6 still run as now, by hand (`run 
 - Cut-offs to start: `culture_drop` 0.40, disambiguation 0.80/0.60, `mention_keep` 0.60. A calibration run on the
   existing articles' press coverage tests them before anything is posted.
 - 25-word quotations, at most three per mention.
-- Timer daily at 04:30, 200 articles per run, 10 s between requests per outlet.
+- Timer daily at 04:30, 250 articles per day (200 per run until the author raised it, 2026-11-23), 10 s between requests per outlet.
 - The enrichment page on en only, like the ranking page (the pipeline writes only en's project namespace).
 - A press source counts as a seed for triage.
 - An outlet that refuses us (403, robots) is skipped and reported, never worked around.
@@ -205,7 +206,70 @@ backfill spreads over days. Domain stages 1–6 still run as now, by hand (`run 
    and for how long, and how an outlet asks to be left out. No personal email. Its text is part of the plan; it is
    published only with the author's approval in session, like any wiki edit.
 4. **Outlets that refuse us** (a 401/403/429, a robots `Disallow`, La Civiltà Cattolica's 403 today): skipped and
-   reported, never written around.
+   reported, never written around. What follows from a refusal: "Outlets that refuse us" below.
+
+## Outlets that refuse us (author, 2026-11-23)
+
+The author's decision: "If a bot is refused access to a site, then the bot should stop reading that site for that day;
+any new articles should still be available the day later. If a bot is refused continuously for say a week, then the
+site should be removed and no longer consulted".
+
+- **A refusal** is a 401, 403 or 429 from the outlet (an article or feed, redirects followed) or from its own robots.txt.
+  It is not a redirect target's robots.txt, a disallowed path, a timeout, a 5xx or an unreachable host (an unreachable
+  robots.txt stops the outlet for that run only, as before).
+- **The day** is the UTC calendar day. The refusal is kept in `press_refusals` (outlet, day, reason); for the rest of that
+  day every run, of any action, asks the outlet nothing, robots.txt included. The day after it is tried again. Articles
+  not read stay `found`, unattempted; feeds not read to the end keep their old validators, so nothing is missed.
+- **A refused day** (toward removal) is one with a refusal and no successful response (2xx or 304) other than robots.txt.
+- **Removal:** at seven refused days with no successful day between them. Each is a different calendar day, so they span
+  seven days at least. A day with neither a refusal nor a success (no run, or only errors) neither counts nor breaks the
+  sequence. Any successful day starts it again.
+- **Removal is state** (`press_outlets`: last successful day, removed on, since, reason, reinstated on), never an edit of
+  `config/press.json`. A removed outlet is never asked again, until `press reinstate OUTLET`, which starts the count again
+  but leaves today's refusal, if any, standing for today.
+- **Seen:** every run that reads outlets ends with `press refused:` and `press removed:`, with since when; `press outlets`
+  lists both without asking anything.
+- **Dry runs:** `run --dry-run` keeps refusals in the store it is given (a copy). `discover --dry-run` honours the real
+  store's state and writes none, so a refusal it meets does not stop a real run later that day.
+
+## The day's limits and robots.txt (author, 2026-11-23)
+
+- **Limits are the UTC day's**, shared by every run: `max_articles_per_day` and each outlet's `max_per_day`, for the
+  articles added (`found_at`) and, apart, for the articles read. An article is counted the first time that day that filter
+  or link sets out to fetch it (`press_reads`, emptied of earlier days), failures included; never twice a day. Link's
+  fetches of articles kept on earlier days count too, and filter leaves them room, at most half. Counted in one SQL
+  statement, so runs at the same time share the budget.
+- **robots.txt** is read as RFC 9309 says (`robots.py`): `*` and `$`, the longest match, Allow on a tie, our group (the
+  groups of one name combined; `SeminaVerbi` counts as ours when `SeminaVerbi-press` is not named) else `*`, escapes
+  normalised, 500 KiB, unreadable lines ignored, Crawl-delay kept. urllib.robotparser knew no wildcards and took the first
+  matching rule.
+
+## What each outlet gives (author, 2026-11-23)
+
+The author's decision: "if no useful proposals come from a source within a month or two, we should consider dropping the
+source". A report (`report.py`, `press outlets`), never an automatic drop.
+
+- **Useful:** a queue row (no benchmark or calibration row) with press evidence from the outlet, its page made and its
+  status open, approved or created. Not declined, not unpublished, not a part retired into its whole. Enrichment entries do
+  not make an outlet useful; they are shown beside the mark.
+- **Marks:** none useful 30 calendar days after the first successful read: review; 60: consider dropping. Days without a run
+  are not treated apart. One useful proposal and the outlet is never marked again.
+- **First read and days read** are stored (`press_outlets.first_read`, `days_read`: 2xx or 304 other than robots.txt). A store
+  made before takes them from its articles' `found_at` and its last successful day.
+- **Credit:** where the article was read, not the outlet its evidence counts for in the queue: the question is what reading
+  the source gives, and most of Vallini's posts count as L'Osservatore Romano. Such candidates are told apart on his line.
+  The same article found in both outlets is credited to both. Enrichment entries are counted by work.
+- Never read (no entries, or never answered), removed, or no longer configured: shown as such, not marked.
+
+## Open: retention (author, 2026-11-23: "We'll cross that bridge when we get to it")
+
+Nothing is deleted today, and the bot's page says so. A rule matching "as long as a SeminaVerbi article or an article
+proposal cites it" would delete, for every article that no mention with route `candidate` (of a queue row not dropped or
+declined), `enrichment` or `waiting` points to, its mentions, fingerprint, cached Jev answers (`press:<sha1>`) and the
+title, date and scores of its row, keeping the bare URL (or a hash of it) so that it is not discovered, fetched and judged
+again. It would do so some weeks after the article was filtered or linked (to allow a redo, and a copy to be recognised),
+and, for an article cited until then, when its last citing row is dropped or declined, its enrichment entry is marked
+done, or the SeminaVerbi article no longer links it, which is the one thing the pipeline cannot see today.
 
 ## Precision (2026-11-23 dry run)
 
@@ -261,3 +325,99 @@ problems. What changed:
   does not separate them either (*A Silvia* and *Vous n'aurez pas ma haine* are named in one paragraph). Fixing this
   needs an article-level signal (for example the article's title given to the substantive question, or a cap on
   mentions per article), which is the author's call rather than wording tuned to this sample.
+
+## Angle and stance (author, 2026-11-23)
+
+Decided by the author: "Yes the article filter should ask for a faith or values angle, because an article could be
+critiquing an author or work that doesn't belong in SeminaVerbi, so we need the context to pick it up as a
+candidate".
+
+1. **Angle (filter).** An article at or above `culture_drop` is asked, as a question of its own, whether it treats the
+   work or artist with a faith or values angle, or through the human questions the Gospel addresses (mercy,
+   forgiveness, suffering, hope, justice...), favourably or critically, rather than as entertainment or industry
+   news. The angle may be implicit. Jev reads the title and opening; below the cut, at most three texts of the title
+   and the paragraphs around a mention (never other parts of the article), and the best score counts. Both that and
+   the opening's score are stored. `angle_drop` 0.40, as `culture_drop`: a drop is for good, while an article kept
+   wrongly still meets the pick, the substantive question, the stance and the votes.
+2. **Stance (link).** Each kept mention is asked, over at most three windows of at most 150 words with the title, what
+   the article makes of the item (its label and description) in the light of the Gospel: a Jev `Choice` of `bearing`
+   (finds something that bears on the Gospel), `mixed` (that, and criticism), `neutral` (neither) and `critical` (only
+   criticism). `stance_keep` 0.50 applies to the best window's bearing + mixed: the four probabilities sum to 1, so
+   above half means that finding something is likelier than not, and the best of three windows is already lenient.
+   Otherwise the outcome is `critical` when a window gives that 0.50 or more, else `neutral`.
+   - Bearing and mixed may become candidates. Neutral and critical may not (route `dropped`): no queue evidence, no
+     sitelink-floor exemption, no dossier note. This holds for mentions released from `waiting` too.
+   - For a work SeminaVerbi covers, every mention goes to the enrichment list; only `critical` is marked there, since
+     it can inform the discernment section.
+   - Existing stores gain the columns by a guarded ALTER. A mention without an outcome (never asked, or with the first
+     version's single score) stays as it is and is not critical.
+
+The first version asked one score ("finds something that bears on the Gospel rather than only criticising") and took
+a low one as critical. On real pages it marked *Heidi* (0.07) and *Jeeg* (0.08), named in a list in an article on the
+Panini album, as critical: neutral mentions.
+
+**Replay of the dry run's 200 articles** (the single-score version, f2b8251, with the page detection of 6b2d257):
+129 dropped by culture (the same 129 as before), 13 dropped by angle, 11 section or home pages skipped (6 of them
+among the 135 the culture filter had dropped, 5 among the 65 kept), 2 Avvenire articles not read (HTTP 503), 45 kept
+and linked, 12 mentions (31 before). Of the 58 asked for the angle the opening showed it for 42, a later text for 3.
+The Pattinson article went at the angle (0.08), and its Bond titles and *The Batman* with it. No linked mention was
+critical (the one article that looks critical by its title, on the Tg1, fell at the angle, 0.37), so **the `critical`
+and `mixed` outcomes are untested on real pages**. L'Osservatore Romano's pages were read with garbled accents
+(served without a charset; fixed in 8321aa5 on another branch), so their verdicts are provisional.
+
+**Stance asked again** with the Choice for those 12 mentions: 8 bearing, 4 neutral (*Heidi*, *Jeeg*, *The Birth of
+Venus* 0.33, and *Una pura formalità* 0.31, a wanted find), none critical or mixed. A cut of 0.40 gives the same
+outcomes. The combined code has not had a full run.
+
+## Gaetano Vallini's blog (2026-11-23)
+
+Added by the author as a twelfth outlet, `vallini`: https://gaetanovallini.blogspot.com/ ("Camera con vista"), where a
+journalist of L'Osservatore Romano republishes his articles. Only the labels Cinema, Film, Musica, Letteratura, Libri
+and Romanzo. Checked with our user agent on 2026-11-23, on 53 posts (2008–2025) of the feeds.
+
+- **Discovery.** Blogger's label feeds, `orderby=updated` (newest change first), cut with `updated-max` (inclusive;
+  the cut is asked a second later so that either reading overlaps). Offsets are never used. Per feed the store keeps
+  (`press_walks`) the date the archive has been read down to and a mark; every run first reads from the top down to the
+  mark, then goes on with the archive. Both move only once every entry above them is taken, so an interrupted run
+  re-reads at most the pages since, and known URLs are dropped. A new, edited, backdated or newly labelled post has
+  changed, so it comes to the top. Conditional requests only for the top page, whose validators are kept only after a
+  complete pass. More posts changed in one second than a page holds: the page is enlarged (to 400), then reported.
+- **Reading.** The pages are a Blogger dynamic view: no text without script, also with `?m=1` and `?v=0`. Each post is
+  read from its own feed entry (`?path=`). Its content is paragraphs in any block element or none; blocks and double
+  line breaks end a paragraph. HTML of any outlet served without a charset (L'Osservatore Romano's) is now read as
+  UTF-8 when it is UTF-8: it was read as Latin-1, with garbled accents.
+- **Cap.** `max_per_day` 40, on articles added and read in a UTC day. The outlet's share of a run (at most half of what the day has left) is attempted
+  first; its failures count toward the cap and go behind its untried articles.
+- **Attribution.** 47 of the 53 posts state the newspaper's issue, in a paragraph of its own (2022 on) or after © or
+  "Copyright" (before), with the date as "8 novembre 2025", "21-22 ottobre 2019" (the first day is taken),
+  "18.01.2008" or "16/17.1.2006". Those forms and no other count; the newspaper named in the text does not (a 2011 post
+  quotes "«L'Osservatore Romano» del 13 ottobre"), nor do credits of different dates. The rest is the blog's own.
+- **Duplicates.** At extraction, for this pair of outlets only, the 64 smallest hashes of the text's 5-word runs are
+  kept; their overlap estimates the text in common. One article: overlap ≥ 0.50; or ≥ 0.25 with the same title (three
+  words or more) and the post's stated issue within three days of the newspaper's date. Below about 100 words there is no
+  fingerprint and no merge. On the real posts, 1378 pairs of different articles overlap by 0.016 at most; the same text
+  with 3% of its words changed overlaps by 0.56 at least (always found), with 5% 0.44 at least (50 of 53 found by the text,
+  all with title and date), with 8% by 0.38 (20 of 53 by the text). No original of a saved post was at hand, so finding
+  a pair was tested only on synthetic texts and on edited copies.
+- **What follows from a duplicate.** The second copy, either way round, is not judged: skipped, "duplicate". The
+  evidence counts for the newspaper in the queue (also for a post that states its issue but whose original was not
+  found), the dossier has one note and the enrichment page one entry, with both links; closing either URL closes it.
+  A row's per-outlet press evidence (and its `press:` sources) is always recomputed from its supporting mentions (routed as
+  candidates, not neutral or critical) under the outlet each counts for now, when a mention is routed and after filter,
+  link and route (never in a dry run). On a pending row a change rebuilds the dossier, and triage again when it gained or
+  lost the exemption from the sitelink floor; with no support left the exemption is gone, and the last `press:` source
+  stays only on a row with no other, as what found it. On a row with a status only the evidence is corrected: its outcomes,
+  dossier, proposal and status stay. Benchmark rows are not triaged again. `press outlets` does not read this map: it
+  credits the outlet where the article was read.
+  Copies form one group under the newspaper's first URL found, other newspaper URLs of the article included; a match with
+  members of two groups joins them whole. A new copy is judged only when no member was. Where members were judged apart
+  before they were joined, keep wins (a drop is for good): the verdicts and mentions stay as they are, so a kept article's
+  mentions stand beside a dropped copy, two kept ones count once in the evidence, the notes and the enrichment page, and
+  an entry marked done under any member's URL is done for the group.
+- **Known limits.** Missed: originals for subscribers only (no text, so no fingerprint), partly shown or heavily edited
+  ones, posts that gather several of the paper's articles (one is cited under Vallini whole), articles filtered before
+  fingerprints existed. A false merge needs half the text in common: an article reprinted with an update. A copy that
+  changes no evidence (its post already counted for the newspaper) adds its link when the dossier is next rebuilt, and one
+  found once a row has a status never changes that row's proposal. The author is not checked: a post
+  with another's article is attributed to Vallini.
+- **Kept, beyond the list above:** the fingerprint (hashes only; no text can be read from them).

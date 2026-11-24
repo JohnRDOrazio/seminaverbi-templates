@@ -82,3 +82,30 @@ def test_text_over_150_words_is_refused(queue):
         judge.substantive("u", "X", long, "X — y")
     assert fake.calls == []
     PressJudge(Counting({"culture": 0.5}), queue).culture("u", " ".join(["w"] * 150))
+
+
+def test_angle_is_its_own_question(queue):
+    from pipeline.press.judge import ANGLE
+    fake = Counting({"angle": 0.7})
+    assert PressJudge(fake, queue).angle(URL, "Title. Text.") == 0.7
+    assert fake.calls[0]["questions"]["angle"].instructions == ANGLE
+    for word in ("mercy", "forgiveness", "suffering", "hope", "justice", "implicit", "casting", "ratings", "gossip"):
+        assert word in ANGLE
+    with pytest.raises(ValueError):
+        PressJudge(fake, queue).angle(URL, " ".join(["w"] * 151))
+
+
+def test_stance_is_a_choice_of_four_outcomes(queue):
+    from pipeline.press.judge import STANCE, STANCES
+    probs = {"bearing": 0.1, "mixed": 0.2, "neutral": 0.6, "critical": 0.1}
+    fake = Counting({"stance": choice(probs, 0.5)})
+    judge = PressJudge(fake, queue)
+    assert judge.stance(URL, "Ben-Hur", "passage", "Ben-Hur — 1959 film", "Titolo") == probs
+    q = fake.calls[0]["questions"]["stance"]
+    assert q.instructions == STANCE and q.criteria == {k: {"name": v} for k, v in STANCES.items()}
+    assert list(STANCES) == ["bearing", "mixed", "neutral", "critical"]
+    assert fake.calls[0]["state"] == {"title": "Titolo", "text": "passage", "mention": "Ben-Hur",
+                                      "item": "Ben-Hur — 1959 film"}
+    assert "`item`" in STANCE and "`title`" in STANCE
+    with pytest.raises(ValueError):  # title and passage together
+        judge.stance(URL, "X", " ".join(["w"] * 149), "X", "two words")

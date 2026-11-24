@@ -82,6 +82,23 @@ class Queue:
         self.db.commit()
         return True
 
+    def set_press(self, qid, press: dict, sources: list, redo: int | None = None):
+        """The row's press evidence (stage-0 data) and its sources and, with `redo`, its outcomes from that stage on
+        cleared, in one transaction."""
+        old = self.db.execute("SELECT data_json FROM outcomes WHERE qid=? AND stage=0", (qid,)).fetchone()
+        data = {**(json.loads(old["data_json"]) if old else {}), "press": press}
+        with self.db:
+            self.db.execute("INSERT OR REPLACE INTO outcomes VALUES (?,0,'pass',?,?)",
+                            (qid, json.dumps(data), time.time()))
+            self.db.execute("UPDATE candidates SET sources=? WHERE qid=?", (json.dumps(sources), qid))
+            if redo is not None:
+                self.db.execute("DELETE FROM outcomes WHERE stage>=? AND qid=?", (redo, qid))
+
+    def press_qids(self) -> list[str]:
+        """The rows that have, or had, press evidence."""
+        return [r["qid"] for r in self.db.execute(
+            "SELECT qid FROM outcomes WHERE stage=0 AND json_type(data_json, '$.press') IS NOT NULL ORDER BY qid")]
+
     def _rows(self, where: str, args: tuple, limit: int | None = None) -> list[Row]:
         sql = f"SELECT * FROM candidates WHERE {where} ORDER BY added_at, qid"
         if limit is not None:

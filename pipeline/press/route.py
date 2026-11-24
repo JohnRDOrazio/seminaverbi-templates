@@ -1,6 +1,7 @@
 """Routing the kept mentions: to the enrichment list (SeminaVerbi already covers the item), into the queue as a
 candidate of the mention's domain (source `press:<outlet>`), or to `waiting` (its domain has no module yet; released
-later with the same coverage decision).
+later with the same coverage decision). A mention whose article is neutral on the item or
+only critical of it never reaches the queue (route `dropped`), but still goes to the enrichment list of a covered work.
 
 A mention keeps its route once set, so routing twice adds neither a second candidate nor a second enrichment entry.
 The queue is keyed by QID alone: a mention of a QID that is already a row of another domain is decided and recorded
@@ -9,6 +10,7 @@ under that row's domain, and its evidence goes to that row.
 from __future__ import annotations
 
 import sys
+from dataclasses import replace
 
 import requests
 
@@ -29,8 +31,9 @@ def lookup_failed(mention, e) -> None:
 
 
 def _outlet(store, url: str) -> str | None:
-    found = store.db.execute("SELECT outlet FROM press_articles WHERE url=?", (url,)).fetchone()
-    return found[0] if found else None
+    """The outlet the article's evidence counts for."""
+    found = store.article(url)
+    return found.evidence_outlet if found else None
 
 
 def _labels(entity: dict) -> dict:
@@ -46,24 +49,66 @@ def _provisional(mention, entity: dict) -> Row:
     return Row(mention.qid, mention.domain, [], _labels(entity), _sitelinks(entity), False)
 
 
-def _add_candidate(queue, mention, outlet: str, entity: dict, domain: str, stage0: dict | None = None) -> None:
+def _evidence(store, qid: str, routing=None) -> dict[str, float]:
+    """{outlet: the highest probability of the item's supporting mentions that count for it now}; supporting: routed as
+    candidates (or `routing`, the one being routed) and not judged neutral or critical."""
+    press: dict[str, float] = {}
+    for m in store.mentions(qid=qid):
+        art = store.article(m.url)
+        if art is None or not m.supports or (m.route != "candidate" and (routing is None or m.url != routing.url)):
+            continue
+        press[art.evidence_outlet] = max(m.p, press.get(art.evidence_outlet, 0.0))
+    return press
+
+
+def _sources(old: list[str], press: dict[str, float]) -> list[str]:
+    """The row's sources, the press ones as `press` has them; the old ones stay on a row that would have none left (what
+    found it; a row with no source is not held to the sitelink floor)."""
+    now = [f"press:{o}" for o in press]
+    kept = [s for s in old if not s.startswith("press:") or s in now]
+    return kept + [s for s in now if s not in kept] or old
+
+
+def _reconcile(store, queue, qid: str, routing=None) -> None:
+    """Make the row's press evidence what its supporting mentions say (see _evidence). Its evidence is corrected whatever
+    its status; its outcomes only when it has none: it is triaged again when it gained or lost the exemption from the
+    sitelink floor (never a benchmark row), and else its dossier is built again."""
+    row = queue.row(qid)
+    if row is None:
+        return
+    stage0 = row.data.get(0, {})
+    old, press = stage0.get("press") or {}, _evidence(store, qid, routing)
+    sources = _sources(row.sources, press)
+    if press == old and sources == row.sources and routing is None:
+        return
+    redo = None
+    if row.status is None and (press != old or routing is not None):
+        was, triage = common.press_exempt(row), row.outcomes.get(2)
+        now = common.press_exempt(replace(row, data={**row.data, 0: {**stage0, "press": press}}))
+        if triage == "drop" and now and (routing is not None or not was):
+            redo = 2  # dropped (under the sitelink floor) before this evidence
+        elif triage == "pass" and was and not now and not row.calibration:
+            redo = 2  # it may have passed by the exemption alone
+        elif 4 in row.outcomes:  # the notes are not those the dossier was built with
+            redo = 4
+    queue.set_press(qid, press, sources, redo)
+
+
+def reconcile(store, queue) -> None:
+    """Every row's press evidence, after articles were read: a copy found changes the outlet an earlier article counts for,
+    and no mention need be routed for it."""
+    for qid in dict.fromkeys([*queue.press_qids(), *(m.qid for m in store.mentions(route="candidate"))]):
+        _reconcile(store, queue, qid)
+
+
+def _add_candidate(store, queue, mention, outlet: str, entity: dict, domain: str, stage0: dict | None = None) -> None:
     """Add the mention's item to the queue under `domain`, or its source and press probability to the row it has.
     `stage0`: the domain's own stage-0 data for a new row (e.g. a literature series' volumes)."""
-    existing = queue.row(mention.qid)
-    press = dict(existing.data.get(0, {}).get("press", {})) if existing else {}
-    press[outlet] = max(mention.p, press.get(outlet, 0.0))
-    data = {"press": press}
-    sitelinks = _sitelinks(entity)
-    if existing is None:  # what triage reads of a row the domain's own queries did not make
-        data |= {"count": len(sitelinks), "instance_of": common.qids(entity, "P31")} | (stage0 or {})
+    sitelinks, data = _sitelinks(entity), None
+    if queue.row(mention.qid) is None:  # what triage reads of a row the domain's own queries did not make
+        data = {"count": len(sitelinks), "instance_of": common.qids(entity, "P31")} | (stage0 or {})
     queue.add(mention.qid, domain, f"press:{outlet}", _labels(entity), sitelinks, data=data)
-    row = queue.row(mention.qid)
-    if not existing or row.status is not None:
-        return
-    if row.outcomes.get(2) == "drop" and common.press_exempt(row):
-        queue.redo(2, mention.qid)  # dropped (under the sitelink floor) before this evidence: triaged again
-    elif 4 in row.outcomes:  # a mention is routed once: its passages are new to the stored dossier
-        queue.redo(4, mention.qid)
+    _reconcile(store, queue, mention.qid, routing=mention)
 
 
 def owner(queue, qid: str, domain: str) -> str:
@@ -86,14 +131,15 @@ def _route(store, queue, mention, outlet: str, domain: str, entity: dict, repo, 
         print(f"press: {mention.qid} in {mention.url}: already a {under} candidate, routed as {under}",
               file=sys.stderr)
     if kind == "candidate":
-        _add_candidate(queue, mention, outlet, entity, under, stage0)
+        _add_candidate(store, queue, mention, outlet, entity, under, stage0)
     # the domain and the route together, once the candidate is in: an interruption leaves the mention as it was
     store.set_route(mention.url, mention.qid, kind, under if under != domain else None)
     return kind
 
 
 def decide(mention, domain: str, entity: dict, repo, wikis, sparql=None) -> tuple[str, dict]:
-    """("enrichment" or "candidate", stage-0 data) for the mention's item under `domain`, with the coverage check
+    """("enrichment", "candidate" or, for a neutral or only critical mention of a work not covered, "dropped"; stage-0
+    data) for the mention's item under `domain`, with the coverage check
     stage 1 runs: the domain's own `covered` when it has one (literature: a series covered through a volume),
     else stages.covered. A domain module may give `press_stage0(qid, entity, sparql) -> dict`, the stage-0 data
     that check needs for an item none of its queries added (literature: a series' volumes; music and art: a
@@ -106,7 +152,9 @@ def decide(mention, domain: str, entity: dict, repo, wikis, sparql=None) -> tupl
     row.data = {0: stage0}
     covered = getattr(module, "covered", None) or stages.covered
     outcome = covered(row, repo, wikis)[0]
-    return ("enrichment" if outcome in ("drop", "translation") else "candidate"), stage0
+    if outcome in ("drop", "translation"):
+        return "enrichment", stage0
+    return ("candidate" if mention.supports else "dropped"), stage0
 
 
 def _route_one(store, queue, mention, outlet: str, repo, wikis, wikidata, sparql) -> str | None:
@@ -137,6 +185,7 @@ def route(store, queue, repo, wikis, wikidata, sparql=None) -> dict[str, int]:
             kind = "errors"
         if kind is not None:
             counts[kind] = counts.get(kind, 0) + 1
+    reconcile(store, queue)
     return counts
 
 
@@ -153,3 +202,4 @@ def release_waiting(store, queue, domain: str, repo, wikis, wikidata, sparql=Non
         if kind is not None:
             counts[kind] = counts.get(kind, 0) + 1
     return counts
+

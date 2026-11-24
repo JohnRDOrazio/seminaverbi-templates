@@ -36,8 +36,9 @@ PAGES = {
     A3: html("La partita", "Una partita di calcio senza nulla di culturale."),
 }
 
-PRESS = {"user_agent": "SeminaVerbi-press/1.0 (+test)", "delay_seconds": 0, "max_articles_per_run": 200,
-         "culture_drop": 0.4, "pick_p": 0.8, "pick_confidence": 0.6, "mention_keep": 0.6, "press_exempt": 0.6,
+PRESS = {"user_agent": "SeminaVerbi-press/1.0 (+test)", "delay_seconds": 0, "max_articles_per_day": 200,
+         "culture_drop": 0.4, "pick_p": 0.8, "pick_confidence": 0.6, "mention_keep": 0.6,
+         "angle_drop": 0.4, "stance_keep": 0.5, "press_exempt": 0.6,
          "waiting_classes": {"music": ["Q7366"]},
          "outlets": [{"id": "sir", "name": "SIR", "base": "https://news.example", "langs": ["it"],
                       "entries": [FEED], "culture_paths": ["/cultura/"], "since": None},
@@ -74,6 +75,14 @@ class FakeJudge:
     def culture(self, url, text):
         self.asked.append(("culture", url))
         return 0.1 if url == A3 else 0.9
+
+    def angle(self, url, text):
+        self.asked.append(("angle", url))
+        return 0.7
+
+    def stance(self, url, label, passage, item, title):
+        self.asked.append(("stance", url))
+        return {"bearing": 0.7, "mixed": 0.1, "neutral": 0.15, "critical": 0.05}
 
     def pick(self, url, passage, label, options):
         assert len(options) == 1, "one hit per title"
@@ -171,7 +180,8 @@ def test_dry_run_writes_nothing_to_queue_or_wiki(press, monkeypatch, capsys):
     store = PressStore.of(Queue(db))
     assert store.unrouted() and all(m.route is None for m in store.mentions())
     assert "enrichment" in out and "candidate" in out and "Q1" in out and "Q2" in out
-    assert "p=0.80" in out and "culture=0.90" in out
+    assert "p=0.80" in out and "culture=0.90" in out and "angle=0.70" in out and "stance=0.80 (bearing)" in out
+    assert ("angle", A3) not in fakes["judge"].asked  # below culture_drop: not asked
     assert "1/2" in out  # share of mentions hitting existing SeminaVerbi articles
     assert store.article(A3).outcome == "drop"
 
@@ -286,16 +296,17 @@ def test_outlets_config():
     cfg = json.loads((ROOT / "config/press.json").read_text())
     ids = [o["id"] for o in cfg["outlets"]]
     assert ids == ["osservatore", "vaticannews", "avvenire", "romasette", "ewtn", "civilta", "famigliacristiana",
-                   "aleteia", "ncregister", "kto", "sir"]
+                   "aleteia", "ncregister", "kto", "sir", "vallini"]
     for o in cfg["outlets"]:
         assert o["entries"] or o.get("note"), o["id"]
     assert cfg["user_agent"].startswith("SeminaVerbi-press/1.0 ")
+    assert cfg["max_articles_per_day"] == 250
 
 
 def test_press_bot_page_text():
     text = (ROOT / "docs/press-bot-page.wiki").read_text()
     assert "Catholic Digital Commons Foundation" in text and "SeminaVerbi-press" in text
-    assert "25 words" in text and "200" in text and "@" not in text
+    assert "25 words" in text and "At most 250 articles per day, across all the outlets it reads." in text and "@" not in text
 
 
 def test_a_jev_error_on_one_article_still_filters_the_others(press, capsys):
@@ -340,3 +351,25 @@ def test_a_wikidata_error_on_one_article_still_links_the_other_and_routes(press,
     assert f"press: sir {A1}: wikidata timed out" in captured.err
     assert "errors 1" in captured.out
     assert "press route: candidate 1" in captured.out and "press enrich:" in captured.out
+
+
+def test_the_vallini_blog_config():
+    cfg = json.loads((ROOT / "config/press.json").read_text())
+    by_id = {o["id"]: o for o in cfg["outlets"]}
+    o = by_id["vallini"]
+    labels = ("Cinema", "Film", "Musica", "Letteratura", "Libri", "Romanzo")
+    assert [e["url"] for e in o["entries"]] == [f"{o['base']}/feeds/posts/summary/-/{x}" for x in labels]
+    assert all(e["walk"] and e["lang"] == "it" for e in o["entries"])
+    assert o["max_per_day"] == 40 < cfg["max_articles_per_day"]
+    assert o["republishes"] in by_id and o["name"] == f"{o['author']}, Camera con vista"
+    assert "{path}" in o["article_feed"] and o["article_feed"].startswith(o["base"])
+
+
+@pytest.mark.parametrize("action", ["filter", "link", "route"])
+@pytest.mark.parametrize("dry", [False, True])
+def test_the_queues_press_evidence_is_corrected_after_each_stage_but_not_in_a_dry_run(press, action, dry):
+    db, _ = press
+    q = Queue(db)
+    q.add("Q7", "film", "press:sir", {}, {}, data={"count": 3, "press": {"sir": 0.9}})  # no mention supports it
+    assert cli.main(["press", action, "--db", str(db)] + ["--dry-run"] * dry) == 0
+    assert Queue(db).row("Q7").data[0]["press"] == ({"sir": 0.9} if dry else {})
