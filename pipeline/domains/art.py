@@ -130,7 +130,7 @@ def candidates(queue, sparql, wikipedia, cfg: dict, wikidata=None, covered=None)
         added += common.fold_parts(queue, sparql, listed, "list", "art", WORK_CLASSES, STOP_CLASSES,
                                     recheck=covered)
     finally:  # a failed source keeps the rows already written: the benchmark works among them are held all the same
-        _hold_benchmark(queue, art.get("benchmark", []))
+        hold_benchmark(queue, cfg)
     return added
 
 
@@ -224,6 +224,11 @@ def dossier_stage(row, cfg: dict, wiki_for, wikidata) -> tuple[str, dict]:
 
 def _hold_benchmark(queue, benchmark: list[dict]) -> None:
     benchmark_code.hold(queue, "art", benchmark)
+
+
+def hold_benchmark(queue, cfg: dict) -> None:
+    """Hold back the configured benchmark works, whatever source found them (see domains.hold_benchmarks)."""
+    _hold_benchmark(queue, cfg.get("art", {}).get("benchmark", []))
 
 
 def add_calibration(queue, sparql, qids: list[str], benchmark: list[dict] | None = None) -> int:

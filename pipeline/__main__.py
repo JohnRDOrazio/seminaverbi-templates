@@ -20,7 +20,7 @@ import sys
 from typesafe_sdk import TypeSafeError
 
 from pipeline import calibration, load_config, stages
-from pipeline.domains import DOMAINS
+from pipeline.domains import DOMAINS, hold_benchmarks
 from pipeline.domains.common import domain_config
 from pipeline.publish import approved_report, publish, sync_votes
 from pipeline.press.fetch import load_press_config
@@ -202,6 +202,7 @@ def cmd_candidates(args, queue, cfg):
         return
     wikis = _wikis()
     released = release_waiting(press, queue, args.domain, _repo(wikis), wikis, _wikidata(), _sparql())
+    hold_benchmarks(queue, cfg)
     if released:
         print(f"candidates: press mentions released from waiting: {released.get('candidate', 0)} as candidates, "
               f"{released.get('enrichment', 0)} to the enrichment list")
@@ -216,18 +217,22 @@ def cmd_stage(args, queue, cfg):
     stage = next(n for n, name in NAMES.items() if name == args.command)
     if stage == 4:
         _require(args, "dossier_stage")
+    hold_benchmarks(queue, cfg)
     fn = _stage_functions(DOMAINS[args.domain], queue, cfg)[stage]
     _show(args.command, stages.run_stage(queue, stage, fn, limit=_limit(stage, cfg), domain=args.domain))
 
 
 def cmd_publish(args, queue, cfg, editor=None):
-    print(f"publish: {publish(queue, editor or _editor(), cfg, domain=args.domain)} pages written")
+    editor = editor or _editor()
+    hold_benchmarks(queue, cfg)
+    print(f"publish: {publish(queue, editor, cfg, domain=args.domain)} pages written")
 
 
 def cmd_run(args, queue, cfg):
     _require(args, "dossier_stage")
     editor = _editor() if args.publish else None  # missing credentials fail before any stage runs
     cmd_candidates(args, queue, cfg)
+    hold_benchmarks(queue, cfg)
     fns = _stage_functions(DOMAINS[args.domain], queue, cfg)
     for stage in (1, 2, 3, 4, 5):
         _show(NAMES[stage], stages.run_stage(queue, stage, fns[stage], limit=_limit(stage, cfg),
@@ -375,6 +380,7 @@ def cmd_press(args, queue, cfg):
             print("\n".join(press_stages.preview(store, repo(), wikis(), wikidata(), _sparql(), queue)))
         else:
             print("press route: " + _counts(route(store, queue, repo(), wikis(), wikidata(), _sparql())))
+            hold_benchmarks(queue, cfg)
     if action in ("enrich", "run") and not dry:
         titles = press_stages.titles(store, repo(), wikidata())
         written = publish_enrichment(store, editor, outlets, titles)

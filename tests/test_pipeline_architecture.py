@@ -495,35 +495,47 @@ WANTED = {
     "en": ["History", "Historical background", "Construction", "Architecture", "Architectural style", "Design", "Plan",
            "Exterior", "Interior", "Decoration", "Art and treasures", "Iconography", "Symbolism", "Mosaics",
            "Stained glass", "Stained-glass windows", "Sculptures", "Façade", "West facade", "Liturgical use", "Worship",
-           "Pilgrimage", "Consecration", "Dedication", "Significance", "Interpretations"],
+           "Pilgrimage", "Consecration", "Dedication", "Significance", "Interpretations",
+           "Art", "Works of art", "Arts", "Artworks", "Artistic features", "Floor plan", "Plans", "Plan and elevation", "Designs", "Designed spaces", "Decorative scheme"],
     "it": ["Storia", "Cenni storici", "Costruzione", "Architettura", "Progetto", "Pianta", "Esterno", "Interni",
            "Decorazioni", "Opere d'arte", "Iconografia", "Simbolismo", "Mosaici", "Vetrate", "Sculture", "La scultura",
            "Facciate", "Liturgia", "Culto", "Pellegrinaggi", "Consacrazione", "Dedicazione", "Significato",
-           "Interpretazioni"],
+           "Interpretazioni",
+           "Progetti", "Esterni", "Interno", "Culti", "Arti figurative", "Arte", "Artisti", "Piante"],
     "es": ["Historia", "Contexto histórico", "Construcción", "Arquitectura", "Diseño", "Planta", "Exterior",
            "Interiores", "Decoración", "Arte", "Iconografía", "Simbología", "Símbolos", "Mosaicos", "Vidrieras",
            "Vitrales", "Esculturas", "Fachadas", "Liturgia", "Uso litúrgico", "Culto", "Peregrinación",
-           "Consagración", "Dedicación", "Significado", "Interpretaciones"],
+           "Consagración", "Dedicación", "Significado", "Interpretaciones",
+           "Proyectos", "Diseños", "Artes decorativas", "Artísticas", "Obras de arte"],
     "fr": ["Histoire", "Historique", "Construction", "Architecture", "Conception", "Plan", "Extérieur", "Intérieur",
            "Décoration", "Décors", "Œuvres d'art", "Art sacré", "Iconographie", "Symbolique", "Mosaïques", "Vitraux",
            "Sculptures", "Façades", "Liturgie", "Culte", "Pèlerinage", "Consécration", "Dédicace", "Signification",
-           "Interprétations"],
+           "Interprétations",
+           "Art", "L'art", "L’art", "Arts décoratifs", "Projets", "Plans", "Œuvres"],
     "de": ["Geschichte", "Baugeschichte", "Bau", "Architektur", "Baubeschreibung", "Entwurf", "Grundriss", "Äußeres",
            "Außenbau", "Inneres", "Innenraum", "Ausstattung", "Kunstwerke", "Ikonographie", "Ikonografie",
            "Symbolik", "Mosaiken", "Fenster", "Glasfenster", "Glasmalereien", "Skulpturen", "Fassade", "Liturgie",
-           "Gottesdienste", "Wallfahrt", "Weihe", "Patrozinium", "Bedeutung", "Deutung", "Interpretation"],
+           "Gottesdienste", "Wallfahrt", "Weihe", "Patrozinium", "Bedeutung", "Deutung", "Interpretation",
+           "Entwürfe", "Pläne", "Plan", "Wandmalerei", "Wandmalereien", "Deckenmalerei", "Wiederaufbau", "Aufbau", "Umbau", "Umbauten", "Kirchenfenster", "Bauzeit", "Bauphasen", "Bauwerk", "Neubau", "Innenausstattung", "Äußere Gestalt", "Fresken"],
     "pt": ["História", "Contexto histórico", "Construção", "Arquitetura", "Arquitectura", "Projeto", "Planta",
            "Exterior", "Interior", "Decoração", "Arte", "Iconografia", "Simbolismo", "Símbolos", "Mosaicos",
            "Vitrais", "Esculturas", "Fachadas", "Liturgia", "Uso litúrgico", "Culto", "Peregrinações", "Consagração",
-           "Dedicação", "Significado", "Interpretação"],
+           "Dedicação", "Significado", "Interpretação",
+           "Projetos", "Obras de arte", "Artes", "Artístico", "Plantas"],
 }
 UNWANTED = {
-    "en": ["See also", "References", "External links", "Gallery", "Bibliography"],
-    "it": ["Note", "Voci correlate", "Bibliografia", "Collegamenti esterni", "Altri progetti"],
-    "es": ["Véase también", "Referencias", "Enlaces externos", "Bibliografía"],
-    "fr": ["Articles connexes", "Voir aussi", "Notes et références", "Liens externes", "Bibliographie"],
-    "de": ["Weblinks", "Literatur", "Einzelnachweise", "Siehe auch"],
-    "pt": ["Ver também", "Referências", "Ligações externas", "Bibliografia"],
+    "en": ["See also", "References", "External links", "Gallery", "Bibliography",
+           "Articles", "Arthurian legend", "Planets", "Heritage designation", "Designation", "Sister projects"],
+    "it": ["Note", "Voci correlate", "Bibliografia", "Collegamenti esterni", "Altri progetti",
+           "Internet", "Articoli", "Nella cultura di massa", "Internazionale", "Artefici vari"],
+    "es": ["Véase también", "Referencias", "Enlaces externos", "Bibliografía",
+           "Proyectos hermanos", "Artículos", "Artesanos"],
+    "fr": ["Articles connexes", "Voir aussi", "Notes et références", "Liens externes", "Bibliographie",
+           "Autres projets", "Article connexe", "Articles", "Planches"],
+    "de": ["Weblinks", "Literatur", "Einzelnachweise", "Siehe auch",
+           "Bauernkrieg", "Bauern", "Innenstadt", "Außenpolitik", "Schwesterprojekte", "Planeten"],
+    "pt": ["Ver também", "Referências", "Ligações externas", "Bibliografia",
+           "Outros projetos", "Outros projectos", "Artigos relacionados", "Projetos irmãos"],
 }
 
 
@@ -531,8 +543,22 @@ UNWANTED = {
 def test_the_headings_read(lang):
     words = architecture.HEADINGS[lang]
     assert len(words) == len(set(words)) and all(w == w.lower() for w in words)
-    assert [h for h in WANTED[lang] if not common.wanted(h, words)] == []
-    assert [h for h in UNWANTED[lang] if common.wanted(h, words)] == []
+    skip = architecture.LINK_SECTIONS
+    assert [h for h in WANTED[lang] if not common.wanted(h, words, skip)] == []
+    assert [h for h in UNWANTED[lang] if common.wanted(h, words, skip)] == []
+
+
+def test_a_fragment_with_a_trailing_blank_is_a_whole_word():
+    assert common.wanted("L'art", ("art ",)) and common.wanted("Art sacré", ("art ",))
+    assert not common.wanted("Articles", ("art ",))
+
+
+def test_link_sections_are_left_out_of_the_dossier():
+    pages = {("it", "wikipedia"): {"T": [("Progetti", "p"), ("Altri progetti", "x"), ("Collegamenti esterni", "y")]},
+             ("fr", "wikipedia"): {"T": [("Projets", "p"), ("Autres projets", "x")]}}
+    d = architecture.dossier(drow({"itwiki": "T", "frwiki": "T"}), DC, wiki_for_pages(pages),
+                             FakeWikidataEntities({"Q1": entity()}))
+    assert [n["heading"] for n in d["notes"]] == ["Progetti", "Projets"]
 
 
 # --- calibration and the benchmark ---
@@ -579,8 +605,11 @@ def test_calibration_defaults_to_the_configured_benchmark(q, monkeypatch):
 def test_the_configured_benchmark():
     bench = load_config()["architecture"]["benchmark"]
     assert len({b["qid"] for b in bench}) == len(bench) == 18
-    kinds = [b["kind"] for b in bench]
-    assert (kinds.count("strong"), kinds.count("weak"), kinds.count("control")) == (11, 4, 3)
+    assert {kind: {b["qid"] for b in bench if b["kind"] == kind} for kind in ("strong", "weak", "control")} == {
+        "strong": {"Q48435", "Q180274", "Q2981", "Q12506", "Q193193", "Q638250", "Q721817", "Q1303856", "Q12512",
+                   "Q963954", "Q187702"},
+        "weak": {"Q493133", "Q624556", "Q254476", "Q3082361"},
+        "control": {"Q243", "Q45178", "Q179199"}}
     assert all(b["name"] for b in bench)
 
 

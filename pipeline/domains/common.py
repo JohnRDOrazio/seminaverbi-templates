@@ -129,13 +129,17 @@ def sections(wiki, title: str) -> list[tuple[str, str]]:
         raise
 
 
-def wanted(heading: str, words: Iterable[str]) -> bool:
-    """True when one of `words` (lower-case fragments) starts a word of the section heading."""
-    low = heading.lower()
+def wanted(heading: str, words: Iterable[str], skip: Iterable[str] = ()) -> bool:
+    """True when one of `words` (lower-case fragments) starts a word of the section heading; a fragment with a trailing
+    blank is a whole word, at the end of the heading too. A heading of `skip` (whole, lower-case) is not wanted."""
+    if heading.strip().lower() in skip:
+        return False
+    low = heading.lower() + " "
     return any(re.search(rf"\b{re.escape(word)}", low) for word in words)
 
 
-def read_page(wikipedia, title: str, lang: str, words: Iterable[str], label: str | None = None) -> list[dict]:
+def read_page(wikipedia, title: str, lang: str, words: Iterable[str], label: str | None = None,
+              skip: Iterable[str] = ()) -> list[dict]:
     """The lead and the sections of one page whose heading is `wanted`, as dossier notes, headed by `label`
     ("<label> / <heading>") for a page read with another."""
     words = tuple(words)
@@ -143,7 +147,7 @@ def read_page(wikipedia, title: str, lang: str, words: Iterable[str], label: str
     if lead := wikipedia.lead(title):
         notes.append({"lang": lang, "url": wikipedia.url(title), "heading": label or "Lead", "text": lead})
     for head, text in sections(wikipedia, title):
-        if text and wanted(head, words):
+        if text and wanted(head, words, skip):
             notes.append({"lang": lang, "url": wikipedia.url(title),
                           "heading": f"{label} / {head}" if label else head, "text": text})
     return notes

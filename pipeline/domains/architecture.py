@@ -197,16 +197,16 @@ def candidates(queue, sparql, wikipedia, cfg: dict, wikidata=None) -> int:
         for row in benchmark_code.listed(sparql, "architecture", [w["qid"] for w in arch["works"]]):
             added += _add(queue, row, "list")
     except BaseException:  # a failed source keeps the rows already written; its error is the one that propagates
-        _finish(queue, arch, cfg, in_flight=True)
+        _finish(queue, cfg, in_flight=True)
         raise
-    _finish(queue, arch, cfg, in_flight=False)
+    _finish(queue, cfg, in_flight=False)
     return added
 
 
-def _finish(queue, arch: dict, cfg: dict, in_flight: bool) -> None:
+def _finish(queue, cfg: dict, in_flight: bool) -> None:
     """Hold the benchmark works, then triage again the floor drops that gained `unesco`; both are always attempted.
     With an error in flight a failure here is printed and the original propagates; otherwise the first one raises."""
-    steps = (lambda: benchmark_code.hold(queue, "architecture", arch.get("benchmark", [])),
+    steps = (lambda: hold_benchmark(queue, cfg),
              lambda: common.retriage(queue, "architecture", triage, common.domain_config(cfg, "architecture")))
     first = None
     for step in steps:
@@ -222,31 +222,51 @@ def _finish(queue, arch: dict, cfg: dict, in_flight: bool) -> None:
 
 # ---- stage 4: the dossier ----
 
-# lower-case fragments of the section headings worth reading, per language (matched at a word start). Kept clear of the
-# headings of the link sections: Italian "altri progetti" and "collegamenti esterni", French "articles connexes".
+# lower-case fragments of the section headings worth reading, per language, matched at a word start; one with a
+# trailing blank is a whole word ("art " is not "articles", "bau " not "Bauernkrieg"). German compounds are listed by
+# their first word, the only one a word start reaches.
 HEADINGS: dict[str, tuple[str, ...]] = {
-    "en": ("architectur", "histor", "construction", "design", "plan", "exterior", "interior", "decoration", "art",
-           "iconograph", "symbol", "mosaic", "stained glass", "stained-glass", "sculpture", "façade", "facade",
-           "liturg", "worship", "pilgrimage", "consecration", "dedication", "significance", "interpretation"),
-    "it": ("architettur", "storia", "storic", "costruzion", "progetto", "piant", "esterno", "intern", "decorazion",
-           "arte", "iconografi", "simbol", "mosaic", "vetrat", "scultur", "facciat", "liturgi", "culto",
-           "pellegrinagg", "consacrazion", "dedicazion", "significat", "interpretazion"),
-    "es": ("arquitect", "historia", "históric", "construcci", "diseño", "proyecto", "planta", "exterior", "interior",
-           "decoraci", "arte", "iconograf", "simbol", "símbol", "mosaico", "vidriera", "vitral", "escultur",
-           "fachada", "liturgia", "litúrgic", "culto", "peregrinaci", "consagraci", "dedicaci", "significado",
-           "interpretaci"),
-    "fr": ("architectur", "histoire", "histori", "construction", "conception", "projet", "plan", "extérieur",
-           "intérieur", "décor", "art ", "arts", "œuvre", "iconograph", "symbol", "mosaïque", "vitra", "sculptur",
-           "façade", "facade", "liturgi", "culte", "pèlerinage", "consécration", "dédicace", "signification",
-           "interprétation"),
-    "de": ("architektur", "geschichte", "bau", "entstehung", "entwurf", "planung", "grundriss", "äußer", "außen",
-           "inner", "innen", "ausstattung", "ausmalung", "kunst", "ikonographi", "ikonografi", "symbol", "mosaik",
-           "fenster", "glasfenster", "glasmalerei", "buntglas", "skulptur", "fassade", "liturgi", "gottesdienst",
-           "wallfahrt", "weihe", "patrozinium", "bedeutung", "deutung", "interpretation"),
-    "pt": ("arquitet", "arquitect", "história", "históric", "construç", "projeto", "projecto", "planta", "exterior",
-           "interior", "decoraç", "arte", "iconograf", "simbol", "símbol", "mosaico", "vitra", "escultur", "fachada",
-           "liturgia", "litúrgic", "culto", "peregrinaç", "consagraç", "dedicaç", "significado", "interpretaç"),
+    "en": ("architectur", "histor", "construction", "design ", "designs ", "designed ", "plan ", "plans ", "exterior",
+           "interior", "decorat", "art ", "arts ", "artwork", "artistic", "iconograph", "symbol", "mosaic",
+           "stained glass", "stained-glass", "sculpture", "façade", "facade", "liturg", "worship", "pilgrimage",
+           "consecration", "dedication", "significance", "interpretation"),
+    "it": ("architettur", "storia", "storic", "costruzion", "progett", "pianta", "piante ", "estern", "interno",
+           "interni ", "interna ", "interne ", "decorazion", "arte ", "arti ", "artist", "iconografi", "simbol",
+           "mosaic", "vetrat", "scultur", "facciat", "liturgi", "culto", "culti ", "pellegrinagg", "consacrazion",
+           "dedicazion", "significat", "interpretazion"),
+    "es": ("arquitect", "historia", "históric", "construcci", "diseño", "proyecto", "planta ", "plantas ", "exterior",
+           "interior", "decoraci", "arte ", "artes ", "artístic", "iconograf", "simbol", "símbol", "mosaico",
+           "vidriera", "vitral", "escultur", "fachada", "liturgia", "litúrgic", "culto", "peregrinaci", "consagraci",
+           "dedicaci", "significado", "interpretaci"),
+    "fr": ("architectur", "histoire", "histori", "construction", "conception", "projet", "plan ", "plans ",
+           "extérieur", "intérieur", "décor", "art ", "arts ", "artistique", "œuvre", "iconograph", "symbol",
+           "mosaïque", "vitra", "sculptur", "façade", "facade", "liturgi", "culte", "pèlerinage", "consécration",
+           "dédicace", "signification", "interprétation"),
+    "de": ("architektur", "geschichte", "bau ", "bauabschnitt", "bauarbeit", "baubeginn", "baubeschreibung", "bauform",
+           "baugeschichte", "baugestalt", "baukunst", "baukörper", "bauphase", "bauplan", "baustil", "bauten",
+           "bautätigkeit", "bauwerk", "bauzeit", "kirchenbau", "neubau", "anbau", "aufbau", "ausbau", "umbau",
+           "wiederaufbau", "entstehung", "entwurf", "entwürf", "plan ", "pläne", "planung", "grundriss", "äußere",
+           "außenansicht", "außenbau", "außenfassade", "außengestalt", "inneres ", "innere ", "innenansicht",
+           "innenarchitektur", "innenausstattung", "innenbau", "inneneinrichtung", "innenraum", "ausstattung",
+           "ausmalung", "kunst", "ikonographi", "ikonografi", "symbol", "mosaik", "fenster", "kirchenfenster",
+           "glasfenster", "glasmalerei", "buntglas", "wandmalerei", "deckenmalerei", "malerei", "fresken", "skulptur",
+           "fassade", "liturgi", "gottesdienst", "wallfahrt", "weihe", "patrozinium", "bedeutung", "deutung",
+           "interpretation"),
+    "pt": ("arquitet", "arquitect", "história", "históric", "construç", "projeto", "projecto", "planta ", "plantas ",
+           "exterior", "interior", "decoraç", "arte ", "artes ", "artístic", "iconograf", "simbol", "símbol",
+           "mosaico", "vitra", "escultur", "fachada", "liturgia", "litúrgic", "culto", "peregrinaç", "consagraç",
+           "dedicaç", "significado", "interpretaç"),
 }
+# the headings of the link and reference sections, whole and lower-case: never read, though a fragment may match
+LINK_SECTIONS = frozenset({
+    "see also", "references", "further reading", "external links", "sister projects", "gallery",
+    "note", "voci correlate", "bibliografia", "altri progetti", "collegamenti esterni",
+    "véase también", "referencias", "bibliografía", "proyectos hermanos", "enlaces externos",
+    "voir aussi", "notes et références", "bibliographie", "articles connexes", "article connexe", "autres projets",
+    "liens externes", "siehe auch", "literatur", "einzelnachweise", "schwesterprojekte", "weblinks",
+    "ver também", "referências", "outros projetos", "outros projectos", "projetos irmãos", "projectos irmãos",
+    "ligações externas",
+})
 WIKIDATA_FACTS = (("P84", "architect"), ("P149", "style"), ("P140", "religion"), ("P825", "dedicated to"),
                   ("P131", "location"), ("P571", "date"), ("P1435", "heritage"))
 INCEPTION = "P571"
@@ -276,7 +296,8 @@ def dossier(row, cfg: dict, wiki_for, wikidata) -> dict:
     notes: list[dict] = []
     languages = {}
     for lang in common.dossier_languages(row, cfg):
-        page = common.read_page(wiki_for(lang, "wikipedia"), row.sitelinks[f"{lang}wiki"], lang, HEADINGS[lang])
+        page = common.read_page(wiki_for(lang, "wikipedia"), row.sitelinks[f"{lang}wiki"], lang, HEADINGS[lang],
+                                skip=LINK_SECTIONS)
         notes += page
         languages[lang] = len(page)
     note = wikidata_note(entity, lambda qid: common.label(wikidata, qid))
@@ -289,6 +310,11 @@ def dossier_stage(row, cfg: dict, wiki_for, wikidata) -> tuple[str, dict]:
 
 
 # ---- calibration and the benchmark ----
+
+def hold_benchmark(queue, cfg: dict) -> None:
+    """Hold back the configured benchmark buildings, whatever source found them (see domains.hold_benchmarks)."""
+    benchmark_code.hold(queue, "architecture", cfg.get("architecture", {}).get("benchmark", []))
+
 
 def add_calibration(queue, sparql, qids: list[str], benchmark: list[dict] | None = None) -> int:
     """Add the buildings SeminaVerbi already covers, flagged as calibration, and every benchmark building (kinds

@@ -99,7 +99,9 @@ there, and the press gives an item that is both an artwork and a building to art
 - `config/infobox_types.json` has no building layout. Proposals do not need one; pages do, in a separate change.
 - The benchmark (`architecture.benchmark`: 18 buildings, 11 strong, 4 weak and 3 secular controls) is added by
   `calibrate --domain architecture` and held back like art's. It needs the author's approval before the first live
-  architecture run; this is not done yet.
+  architecture run; this is not done yet. Both domains' benchmark works are held whatever source brought them in, the
+  press included: by `candidates` and `press route` when they add rows, and before each stage, `run` and `publish`.
+  A live row held that way starts again at stage 1, as calibration.
 
 Commands (options `--db PATH`, default `data/pipeline.sqlite`, and `--domain`, default `film`, go before or after the command):
 
