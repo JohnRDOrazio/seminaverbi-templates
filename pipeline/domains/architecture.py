@@ -22,6 +22,7 @@ subclasses timed out, and a FILTER EXISTS on the statements, in place of the OPT
 """
 from __future__ import annotations
 
+import sys
 from collections.abc import Callable, Iterable, Iterator
 from pathlib import Path
 
@@ -128,10 +129,21 @@ def triage(row, cfg: dict) -> tuple[str, str]:
 def _branches(sparql) -> dict[str, set[str]]:
     """Work class -> its closure, without the closure of any work class nested in it. On Wikidata chapel, basilica
     and cathedral are subclasses of church building, and abbey of monastery: each is asked by its own query, so that
-    a chapel does not enter as a church, with no proof that it is Christian."""
+    a chapel does not enter as a church, with no proof that it is Christian. Reported on stderr, when it stops being so:
+    a work class inside another one nested in it (a P279 cycle), which no query asks any more, and a branch too large
+    for a list of classes, whose query walks the subclasses of the nested ones too."""
     closures = {cls: common.class_closure(sparql, [cls]) for cls in WORK_CLASSES}
-    return {cls: closure.difference(*(closures[c] for c in WORK_CLASSES if c != cls and c in closure))
-            for cls, closure in closures.items()}
+    branches = {cls: closure.difference(*(closures[c] for c in WORK_CLASSES if c != cls and c in closure))
+                for cls, closure in closures.items()}
+    for cls, branch in branches.items():
+        if cls not in branch:
+            print(f"architecture candidates: WARNING: work class {cls} is left out (a P279 cycle with another work "
+                  "class)", file=sys.stderr)
+        elif len(branch) > common.VALUES_MAX:
+            print(f"architecture candidates: WARNING: work class {cls} has {len(branch)} classes, over "
+                  f"{common.VALUES_MAX}: the work classes nested in it are not left out of its queries",
+                  file=sys.stderr)
+    return branches
 
 
 def _christian(cls: str, religions: Iterable[str]) -> str:
@@ -182,31 +194,47 @@ def _add(queue, row: dict, source: str) -> int:
 
 
 def candidates(queue, sparql, wikipedia, cfg: dict, wikidata=None) -> int:
-    """Stage 0: add the buildings of the work classes, those with a UNESCO designation and the curated `works` (which
-    need no class, religion or floor) to the queue; returns the rows added. `wikipedia` and `wikidata` are unused."""
+    """Stage 0: add the curated `works` (which need no class, religion or floor), the buildings of the work classes and
+    those with a UNESCO designation to the queue; returns the rows added. The rows are judged in the order they are
+    added: the works, as the config lists them, then the others by sitelinks, most first, whatever query found them. A
+    later run adds its new rows after those queued, in the same order. `wikipedia` and `wikidata` are unused."""
     arch = cfg["architecture"]
     floor = arch.get("sitelink_floor", cfg["sitelink_floor"])
-    added = 0
+    works = [w["qid"] for w in arch["works"]]
+    found: list[tuple[str, dict]] = []  # (source, row)
+    added: list[int] = []
     try:
+        found += [("list", row) for row in benchmark_code.listed(sparql, "architecture", works)]
         for source, label, query in _queries(sparql, arch, floor):
             for row in common.run_query(sparql, "architecture", label, query):
                 if PERSON in row.get("types", "").split():
                     print(f"architecture candidates: {row['item']} is a person, skipped")
                 else:
-                    added += _add(queue, row, source)
-        for row in benchmark_code.listed(sparql, "architecture", [w["qid"] for w in arch["works"]]):
-            added += _add(queue, row, "list")
-    except BaseException:  # a failed source keeps the rows already written; its error is the one that propagates
-        _finish(queue, cfg, in_flight=True)
+                    found.append((source, row))
+    except BaseException:  # a failed source keeps the rows already found; its error is the one that propagates
+        _finish(queue, cfg, found, works, added, in_flight=True)
         raise
-    _finish(queue, cfg, in_flight=False)
-    return added
+    _finish(queue, cfg, found, works, added, in_flight=False)
+    return sum(added)
 
 
-def _finish(queue, cfg: dict, in_flight: bool) -> None:
-    """Hold the benchmark works, then triage again the floor drops that gained `unesco`; both are always attempted.
-    With an error in flight a failure here is printed and the original propagates; otherwise the first one raises."""
-    steps = (lambda: hold_benchmark(queue, cfg),
+def _in_order(found: list[tuple[str, dict]], works: list[str]) -> list[tuple[str, dict]]:
+    """The works in their own order, then the other rows by sitelinks, most first (ties by QID); the rows of an item
+    several sources found stay together, in the order the sources were asked."""
+    place = {qid: n for n, qid in reversed(list(enumerate(works)))}
+    count: dict[str, int] = {}
+    for _, row in found:
+        count[row["item"]] = max(count.get(row["item"], 0), common.row_data(row)[2]["count"])
+    return sorted(found, key=lambda f: (place.get(f[1]["item"], len(works)), -count[f[1]["item"]], f[1]["item"]))
+
+
+def _finish(queue, cfg: dict, found: list[tuple[str, dict]], works: list[str], added: list[int],
+            in_flight: bool) -> None:
+    """Add the rows found (how many were new goes to `added`), hold the benchmark works, then triage again the floor
+    drops that gained `unesco`; all are always attempted. With an error in flight a failure here is printed and the
+    original propagates; otherwise the first one raises."""
+    steps = (lambda: added.extend(_add(queue, row, source) for source, row in _in_order(found, works)),
+             lambda: hold_benchmark(queue, cfg),
              lambda: common.retriage(queue, "architecture", triage, common.domain_config(cfg, "architecture")))
     first = None
     for step in steps:

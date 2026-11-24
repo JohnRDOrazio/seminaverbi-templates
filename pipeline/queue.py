@@ -82,7 +82,8 @@ class Queue:
             return False
         self.db.execute(
             "INSERT INTO candidates (qid, domain, sources, labels, sitelinks, calibration, added_at)"
-            " VALUES (?,?,?,?,?,?,?)",
+            # rows are read by added_at: each one comes after all the others, whatever the clock's resolution
+            " VALUES (?,?,?,?,?,?,MAX(?, COALESCE((SELECT MAX(added_at) FROM candidates), 0) + 1e-5))",
             (qid, domain, json.dumps([source]), json.dumps(labels), json.dumps(sitelinks),
              int(calibration), time.time()))
         self.db.commit()

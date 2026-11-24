@@ -357,6 +357,65 @@ def test_a_building_skipped_by_hand_is_not_brought_back_by_candidates(q, tmp_pat
     assert "unesco" in row.sources and {n: row.data[n] for n in before if n} == {n: before[n] for n in before if n}
 
 
+# --- the judging order ---
+
+def order(q):
+    return [r.qid for r in q.pending(1, "architecture")]
+
+
+def counted(*pairs):
+    return [item(qid, qid, n, "Q16970") for qid, n in pairs]
+
+
+ORDERED = {"wdt:P1435": counted(("Q4", 40), ("Q3", 2), ("Q6", 60)), "VALUES ?item": counted(("Q8", 5), ("Q9", 7)),
+           "FILTER(?sitelinks < 20)": counted(("Q15", 15), ("Q1", 60)), "ORDER BY DESC": counted(("Q6", 60), ("Q2", 90))}
+TWO = [{"qid": "Q9", "name": "x"}, {"qid": "Q8", "name": "y"}]
+
+
+def test_the_works_come_first_then_the_most_linked_buildings(q):
+    stage0(q, FakeSparql(ORDERED), works=TWO)
+    assert order(q) == ["Q9", "Q8", "Q2", "Q1", "Q6", "Q4", "Q15", "Q3"]  # a tie goes by QID
+    assert set(q.row("Q6").sources) == {"building", "unesco"}
+
+
+def test_the_order_does_not_depend_on_the_clock(q, monkeypatch):
+    from pipeline import queue
+    monkeypatch.setattr(queue.time, "time", lambda: 1000.0)
+    stage0(q, FakeSparql(ORDERED), works=TWO)
+    assert order(q) == ["Q9", "Q8", "Q2", "Q1", "Q6", "Q4", "Q15", "Q3"]
+
+
+def test_a_failed_source_adds_what_was_found_in_order(q):
+    with pytest.raises(RuntimeError, match="timeout"):
+        stage0(q, FailingOn(ORDERED, "wdt:P1435"), works=TWO)
+    assert order(q) == ["Q9", "Q8", "Q2", "Q1", "Q6", "Q15"]
+
+
+def test_a_later_run_adds_its_rows_after_those_queued(q):
+    stage0(q, FakeSparql({"ORDER BY DESC": counted(("Q5", 20))}), works=[])
+    stage0(q, FakeSparql(ORDERED), works=TWO)
+    assert order(q) == ["Q5", "Q9", "Q8", "Q2", "Q1", "Q6", "Q4", "Q15", "Q3"]
+
+
+def test_a_class_closure_too_large_for_the_nested_exclusion_is_reported(q, monkeypatch, capsys):
+    monkeypatch.setattr(common, "VALUES_MAX", 2)
+    sparql = FakeSparql({"?sub wdt:P279* wd:Q44613": [{"sub": s} for s in ("Q44613", "QA", "QB")]})
+    stage0(q, sparql)
+    assert "Q44613 has 3 classes, over 2" in capsys.readouterr().err
+
+
+def test_a_work_class_lost_to_a_cycle_is_reported(q, capsys):
+    both = [{"sub": "Q44613"}, {"sub": "Q160742"}]
+    stage0(q, FakeSparql({"wdt:P279* wd:Q44613": both, "wdt:P279* wd:Q160742": both}))
+    err = capsys.readouterr().err
+    assert "Q44613 is left out" in err and "Q160742 is left out" in err
+
+
+def test_ordinary_closures_report_nothing(q, capsys):
+    stage0(q, FakeSparql({}))
+    assert capsys.readouterr().err == ""
+
+
 def test_retriage_never_triages_a_row_with_a_status(q):
     dropped(q, status="open")
     calls = []
@@ -390,9 +449,12 @@ def test_a_run_that_raised_in_retriage_is_cleared_by_the_next(q, monkeypatch):
 
 def test_a_failed_source_still_retriages_and_the_error_propagates(q):
     dropped(q)
-    sparql = FailingOn({"wdt:P1435": [item("Q1", "A", 3, "Q16970")]}, "VALUES ?item { wd:Q3 }")
+    # the last query, unesco on monasteries, fails
+    sparql = FailingOn({"wdt:P1435": [item("Q1", "A", 3, "Q16970")]},
+                       "P1435 ?heritage .\n  ?item wikibase:sitelinks ?sitelinks . FILTER(?sitelinks >= 1)\n"
+                       "  ?item wdt:P31 ?cls . FILTER(?cls IN (wd:Q44613))")
     with pytest.raises(RuntimeError, match="timeout"):
-        stage0(q, sparql, works=[{"qid": "Q3", "name": "C"}])
+        stage0(q, sparql)
     assert "unesco" in q.row("Q1").sources and 2 not in q.row("Q1").outcomes
 
 
