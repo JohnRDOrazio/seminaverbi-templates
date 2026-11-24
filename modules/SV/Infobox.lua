@@ -204,8 +204,8 @@ function p._render(kind, args, ctx)
 		out[#out + 1] = r
 	end
 	if entity and id then
-		-- Where the facts come from: the item on the repository wiki (en), reached by interwiki elsewhere.
-		local target = (lang == 'en' and '' or 'seminaverbi:') .. 'Item:' .. id
+		-- Where the facts come from: the item on the repository wiki, reached by its own interwiki prefix on every wiki.
+		local target = 'svdata:Item:' .. id
 		out[#out + 1] = '<tr><td colspan="2" class="sv-infobox-source">'
 			.. Util.msg('infobox_source', lang, '[[' .. target .. '|' .. id .. ']]') .. '</td></tr>'
 	end
