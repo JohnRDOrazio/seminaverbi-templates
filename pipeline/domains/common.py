@@ -48,12 +48,14 @@ def query(pattern: str, key: str = "") -> str:
             f"GROUP BY {key}?item\nLIMIT {LIMIT}")
 
 
-def bounded(pattern: str, cls: str, subclasses: Iterable[str] | None = None, floor: int | None = None) -> str:
+def bounded(pattern: str, cls: str, subclasses: Iterable[str] | None = None, floor: int | None = None,
+            test: str = "") -> str:
     """The query of `pattern` on items of class `cls`, at most LIMIT items: the most linked ones (sitelink
     count), so a truncated result drops the least notable. `subclasses` (a class closure) of up to VALUES_MAX
     classes replaces the `P31/P279*` path by a list of classes (`FILTER IN`: a VALUES list, joined before the
     pattern, timed out on WDQS); a larger closure keeps the path, walked up from the item. `floor` keeps only
-    items with at least that many sitelinks, tested right after the pattern, before the class."""
+    items with at least that many sitelinks, tested right after the pattern, before the class. `test` is a pattern
+    on ?item and ?sitelinks, tested last (its lines end with a newline)."""
     listed = None if subclasses is None else set(subclasses) | {cls}
     if listed is None:
         kind = f"  ?item wdt:P31/wdt:P279* wd:{cls} .\n"
@@ -65,6 +67,7 @@ def bounded(pattern: str, cls: str, subclasses: Iterable[str] | None = None, flo
         body = f"{pattern}\n{kind}  ?item wikibase:sitelinks ?sitelinks .\n"
     else:
         body = f"{pattern}\n  ?item wikibase:sitelinks ?sitelinks . FILTER(?sitelinks >= {int(floor)})\n{kind}"
+    body += test
     return query(f"  {{ SELECT DISTINCT ?item ?sitelinks WHERE {{\n{_ORDERED}{body}"
                  f"  }} ORDER BY DESC(?sitelinks) LIMIT {LIMIT} }}")
 
