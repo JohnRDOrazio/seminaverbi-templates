@@ -1,7 +1,7 @@
 import pytest
 import requests
 
-from sync.wiki import SyncError
+from sync.wiki import REPO_WIKI, SyncError
 from tools import switch_infobox as si
 from tools.switch_infobox import Unresolved, Value
 
@@ -584,7 +584,7 @@ def test_imports_needed_stop_the_apply_without_a_log(capsys):
     repo = Repo([entity("Q100", [FILM], {"en": "Bloodshot"})], {("en", "Bloodshot (film)"): "Q100"})
     client = Client("en", repo, {"Bloodshot (film)": FILM_TEXT}, images={"Bloodshot poster.jpg": "commons"})
     assert si.run(repo, {"en": client}, wd, MAPPING, {"en": set()}, apply=True, out=print) == 3
-    assert "EnrichItems.php --wiki=en --import Q999" in capsys.readouterr().out
+    assert f"EnrichItems.php --wiki={REPO_WIKI} --import Q999" in capsys.readouterr().out
     assert repo.added == [] and client.edits == []
     si.run(repo, {"en": client}, wd, MAPPING, {"en": set()}, apply=True, out=print,
            import_log="IMPORT Q999 = Q48001 (created)\n")
@@ -688,7 +688,7 @@ def test_relying_on_a_page_that_failed_is_not_saved(capsys):
 def test_dry_run_names_the_items_to_enrich_from_wikidata_first(capsys):
     repo, client = film_world()
     si.run(repo, {"en": client}, Wikidata(), MAPPING, {"en": set()}, apply=False, out=print, tools_dir="/t")
-    assert "EnrichItems.php --wiki=en --item Q100" in capsys.readouterr().out
+    assert f"EnrichItems.php --wiki={REPO_WIKI} --item Q100" in capsys.readouterr().out
 
 
 def test_dry_run_lists_the_imports_of_blocked_pages_apart(capsys):

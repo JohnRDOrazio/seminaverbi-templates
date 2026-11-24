@@ -29,7 +29,7 @@ WIKIS = Path(__file__).resolve().parent.parent / "config" / "wikis.json"
 
 
 def load_repo_wiki(path: Path = WIKIS) -> str:
-    """The wiki that holds the Wikibase repository: "en", or "data" once the repository has its own wiki."""
+    """The wiki that holds the Wikibase repository: "data", its own wiki ("en" before the move)."""
     value = json.loads(Path(path).read_text(encoding="utf-8")).get("repository")
     if value not in ("en", "data"):  # the two wikis that can hold the repository
         raise ValueError(f"{path}: repository must be en or data, not {value!r}")

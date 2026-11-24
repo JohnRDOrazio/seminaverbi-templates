@@ -113,7 +113,7 @@ def test_skill_mentions_jev_routine():
 def test_skill_files_on_the_item():
     text = flat((SKILL / "SKILL.md").read_text(encoding="utf-8"))
     for needle in ("`SV field` once", "`SV Gospel theme` once per theme",
-                   "Write them with `wikibase-add-statement` on the repository wiki",
+                   "Write them with `wikibase-add-statement` on `data`",
                    "outputs the categories on every language's page",
                    "add a line to `docs/content-tasks.md`"):
         assert needle in text, needle

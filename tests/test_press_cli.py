@@ -124,7 +124,7 @@ class FakeEditor:
 
 
 class FakeRepo:
-    """The en wiki, read-only: Ordet has a SeminaVerbi article (local item Q900), Silence does not."""
+    """The repository (and any page wiki), read-only: Ordet has a SeminaVerbi article (local item Q900), Silence does not."""
 
     def items_for(self, site, titles):
         return {"Ordet": "Q900"} if "Ordet" in titles and site == "enwiki" else {}
@@ -137,7 +137,7 @@ class FakeRepo:
 
 
 @pytest.fixture
-def press(monkeypatch, tmp_path):
+def press(use_repository, monkeypatch, tmp_path):
     """The press commands with the outlets, Jev, Wikidata and the wikis faked; returns the db path and the fakes."""
     fakes = {"client": FakeClient(), "judge": FakeJudge(), "editor": FakeEditor(), "logins": 0, "judges": 0,
              "routes": 0}
@@ -157,6 +157,7 @@ def press(monkeypatch, tmp_path):
     monkeypatch.setattr(cli, "_login_editor", login)
     monkeypatch.setattr(cli, "_wikidata", lambda: FakeWikidata())
     monkeypatch.setattr(cli, "_sparql", lambda: None)
+    use_repository(FakeRepo())
     monkeypatch.setattr(cli, "_wikis", lambda: {lang: FakeRepo() for lang in cli.LANGS})
     monkeypatch.setattr(link, "class_route", lambda instance_of, sparql, cfg, cache=None: "film")
     # covered: Ordet is covered on en (translation), Silence nowhere

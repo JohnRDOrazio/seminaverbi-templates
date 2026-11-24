@@ -382,9 +382,8 @@ def test_calibration_reads_items_on_the_repository_and_categories_on_the_six_wik
 
 def test_the_repository_is_the_configured_wiki():
     config = json.loads((ROOT / "config" / "wikis.json").read_text(encoding="utf-8"))
-    assert sync.wiki.REPO_WIKI == config["repository"] == "en"  # "data" at the switch
-    assert WikiClient(sync.wiki.REPO_WIKI).api == "https://en.seminaverbi.bibleget.io/w/api.php"
-    assert WikiClient("data").api == "https://data.seminaverbi.bibleget.io/w/api.php"
+    assert sync.wiki.REPO_WIKI == config["repository"] == "data"
+    assert WikiClient(sync.wiki.REPO_WIKI).api == "https://data.seminaverbi.bibleget.io/w/api.php"
 
 
 @pytest.mark.parametrize("value", ["", "it", "www.example.org/", None])

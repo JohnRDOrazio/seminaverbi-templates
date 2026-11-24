@@ -2,8 +2,8 @@
 
 All six wikis share **one** interwiki table. Prefixes without a language point to English projects on
 every wiki: `w:` and `wikipedia:` → en.wikipedia.org, `wikisource:` → en.wikisource.org, `wiktionary:` →
-en.wiktionary.org, `seminaverbi:` → the en SeminaVerbi wiki, `svdata:` → the wiki that holds the
-Wikibase repository (`svdata:Item:Q…`; the infobox writes it). `cathopedia:` → it.cathopedia.org.
+en.wiktionary.org, `seminaverbi:` → the en SeminaVerbi wiki, `svdata:` → data.seminaverbi.bibleget.io,
+the Wikibase repository (an item: `[[svdata:Item:Q…]]`, never `[[Item:Q…]]`). `cathopedia:` → it.cathopedia.org.
 So **always write the language**.
 
 ## Internal (same wiki)
