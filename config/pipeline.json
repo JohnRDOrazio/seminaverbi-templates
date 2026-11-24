@@ -209,7 +209,26 @@
                             "Q329344", "Q391951", "Q338309", "Q426316", "Q463455", "Q194253", "Q49830", "Q101849", "Q966577",
                             "Q2060869", "Q894479", "Q42504", "Q106687"],
     "unesco": ["Q9259", "Q43113623"],
-    "works": [{"qid": "Q48435", "name": "Sagrada Família"}],
-    "benchmark": []
+    "works": [{"qid": "Q48435", "name": "Sagrada Família"}, {"qid": "Q12506", "name": "Hagia Sophia"}],
+    "benchmark": [
+      {"qid": "Q48435", "name": "Sagrada Família", "kind": "strong"},
+      {"qid": "Q180274", "name": "Chartres Cathedral", "kind": "strong"},
+      {"qid": "Q2981", "name": "Notre-Dame de Paris", "kind": "strong"},
+      {"qid": "Q12506", "name": "Hagia Sophia", "kind": "strong"},
+      {"qid": "Q193193", "name": "Sainte-Chapelle", "kind": "strong"},
+      {"qid": "Q638250", "name": "Notre-Dame du Haut (Ronchamp)", "kind": "strong"},
+      {"qid": "Q721817", "name": "San Vitale (Ravenna)", "kind": "strong"},
+      {"qid": "Q1303856", "name": "Monreale Cathedral", "kind": "strong"},
+      {"qid": "Q12512", "name": "St Peter's Basilica", "kind": "strong"},
+      {"qid": "Q963954", "name": "Scrovegni Chapel", "kind": "strong"},
+      {"qid": "Q187702", "name": "Church of the Holy Sepulchre", "kind": "strong"},
+      {"qid": "Q493133", "name": "Matthias Church (Budapest)", "kind": "weak"},
+      {"qid": "Q624556", "name": "St. Patrick's Cathedral (New York)", "kind": "weak"},
+      {"qid": "Q254476", "name": "Votive Church (Vienna)", "kind": "weak"},
+      {"qid": "Q3082361", "name": "Grace Cathedral (San Francisco)", "kind": "weak"},
+      {"qid": "Q243", "name": "Eiffel Tower", "kind": "control"},
+      {"qid": "Q45178", "name": "Sydney Opera House", "kind": "control"},
+      {"qid": "Q179199", "name": "Guggenheim Museum Bilbao", "kind": "control"}
+    ]
   }
 }

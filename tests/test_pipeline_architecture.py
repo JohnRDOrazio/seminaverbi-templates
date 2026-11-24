@@ -4,7 +4,8 @@ from pipeline import load_config
 from pipeline.domains import DOMAINS, architecture, common
 from pipeline.judge import Judge
 from pipeline.queue import Queue, Row
-from test_pipeline_film import FakeSparql, item
+from test_pipeline_art import time_claim
+from test_pipeline_film import FakeSparql, FakeWikidataEntities, entity, item, wiki_for_pages
 
 CFG = {"sitelink_floor": 15}
 PROOF_CLASSES = ("Q163687", "Q108325", "Q160742", "Q44613")
@@ -72,7 +73,7 @@ def test_classes_questions_and_press():
 def test_config_block():
     cfg = load_config()["architecture"]
     assert cfg["sitelink_floor"] == 15 and cfg["unesco"] == ["Q9259", "Q43113623"]
-    assert cfg["works"] == [{"qid": "Q48435", "name": "Sagrada Família"}] and cfg["benchmark"] == []
+    assert cfg["works"] == [{"qid": "Q48435", "name": "Sagrada Família"}, {"qid": "Q12506", "name": "Hagia Sophia"}]
     religions = cfg["christian_religions"]
     assert len(religions) == len(set(religions))
     assert {"Q5043", "Q1841", "Q3333484", "Q75809", "Q6423963"} <= set(religions)
@@ -412,3 +413,206 @@ def test_a_failing_finish_alone_propagates_and_both_ran(q, monkeypatch, name):
     with pytest.raises(ValueError, match=f"{name} failed"):
         stage0(q, FakeSparql({}))
     assert ran == ["hold", "retriage"]
+
+
+# --- stage 4: the dossier ---
+
+DC = {"dossier_languages": 3}
+
+
+def drow(sitelinks, calibration=False, **data):
+    return Row("Q1", "architecture", ["building"], {}, sitelinks, calibration, data={0: {"count": 40, **data}})
+
+
+def test_wikidata_note_names_the_facts_of_the_building_in_order():
+    ent = entity("Sagrada Família", P1435=["Q7"], P131=["Q5"], P825=["Q4"], P140=["Q3"], P149=["Q2"], P84=["Q6"])
+    ent["claims"]["P571"] = [time_claim(1882)]
+    labels = {"Q6": "Antoni Gaudí", "Q2": "Modernisme", "Q3": "Catholicism", "Q4": "Holy Family", "Q5": "Barcelona",
+              "Q7": "World Heritage Site"}
+    note = architecture.wikidata_note({**ent, "id": "Q9"}, labels.get)
+    assert note == {"lang": "en", "url": "https://www.wikidata.org/wiki/Q9", "heading": "Wikidata", "text": (
+        "Architect: Antoni Gaudí; style: Modernisme; religion: Catholicism; dedicated to: Holy Family; "
+        "location: Barcelona; date: 1882; heritage: World Heritage Site.")}
+
+
+def test_wikidata_note_leaves_out_what_is_not_stated_or_has_no_label():
+    ent = entity(P84=["Q6"], P149=["Q2"], P1435=["Q7"])
+    note = architecture.wikidata_note({**ent, "id": "Q9"}, {"Q6": "Antoni Gaudí", "Q7": "World Heritage Site"}.get)
+    assert note["text"] == "Architect: Antoni Gaudí; heritage: World Heritage Site."
+    assert architecture.wikidata_note({**entity(), "id": "Q9"}, {}.get) is None
+
+
+def test_wikidata_note_of_a_person_is_none():
+    ent = entity("Man", P31=["Q5"], P140=["Q3"])
+    assert architecture.wikidata_note({**ent, "id": "Q9"}, {"Q3": "Catholicism"}.get) is None
+
+
+def test_the_dossier_reads_the_lead_and_wanted_sections_of_each_language():
+    pages = {("en", "wikipedia"): {"#lead:T": "A church.", "T": [("Architecture", "a"), ("Façade", "f"),
+                                                                 ("Gallery", "g"), ("Stained glass", "s")]},
+             ("it", "wikipedia"): {"T it": [("Cenni storici", "c"), ("Mosaici", "m"), ("Note", "n")]},
+             ("es", "wikipedia"): {"T es": [("Historia", "h")]},
+             ("de", "wikipedia"): {"T de": [("Baugeschichte", "b"), ("Weblinks", "w")]}}
+    d = architecture.dossier(drow({"dewiki": "T de", "itwiki": "T it", "eswiki": "T es", "enwiki": "T"}), DC,
+                             wiki_for_pages(pages), FakeWikidataEntities({"Q1": entity()}))
+    assert d["languages"] == {"en": 4, "it": 2, "es": 1}  # the German page is past dossier_languages
+    assert [(n["lang"], n["heading"]) for n in d["notes"]] == [
+        ("en", "Lead"), ("en", "Architecture"), ("en", "Façade"), ("en", "Stained glass"),
+        ("it", "Cenni storici"), ("it", "Mosaici"), ("es", "Historia")]
+    assert d["notes"][0] == {"lang": "en", "url": "https://en.wikipedia.org/wiki/T", "heading": "Lead",
+                             "text": "A church."}
+
+
+def test_the_dossier_closes_with_one_wikidata_note():
+    wd = FakeWikidataEntities({"Q1": entity(P84=["Q100"]), "Q100": entity("Gaudí")})
+    pages = wiki_for_pages({("en", "wikipedia"): {"T": [("History", "h")]}})
+    d = architecture.dossier(drow({"enwiki": "T"}), DC, pages, wd)
+    assert [n["heading"] for n in d["notes"]] == ["History", "Wikidata"] and d["languages"] == {"en": 1}
+    assert d["notes"][-1]["text"] == "Architect: Gaudí."
+    assert d["notes"][-1]["url"] == "https://www.wikidata.org/wiki/Q1"
+
+
+def test_the_scrovegni_chapel_is_read_without_its_frescos():
+    frescos = {"P1": {"sitelinks": {"enwiki": "Lamentation"}, "count": 30}}
+    wd = FakeWikidataEntities({"Q1": entity("Scrovegni Chapel", P527=["P1", "P2"], P361=["P3"]),
+                               "P2": entity(sitelinks={"enwiki": "Last Judgment"})})
+    pages = {("en", "wikipedia"): {"Scrovegni Chapel": [("Decoration", "Giotto's cycle")],
+                                   "Lamentation": [("Iconography", "x")], "Last Judgment": [("Iconography", "y")]}}
+    d = architecture.dossier(drow({"enwiki": "Scrovegni Chapel"}, parts=frescos), DC, wiki_for_pages(pages), wd)
+    assert [(n["heading"], n["text"]) for n in d["notes"]] == [("Decoration", "Giotto's cycle")]
+    assert wd.asked == ["Q1"]  # no part, no whole
+
+
+def test_the_dossier_stage_drops_an_empty_dossier_but_not_calibration():
+    wd = FakeWikidataEntities({"Q1": entity(P84=["Q100"]), "Q100": entity("Gaudí")})
+    pages = wiki_for_pages({("en", "wikipedia"): {"T": []}})
+    assert architecture.dossier_stage(drow({"enwiki": "T"}), DC, pages, wd) == ("drop", {"reason": "empty dossier"})
+    outcome, data = architecture.dossier_stage(drow({"enwiki": "T"}, calibration=True), DC, pages, wd)
+    assert outcome == "pass" and [n["heading"] for n in data["notes"]] == ["Wikidata"]
+
+
+WANTED = {
+    "en": ["History", "Historical background", "Construction", "Architecture", "Architectural style", "Design", "Plan",
+           "Exterior", "Interior", "Decoration", "Art and treasures", "Iconography", "Symbolism", "Mosaics",
+           "Stained glass", "Stained-glass windows", "Sculptures", "Façade", "West facade", "Liturgical use", "Worship",
+           "Pilgrimage", "Consecration", "Dedication", "Significance", "Interpretations"],
+    "it": ["Storia", "Cenni storici", "Costruzione", "Architettura", "Progetto", "Pianta", "Esterno", "Interni",
+           "Decorazioni", "Opere d'arte", "Iconografia", "Simbolismo", "Mosaici", "Vetrate", "Sculture", "La scultura",
+           "Facciate", "Liturgia", "Culto", "Pellegrinaggi", "Consacrazione", "Dedicazione", "Significato",
+           "Interpretazioni"],
+    "es": ["Historia", "Contexto histórico", "Construcción", "Arquitectura", "Diseño", "Planta", "Exterior",
+           "Interiores", "Decoración", "Arte", "Iconografía", "Simbología", "Símbolos", "Mosaicos", "Vidrieras",
+           "Vitrales", "Esculturas", "Fachadas", "Liturgia", "Uso litúrgico", "Culto", "Peregrinación",
+           "Consagración", "Dedicación", "Significado", "Interpretaciones"],
+    "fr": ["Histoire", "Historique", "Construction", "Architecture", "Conception", "Plan", "Extérieur", "Intérieur",
+           "Décoration", "Décors", "Œuvres d'art", "Art sacré", "Iconographie", "Symbolique", "Mosaïques", "Vitraux",
+           "Sculptures", "Façades", "Liturgie", "Culte", "Pèlerinage", "Consécration", "Dédicace", "Signification",
+           "Interprétations"],
+    "de": ["Geschichte", "Baugeschichte", "Bau", "Architektur", "Baubeschreibung", "Entwurf", "Grundriss", "Äußeres",
+           "Außenbau", "Inneres", "Innenraum", "Ausstattung", "Kunstwerke", "Ikonographie", "Ikonografie",
+           "Symbolik", "Mosaiken", "Fenster", "Glasfenster", "Glasmalereien", "Skulpturen", "Fassade", "Liturgie",
+           "Gottesdienste", "Wallfahrt", "Weihe", "Patrozinium", "Bedeutung", "Deutung", "Interpretation"],
+    "pt": ["História", "Contexto histórico", "Construção", "Arquitetura", "Arquitectura", "Projeto", "Planta",
+           "Exterior", "Interior", "Decoração", "Arte", "Iconografia", "Simbolismo", "Símbolos", "Mosaicos",
+           "Vitrais", "Esculturas", "Fachadas", "Liturgia", "Uso litúrgico", "Culto", "Peregrinações", "Consagração",
+           "Dedicação", "Significado", "Interpretação"],
+}
+UNWANTED = {
+    "en": ["See also", "References", "External links", "Gallery", "Bibliography"],
+    "it": ["Note", "Voci correlate", "Bibliografia", "Collegamenti esterni", "Altri progetti"],
+    "es": ["Véase también", "Referencias", "Enlaces externos", "Bibliografía"],
+    "fr": ["Articles connexes", "Voir aussi", "Notes et références", "Liens externes", "Bibliographie"],
+    "de": ["Weblinks", "Literatur", "Einzelnachweise", "Siehe auch"],
+    "pt": ["Ver também", "Referências", "Ligações externas", "Bibliografia"],
+}
+
+
+@pytest.mark.parametrize("lang", common.LANGS)
+def test_the_headings_read(lang):
+    words = architecture.HEADINGS[lang]
+    assert len(words) == len(set(words)) and all(w == w.lower() for w in words)
+    assert [h for h in WANTED[lang] if not common.wanted(h, words)] == []
+    assert [h for h in UNWANTED[lang] if common.wanted(h, words)] == []
+
+
+# --- calibration and the benchmark ---
+
+KINDS = [{"qid": "Q2", "name": "x", "kind": "strong"}, {"qid": "Q3", "name": "y", "kind": "weak"},
+         {"qid": "Q4", "name": "z", "kind": "control"}]
+
+
+def test_calibration_root_is_sacred_architecture(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(common, "calibration_qids",
+                        lambda wikis, wd, tree, roots: seen.update(tree=tree, roots=roots) or (["Q1"], ["en:X"]))
+    tree = {"fields": []}
+    assert architecture.calibration_qids({}, wikidata=object(), tree=tree) == (["Q1"], ["en:X"])
+    assert seen == {"tree": tree, "roots": {"sacred-architecture"}}
+
+
+def test_the_calibration_root_is_a_node_of_the_tree(monkeypatch):
+    monkeypatch.setattr(common, "calibration_qids", lambda wikis, wd, tree, roots: (common.field_keys(tree, roots), []))
+    keys, _ = architecture.calibration_qids({}, wikidata=object())
+    assert keys == {"sacred-architecture"}
+
+
+def test_calibration_adds_the_pages_and_the_benchmark_of_the_three_kinds(q):
+    sparql = FakeSparql({"VALUES ?item { wd:Q1 }\n  ?item wdt:P31/wdt:P279* wd:Q2977 .": [item("Q1", "A", 50, "Q2977")],
+                         "VALUES ?item { wd:Q2 wd:Q3 wd:Q4 }": [item("Q2", "B", 50), item("Q3", "C", 5),
+                                                               item("Q4", "D", 90, "Q1440476")]})
+    assert architecture.add_calibration(q, sparql, ["Q1"], benchmark=KINDS) == 4
+    assert {w["qid"]: q.row(w["qid"]).data[0]["benchmark_kind"] for w in KINDS} == {
+        "Q2": "strong", "Q3": "weak", "Q4": "control"}
+    for qid in ("Q1", "Q2", "Q3", "Q4"):
+        row = q.row(qid)
+        assert row.domain == "architecture" and row.calibration and row.sources == ["calibration"]
+    assert all(q.row(w["qid"]).data[0]["benchmark"] for w in KINDS) and "benchmark" not in q.row("Q1").data[0]
+    assert q.open_rows("architecture") == []
+
+
+def test_calibration_defaults_to_the_configured_benchmark(q, monkeypatch):
+    monkeypatch.setattr(architecture, "load_config", lambda: {"architecture": {"benchmark": KINDS[1:2]}})
+    assert architecture.add_calibration(q, FakeSparql({"VALUES ?item { wd:Q3 }": [item("Q3", "C", 5)]}), []) == 1
+    assert q.row("Q3").data[0]["benchmark_kind"] == "weak"
+
+
+def test_the_configured_benchmark():
+    bench = load_config()["architecture"]["benchmark"]
+    assert len({b["qid"] for b in bench}) == len(bench) == 18
+    kinds = [b["kind"] for b in bench]
+    assert (kinds.count("strong"), kinds.count("weak"), kinds.count("control")) == (11, 4, 3)
+    assert all(b["name"] for b in bench)
+
+
+@pytest.mark.parametrize("calibrate_first", [False, True])
+def test_a_listed_work_of_the_benchmark_is_held_back_until_its_release(q, calibrate_first):
+    """Hagia Sophia is in `works` and in the benchmark: the benchmark wins, whatever the order of the commands; once
+    released it is a candidate with the `list` source, so the floor does not apply."""
+    hagia = [{"qid": "Q12506", "name": "Hagia Sophia", "kind": "strong"}]
+    sparql = FakeSparql({"VALUES ?item { wd:Q12506 }": [item("Q12506", "Hagia Sophia", 3, "Q32815")]})
+    runs = [lambda: stage0(q, sparql, works=[{"qid": "Q12506", "name": "Hagia Sophia"}], benchmark=hagia),
+            lambda: architecture.add_calibration(q, sparql, [], benchmark=hagia)]
+    for run in reversed(runs) if calibrate_first else runs:
+        run()
+        row = q.row("Q12506")
+        assert row.calibration and row.data[0]["benchmark"] and row.data[0]["benchmark_kind"] == "strong"
+        assert q.open_rows("architecture") == []
+    assert set(q.row("Q12506").sources) == {"list", "calibration"}
+    assert q.release_calibration("Q12506")
+    for run in runs:  # later runs leave it released
+        run()
+    row = q.row("Q12506")
+    assert row.calibration is False and "benchmark" not in row.data[0]
+    assert [r.qid for r in q.open_rows("architecture")] == ["Q12506"]
+    assert architecture.triage(row, CFG) == ("pass", "")
+
+
+def test_release_benchmark_releases_one_building(q, tmp_path, capsys):
+    from pipeline import __main__ as cli
+    sparql = FakeSparql({"VALUES ?item": [item(w["qid"], w["name"], 50) for w in KINDS]})
+    architecture.add_calibration(q, sparql, [], benchmark=KINDS)
+    args = ["--domain", "architecture", "release-benchmark", "Q3", "--db", str(tmp_path / "q.db")]
+    assert cli.main(args) == 0
+    assert "released Q3" in capsys.readouterr().out
+    assert [r.qid for r in q.open_rows("architecture")] == ["Q3"]
+    assert q.row("Q2").calibration and q.row("Q4").calibration

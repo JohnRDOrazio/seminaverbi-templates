@@ -129,6 +129,67 @@ def sections(wiki, title: str) -> list[tuple[str, str]]:
         raise
 
 
+def wanted(heading: str, words: Iterable[str]) -> bool:
+    """True when one of `words` (lower-case fragments) starts a word of the section heading."""
+    low = heading.lower()
+    return any(re.search(rf"\b{re.escape(word)}", low) for word in words)
+
+
+def read_page(wikipedia, title: str, lang: str, words: Iterable[str], label: str | None = None) -> list[dict]:
+    """The lead and the sections of one page whose heading is `wanted`, as dossier notes, headed by `label`
+    ("<label> / <heading>") for a page read with another."""
+    words = tuple(words)
+    notes = []
+    if lead := wikipedia.lead(title):
+        notes.append({"lang": lang, "url": wikipedia.url(title), "heading": label or "Lead", "text": lead})
+    for head, text in sections(wikipedia, title):
+        if text and wanted(head, words):
+            notes.append({"lang": lang, "url": wikipedia.url(title),
+                          "heading": f"{label} / {head}" if label else head, "text": text})
+    return notes
+
+
+def dossier_languages(row, cfg: dict) -> list[str]:
+    """The languages of LANGS the work has a Wikipedia page in, at most cfg['dossier_languages']."""
+    return [l for l in LANGS if f"{l}wiki" in row.sitelinks][:cfg["dossier_languages"]]
+
+
+def dossier_outcome(result: dict, calibration: bool) -> tuple[str, dict]:
+    """Stage 4 on a built dossier: a non-calibration one with no note but the Wikidata one is dropped (it is a list
+    of names, not evidence)."""
+    if not any(n["heading"] != "Wikidata" for n in result["notes"]) and not calibration:
+        return "drop", {"reason": "empty dossier"}
+    return "pass", result
+
+
+def label(wikidata, qid: str, lang: str = "en") -> str | None:
+    return wikidata.entity(qid).get("labels", {}).get(lang, {}).get("value")
+
+
+def inception_year(entity: dict) -> str | None:
+    """The year of the first P571 statement that has one."""
+    for claim in entity.get("claims", {}).get("P571", []):
+        time = claim.get("mainsnak", {}).get("datavalue", {}).get("value", {}).get("time", "")
+        if match := re.match(r"([+-]?)(\d+)-", time):
+            return str(int(match.group(2))) + (" BCE" if match.group(1) == "-" else "")
+    return None
+
+
+def named_fact(entity: dict, prop: str, role: str, labels_of) -> list[str]:
+    """["<role>: <names>"] of the items `prop` states, [] when it states none with a label."""
+    names = [n for q in qids(entity, prop) if (n := labels_of(q))]
+    return [f"{role}: {', '.join(names)}"] if names else []
+
+
+def facts_note(entity: dict, facts: list[str]) -> dict | None:
+    """The dossier's Wikidata note of these facts; None when there are none."""
+    if not facts:
+        return None
+    text = "; ".join(facts)
+    return {"lang": "en", "url": f"https://www.wikidata.org/wiki/{entity.get('id', '')}", "heading": "Wikidata",
+            "text": text[0].upper() + text[1:] + "."}
+
+
 def wikidata_qid(repo, wikidata, lang: str, title: str) -> str | None:
     """The Wikidata QID of the page `title` on the `lang` SeminaVerbi wiki (site id `lang`), through the local
     item's Wikipedia sitelinks, asked of the repository."""

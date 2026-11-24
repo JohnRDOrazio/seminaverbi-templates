@@ -1,4 +1,5 @@
-"""Sacred architecture: the owned classes, Jev's significance wording, triage (stage 2) and candidates (stage 0).
+"""Sacred architecture: the owned classes, Jev's significance wording, triage (stage 2), candidates (stage 0), the
+dossier (stage 4) and calibration.
 
 Sources, tagged on each queue row: ``building`` (the work classes), ``unesco`` (a World Heritage designation, P1435,
 no sitelink floor), ``list`` (the curated works) and ``calibration``. Stage-0 data on a row: ``count`` (sitelinks) and
@@ -14,15 +15,19 @@ common.LIMIT; the endpoint's times vary, the same query took from 12 to 43 s):
     unesco    church building       1-4 sitelinks 185, 1.8 s       5 and more 299, 7.6 s
     unesco    cathedral             1-4 sitelinks 1, 1.9 s         5 and more 84, 4.5 s
     unesco    basilica 113, 10.5 s    chapel 29, 5.5 s    abbey 18, 3.0 s    monastery 74, 7.2 s
-    list      1, 1.2 s
+    list      1, 1.2 s (the Sagrada Família alone)
 
 1,538 buildings and 655 UNESCO ones, 436 of them not among the first. Church building asked in one query with its
 subclasses timed out, and a FILTER EXISTS on the statements, in place of the OPTIONAL, was slower (chapel: 48 s).
 """
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from pathlib import Path
+
+from pipeline import load_config
+from sync import categories
+from sync.wikidata import WikidataClient
 
 from . import benchmark as benchmark_code
 from . import common
@@ -213,3 +218,89 @@ def _finish(queue, arch: dict, cfg: dict, in_flight: bool) -> None:
             first = first or error
     if first is not None and not in_flight:
         raise first
+
+
+# ---- stage 4: the dossier ----
+
+# lower-case fragments of the section headings worth reading, per language (matched at a word start). Kept clear of the
+# headings of the link sections: Italian "altri progetti" and "collegamenti esterni", French "articles connexes".
+HEADINGS: dict[str, tuple[str, ...]] = {
+    "en": ("architectur", "histor", "construction", "design", "plan", "exterior", "interior", "decoration", "art",
+           "iconograph", "symbol", "mosaic", "stained glass", "stained-glass", "sculpture", "façade", "facade",
+           "liturg", "worship", "pilgrimage", "consecration", "dedication", "significance", "interpretation"),
+    "it": ("architettur", "storia", "storic", "costruzion", "progetto", "piant", "esterno", "intern", "decorazion",
+           "arte", "iconografi", "simbol", "mosaic", "vetrat", "scultur", "facciat", "liturgi", "culto",
+           "pellegrinagg", "consacrazion", "dedicazion", "significat", "interpretazion"),
+    "es": ("arquitect", "historia", "históric", "construcci", "diseño", "proyecto", "planta", "exterior", "interior",
+           "decoraci", "arte", "iconograf", "simbol", "símbol", "mosaico", "vidriera", "vitral", "escultur",
+           "fachada", "liturgia", "litúrgic", "culto", "peregrinaci", "consagraci", "dedicaci", "significado",
+           "interpretaci"),
+    "fr": ("architectur", "histoire", "histori", "construction", "conception", "projet", "plan", "extérieur",
+           "intérieur", "décor", "art ", "arts", "œuvre", "iconograph", "symbol", "mosaïque", "vitra", "sculptur",
+           "façade", "facade", "liturgi", "culte", "pèlerinage", "consécration", "dédicace", "signification",
+           "interprétation"),
+    "de": ("architektur", "geschichte", "bau", "entstehung", "entwurf", "planung", "grundriss", "äußer", "außen",
+           "inner", "innen", "ausstattung", "ausmalung", "kunst", "ikonographi", "ikonografi", "symbol", "mosaik",
+           "fenster", "glasfenster", "glasmalerei", "buntglas", "skulptur", "fassade", "liturgi", "gottesdienst",
+           "wallfahrt", "weihe", "patrozinium", "bedeutung", "deutung", "interpretation"),
+    "pt": ("arquitet", "arquitect", "história", "históric", "construç", "projeto", "projecto", "planta", "exterior",
+           "interior", "decoraç", "arte", "iconograf", "simbol", "símbol", "mosaico", "vitra", "escultur", "fachada",
+           "liturgia", "litúrgic", "culto", "peregrinaç", "consagraç", "dedicaç", "significado", "interpretaç"),
+}
+WIKIDATA_FACTS = (("P84", "architect"), ("P149", "style"), ("P140", "religion"), ("P825", "dedicated to"),
+                  ("P131", "location"), ("P571", "date"), ("P1435", "heritage"))
+INCEPTION = "P571"
+
+
+def wikidata_note(entity: dict, labels_of: Callable[[str], str | None]) -> dict | None:
+    """One note of what Wikidata records about the building: architect (P84), style (P149), religion (P140),
+    dedication (P825), location (P131), the year of its inception (P571) and heritage designation (P1435). Names
+    only. None when there is nothing to say, or for a person."""
+    if PERSON in common.qids(entity, "P31"):
+        return None
+    facts = []
+    for prop, role in WIKIDATA_FACTS:
+        if prop != INCEPTION:
+            facts += common.named_fact(entity, prop, role, labels_of)
+        elif year := common.inception_year(entity):
+            facts.append(f"{role}: {year}")
+    return common.facts_note(entity, facts)
+
+
+def dossier(row, cfg: dict, wiki_for, wikidata) -> dict:
+    """Stage 4: research notes {"notes": [{lang, url, heading, text}], "languages": {lang: notes}}.
+
+    Per language (common.dossier_languages): the lead and wanted sections of the building's own page. No part or
+    whole is read: the art a building holds has its own rows. One Wikidata note closes the list."""
+    entity = {**wikidata.entity(row.qid), "id": row.qid}
+    notes: list[dict] = []
+    languages = {}
+    for lang in common.dossier_languages(row, cfg):
+        page = common.read_page(wiki_for(lang, "wikipedia"), row.sitelinks[f"{lang}wiki"], lang, HEADINGS[lang])
+        notes += page
+        languages[lang] = len(page)
+    note = wikidata_note(entity, lambda qid: common.label(wikidata, qid))
+    return {"notes": notes + ([note] if note else []), "languages": languages}
+
+
+def dossier_stage(row, cfg: dict, wiki_for, wikidata) -> tuple[str, dict]:
+    """Stage 4 function for run_stage: a non-calibration row with no Wikipedia note is dropped."""
+    return common.dossier_outcome(dossier(row, cfg, wiki_for, wikidata), row.calibration)
+
+
+# ---- calibration and the benchmark ----
+
+def add_calibration(queue, sparql, qids: list[str], benchmark: list[dict] | None = None) -> int:
+    """Add the buildings SeminaVerbi already covers, flagged as calibration, and every benchmark building (kinds
+    `strong`, `weak` and `control`) held back until `release-benchmark` (see benchmark.add). A benchmark building that
+    is also one of `works` is held back all the same; released, it keeps its `list` source and needs no floor."""
+    benchmark = load_config()["architecture"]["benchmark"] if benchmark is None else benchmark
+    return benchmark_code.add(queue, sparql, "architecture", qids, benchmark, WORK_CLASSES)
+
+
+def calibration_qids(wikis: dict, wikidata=None, tree: dict | None = None) -> tuple[list[str], list[str]]:
+    """Wikidata QIDs of the articles in the sacred architecture category of every wiki, and the 'lang:Title' of those
+    with no local item or no Wikipedia sitelink (reported, never guessed)."""
+    wikidata = wikidata or WikidataClient()
+    tree = tree or categories.load(Path(__file__).resolve().parents[2])
+    return common.calibration_qids(wikis, wikidata, tree, {"sacred-architecture"})
