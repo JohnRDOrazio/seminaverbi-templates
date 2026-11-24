@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 
 from . import common
 
@@ -11,17 +11,21 @@ PERSON = "Q5"
 
 
 def listed(sparql, domain: str, qids: list[str]) -> list[dict]:
+    """All of `iter_listed`."""
+    return list(iter_listed(sparql, domain, qids))
+
+
+def iter_listed(sparql, domain: str, qids: list[str]) -> Iterator[dict]:
     """The curated works by QID: one query per chunk, no class filter (a listed work need not be of a work
-    class), the query limit kept; people are reported and left out."""
-    found: list[dict] = []
+    class), the query limit kept; people are reported and left out. A chunk that fails comes after the rows of the
+    earlier ones."""
     for i in range(0, len(qids), common.CHUNK):
         pattern = f"  VALUES ?item {{ {common.values(qids[i:i + common.CHUNK])} }}"
         for row in common.run_query(sparql, domain, f"listed works {i // common.CHUNK + 1}", common.query(pattern)):
             if PERSON in row.get("types", "").split():
                 print(f"{domain} candidates: {row['item']} is a person, skipped")
             else:
-                found.append(row)
-    return found
+                yield row
 
 
 def released(queue, qid: str) -> bool:
@@ -57,7 +61,8 @@ def add(queue, sparql, domain: str, qids: list[str], benchmark: list[dict], work
     stage-0 data {"benchmark": True, "benchmark_kind": kind} (held back until `release-benchmark`); returns the
     rows added. A QID that answers to no work class, or is a person, is reported and skipped; a benchmark work
     need not be of a work class. A row that already has a status, or belongs to another domain, is left
-    alone (reported)."""
+    alone (reported). A live benchmark row is held first, so that it starts again at stage 1."""
+    hold(queue, domain, benchmark)
     kinds = {b["qid"]: b["kind"] for b in benchmark}
     kinds = {qid: kind for qid, kind in kinds.items()
              if not common.other_domain(queue, qid, domain) and not released(queue, qid)

@@ -211,3 +211,28 @@ def test_calibrate_keeps_the_skip_of_a_benchmark_row(wired):
     sparql = FakeSparql({"VALUES ?item": [item(wired.qid, "Work", 90, wired.cls)]})
     DOMAINS[wired.domain].add_calibration(wired.queue(), sparql, [])
     assert wired.held() and wired.row().data[3] == {"reason": "not now", "skipped": True}
+
+
+def test_calibrate_restarts_a_live_benchmark_row_at_stage_1(wired):
+    wired.live(stage=5)
+    sparql = FakeSparql({"VALUES ?item": [item(wired.qid, "Work", 90, wired.cls)]})
+    DOMAINS[wired.domain].add_calibration(wired.queue(), sparql, [])
+    assert wired.held() and set(wired.row().outcomes) == {0} and "calibration" in wired.row().sources
+
+
+@pytest.mark.parametrize("status, data", [("open", {}), (None, {"released": True})])
+def test_calibrate_leaves_a_released_or_published_benchmark_row_alone(wired, status, data):
+    wired.live(stage=5, **data)
+    if status:
+        wired.queue().set_status(wired.qid, status)
+    sparql = FakeSparql({"VALUES ?item": [item(wired.qid, "Work", 90, wired.cls)]})
+    DOMAINS[wired.domain].add_calibration(wired.queue(), sparql, [])
+    row = wired.row()
+    assert not row.calibration and "benchmark" not in row.data[0] and set(row.outcomes) == set(range(6))
+
+
+def test_a_second_calibrate_keeps_the_outcomes_of_a_held_row(wired):
+    wired.live(stage=5, calibration=True, benchmark=True, benchmark_kind="strong")
+    sparql = FakeSparql({"VALUES ?item": [item(wired.qid, "Work", 90, wired.cls)]})
+    DOMAINS[wired.domain].add_calibration(wired.queue(), sparql, [])
+    assert set(wired.row().outcomes) == set(range(6))

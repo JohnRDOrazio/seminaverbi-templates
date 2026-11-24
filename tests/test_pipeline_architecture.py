@@ -845,3 +845,11 @@ def test_release_benchmark_releases_one_building(q, tmp_path, capsys):
     assert "released Q3" in capsys.readouterr().out
     assert [r.qid for r in q.open_rows("architecture")] == ["Q3"]
     assert q.row("Q2").calibration and q.row("Q4").calibration
+
+
+def test_a_failing_chunk_of_works_keeps_the_earlier_ones_in_order(q):
+    works = [{"qid": f"Q{n}", "name": "x"} for n in range(1000, 1060)]
+    sparql = FailingOn({"VALUES ?item { wd:Q1000 ": counted(("Q1001", 90), ("Q1000", 3))}, "VALUES ?item { wd:Q1050 ")
+    with pytest.raises(RuntimeError, match="timeout"):
+        stage0(q, sparql, works=works)
+    assert order(q) == ["Q1000", "Q1001"] and q.row("Q1000").sources == ["list"]

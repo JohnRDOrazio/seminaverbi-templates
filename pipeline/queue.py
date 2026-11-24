@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS candidates (
     qid TEXT PRIMARY KEY, domain TEXT NOT NULL, sources TEXT NOT NULL,
     labels TEXT NOT NULL, sitelinks TEXT NOT NULL, calibration INTEGER NOT NULL,
     status TEXT, page TEXT, reason TEXT, votes INTEGER, added_at REAL NOT NULL);
+CREATE INDEX IF NOT EXISTS candidates_added_at ON candidates (added_at, qid);
 CREATE TABLE IF NOT EXISTS outcomes (
     qid TEXT NOT NULL, stage INTEGER NOT NULL, outcome TEXT NOT NULL,
     data_json TEXT NOT NULL, at REAL NOT NULL, PRIMARY KEY (qid, stage));

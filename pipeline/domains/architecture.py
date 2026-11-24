@@ -204,7 +204,8 @@ def candidates(queue, sparql, wikipedia, cfg: dict, wikidata=None) -> int:
     found: list[tuple[str, dict]] = []  # (source, row)
     added: list[int] = []
     try:
-        found += [("list", row) for row in benchmark_code.listed(sparql, "architecture", works)]
+        for row in benchmark_code.iter_listed(sparql, "architecture", works):
+            found.append(("list", row))
         for source, label, query in _queries(sparql, arch, floor):
             for row in common.run_query(sparql, "architecture", label, query):
                 if PERSON in row.get("types", "").split():
