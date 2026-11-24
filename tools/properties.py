@@ -1,6 +1,6 @@
 """python -m tools.properties [--apply]
 
-Ensures the two properties that file SeminaVerbi articles exist on the en repository: SV field (the
+Ensures the two properties that file SeminaVerbi articles exist on the repository wiki: SV field (the
 article's one field in the category tree) and SV Gospel theme (its Gospel themes). An existing property
 with the same English label is reused. With --apply the missing ones are created and the IDs written to
 config/wikibase.json (keys sv_field, sv_theme); without it nothing is written.
@@ -14,7 +14,7 @@ import os
 import sys
 from pathlib import Path
 
-from sync.wiki import SyncError, WikiClient
+from sync.wiki import SyncError, WikiClient, repo_client
 
 ROOT = Path(__file__).resolve().parent.parent
 WIKIBASE = ROOT / "config" / "wikibase.json"
@@ -70,7 +70,7 @@ def main(argv=None, repo=None) -> int:
     args = parser.parse_args(argv)
     try:
         if repo is None:
-            repo = WikiClient("en")
+            repo = repo_client(factory=WikiClient)
             if args.apply:
                 repo.login(os.environ["SV_EDITOR_USER"], os.environ["SV_EDITOR_PASSWORD"])
         ids = ensure(repo, args.apply)

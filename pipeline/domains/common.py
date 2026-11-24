@@ -10,7 +10,7 @@ from typing import Iterable
 from urllib.parse import unquote
 
 from sync import categories
-from sync.wiki import SyncError
+from sync.wiki import SyncError, repo_client
 
 LANGS = ("en", "it", "es", "fr", "de", "pt")
 SAINT_PROPERTY = "P411"
@@ -155,7 +155,7 @@ def calibration_qids(wikis: dict, wikidata, tree: dict, roots: set[str]) -> tupl
     """Wikidata QIDs of the articles in the categories of `roots` (and their descendants) on every wiki, and
     the 'lang:Title' of those with no local item or no Wikipedia sitelink (reported, never guessed)."""
     keys = field_keys(tree, roots)
-    repo = wikis["en"]  # the farm's Wikibase repository: the client wikis have no wbgetentities
+    repo = repo_client(wikis)  # the farm's Wikibase repository: the client wikis have no wbgetentities
     qids: list[str] = []
     unmapped: list[str] = []
     for lang, wiki in wikis.items():

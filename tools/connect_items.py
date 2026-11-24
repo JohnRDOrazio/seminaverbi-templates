@@ -43,14 +43,14 @@ from typing import NamedTuple
 import mwparserfromhell
 
 from sync.pages import LANGS
-from sync.wiki import SyncError, WikiClient
+from sync.wiki import SyncError, WikiClient, repo_client
 from sync.wikidata import WikidataClient
 from tools.imports import (WIKIPEDIA, import_command, local_copy as _local_copy, page_key, parse_import_log,
                            sitelink_clash)
 
 ROOT = Path(__file__).resolve().parent.parent
 TAG = "seminaverbi-mcp"
-# the repository is en: its edit summaries are in English
+# edits of the items have English summaries
 SUMMARY = json.loads((ROOT / "i18n" / "en.json").read_text(encoding="utf-8"))["connect_summary"]
 MAIN_PAGE_ITEM = "Q4"
 DEFAULT_MAIN_PAGE = "Main Page"  # MediaWiki's default, left over on wikis whose main page is localized
@@ -525,10 +525,10 @@ def main(argv=None, repo=None, clients=None, wikidata=None, classify=None, out=p
     try:
         if clients is None:
             clients = {lang: WikiClient(lang) for lang in LANGS}
-            repo = clients["en"]
+            repo = repo_client(clients, WikiClient)
             if args.apply:
                 user, password = os.environ["SV_EDITOR_USER"], os.environ["SV_EDITOR_PASSWORD"]
-                for client in clients.values():
+                for client in {id(c): c for c in [*clients.values(), repo]}.values():
                     client.login(user, password)
         wikidata = wikidata or WikidataClient()
         articles, connected = gather(clients, repo, langs)  # all wikis' items, only --wiki's page texts

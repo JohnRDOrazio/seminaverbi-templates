@@ -33,7 +33,7 @@ from pipeline.press import store as press_store
 from pipeline.press.store import PressStore
 from pipeline.queue import Queue
 from sync import categories
-from sync.wiki import SyncError, WikiClient
+from sync.wiki import SyncError, WikiClient, repo_client
 
 DEFAULT_DB = "data/pipeline.sqlite"
 LANGS = stages.LANGS
@@ -64,6 +64,10 @@ def _wikis() -> dict:
     return {lang: WikiClient(lang) for lang in LANGS}
 
 
+def _repo(wikis: dict) -> WikiClient:
+    return repo_client(wikis, WikiClient)
+
+
 def _judge(queue):
     from pipeline.judge import Judge
     from tools import jev
@@ -81,7 +85,7 @@ def _login_editor() -> WikiClient:
     except KeyError as exc:
         raise CliError(f"{exc.args[0]} is not set; this command writes to the wiki and needs the editor bot "
                        "(run it through ~/.config/seminaverbi/runeditor.py)") from None
-    en = WikiClient("en")
+    en = WikiClient("en")  # pages only: proposals and the press lists are on the English wiki
     en.login(user, password)
     return en
 
@@ -123,6 +127,11 @@ def _stage_functions(domain, queue, cfg) -> dict:
     def wikis():
         return lazy.setdefault("wikis", _wikis())
 
+    def repo():
+        if "repo" not in lazy:
+            lazy["repo"] = _repo(wikis())
+        return lazy["repo"]
+
     def judge():
         return lazy.setdefault("judge", _judge(queue))
 
@@ -155,7 +164,7 @@ def _stage_functions(domain, queue, cfg) -> dict:
         return outcome, data
 
     return {
-        1: lambda row: (getattr(domain, "covered", None) or stages.covered)(row, wikis()["en"], wikis()),
+        1: lambda row: (getattr(domain, "covered", None) or stages.covered)(row, repo(), wikis()),
         2: _triage_stage(domain, cfg),
         3: lambda row: stages.quick(row, judge(), wiki_for),
         4: dossier,
@@ -174,7 +183,9 @@ def cmd_candidates(args, queue, cfg):
 
         def covered(row):  # stage 1 for an open whole that gains parts; the wikis are made when first needed
             wikis = lazy.setdefault("wikis", _wikis())
-            return domain.covered(row, wikis["en"], wikis)
+            if "repo" not in lazy:
+                lazy["repo"] = _repo(wikis)
+            return domain.covered(row, lazy["repo"], wikis)
         extra["covered"] = covered
     added = domain.candidates(queue, _sparql(), _wikipedia("en"), cfg, _wikidata(), **extra)
     print(f"candidates: {added} added")
@@ -183,7 +194,7 @@ def cmd_candidates(args, queue, cfg):
     if not any(m.domain == waiting for m in press.mentions(route="waiting")):
         return
     wikis = _wikis()
-    released = release_waiting(press, queue, args.domain, wikis["en"], wikis, _wikidata(), _sparql())
+    released = release_waiting(press, queue, args.domain, _repo(wikis), wikis, _wikidata(), _sparql())
     if released:
         print(f"candidates: press mentions released from waiting: {released.get('candidate', 0)} as candidates, "
               f"{released.get('enrichment', 0)} to the enrichment list")
@@ -331,6 +342,11 @@ def cmd_press(args, queue, cfg):
     def wikis():
         return lazy.setdefault("wikis", _wikis())
 
+    def repo():
+        if "repo" not in lazy:
+            lazy["repo"] = _repo(wikis())
+        return lazy["repo"]
+
     if action in ("discover", "run"):
         print("press discover: " + _counts(press_stages.run_discover(store, client, pcfg)))
         if action == "discover" and dry:
@@ -345,17 +361,17 @@ def cmd_press(args, queue, cfg):
         reconcile(store, queue)
     if action in ("route", "run"):
         if dry:
-            print("\n".join(press_stages.preview(store, wikis()["en"], wikis(), wikidata(), _sparql(), queue)))
+            print("\n".join(press_stages.preview(store, repo(), wikis(), wikidata(), _sparql(), queue)))
         else:
-            print("press route: " + _counts(route(store, queue, wikis()["en"], wikis(), wikidata(), _sparql())))
+            print("press route: " + _counts(route(store, queue, repo(), wikis(), wikidata(), _sparql())))
     if action in ("enrich", "run") and not dry:
-        titles = press_stages.titles(store, wikis()["en"], wikidata())
+        titles = press_stages.titles(store, repo(), wikidata())
         written = publish_enrichment(store, editor, outlets, titles)
         print("press enrich: " + ("page written" if written else "page unchanged"))
     elif action == "enrich":
         current = wikis()["en"].revision(ENRICH_TITLE)
         print(enrichment(store, outlets, current[1] if current else None,
-                         press_stages.titles(store, wikis()["en"], wikidata())))
+                         press_stages.titles(store, repo(), wikidata())))
     if client is not None:
         _refused(client, kept)
     if action == "run" and not dry:

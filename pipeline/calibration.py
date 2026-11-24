@@ -6,6 +6,7 @@ from pipeline import load_config
 from pipeline.publish import display_name
 from pipeline.stages import THEME_KEEP, _local_item, direct
 from sync import categories
+from sync.wiki import repo_client
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -65,17 +66,17 @@ def _verdict(row, result: dict, quick_drop: float) -> str:
     return "would be proposed"
 
 
-def _row_block(row, wiki, props, keys, ancestors, quick_drop) -> str:
+def _row_block(row, repo, props, keys, ancestors, quick_drop) -> str:
     lines = [f"### {_cell(display_name(row))} ({row.qid})", "", "| | Jev | SeminaVerbi item |", "| --- | --- | --- |"]
     result = row.data.get(5)
     if not result:
         return "\n".join(lines + ["| result | not judged (no stage 5 outcome) | |"])
-    item = _local_item(row, wiki)
+    item = _local_item(row, repo)
     item_field: set[str] = set()
     item_themes: set[str] = set()
     if item:
-        item_field = {keys.get(q, q) for q in wiki.item_values(item, props["sv_field"])}
-        item_themes = {keys.get(q, q) for q in wiki.item_values(item, props["sv_theme"])}
+        item_field = {keys.get(q, q) for q in repo.item_values(item, props["sv_field"])}
+        item_themes = {keys.get(q, q) for q in repo.item_values(item, props["sv_theme"])}
     lines.append(f"| verdict | {_verdict(row, result, quick_drop)} | |")
     conn = result["connection"]
     p = conn.get("probabilities", {}).get(conn["choice"])
@@ -104,10 +105,10 @@ def report(queue, wikis, tree=None, unmapped=()) -> str:
     keys = _item_keys(tree)
     ancestors = _ancestors(tree)
     quick_drop = load_config()["quick_drop"]
-    wiki = wikis["en"]
+    repo = repo_client(wikis)
     rows = sorted((r for r in queue.calibration_rows()), key=lambda r: r.qid)
     blocks = ["# Calibration report", ""]
-    blocks += [_row_block(r, wiki, props, keys, ancestors, quick_drop) + "\n" for r in rows]
+    blocks += [_row_block(r, repo, props, keys, ancestors, quick_drop) + "\n" for r in rows]
     if not rows:
         blocks.append("No calibration rows.\n")
     blocks.append("## Pages not mapped to a Wikidata item\n")
