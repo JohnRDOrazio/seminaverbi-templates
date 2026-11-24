@@ -402,6 +402,19 @@ def _recheck_open_whole(queue, whole_qid: str, domain: str, recheck) -> None:
               f"retired; decline or redirect {row.page} by hand")
 
 
+def retriage(queue, domain: str, triage, cfg: dict) -> int:
+    """Stage 2 again for the rows of `domain` dropped by triage that a later source may now exempt (a floor drop that
+    gained `unesco`): a row with no status, not calibration, whose stage-2 outcome is `drop` and which `triage`, on
+    the row as stored now, passes has its outcomes from stage 2 on cleared. A row with a status is never touched.
+    Returns how many were cleared."""
+    cleared = 0
+    for row in queue.open_rows(domain):
+        if row.outcomes.get(2) == "drop" and triage(row, cfg)[0] == "pass":
+            queue.redo(2, row.qid)
+            cleared += 1
+    return cleared
+
+
 def recheck_pending(queue, domain: str, recheck) -> None:
     """Re-check every open, unretired whole of `domain` whose earlier check did not complete."""
     for row in queue.by_status("open"):

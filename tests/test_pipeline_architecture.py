@@ -265,3 +265,89 @@ def test_the_benchmark_is_held_even_when_a_later_source_fails(q):
         stage0(q, sparql, benchmark=[{"qid": "Q1", "name": "x", "kind": "strong"}])
     row = q.row("Q1")
     assert row.calibration and row.data[0]["benchmark"] and row.data[0]["benchmark_kind"] == "strong"
+
+
+# --- retriage ---
+
+def dropped(q, qid="Q1", sources=("building",), count=3, instance_of=("Q16970",), status=None):
+    q.add(qid, "architecture", sources[0], {}, {}, False, {"count": count, "instance_of": list(instance_of)})
+    for extra in sources[1:]:
+        q.add(qid, "architecture", extra, {}, {}, False)
+    q.set_outcome(qid, 1, "pass")
+    q.set_outcome(qid, 2, "drop", {"reason": "x"})
+    if status:
+        q.set_status(qid, status)
+
+
+def test_a_floor_drop_that_gained_unesco_is_triaged_again(q):
+    dropped(q)
+    q.add("Q1", "architecture", "unesco", {}, {}, False)
+    assert common.retriage(q, "architecture", architecture.triage, CFG) == 1
+    assert 2 not in q.row("Q1").outcomes and q.row("Q1").outcomes[1] == "pass"
+
+
+@pytest.mark.parametrize("status", ["open", "declined"])
+def test_a_row_with_a_status_keeps_its_outcomes(q, status):
+    dropped(q, sources=("building", "unesco"), status=status)
+    assert common.retriage(q, "architecture", architecture.triage, CFG) == 0
+    assert q.row("Q1").outcomes[2] == "drop"
+
+
+def test_a_person_stays_dropped(q):
+    dropped(q, sources=("building", "unesco"), instance_of=("Q5", "Q16970"))
+    assert common.retriage(q, "architecture", architecture.triage, CFG) == 0
+    assert q.row("Q1").outcomes[2] == "drop"
+
+
+def test_a_row_still_under_the_floor_stays_dropped(q):
+    dropped(q)
+    assert common.retriage(q, "architecture", architecture.triage, CFG) == 0
+    assert q.row("Q1").outcomes[2] == "drop"
+
+
+def test_retriage_leaves_other_domains_calibration_and_other_outcomes(q):
+    dropped(q, "Q1", sources=("building", "unesco"))
+    q.set_domain("Q1", "art")
+    dropped(q, "Q2", sources=("building", "unesco"))
+    q.set_outcome("Q2", 2, "translation")
+    assert common.retriage(q, "architecture", architecture.triage, CFG) == 0
+    assert q.row("Q1").outcomes[2] == "drop" and q.row("Q2").outcomes[2] == "translation"
+
+
+def test_retriage_never_triages_a_row_with_a_status(q):
+    dropped(q, status="open")
+    calls = []
+    common.retriage(q, "architecture", lambda row, cfg: calls.append(row.qid) or ("pass", ""), CFG)
+    assert calls == []
+
+
+def test_candidates_clears_a_floor_drop_when_unesco_arrives(q):
+    dropped(q)
+    sparql = FakeSparql({"wdt:P1435": [item("Q1", "A", 3, "Q16970")]})
+    stage0(q, sparql)
+    assert 2 not in q.row("Q1").outcomes
+
+
+def test_a_run_that_raised_in_retriage_is_cleared_by_the_next(q, monkeypatch):
+    dropped(q)
+    sparql = FakeSparql({"wdt:P1435": [item("Q1", "A", 3, "Q16970")]})
+    real = common.retriage
+
+    def boom(*args):
+        raise RuntimeError("retriage failed")
+
+    monkeypatch.setattr(common, "retriage", boom)
+    with pytest.raises(RuntimeError, match="retriage failed"):
+        stage0(q, sparql)
+    assert "unesco" in q.row("Q1").sources and q.row("Q1").outcomes[2] == "drop"
+    monkeypatch.setattr(common, "retriage", real)
+    stage0(q, sparql)
+    assert 2 not in q.row("Q1").outcomes
+
+
+def test_a_failed_source_still_retriages_and_the_error_propagates(q):
+    dropped(q)
+    sparql = FailingOn({"wdt:P1435": [item("Q1", "A", 3, "Q16970")]}, "VALUES ?item { wd:Q3 }")
+    with pytest.raises(RuntimeError, match="timeout"):
+        stage0(q, sparql, works=[{"qid": "Q3", "name": "C"}])
+    assert "unesco" in q.row("Q1").sources and 2 not in q.row("Q1").outcomes

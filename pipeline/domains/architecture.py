@@ -192,5 +192,8 @@ def candidates(queue, sparql, wikipedia, cfg: dict, wikidata=None) -> int:
         for row in benchmark_code.listed(sparql, "architecture", [w["qid"] for w in arch["works"]]):
             added += _add(queue, row, "list")
     finally:  # a failed source keeps the rows already written: the benchmark works among them are held all the same
-        benchmark_code.hold(queue, "architecture", arch.get("benchmark", []))
+        try:
+            benchmark_code.hold(queue, "architecture", arch.get("benchmark", []))
+        finally:  # a floor drop that gained `unesco` is triaged again, whatever failed before
+            common.retriage(queue, "architecture", triage, common.domain_config(cfg, "architecture"))
     return added
