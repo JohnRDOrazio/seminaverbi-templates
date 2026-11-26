@@ -88,13 +88,15 @@ Jev's quick question asks about significance, as art's does. A building already 
 there, and the press gives an item that is both an artwork and a building to art. Decisions (design:
 `docs/superpowers/specs/2026-11-23-sacred-architecture-design.md`):
 
-- Churches and cathedrals are Christian by definition and need no statement. A basilica, chapel, abbey or monastery
-  needs a Christian religion (P140, `architecture.christian_religions`), or a dedication (P825) when it states no
-  religion. A building of any class whose stated religions are none of them Christian is left out. The press routes by
-  class alone, so a non-Christian monastery it mentions may become a candidate, for Jev's questions to reject.
-- Hagia Sophia and other buildings now of another class or religion come only through `architecture.works`, where no
-  class or religion is asked. A listed building that is also in the benchmark, as Hagia Sophia and the Sagrada Família
-  are, is held back like the rest of it; once released, it keeps its `list` source and needs no floor.
+- Catholic buildings only (`architecture.catholic_religions`: the Catholic Church, the Latin Church and the Eastern
+  Catholic churches). A building of any class is Catholic when one of its stated religions (P140) is one of them, a
+  church shared with another confession included; or, when it states none, when its diocese (P708 or P5607) does. A
+  dedication proves nothing, and Christianity in general or the Byzantine Rite is not Catholic. The press routes by
+  class, then the same test is asked of the entity (`press_stage0`, data `catholic`), and triage drops a building
+  that fails it, whatever its press evidence.
+- A building of another religion today, such as Hagia Sophia, comes only through `architecture.works`, where no class
+  or religion is asked; none is listed now. A listed building that is also in the benchmark, as the Sagrada Família
+  is, is held back like the rest of it; once released, it keeps its `list` source and needs no floor.
 - The dossier reads a building's own pages only: the art in it stays in `art`, and no part is folded. A wanted heading
   brings its subsections, up to a limit of characters per heading; the leads come first, then art and liturgy,
   architecture and history, because Jev is sent the start of a long dossier.

@@ -8,7 +8,8 @@ from test_pipeline_art import time_claim
 from test_pipeline_film import FakeSparql, FakeWikidataEntities, entity, item, wiki_for_pages
 
 CFG = {"sitelink_floor": 15}
-PROOF_CLASSES = ("Q163687", "Q108325", "Q160742", "Q44613")
+PROOF_CLASSES = ("Q163687", "Q108325", "Q160742", "Q44613")  # asked in one band
+CATHOLIC = ["Q9592", "Q1841"]
 
 
 # --- triage ---
@@ -48,6 +49,17 @@ def test_a_museum_or_ruin_that_is_also_a_church_passes():
     assert architecture.triage(arow(["building"], 30, ["Q33506", "Q109607", "Q16970"]), CFG) == ("pass", "")
 
 
+@pytest.mark.parametrize("sources", [["press:sir"], ["unesco"], ["list"], ["building"]])
+def test_a_building_found_not_catholic_is_dropped_whatever_its_source(sources):
+    assert architecture.triage(arow(sources, 90, catholic=False, press={"u": 0.9}), CFG) == (
+        "drop", "not a Catholic building")
+
+
+def test_a_building_found_catholic_or_never_checked_passes():
+    assert architecture.triage(arow(["press:sir"], 3, catholic=True, press={"u": 0.9}), CFG) == ("pass", "")
+    assert architecture.triage(arow(["building"], 30), CFG) == ("pass", "")
+
+
 def test_calibration_always_passes():
     assert architecture.triage(arow(["calibration"], 1, ["Q5"], calibration=True), CFG) == ("pass", "calibration")
 
@@ -64,20 +76,72 @@ def test_owns(tmp_path):
 
 def test_classes_questions_and_press():
     assert architecture.WORK_CLASSES == ("Q16970", "Q2977", "Q163687", "Q108325", "Q160742", "Q44613")
-    assert architecture.CHRISTIAN_BY_CLASS == ("Q16970", "Q2977")
+    assert architecture.BANDED == ("Q16970", "Q2977")
     assert "an ordinary parish church, however old, does not" in architecture.QUESTIONS["plausible"]
     assert set(architecture.QUESTIONS["connections"]) == {"direct", "seeds", "entertainment", "none"}
-    assert architecture.press_stage0("Q1", {"claims": {"P527": []}}, None) == {}
+
+
+class Dioceses(FakeSparql):
+    """A FakeSparql whose diocese query answers a row when it names one of `catholic`."""
+
+    def __init__(self, catholic=()):
+        super().__init__({f"VALUES ?diocese {{ wd:{d} }}": [{"diocese": d}] for d in catholic})
+
+
+@pytest.mark.parametrize("religions,expected", [(["Q9592"], True), (["Q597526"], True), (["Q64900"], True),
+                                                (["Q35032", "Q1841"], True), (["Q35032"], False),
+                                                (["Q82708"], False), (["Q432"], False)])
+def test_press_stage0_reads_the_stated_religions(religions, expected):
+    sparql = Dioceses()
+    assert architecture.press_stage0("Q1", entity("B", P140=religions, P708=["Q7"]), sparql) == {"catholic": expected}
+    assert sparql.queries == []  # a stated religion decides: the diocese is not asked
+
+
+def test_press_stage0_asks_the_diocese_of_a_building_that_states_no_religion():
+    assert architecture.press_stage0("Q1", entity("B", P708=["Q7"]), Dioceses(["Q7"])) == {"catholic": True}
+    assert architecture.press_stage0("Q1", entity("B", P5607=["Q7"]), Dioceses(["Q7"])) == {"catholic": True}
+    sparql = Dioceses()
+    assert architecture.press_stage0("Q1", entity("B", P708=["Q8"]), sparql) == {"catholic": False}
+    assert "VALUES ?diocese { wd:Q8 }" in sparql.queries[0] and "wd:Q9592" in sparql.queries[0]
+
+
+def test_press_stage0_without_religion_or_diocese_is_not_catholic():
+    sparql = Dioceses()
+    assert architecture.press_stage0("Q1", entity("B"), sparql) == {"catholic": False}
+    assert sparql.queries == []
+
+
+def test_press_stage0_an_unknown_religion_is_stated_and_a_novalue_is_not():
+    """As WDQS's wdt:P140 reads them: `somevalue` binds ?stated (no diocese fallback), `novalue` binds nothing."""
+    for snaktype, expected, asked in (("somevalue", False, 0), ("novalue", True, 1)):
+        ent = entity("B", P708=["Q7"])
+        ent["claims"]["P140"] = [{"mainsnak": {"snaktype": snaktype}, "rank": "normal"}]
+        sparql = Dioceses(["Q7"])
+        assert architecture.press_stage0("Q1", ent, sparql) == {"catholic": expected}
+        assert len(sparql.queries) == asked
+
+
+def test_press_stage0_reads_the_best_rank_only():
+    ent = entity("B", P140=["Q9592", "Q35032"])
+    ent["claims"]["P140"][0]["rank"] = "deprecated"
+    assert architecture.press_stage0("Q1", ent, Dioceses()) == {"catholic": False}
+    ent["claims"]["P140"][1]["rank"] = "preferred"
+    ent["claims"]["P140"][0]["rank"] = "normal"
+    assert architecture.press_stage0("Q1", ent, Dioceses()) == {"catholic": False}
 
 
 def test_config_block():
     cfg = load_config()["architecture"]
     assert cfg["sitelink_floor"] == 15 and cfg["unesco"] == ["Q9259", "Q43113623"]
-    assert cfg["works"] == [{"qid": "Q48435", "name": "Sagrada Família"}, {"qid": "Q12506", "name": "Hagia Sophia"}]
-    religions = cfg["christian_religions"]
-    assert len(religions) == len(set(religions))
-    assert {"Q5043", "Q1841", "Q3333484", "Q75809", "Q6423963"} <= set(religions)
-    assert not {"Q432", "Q483654", "Q9268", "Q748", "Q46825", "Q66085482"} & set(religions)
+    assert cfg["works"] == [{"qid": "Q48435", "name": "Sagrada Família"}]
+    assert "christian_religions" not in cfg
+    religions = cfg["catholic_religions"]
+    assert len(religions) == len(set(religions)) == 30
+    assert {"Q9592", "Q1841", "Q7361618", "Q597526", "Q17549077", "Q49376", "Q1546359", "Q64900", "Q472189",
+            "Q64871", "Q3443559"} <= set(religions)
+    # Christianity in general, the Byzantine Rite (Orthodox too), Orthodox, Protestant and other confessions
+    assert not {"Q5043", "Q617075", "Q3333484", "Q35032", "Q383258", "Q683724", "Q75809", "Q6423963", "Q82708",
+                "Q42504", "Q106687", "Q432"} & set(religions)
 
 
 # --- stage 0: candidates ---
@@ -108,25 +172,23 @@ def of_class(queries, cls):
     return [x for x in queries if f"?cls IN (wd:{cls})" in x]
 
 
-def test_only_the_four_classes_need_a_statement_of_the_building(q):
-    sparql = FakeSparql()
-    stage0(q, sparql)
-    for queries in asked(sparql):
-        for cls in architecture.CHRISTIAN_BY_CLASS:
-            assert of_class(queries, cls)
-            assert not any("P825" in x for x in of_class(queries, cls))
-        for cls in PROOF_CLASSES:
-            assert of_class(queries, cls)
-            assert all("FILTER(BOUND(?religion) || EXISTS { ?item wdt:P825 [] })" in x for x in of_class(queries, cls))
+CATHOLIC_TEST = ("  OPTIONAL { ?item wdt:P140 ?religion . FILTER(?religion IN (wd:Q1841, wd:Q9592)) }\n"
+                 "  OPTIONAL { ?item wdt:P140 ?stated }\n"
+                 "  OPTIONAL { ?item wdt:P708|wdt:P5607 ?diocese . ?diocese wdt:P140 ?faith ."
+                 " FILTER(?faith IN (wd:Q1841, wd:Q9592)) }\n"
+                 "  FILTER(BOUND(?religion) || (!BOUND(?stated) && BOUND(?diocese)))\n")
 
 
-def test_every_query_leaves_out_a_stated_other_religion(q):
+def test_every_query_of_every_class_asks_for_a_catholic_building(q):
+    """A Catholic religion among the stated ones, or none stated and a Catholic diocese; a dedication proves
+    nothing."""
     sparql = FakeSparql()
-    stage0(q, sparql, christian_religions=["Q5043", "Q1841"])
-    excluded = ("  OPTIONAL { ?item wdt:P140 ?religion }\n"
-                "  FILTER(!BOUND(?religion) || ?religion IN (wd:Q1841, wd:Q5043))\n")
+    stage0(q, sparql, catholic_religions=CATHOLIC)
     building, unesco = asked(sparql)
-    assert building and unesco and all(excluded in x for x in building + unesco)
+    for queries in (building, unesco):
+        for cls in architecture.WORK_CLASSES:
+            assert of_class(queries, cls) and all(CATHOLIC_TEST in x for x in of_class(queries, cls))
+    assert not any("P825" in x for x in building + unesco)
 
 
 def test_building_queries_carry_the_floor(q):
@@ -141,7 +203,7 @@ def test_churches_and_cathedrals_are_asked_in_two_bands_that_meet(q):
     sparql = FakeSparql()
     stage0(q, sparql)
     building, unesco = asked(sparql)
-    for cls in architecture.CHRISTIAN_BY_CLASS:
+    for cls in architecture.BANDED:
         low, high = of_class(building, cls)
         assert "FILTER(?sitelinks >= 15)" in low and "FILTER(?sitelinks < 20)" in low
         assert "FILTER(?sitelinks >= 20)" in high and "?sitelinks <" not in high
@@ -162,14 +224,14 @@ def test_unesco_queries_have_both_designations_and_no_floor(q):
     assert all("wd:Q9259" in x and "wd:Q43113623" in x and "FILTER(?sitelinks >= 15)" not in x for x in unesco)
     assert all(len(of_class(unesco, c)) == 1 and "FILTER(?sitelinks >= 1)" in of_class(unesco, c)[0]
                for c in PROOF_CLASSES)
-    for cls in architecture.CHRISTIAN_BY_CLASS:
+    for cls in architecture.BANDED:
         low, high = of_class(unesco, cls)
         assert "FILTER(?sitelinks >= 1)" in low and "FILTER(?sitelinks < 5)" in low
         assert "FILTER(?sitelinks >= 5)" in high and "?sitelinks <" not in high
 
 
 def test_a_nested_work_class_is_asked_by_its_own_query_only(q):
-    # on Wikidata chapel and basilica are subclasses of church building: asked as churches they would need no proof
+    # on Wikidata chapel and basilica are subclasses of church building: each class is asked once
     sparql = FakeSparql({
         "wdt:P279* wd:Q16970": [{"sub": s} for s in ("Q16970", "Q2977", "Q108325", "Q746310", "Q1457501")],
         "wdt:P279* wd:Q108325": [{"sub": s} for s in ("Q108325", "Q1457501")],
@@ -234,25 +296,26 @@ def test_a_building_queued_under_art_is_left_unchanged(q, capsys):
 
 
 class Triples:
-    """Answers a class-bounded query from items {qid: religions} as its religion test reads: an item is kept when
-    one of its P140 values is in the list, or it has none."""
+    """Answers a class-bounded query from items {qid: (religions, diocese religion)} as its Catholic test reads."""
 
-    def __init__(self, religions):
-        self.religions = religions
+    def __init__(self, items):
+        self.items = items
 
     def select(self, query):
         if "ORDER BY DESC(?sitelinks)" not in query:
             return []
-        test = query.split("|| ?religion IN (")[1].split(")")[0]
+        test = query.split("FILTER(?religion IN (")[1].split(")")[0]
         taken = {x.strip().removeprefix("wd:") for x in test.split(",")}
-        return [item(qid, qid, 30, "Q16970") for qid, has in self.religions.items()
-                if not has or taken & set(has)]
+        return [item(qid, qid, 30, "Q16970") for qid, (has, diocese) in self.items.items()
+                if taken & set(has) or (not has and diocese in taken)]
 
 
-def test_a_converted_church_with_two_religions_is_added(q):
-    stage0(q, Triples({"Q1": ["Q432", "Q1841"], "Q2": ["Q432"], "Q3": []}))
-    assert q.row("Q1").sources == ["building", "unesco"]
-    assert q.row("Q2") is None and q.row("Q3") is not None
+def test_the_catholic_test_on_stated_religions_and_dioceses(q):
+    stage0(q, Triples({"Q1": (["Q432", "Q1841"], None), "Q2": (["Q432"], None), "Q3": ([], None),
+                       "Q4": ([], "Q9592"), "Q5": (["Q35032"], "Q9592"), "Q6": ([], "Q35032")}))
+    assert q.row("Q1").sources == ["building", "unesco"]  # a converted or shared church
+    assert q.row("Q4") is not None  # no religion stated, in a Catholic diocese
+    assert all(q.row(x) is None for x in ("Q2", "Q3", "Q5", "Q6"))
 
 
 class FailingOn(FakeSparql):
@@ -806,16 +869,16 @@ def test_the_configured_benchmark():
     bench = load_config()["architecture"]["benchmark"]
     assert len({b["qid"] for b in bench}) == len(bench) == 18
     assert {kind: {b["qid"] for b in bench if b["kind"] == kind} for kind in ("strong", "weak", "control")} == {
-        "strong": {"Q48435", "Q180274", "Q2981", "Q12506", "Q193193", "Q638250", "Q721817", "Q1303856", "Q12512",
+        "strong": {"Q48435", "Q180274", "Q2981", "Q186282", "Q193193", "Q638250", "Q721817", "Q1303856", "Q12512",
                    "Q963954", "Q187702"},
-        "weak": {"Q493133", "Q624556", "Q254476", "Q3082361"},
+        "weak": {"Q493133", "Q624556", "Q254476", "Q167538"},
         "control": {"Q243", "Q45178", "Q179199"}}
     assert all(b["name"] for b in bench)
 
 
 @pytest.mark.parametrize("calibrate_first", [False, True])
 def test_a_listed_work_of_the_benchmark_is_held_back_until_its_release(q, calibrate_first):
-    """Hagia Sophia is in `works` and in the benchmark: the benchmark wins, whatever the order of the commands; once
+    """A building in `works` and in the benchmark (Hagia Sophia here, as test data): the benchmark wins, whatever the order of the commands; once
     released it is a candidate with the `list` source, so the floor does not apply."""
     hagia = [{"qid": "Q12506", "name": "Hagia Sophia", "kind": "strong"}]
     sparql = FakeSparql({"VALUES ?item { wd:Q12506 }": [item("Q12506", "Hagia Sophia", 3, "Q32815")]})

@@ -5,20 +5,22 @@ Sources, tagged on each queue row: ``building`` (the work classes), ``unesco`` (
 no sitelink floor), ``list`` (the curated works) and ``calibration``. Stage-0 data on a row: ``count`` (sitelinks) and
 ``instance_of`` (P31 QIDs).
 
-The queries on live WDQS, 2026-11-24, floor 15, one attempt each, 6 s apart: rows and seconds (none timed out or reached
-common.LIMIT; the endpoint's times vary, the same query took from 12 to 43 s):
+The queries on live WDQS, 2026-11-26, floor 15, Catholic buildings only, 6 s apart: rows and seconds (none reached
+common.LIMIT; the endpoint's times vary, the same query took from 5 to 110 s, with the client's retries, and the
+slowest one 17 and 54 s when asked again):
 
-    building  church building       15-19 sitelinks 243, 20.6 s    20 and more 268, 42.3 s
-    building  its subclasses        15-19 sitelinks 156,  5.1 s    20 and more 188, 13.2 s
-    building  cathedral             15-19 sitelinks 258,  5.0 s    20 and more 359, 43.8 s
-    building  basilica 275, 10.7 s    chapel 51, 7.6 s    abbey 80, 19.2 s    monastery 220, 17.2 s
-    unesco    church building       1-4 sitelinks 185, 1.8 s       5 and more 299, 7.6 s
-    unesco    cathedral             1-4 sitelinks 1, 1.9 s         5 and more 84, 4.5 s
-    unesco    basilica 113, 10.5 s    chapel 29, 5.5 s    abbey 18, 3.0 s    monastery 74, 7.2 s
-    list      1, 1.2 s (the Sagrada Família alone)
+    building  church building       15-19 sitelinks 165, 33.2 s    20 and more 173, 5.5-110 s
+    building  its subclasses        15-19 sitelinks  90,  8.3 s    20 and more 114,  4.0 s
+    building  cathedral             15-19 sitelinks 181, 16.0 s    20 and more 224, 12.4 s
+    building  basilica 270, 4.2 s    chapel 44, 7.6 s    abbey 85, 4.4 s    monastery 90, 4.6 s
+    unesco    church building       1-4 sitelinks 122, 2.8 s       5 and more 204, 4.9 s
+    unesco    cathedral             1-4 sitelinks 0, 2.5 s         5 and more 70, 5.0 s
+    unesco    basilica 109, 3.1 s    chapel 25, 3.3 s    abbey 21, 4.3 s    monastery 36, 1.9 s
+    list      1 (the Sagrada Família alone)
 
-1,538 buildings and 655 UNESCO ones, 436 of them not among the first. Church building asked in one query with its
-subclasses timed out, and a FILTER EXISTS on the statements, in place of the OPTIONAL, was slower (chapel: 48 s).
+971 buildings and 451 UNESCO ones, 310 of them not among the first (with every Christian confession, 2026-11-24:
+1,538 and 655, 436). Church building asked in one query with its subclasses timed out, and a FILTER EXISTS on the
+statements, in place of the OPTIONAL, was slower (chapel: 48 s).
 """
 from __future__ import annotations
 
@@ -37,43 +39,30 @@ from .benchmark import PERSON
 # Church building, cathedral, basilica, chapel, abbey, monastery.
 WORK_CLASSES: tuple[str, ...] = ("Q16970", "Q2977", "Q163687", "Q108325", "Q160742", "Q44613")
 CHURCH = "Q16970"
-CHRISTIAN_BY_CLASS: tuple[str, ...] = (CHURCH, "Q2977")  # Christian by definition: no statement is asked of them
+BANDED: tuple[str, ...] = (CHURCH, "Q2977")  # asked in two sitelink bands (BANDS): their queries come near the limit
 
-# config/pipeline.json, `architecture.christian_religions`: the P140 values of the items of the work classes (their
-# closures, WDQS, 2026-11-24) that are Christianity or a Christian confession, rite or order. The query, once per
-# class:
-#   SELECT ?r (SAMPLE(?lab) AS ?l) (COUNT(DISTINCT ?item) AS ?n) WHERE { hint:Query hint:optimizer "None" .
-#     VALUES ?cls { <the class closure> } ?item wdt:P31 ?cls . ?item wikibase:sitelinks ?s . FILTER(?s >= 15)
-#     ?item wdt:P140 ?r . OPTIONAL { ?r rdfs:label ?lab FILTER(LANG(?lab) = "en") } } GROUP BY ?r
-# Five came from the same query without the floor, on the items with a P1435 of `unesco` (the UNESCO
-# buildings below the floor have them): Q856349, Q844083, Q329344, Q894479, Q106687. Kept:
-# Q5043 Christianity, Q1841 Catholicism, Q9592 Catholic Church, Q7361618 Roman Catholic, Q597526 Latin Church, Q617075
-# Byzantine Rite, Q472189 Ukrainian Greek Catholic Church, Q64885 Melkite Greek Catholic Church, Q64842 Armenian
-# Catholic Church, Q64900 Maronite Church, Q657390 Ruthenian Greek Catholic Church, Q64868 Chaldean Catholic Church,
-# Q755970 Syriac Catholic Church, Q856349 Romanian Greek Catholic Church, Q3333484 Eastern Orthodoxy, Q35032 Eastern
-# Orthodox Church, Q383258 orthodoxy, Q7970362 Greek Orthodoxy, Q211004 Ecumenical Patriarchate of Constantinople,
-# Q632602 Greek Orthodox Patriarchate of Jerusalem, Q192173 Georgian Orthodox Church, Q188814 Serbian Orthodox Church,
-# Q60995 Russian Orthodox Church, Q181901 Romanian Orthodox Church, Q242758 Bulgarian Orthodox Church, Q906685
-# Macedonian Orthodox Church, Q752474 Ukrainian Orthodox Church (Moscow Patriarchate), Q59493657 Orthodox Church of
-# Ukraine, Q463406 Polish Orthodox Church, Q598783 Belarusian Orthodox Church, Q248559 Moldovan Orthodox Church,
-# Q59778 Church of Greece, Q59776 Church of Cyprus, Q475683 Orthodox Church of the Czech Lands and Slovakia, Q255670
-# Orthodox Church in Japan (Moscow Patriarchate), Q683724 Armenian Apostolic Church, Q198998 Coptic Orthodox Church,
-# Q179829 Ethiopian Orthodox Tewahedo Church, Q844083 Eritrean Orthodox Tewahedo Church, Q210540 Syriac Orthodox
-# Church, Q23540 Protestantism, Q75809 Lutheranism, Q6423963 Anglicanism, Q82708 Church of England, Q682443 Episcopal
-# Church, Q922480 Church of Scotland, Q170111 Protestant Church in Germany, Q666860 Church of Norway, Q749243 Church
-# of Sweden, Q855585 Church of Denmark, Q1379849 Evangelical Lutheran Church of Finland, Q1413245 Church of Iceland,
-# Q1379796 Evangelical Church of the Augsburg Confession in Poland, Q329344 Evangelical Church of Augustan Confession
-# in Romania, Q391951 Protestant Church in the Netherlands, Q338309 Protestant Church of Switzerland, Q426316 United
-# Church of Christ, Q463455 American Baptist Churches USA, Q194253 Evangelicalism, Q49830 Continental Reformed
-# Protestantism, Q101849 Reformed Christianity, Q966577 united and uniting churches, Q2060869 Czechoslovak Hussite
-# Church, Q894479 Bosnian Church, Q42504 The Church of Jesus Christ of Latter-day Saints, Q106687 Unitarianism.
-# Q383258 (orthodoxy) is the concept, found only on Uspenski Cathedral, for Eastern Orthodoxy. Q42504 and Q106687 are
-# kept as confessions that call themselves Christian. Left out as other religions: Q432 Islam, Q483654 Sunni Islam,
-# Q9268 Judaism, Q748 Buddhism, Q319218 Gelug, Q848771 Nyingma, Q784270 Drukpa Lineage, Q650035 Sakya, Q132265
-# Theravāda, Q1571776 Rimé movement, Q471187 Kagyu, Q483889 Tibetan Buddhism, Q4098001 Buddhist Traditional Sangha of
-# Russia, Q588362 Kadam, Q940709 Chan Buddhism, and Q1622507 Unitarian Universalism, which is not a Christian
-# confession. Left out as no religion at all: Q46825 Gothic art and Q66085482, a web page (the one cathedral with it
-# has Q1841 too).
+# Catholic buildings only (the author's ruling, 2026-11-26). config/pipeline.json, `architecture.catholic_religions`: the
+# P140 values that name the Catholic Church, the Latin Church or an Eastern Catholic church sui iuris. Measured on
+# WDQS, 2026-11-26: the values found on the items of the work classes, and every P140 value that is part of (P361)
+# the Catholic Church on an item with 5 sitelinks or more:
+#   SELECT ?r (COUNT(DISTINCT ?i) AS ?n) WHERE { ?r wdt:P361 wd:Q9592 . ?i wdt:P140 ?r ; wikibase:sitelinks ?s .
+#     FILTER(?s >= 5) } GROUP BY ?r
+# Q1841 Catholicism, Q9592 Catholic Church, Q7361618 Roman Catholic, Q597526 Latin Church, Q17549077 Catholic, Q49376
+# Eastern Catholic Churches, Q1546359 Byzantine Catholic Churches, Q64900 Maronite, Q472189 Ukrainian Greek Catholic,
+# Q856349 Romanian Greek Catholic, Q64842 Armenian Catholic, Q64868 Chaldean, Q755970 Syriac Catholic, Q64885 Melkite,
+# Q911398 Slovak Greek Catholic, Q657390 Ruthenian, Q49378 Coptic Catholic, Q64871 Syro-Malabar, Q950310 Hungarian
+# Greek Catholic, Q792212 Belarusian Greek Catholic, Q846093 Italo-Albanian, Q256178 Syro-Malankara, Q64852 Russian
+# Greek Catholic, Q3586020 Greek Catholic Church of Croatia and Serbia, Q2664136 Bulgarian Greek Catholic, Q44476
+# Greek Byzantine Catholic, Q18813575 Eritrean Catholic, Q64849 Ethiopian Catholic, Q519571 Albanian Greek Catholic,
+# Q3443559 Macedonian Greek Catholic. Left out: Q5043 Christianity and Q617075 Byzantine Rite (neither says
+# Catholic), and every Orthodox, Oriental Orthodox, Protestant and other confession.
+#
+# A building is Catholic when one of its stated religions (best rank) is one of them, a church shared with another
+# confession (the Holy Sepulchre) or built Catholic and later also used by another included; or, when it states no
+# religion, when its diocese (P708, or P5607 ecclesiastical territorial entity) states one of them. Measured the same
+# day, 15 sitelinks or more: church building 332 Catholic, 162 another religion, 33 none (6 of them in a Catholic
+# diocese); cathedral 162 Catholic, 56 another, none without. A dedication (P825) proves nothing.
+# Buildings of another religion today, as Hagia Sophia, come only through `architecture.works` (none listed now).
 
 # Churches and cathedrals pass common.LIMIT in one query, or come near it: each source asks them in two, below and from
 # this many sitelinks.
@@ -100,9 +89,31 @@ QUESTIONS = {
 }
 
 
+def _best_claims(entity: dict, prop: str) -> list[dict]:
+    """The claims of `prop` at their best rank, as WDQS's wdt: gives them (preferred, else normal), without the
+    `novalue` ones, which wdt: does not give either; a `somevalue` (unknown) claim stays, as wdt: binds it."""
+    claims = [c for c in entity.get("claims", {}).get(prop, []) if c.get("rank", "normal") != "deprecated"]
+    best = [c for c in claims if c.get("rank") == "preferred"] or claims
+    return [c for c in best if c.get("mainsnak", {}).get("snaktype", "value") != "novalue"]
+
+
+def _best(entity: dict, prop: str) -> list[str]:
+    """The item values of `prop` at their best rank."""
+    return common.qids({"claims": {prop: _best_claims(entity, prop)}}, prop)
+
+
 def press_stage0(qid: str, entity: dict, sparql) -> dict:
-    """No stage-0 data: a building has no parts to fold."""
-    return {}
+    """`catholic`, for a building the press brings (no query of stage 0 found it): the test of `_catholic`, on the
+    entity, asking WDQS only for the religion of its dioceses. A building has no parts to fold."""
+    religions = set(load_config()["architecture"]["catholic_religions"])
+    if _best_claims(entity, "P140"):  # a stated religion decides, an unknown one too
+        return {"catholic": bool(religions & set(_best(entity, "P140")))}
+    dioceses = _best(entity, "P708") + _best(entity, "P5607")
+    if not dioceses:
+        return {"catholic": False}
+    rows = sparql.select(f"SELECT ?diocese WHERE {{ VALUES ?diocese {{ {common.values(dioceses)} }}\n"
+                         f"  ?diocese wdt:P140 ?faith . FILTER(?faith IN ({common.one_of(religions)})) }} LIMIT 1")
+    return {"catholic": bool(rows)}
 
 
 def owns(instance_of: Iterable[str], sparql, cache: Path | None = None) -> bool:
@@ -111,13 +122,16 @@ def owns(instance_of: Iterable[str], sparql, cache: Path | None = None) -> bool:
 
 
 def triage(row, cfg: dict) -> tuple[str, str]:
-    """Stage 2: ('drop', reason) for a person, or a row under the sitelink floor (a `unesco` or `list` row, and one
+    """Stage 2: ('drop', reason) for a person, a building the press brought that is not Catholic, or a row under
+    the sitelink floor (a `unesco` or `list` row, and one
     with a kept press mention, pass without a floor). Calibration always passes."""
     if row.calibration:
         return "pass", "calibration"
     data = row.data.get(0, {})
     if PERSON in data.get("instance_of", []):
         return "drop", "a person, not a work"
+    if data.get("catholic") is False:
+        return "drop", "not a Catholic building"
     if {"unesco", "list"} & set(row.sources) or common.press_exempt(row):
         return "pass", ""
     count = data.get("count", 0)
@@ -129,7 +143,7 @@ def triage(row, cfg: dict) -> tuple[str, str]:
 def _branches(sparql) -> dict[str, set[str]]:
     """Work class -> its closure, without the closure of any work class nested in it. On Wikidata chapel, basilica
     and cathedral are subclasses of church building, and abbey of monastery: each is asked by its own query, so that
-    a chapel does not enter as a church, with no proof that it is Christian. Reported on stderr, when it stops being so:
+    no class is asked twice (and churches, asked in two bands, stay within the limit). Reported on stderr, when it stops being so:
     a work class inside another one nested in it (a P279 cycle), which no query asks any more, and a branch too large
     for a list of classes, whose query walks the subclasses of the nested ones too."""
     closures = {cls: common.class_closure(sparql, [cls]) for cls in WORK_CLASSES}
@@ -146,18 +160,20 @@ def _branches(sparql) -> dict[str, set[str]]:
     return branches
 
 
-def _christian(cls: str, religions: Iterable[str]) -> str:
-    """The Christian test of an item of `cls`: no P140, or one of `religions` among its P140 values (a converted
-    church may have two); outside CHRISTIAN_BY_CLASS an item with no P140 must have a dedication (P825)."""
-    test = ("  OPTIONAL { ?item wdt:P140 ?religion }\n"
-            f"  FILTER(!BOUND(?religion) || ?religion IN ({common.one_of(religions)}))\n")
-    return test if cls in CHRISTIAN_BY_CLASS else test + "  FILTER(BOUND(?religion) || EXISTS { ?item wdt:P825 [] })\n"
+def _catholic(religions: Iterable[str]) -> str:
+    """The Catholic test of an item (see `catholic_religions` above): a Catholic religion among the stated ones, or
+    none stated and a Catholic diocese."""
+    listed = common.one_of(religions)
+    return (f"  OPTIONAL {{ ?item wdt:P140 ?religion . FILTER(?religion IN ({listed})) }}\n"
+            "  OPTIONAL { ?item wdt:P140 ?stated }\n"
+            f"  OPTIONAL {{ ?item wdt:P708|wdt:P5607 ?diocese . ?diocese wdt:P140 ?faith . FILTER(?faith IN ({listed})) }}\n"
+            "  FILTER(BOUND(?religion) || (!BOUND(?stated) && BOUND(?diocese)))\n")
 
 
 def _bands(source: str, cls: str, floor: int) -> list[tuple[int, str]]:
     """The (floor, test on ?sitelinks) of each query of a source and class."""
     split = BANDS[source]
-    if cls not in CHRISTIAN_BY_CLASS or floor >= split:
+    if cls not in BANDED or floor >= split:
         return [(floor, "")]
     return [(floor, f"  FILTER(?sitelinks < {split})\n"), (split, "")]
 
@@ -179,7 +195,7 @@ def _queries(sparql, arch: dict, floor: int) -> Iterator[tuple[str, str, str]]:
     branches = _branches(sparql)
     for source, lowest in (("building", floor), ("unesco", 1)):
         for cls, branch in branches.items():
-            test = _christian(cls, arch["christian_religions"])
+            test = _catholic(arch["catholic_religions"])
             for label, pattern, kinds in _patterns(source, cls, branch, arch):
                 for low, band in _bands(source, cls, lowest):
                     yield source, f"{source} from {low} sitelinks ({label})", common.bounded(

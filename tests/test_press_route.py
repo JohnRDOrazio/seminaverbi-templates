@@ -308,10 +308,10 @@ def route_building(q, store, qid, entity):
 
 
 def test_a_church_becomes_an_architecture_candidate_with_its_press_evidence(q, store, uncovered, closure_cache):
-    assert route_building(q, store, "Q20", building_ent("Church", "Q16970")) == {"candidate": 1}
+    assert route_building(q, store, "Q20", building_ent("Church", "Q16970", religion="Q9592")) == {"candidate": 1}
     r = q.row("Q20")
     assert (r.domain, r.sources) == ("architecture", ["press:sir"])
-    assert r.data[0] == {"count": 1, "instance_of": ["Q16970"], "press": {"sir": 0.8}}
+    assert r.data[0] == {"count": 1, "instance_of": ["Q16970"], "catholic": True, "press": {"sir": 0.8}}
     assert [row.domain for row in uncovered] == ["architecture"]
     m = store.mentions()[0]
     assert (m.domain, m.route) == ("architecture", "candidate")
@@ -333,15 +333,18 @@ def test_a_chapel_queued_under_art_stays_there(q, store, uncovered, closure_cach
     assert "already a art candidate, routed as art" in capsys.readouterr().err
 
 
-def test_a_buddhist_monastery_in_the_press_becomes_a_candidate(q, store, uncovered, closure_cache):
-    """Accepted: the press routes by class alone, so the Christian test of the domain's own queries is not asked;
-    such a row goes on to Jev's significance and connection questions, which are to reject it."""
-    entity = building_ent("Monastery", "Q44613", religion="Q748")
+@pytest.mark.parametrize("religion", ["Q748", "Q35032", "Q82708", None])
+def test_a_building_in_the_press_that_is_not_catholic_is_dropped_at_triage(q, store, uncovered, closure_cache,
+                                                                              religion):
+    """The press routes by class alone; stage 0's Catholic test is asked of the entity (a Buddhist monastery, an
+    Orthodox or Anglican church, a church stating no religion and no diocese), and triage drops it, whatever its
+    press evidence."""
+    entity = building_ent("Monastery", "Q44613", religion=religion)
     assert route_building(q, store, "Q22", entity) == {"candidate": 1}
     r = q.row("Q22")
-    assert (r.domain, r.sources) == ("architecture", ["press:sir"])
+    assert (r.domain, r.sources) == ("architecture", ["press:sir"]) and r.data[0]["catholic"] is False
     cfg = common.domain_config(load_config(), "architecture")
-    assert architecture.triage(r, cfg) == ("pass", "")
+    assert architecture.triage(r, cfg) == ("drop", "not a Catholic building")
 
 
 def test_a_qid_of_another_domains_row_is_routed_under_that_domain(q, store, uncovered):
