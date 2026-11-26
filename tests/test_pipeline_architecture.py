@@ -111,6 +111,16 @@ def test_press_stage0_without_religion_or_diocese_is_not_catholic():
     assert sparql.queries == []
 
 
+def test_press_stage0_an_unknown_religion_is_stated_and_a_novalue_is_not():
+    """As WDQS's wdt:P140 reads them: `somevalue` binds ?stated (no diocese fallback), `novalue` binds nothing."""
+    for snaktype, expected, asked in (("somevalue", False, 0), ("novalue", True, 1)):
+        ent = entity("B", P708=["Q7"])
+        ent["claims"]["P140"] = [{"mainsnak": {"snaktype": snaktype}, "rank": "normal"}]
+        sparql = Dioceses(["Q7"])
+        assert architecture.press_stage0("Q1", ent, sparql) == {"catholic": expected}
+        assert len(sparql.queries) == asked
+
+
 def test_press_stage0_reads_the_best_rank_only():
     ent = entity("B", P140=["Q9592", "Q35032"])
     ent["claims"]["P140"][0]["rank"] = "deprecated"

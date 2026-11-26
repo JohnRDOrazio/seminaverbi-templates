@@ -89,20 +89,25 @@ QUESTIONS = {
 }
 
 
-def _best(entity: dict, prop: str) -> list[str]:
-    """The item values of `prop` at their best rank, as WDQS's wdt: gives them (preferred, else normal)."""
+def _best_claims(entity: dict, prop: str) -> list[dict]:
+    """The claims of `prop` at their best rank, as WDQS's wdt: gives them (preferred, else normal), without the
+    `novalue` ones, which wdt: does not give either; a `somevalue` (unknown) claim stays, as wdt: binds it."""
     claims = [c for c in entity.get("claims", {}).get(prop, []) if c.get("rank", "normal") != "deprecated"]
-    preferred = [c for c in claims if c.get("rank") == "preferred"]
-    return common.qids({"claims": {prop: preferred or claims}}, prop)
+    best = [c for c in claims if c.get("rank") == "preferred"] or claims
+    return [c for c in best if c.get("mainsnak", {}).get("snaktype", "value") != "novalue"]
+
+
+def _best(entity: dict, prop: str) -> list[str]:
+    """The item values of `prop` at their best rank."""
+    return common.qids({"claims": {prop: _best_claims(entity, prop)}}, prop)
 
 
 def press_stage0(qid: str, entity: dict, sparql) -> dict:
     """`catholic`, for a building the press brings (no query of stage 0 found it): the test of `_catholic`, on the
     entity, asking WDQS only for the religion of its dioceses. A building has no parts to fold."""
     religions = set(load_config()["architecture"]["catholic_religions"])
-    stated = _best(entity, "P140")
-    if stated:
-        return {"catholic": bool(religions & set(stated))}
+    if _best_claims(entity, "P140"):  # a stated religion decides, an unknown one too
+        return {"catholic": bool(religions & set(_best(entity, "P140")))}
     dioceses = _best(entity, "P708") + _best(entity, "P5607")
     if not dioceses:
         return {"catholic": False}
