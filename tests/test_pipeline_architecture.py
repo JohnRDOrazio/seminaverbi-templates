@@ -133,7 +133,7 @@ def test_press_stage0_reads_the_best_rank_only():
 def test_config_block():
     cfg = load_config()["architecture"]
     assert cfg["sitelink_floor"] == 15 and cfg["unesco"] == ["Q9259", "Q43113623"]
-    assert cfg["works"] == [{"qid": "Q48435", "name": "Sagrada Família"}]
+    assert cfg["works"] == [{"qid": "Q48435", "name": "Sagrada Família"}, {"qid": "Q12506", "name": "Hagia Sophia"}]
     assert "christian_religions" not in cfg
     religions = cfg["catholic_religions"]
     assert len(religions) == len(set(religions)) == 30

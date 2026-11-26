@@ -205,7 +205,7 @@
                            "Q950310", "Q792212", "Q846093", "Q256178", "Q64852", "Q3586020", "Q2664136", "Q44476",
                            "Q18813575", "Q64849", "Q519571", "Q3443559"],
     "unesco": ["Q9259", "Q43113623"],
-    "works": [{"qid": "Q48435", "name": "Sagrada Família"}],
+    "works": [{"qid": "Q48435", "name": "Sagrada Família"}, {"qid": "Q12506", "name": "Hagia Sophia"}],
     "benchmark": [
       {"qid": "Q48435", "name": "Sagrada Família", "kind": "strong"},
       {"qid": "Q180274", "name": "Chartres Cathedral", "kind": "strong"},

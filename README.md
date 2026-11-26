@@ -94,8 +94,9 @@ there, and the press gives an item that is both an artwork and a building to art
   dedication proves nothing, and Christianity in general or the Byzantine Rite is not Catholic. The press routes by
   class, then the same test is asked of the entity (`press_stage0`, data `catholic`), and triage drops a building
   that fails it, whatever its press evidence.
-- A building of another religion today, such as Hagia Sophia, comes only through `architecture.works`, where no class
-  or religion is asked; none is listed now. A listed building that is also in the benchmark, as the Sagrada Família
+- A building of another religion today comes only through `architecture.works`, where no class or religion is asked:
+  Hagia Sophia, now a mosque, is listed for its place among the first great Christian basilicas and its Byzantine
+  mosaics. A listed building that is also in the benchmark, as the Sagrada Família
   is, is held back like the rest of it; once released, it keeps its `list` source and needs no floor.
 - The dossier reads a building's own pages only: the art in it stays in `art`, and no part is folded. A wanted heading
   brings its subsections, up to a limit of characters per heading; the leads come first, then art and liturgy,

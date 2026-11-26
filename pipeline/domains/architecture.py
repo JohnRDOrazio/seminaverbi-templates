@@ -62,7 +62,8 @@ BANDED: tuple[str, ...] = (CHURCH, "Q2977")  # asked in two sitelink bands (BAND
 # religion, when its diocese (P708, or P5607 ecclesiastical territorial entity) states one of them. Measured the same
 # day, 15 sitelinks or more: church building 332 Catholic, 162 another religion, 33 none (6 of them in a Catholic
 # diocese); cathedral 162 Catholic, 56 another, none without. A dedication (P825) proves nothing.
-# Buildings of another religion today, as Hagia Sophia, come only through `architecture.works` (none listed now).
+# Buildings of another religion today come only through `architecture.works`: Hagia Sophia (a mosque since 2020),
+# for its place among the first great Christian basilicas and its Byzantine mosaics (the author, 2026-11-26).
 
 # Churches and cathedrals pass common.LIMIT in one query, or come near it: each source asks them in two, below and from
 # this many sitelinks.
